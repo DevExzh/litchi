@@ -4,7 +4,8 @@ use super::{
     buffer::ElementBuffer,
     path::PathBuilder,
     state::{
-        Brush, Canvas, ClipRule, DashPattern, DeviceContext, Font, GdiObject, Pen, RenderState,
+        Brush, Canvas, ClipRule, ClipShape, DashPattern, DeviceContext, Font, GdiObject, Pen,
+        RenderState,
     },
 };
 use crate::emf::{
@@ -16,9 +17,9 @@ use crate::svg_utils::{ClipGrouper, write_num, write_xml_escaped};
 use crate::{
     dib::{ColorUsage, Dib, DibLimits},
     metafile_bitmap::{
-        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, RasterComposite, Rop2,
-        Rop2Paint, Rop3, StretchPolicy, convex_outlines_overlap, is_convex, parse_emf_object_dib,
-        xor_bracket_paint,
+        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, MAX_BRACKET_OUTLINE_VERTICES,
+        MAX_BRACKET_SHAPES, RasterComposite, Rop2, Rop2Paint, Rop3, StretchPolicy,
+        convex_outlines_overlap, is_convex, parse_emf_object_dib, xor_bracket_paint,
     },
     text_charset::DecodedText,
 };
@@ -776,7 +777,12 @@ impl<'a> EmfSvgConverter<'a> {
                 let builder = state.take_path().ok_or_else(|| {
                     Error::ParseError("SelectClipPath without a completed path".into())
                 })?;
-                if !state.install_clip(&builder.build(), ClipRule::NonZero, mode) {
+                let path = builder.build();
+                if !state.install_clip(
+                    ClipShape::Path(&path, ClipRule::NonZero),
+                    mode,
+                    self.canvas(),
+                ) {
                     return unsupported(
                         kind,
                         "requested region combine mode is not faithfully representable",
@@ -867,20 +873,24 @@ impl<'a> EmfSvgConverter<'a> {
             // Clipping and regions.
             EmrType::IntersectClipRect | EmrType::ExcludeClipRect => {
                 let rect = read_record::<RectL>(data, kind)?;
-                let (path, rule) = if kind == EmrType::IntersectClipRect {
+                let canvas = self.canvas();
+                let installed = if kind == EmrType::IntersectClipRect {
                     // An empty rectangle leaves an empty clip region, which
                     // hides everything drawn through it.
-                    (
-                        rectangle_outline(rect, &state.dc).build(),
-                        ClipRule::NonZero,
-                    )
+                    let outline = rectangle_outline(rect, &state.dc);
+                    match device_rect(rect, &state.dc) {
+                        Some(device) => state.install_clip(ClipShape::Rect(device), 1, canvas),
+                        None => state.install_clip(
+                            ClipShape::Path(&outline.build(), ClipRule::NonZero),
+                            1,
+                            canvas,
+                        ),
+                    }
                 } else {
-                    (
-                        exclusion_path(rect, &state.dc, self.canvas())?,
-                        ClipRule::EvenOdd,
-                    )
+                    let path = exclusion_path(rect, &state.dc, canvas)?;
+                    state.install_clip(ClipShape::Path(&path, ClipRule::EvenOdd), 1, canvas)
                 };
-                if !state.install_clip(&path, rule, 1) {
+                if !installed {
                     return unsupported(kind, "clip combine mode");
                 }
                 Ok(Vec::new())
@@ -907,7 +917,7 @@ impl<'a> EmfSvgConverter<'a> {
                     if mode != 5 {
                         return malformed(kind, "empty region requires RGN_COPY");
                     }
-                    state.dc.clip_id = None;
+                    state.clear_clip();
                     return Ok(Vec::new());
                 }
                 let end = 8usize
@@ -923,7 +933,11 @@ impl<'a> EmfSvgConverter<'a> {
                     self.limits.max_path_points,
                     self.limits.max_output_bytes,
                 )?;
-                if !state.install_clip(&path, ClipRule::NonZero, mode) {
+                let shape = match region_rect(&data[8..end], &state.dc) {
+                    Some(rect) => ClipShape::Rect(rect),
+                    None => ClipShape::Path(&path, ClipRule::NonZero),
+                };
+                if !state.install_clip(shape, mode, self.canvas()) {
                     return unsupported(
                         kind,
                         "requested region combine mode is not faithfully representable",
@@ -1359,8 +1373,12 @@ impl<'a> EmfSvgConverter<'a> {
                     outline,
                 };
                 let Some(bracket) = &mut state.xor_bracket else {
+                    if shape.element.len() > self.limits.max_output_bytes {
+                        return Err(xor_bracket_failure());
+                    }
                     state.xor_bracket = Some(XorBracket {
                         matrix,
+                        bytes: shape.element.len(),
                         first: vec![shape],
                         middle: None,
                         matched: 0,
@@ -1372,6 +1390,15 @@ impl<'a> EmfSvgConverter<'a> {
                     return Err(xor_bracket_failure());
                 }
                 if bracket.middle.is_none() {
+                    // The fills wait outside every output limit until the
+                    // bracket completes, so the bracket bounds them itself.
+                    bracket.bytes = bracket.bytes.saturating_add(shape.element.len());
+                    if bracket.first.len() >= MAX_BRACKET_SHAPES
+                        || bracket.bytes > self.limits.max_output_bytes
+                    {
+                        state.xor_bracket = None;
+                        return Err(xor_bracket_failure());
+                    }
                     bracket.first.push(shape);
                     return Ok(Vec::new());
                 }
@@ -1394,6 +1421,11 @@ impl<'a> EmfSvgConverter<'a> {
             },
             BracketShape::Middle(middle) => {
                 if let Some(bracket) = &mut state.xor_bracket {
+                    bracket.bytes = bracket.bytes.saturating_add(element.len());
+                    if bracket.bytes > self.limits.max_output_bytes {
+                        state.xor_bracket = None;
+                        return Err(xor_bracket_failure());
+                    }
                     bracket.middle = Some((element, middle, outline));
                 }
                 Ok(Vec::new())
@@ -1420,7 +1452,7 @@ impl<'a> EmfSvgConverter<'a> {
                 .map(|shape| shape.outline.as_deref())
                 .collect::<Option<Vec<_>>>()
                 .ok_or_else(xor_bracket_failure)?;
-            if outlines.len() > 4096 || convex_outlines_overlap(&outlines) {
+            if convex_outlines_overlap(&outlines) {
                 return Err(xor_bracket_failure());
             }
         }
@@ -2422,6 +2454,8 @@ pub(super) enum XorMiddle {
 #[derive(Debug, Clone)]
 pub(super) struct XorBracket {
     matrix: [f64; 6],
+    /// Bytes of the waiting fill and middle elements.
+    bytes: usize,
     first: Vec<XorShape>,
     /// The middle elements, with [`XOR_FILL`] as their fill, their paint and
     /// their logical outline, when the record has one.
@@ -2448,14 +2482,16 @@ fn xor_fills_cover(fills: &[XorShape], middle: Option<&[(i64, i64)]>) -> bool {
             },
         )
     };
+    // Exact for `i32` coordinates: each product stays below 2^62 and at
+    // most [`MAX_BRACKET_OUTLINE_VERTICES`] terms are added.
     let doubled_area = |outline: &[(i64, i64)]| {
-        let mut sum = 0i64;
+        let mut sum = 0i128;
         for index in 0..outline.len() {
             let (x0, y0) = outline[index];
             let (x1, y1) = outline[(index + 1) % outline.len()];
-            sum = sum.saturating_add(x0.saturating_mul(y1).saturating_sub(x1.saturating_mul(y0)));
+            sum += i128::from(x0) * i128::from(y1) - i128::from(x1) * i128::from(y0);
         }
-        sum.saturating_abs()
+        sum.abs()
     };
     let (Some(middle), Some(outlines)) = (
         middle,
@@ -2482,15 +2518,13 @@ fn xor_fills_cover(fills: &[XorShape], middle: Option<&[(i64, i64)]>) -> bool {
     };
     // Disjoint fills tile their bounds exactly when their areas add up to
     // its area; both sides are doubled to stay in integers.
-    let area = outlines.iter().try_fold(0i64, |total, outline| {
-        total.checked_add(doubled_area(outline))
-    });
-    let cover_area = (cover[2] - cover[0])
-        .checked_mul(cover[3] - cover[1])
-        .and_then(|value| value.checked_mul(2));
+    let area = outlines
+        .iter()
+        .map(|outline| doubled_area(outline))
+        .sum::<i128>();
+    let cover_area = 2 * i128::from(cover[2] - cover[0]) * i128::from(cover[3] - cover[1]);
     let inner = bounds(middle);
-    area.is_some()
-        && area == cover_area
+    area == cover_area
         && inner[0] >= cover[0]
         && inner[1] >= cover[1]
         && inner[2] <= cover[2]
@@ -2575,7 +2609,8 @@ fn rop3_as_rop2(rop3: Rop3) -> Rop2 {
 }
 
 /// The convex outline of a rectangle or polygon record in logical
-/// coordinates, or `None` for other records and non-convex polygons.
+/// coordinates, or `None` for other records, non-convex polygons and
+/// polygons with more than [`MAX_BRACKET_OUTLINE_VERTICES`] vertices.
 fn logical_outline(record: &EmfRecord) -> Option<Vec<(i64, i64)>> {
     let data: &[u8] = &record.data;
     let int = |offset: usize| -> Option<i64> {
@@ -2595,13 +2630,19 @@ fn logical_outline(record: &EmfRecord) -> Option<Vec<(i64, i64)>> {
         },
         EmrType::Polygon => {
             let count = usize::try_from(int(16)?).ok()?;
-            (0..count.min(MAX_RECORD_ITEMS))
+            if count > MAX_BRACKET_OUTLINE_VERTICES {
+                return None;
+            }
+            (0..count)
                 .map(|index| Some((int(20 + index * 8)?, int(24 + index * 8)?)))
                 .collect::<Option<Vec<_>>>()?
         },
         EmrType::Polygon16 => {
             let count = usize::try_from(int(16)?).ok()?;
-            (0..count.min(MAX_RECORD_ITEMS))
+            if count > MAX_BRACKET_OUTLINE_VERTICES {
+                return None;
+            }
+            (0..count)
                 .map(|index| Some((short(20 + index * 4)?, short(22 + index * 4)?)))
                 .collect::<Option<Vec<_>>>()?
         },
@@ -2811,6 +2852,39 @@ fn rectangle_path(rect: RectL, dc: &DeviceContext) -> Result<PathBuilder> {
         return Err(Error::ParseError("empty EMF rectangle".into()));
     }
     Ok(rectangle_outline(rect, dc))
+}
+
+/// The device-space rectangle `[left, top, right, bottom]` that `rect`
+/// maps to, when the mapping keeps it axis-aligned.
+fn device_rect(rect: RectL, dc: &DeviceContext) -> Option<[f64; 4]> {
+    let [a, b, c, d] = [
+        (rect.left, rect.top),
+        (rect.right, rect.top),
+        (rect.right, rect.bottom),
+        (rect.left, rect.bottom),
+    ]
+    .map(|point| transform(point, dc));
+    let aligned = (a.1 == b.1 && b.0 == c.0 && c.1 == d.1 && d.0 == a.0)
+        || (a.0 == b.0 && b.1 == c.1 && c.0 == d.0 && d.1 == a.1);
+    let values = [a.0, a.1, c.0, c.1];
+    (aligned && values.iter().all(|value| value.is_finite()))
+        .then(|| [a.0.min(c.0), a.1.min(c.1), a.0.max(c.0), a.1.max(c.1)])
+}
+
+/// The device-space rectangle of a region that holds exactly one
+/// rectangle, when the mapping keeps it axis-aligned.
+fn region_rect(data: &[u8], dc: &DeviceContext) -> Option<[f64; 4]> {
+    let field = |offset: usize| {
+        Some(u32::from_le_bytes(
+            data.get(offset..offset + 4)?.try_into().ok()?,
+        ))
+    };
+    let header_size = usize::try_from(field(0)?).ok()?;
+    if field(8)? != 1 {
+        return None;
+    }
+    let rect = read_record::<RectL>(data.get(header_size..)?, EmrType::ExtSelectClipRgn).ok()?;
+    device_rect(rect, dc)
 }
 
 /// The closed outline of a rectangle, which has no area when two opposite
@@ -3873,6 +3947,32 @@ mod tests {
     }
 
     #[test]
+    fn nested_rectangle_clips_render_as_one_clip() {
+        let mut records = (0..5_000)
+            .map(|step| clip_rect(step % 5, 0, 100 - step % 5, 90))
+            .collect::<Vec<_>>();
+        records.extend(black_filled_canvas());
+        records.push(clip_rect(0, 0, 100, 100));
+        records.extend(black_filled_canvas());
+        let bytes = classic_emf(records.clone());
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        let svg = EmfSvgConverter::new(&parser).convert().unwrap();
+        // One clip definition per distinct region, none referencing another;
+        // both fills share the last one.
+        let (defs, body) = svg.split_once("</defs>").unwrap();
+        assert_eq!(defs.matches("<clipPath").count(), 5, "{defs}");
+        assert!(!defs.contains("clip-path="), "{defs}");
+        assert_eq!(
+            body.matches("clip-path=\"url(#emf-clip-4)\"").count(),
+            1,
+            "{body}"
+        );
+
+        // The intersection is x 4..96, y 0..90.
+        assert_eq!(painted_pixels(records), 92 * 90);
+    }
+
+    #[test]
     fn offset_clip_moves_the_installed_region() {
         let mut records = vec![clip_rect(0, 0, 50, 50), offset_clip(80, 80)];
         records.extend(black_filled_canvas());
@@ -4156,6 +4256,130 @@ mod tests {
             EmfSvgConverter::new(&parser).convert(),
             Err(Error::Unsupported(_))
         ));
+    }
+
+    /// A Polygon record through `points`, bounded by their extremes.
+    fn polygon_record(points: &[(i32, i32)]) -> Vec<u8> {
+        let mut payload = Vec::new();
+        let xs = points.iter().map(|point| point.0);
+        let ys = points.iter().map(|point| point.1);
+        for value in [
+            xs.clone().min().unwrap(),
+            ys.clone().min().unwrap(),
+            xs.max().unwrap(),
+            ys.max().unwrap(),
+        ] {
+            sdword(&mut payload, value);
+        }
+        dword(&mut payload, u32::try_from(points.len()).unwrap());
+        for (x, y) in points {
+            payload.extend_from_slice(&point(*x, *y));
+        }
+        record(EmrType::Polygon, &payload)
+    }
+
+    /// Two XOR strips with `vertices` vertices each, a black middle fill
+    /// and the second XOR pass.
+    fn polygon_xor_bracket(vertices: i32) -> Vec<Vec<u8>> {
+        // A rectangle strip whose top edge holds collinear vertices.
+        let strip = |left: i32| {
+            let mut points = (0..vertices - 2)
+                .map(|index| (left + index * 20 / (vertices - 3), 0))
+                .collect::<Vec<_>>();
+            points.extend([(left + 20, 50), (left, 50)]);
+            polygon_record(&points)
+        };
+        let pass = || {
+            vec![
+                set_rop2(7),
+                select_object(1),
+                strip(0),
+                select_object(2),
+                strip(20),
+            ]
+        };
+        let mut records = vec![
+            create_solid_brush(1, 0x0000_00ff),
+            create_solid_brush(2, 0x0000_ff00),
+            create_solid_brush(3, 0),
+            select_object(stock_objects::NULL_PEN),
+        ];
+        records.extend(pass());
+        records.extend([
+            set_rop2(13),
+            select_object(3),
+            polygon_record(&[(0, 0), (40, 0), (0, 40)]),
+        ]);
+        records.extend(pass());
+        records
+    }
+
+    #[test]
+    fn xor_bracket_outlines_with_many_vertices_are_not_overlap_tested() {
+        let (svg, diagnostics) = convert_with_report(polygon_xor_bracket(
+            i32::try_from(MAX_BRACKET_OUTLINE_VERTICES).unwrap(),
+        ));
+        assert!(diagnostics.is_empty(), "{diagnostics:?}");
+        assert!(svg.contains("<g clip-path=\"url(#emf-xor-clip-"), "{svg}");
+
+        let bytes = classic_emf(polygon_xor_bracket(
+            i32::try_from(MAX_BRACKET_OUTLINE_VERTICES + 1).unwrap(),
+        ));
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        assert!(matches!(
+            EmfSvgConverter::new(&parser).convert(),
+            Err(Error::Unsupported(_))
+        ));
+    }
+
+    #[test]
+    fn xor_fills_cover_stays_exact_at_i32_extremes() {
+        let (low, high) = (i64::from(i32::MIN), i64::from(i32::MAX));
+        let fill = |left: i64, right: i64| XorShape {
+            element: String::new(),
+            color: 0x0000_00ff,
+            outline: Some(vec![(left, low), (right, low), (right, high), (left, high)]),
+        };
+        let middle = [(-5, -5), (5, -5), (0, 5)];
+        assert!(xor_fills_cover(
+            &[fill(low, 0), fill(0, high)],
+            Some(&middle)
+        ));
+        assert!(!xor_fills_cover(
+            &[fill(low, -1), fill(0, high)],
+            Some(&middle)
+        ));
+    }
+
+    #[test]
+    fn xor_bracket_fails_once_its_waiting_fills_pass_a_limit() {
+        let fills = |count: usize, limits: crate::Limits| {
+            let patinvert = brush_bitblt(0x005a_0049, 0, 0, 40, 40);
+            let mut records = vec![create_solid_brush(1, 0x0000_00ff), select_object(1)];
+            records.extend(std::iter::repeat_n(patinvert, count));
+            let bytes = classic_emf(records);
+            let parser = EmfParser::new(&bytes, &limits).unwrap();
+            let converter = EmfSvgConverter::with_limits(&parser, limits);
+            let mut state = RenderState::new();
+            // Every fill waits in the bracket until one fails it.
+            let played = parser
+                .records
+                .iter()
+                .take_while(|record| converter.play_record(record, &mut state).is_ok())
+                .count();
+            (played, state.xor_bracket.map(|bracket| bracket.first.len()))
+        };
+        let (played, waiting) = fills(MAX_BRACKET_SHAPES + 1, crate::Limits::default());
+        assert_eq!(played, MAX_BRACKET_SHAPES + 2);
+        assert_eq!(waiting, None);
+
+        let limits = crate::Limits {
+            max_output_bytes: 1000,
+            ..crate::Limits::default()
+        };
+        let (played, waiting) = fills(100, limits);
+        assert!(played < 20, "{played}");
+        assert_eq!(waiting, None);
     }
 
     #[test]

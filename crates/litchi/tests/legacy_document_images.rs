@@ -29,7 +29,7 @@ fn picture_frames_without_stored_pictures_are_skipped() {
 }
 
 #[test]
-fn floating_pictures_are_not_merged_by_their_shared_picture_location() {
+fn floating_pictures_are_merged_by_their_image_store_entry_only() {
     // Floating anchors keep CPicLocation 0, which is also the Data-stream
     // offset of the first inline picture, and two consecutive anchors share
     // one run.
@@ -37,9 +37,11 @@ fn floating_pictures_are_not_merged_by_their_shared_picture_location() {
     assert_eq!(trigonometry.len(), 677);
     assert_eq!(count(&trigonometry, Kind::Png), 4);
     assert_eq!(count(&trigonometry, Kind::Emf), 1);
+    // Sixteen inline pictures, and four floating shapes that show one
+    // image-store entry.
     let floating = kinds("ole/doc/FloatingPictures.doc");
-    assert_eq!(floating.len(), 20);
-    assert_eq!(count(&floating, Kind::Png), 19);
+    assert_eq!(floating.len(), 17);
+    assert_eq!(count(&floating, Kind::Png), 16);
 }
 
 #[test]

@@ -1178,7 +1178,9 @@ impl<R: Read + Seek> OleFile<R> {
                 "Directory starts at an invalid sector".to_string(),
             ));
         }
-        let physical_sector_count = usize::try_from(file_size / sector_size as u64 - 1)
+        // Every sector that starts before the end of the file is physical,
+        // including a short final one; see the file-length note above.
+        let physical_sector_count = usize::try_from((file_size - 1) / sector_size as u64)
             .map_err(|_err| OleError::InvalidFormat("Too many physical sectors".to_string()))?;
 
         // Validate all count metadata that can otherwise size an allocation or

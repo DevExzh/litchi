@@ -18,8 +18,9 @@ use crate::svg_utils::{write_color_hex, write_num};
 use crate::{
     dib::{ColorUsage, Dib, DibLimits},
     metafile_bitmap::{
-        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, RasterComposite, Rop2,
-        Rop2Paint, Rop3, StretchPolicy, convex_outlines_overlap, is_convex, xor_bracket_paint,
+        BitmapOp, BitmapPaint, BitmapSource, BlitGrid, BrushPattern, MAX_BRACKET_OUTLINE_VERTICES,
+        MAX_BRACKET_SHAPES, RasterComposite, Rop2, Rop2Paint, Rop3, StretchPolicy,
+        convex_outlines_overlap, is_convex, xor_bracket_paint,
     },
 };
 use bytes::Bytes;
@@ -177,6 +178,8 @@ impl XorMiddle {
 #[derive(Debug, Clone)]
 struct XorBracket {
     mapping: MappingState,
+    /// Bytes of the waiting fill and middle elements.
+    bytes: usize,
     first: Vec<XorShape>,
     /// The paint the middle fills share.
     paint: Option<XorMiddle>,
@@ -2554,8 +2557,13 @@ impl<'hook> SvgRenderer<'hook> {
         match shape {
             BracketShape::Xor(color) => {
                 let Some(bracket) = &mut self.xor_bracket else {
+                    if element.len() > self.max_output_bytes {
+                        self.fail_xor_bracket();
+                        return None;
+                    }
                     self.xor_bracket = Some(XorBracket {
                         mapping,
+                        bytes: element.len(),
                         first: vec![XorShape {
                             element,
                             color,
@@ -2572,6 +2580,15 @@ impl<'hook> SvgRenderer<'hook> {
                     return None;
                 }
                 if bracket.middles.is_empty() {
+                    // The fills wait outside every output limit until the
+                    // bracket completes, so the bracket bounds them itself.
+                    bracket.bytes = bracket.bytes.saturating_add(element.len());
+                    if bracket.first.len() >= MAX_BRACKET_SHAPES
+                        || bracket.bytes > self.max_output_bytes
+                    {
+                        self.fail_xor_bracket();
+                        return None;
+                    }
                     bracket.first.push(XorShape {
                         element,
                         color,
@@ -2605,6 +2622,11 @@ impl<'hook> SvgRenderer<'hook> {
                     return None;
                 }
                 if let Some(bracket) = &mut self.xor_bracket {
+                    bracket.bytes = bracket.bytes.saturating_add(element.len());
+                    if bracket.bytes > self.max_output_bytes {
+                        self.fail_xor_bracket();
+                        return None;
+                    }
                     bracket.paint.get_or_insert(middle);
                     bracket.middles.push(MiddleShape {
                         element,
@@ -2695,8 +2717,7 @@ impl<'hook> SvgRenderer<'hook> {
                 .iter()
                 .map(|shape| shape.outline.as_deref())
                 .collect::<Option<Vec<_>>>()?;
-            if outlines.len() > 4096
-                || !self.charge_work(outlines.len().saturating_mul(outlines.len()) / 64)
+            if !self.charge_work(outlines.len().saturating_mul(outlines.len()) / 64)
                 || convex_outlines_overlap(&outlines)
             {
                 return None;
@@ -3543,6 +3564,9 @@ fn logical_bounds(function: u16, params: &[u8]) -> Option<[i64; 4]> {
         },
         record::POLYGON => {
             let count = usize::from(read_u16_le(params, 0).ok()?);
+            if count > MAX_BRACKET_OUTLINE_VERTICES {
+                return None;
+            }
             (0..count)
                 .map(|index| point(2 + index * 4))
                 .collect::<Option<Vec<_>>>()?
@@ -3563,7 +3587,8 @@ fn logical_bounds(function: u16, params: &[u8]) -> Option<[i64; 4]> {
 }
 
 /// The convex outline of a polygon or rectangle record in logical
-/// coordinates, or `None` for other records and non-convex polygons.
+/// coordinates, or `None` for other records, non-convex polygons and
+/// polygons with more than [`MAX_BRACKET_OUTLINE_VERTICES`] vertices.
 fn logical_outline(function: u16, params: &[u8]) -> Option<Vec<(i64, i64)>> {
     let outline = match function {
         record::RECTANGLE => {
@@ -3578,6 +3603,9 @@ fn logical_outline(function: u16, params: &[u8]) -> Option<Vec<(i64, i64)>> {
         },
         record::POLYGON => {
             let count = usize::from(read_u16_le(params, 0).ok()?);
+            if count > MAX_BRACKET_OUTLINE_VERTICES {
+                return None;
+            }
             (0..count)
                 .map(|index| {
                     Some((
@@ -4161,6 +4189,65 @@ mod tests {
             &[((0, 30), 0x0000_00ff), ((20, 40), 0x0000_ff00)],
         );
         assert!(fatal(&renderer));
+    }
+
+    #[test]
+    fn xor_bracket_outlines_with_many_vertices_are_not_overlap_tested() {
+        let bracket = |vertices: i16| {
+            let mut renderer = renderer();
+            // Rectangle strips whose top edges hold collinear vertices.
+            let strip = |left: i16| {
+                let mut points = (0..vertices - 2)
+                    .map(|index| (left + index * 20 / (vertices - 3), 0))
+                    .collect::<Vec<_>>();
+                points.extend([(left + 20, 50), (left, 50)]);
+                polygon(&points)
+            };
+            let mut output = String::new();
+            for pass in 0..2 {
+                renderer.render_record(&rec(record::SET_ROP2, &[7, 0]));
+                for (left, color) in [(0, 0x0000_00ff), (20, 0x0000_ff00)] {
+                    select_null_pen_and_brush(&mut renderer, color);
+                    if let Some(element) = renderer.render_record(&strip(left)) {
+                        output.push_str(&element);
+                    }
+                }
+                if pass == 0 {
+                    renderer.render_record(&rec(record::SET_ROP2, &[13, 0]));
+                    select_null_pen_and_brush(&mut renderer, 0);
+                    renderer.render_record(&polygon(&[(0, 0), (40, 0), (0, 40)]));
+                }
+            }
+            (fatal(&renderer), output)
+        };
+        let (failed, output) = bracket(i16::try_from(MAX_BRACKET_OUTLINE_VERTICES).unwrap());
+        assert!(!failed);
+        assert!(output.starts_with(r#"<g clip-path="url(#wmf-xor-clip-"#));
+        let (failed, _) = bracket(i16::try_from(MAX_BRACKET_OUTLINE_VERTICES + 1).unwrap());
+        assert!(failed);
+    }
+
+    #[test]
+    fn xor_bracket_fails_once_its_waiting_fills_pass_a_limit() {
+        let fills = |renderer: &mut SvgRenderer<'_>, count: usize| {
+            renderer.render_record(&rec(record::SET_ROP2, &[7, 0]));
+            select_null_pen_and_brush(renderer, 0x0000_00ff);
+            let strip = polygon(&[(0, 0), (10, 0), (10, 10), (0, 10)]);
+            (0..count)
+                .take_while(|_| {
+                    renderer.render_record(&strip);
+                    !fatal(renderer)
+                })
+                .count()
+        };
+        let mut many = renderer();
+        assert_eq!(fills(&mut many, MAX_BRACKET_SHAPES + 1), MAX_BRACKET_SHAPES);
+        assert!(many.xor_bracket.is_none());
+
+        let mut large = renderer();
+        large.max_output_bytes = 1000;
+        assert!(fills(&mut large, 100) < 20);
+        assert!(large.xor_bracket.is_none());
     }
 
     #[test]

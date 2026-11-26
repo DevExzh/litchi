@@ -418,7 +418,13 @@ struct Renderer<'a> {
     painted_vector: bool,
     /// Largest source-to-destination scale of a drawn bitmap.
     bitmap_scale: f64,
+    /// Pixels of the QuickTime images decoded so far.
+    quicktime_pixels: u64,
 }
+
+/// Most pixels, per pixel of [`crate::Limits::max_pixels`], that the QuickTime
+/// images of one picture may decode to in total.
+const MAX_QUICKTIME_PIXELS_PER_PIXEL: u64 = 4;
 
 impl<'a> Renderer<'a> {
     fn new(parser: &'a PictParser, limits: &'a crate::Limits, geometry: Geometry) -> Self {
@@ -446,6 +452,7 @@ impl<'a> Renderer<'a> {
             painted_bitmap: false,
             painted_vector: false,
             bitmap_scale: 1.0,
+            quicktime_pixels: 0,
         }
     }
 
@@ -1850,6 +1857,21 @@ impl<'a> Renderer<'a> {
             return Ok(false);
         };
         let codec = image.description.codec_name();
+        // Every image is decoded, and a wrapped metafile rendered, at up to
+        // the pixel limit; the picture as a whole gets a few times that.
+        let pixels = u64::from(image.description.width) * u64::from(image.description.height);
+        let budget = self
+            .limits
+            .max_pixels
+            .saturating_mul(MAX_QUICKTIME_PIXELS_PER_PIXEL);
+        if self.quicktime_pixels.saturating_add(pixels) > budget {
+            self.note(
+                "pict-quicktime-limit",
+                format!("QuickTime images beyond {budget} decoded pixels are not decoded; the picture's fallback drawing is shown"),
+            );
+            return Ok(false);
+        }
+        self.quicktime_pixels += pixels;
         let embedded = match quicktime::decode(&image, self.limits) {
             Decoded::Image(embedded) => embedded,
             Decoded::Unsupported => {
@@ -2557,6 +2579,30 @@ mod tests {
         assert!(!svg.contains("<text"), "{svg}");
         assert!(svg.contains(r#"d="M50 50H60V60H50Z""#), "{svg}");
         assert!(rendered.diagnostics.is_empty());
+    }
+
+    #[test]
+    fn quicktime_images_share_one_decoded_pixel_budget_per_picture() {
+        let mut jpeg = std::io::Cursor::new(Vec::new());
+        DynamicImage::ImageRgb8(image::RgbImage::new(64, 64))
+            .write_to(&mut jpeg, ImageFormat::Jpeg)
+            .unwrap();
+        let image = compressed_record(b"jpeg", 64, 64, 24, (0, 0), &jpeg.into_inner());
+        let mut records = Vec::new();
+        for _ in 0..5 {
+            op(&mut records, 0x8200, &image);
+        }
+        records.extend_from_slice(&0x00FFu16.to_be_bytes());
+        let data = version2_picture([0, 0, 64, 64], &records);
+        // Each image fits the limit; four of them use up the picture's share.
+        let limits = crate::Limits {
+            max_pixels: 64 * 64,
+            ..crate::Limits::default()
+        };
+        let parser = PictParser::new(&data, &limits).unwrap();
+        let rendered = render(&parser, &limits).unwrap();
+        assert_eq!(rendered.svg.matches("data:image/jpeg").count(), 4);
+        assert_eq!(codes(&rendered), ["pict-quicktime-limit"]);
     }
 
     #[test]

@@ -263,12 +263,38 @@ impl PictParser {
             }
         }
         if !ended && !stopped {
-            warnings.push(PictParserWarning {
-                code: "noncanonical-pict-missing-end",
-                message: format!(
-                    "picture ends after {} records without an end-of-picture opcode",
-                    records.len()
-                ),
+            // picSize holds the length of the picture data, of which version 2
+            // keeps only the low 16 bits. A picture that ends there, with or
+            // without room for its end-of-picture opcode, lost nothing but
+            // that opcode; one that ends earlier was cut short.
+            let consumed = offset.min(picture.len());
+            let declared = read_u16(picture, 0).map(usize::from);
+            let end_opcode = if two_byte_opcodes { 2 } else { 1 };
+            let complete = [consumed, consumed + end_opcode].iter().any(|&length| {
+                let length = if two_byte_opcodes {
+                    length & 0xFFFF
+                } else {
+                    length
+                };
+                declared == Some(length)
+            });
+            warnings.push(if complete {
+                PictParserWarning {
+                    code: "noncanonical-pict-missing-end",
+                    message: format!(
+                        "picture ends after {} records without an end-of-picture opcode",
+                        records.len()
+                    ),
+                }
+            } else {
+                PictParserWarning {
+                    code: "pict-truncated",
+                    message: format!(
+                        "picture ends after {} records and {consumed} bytes without an end-of-picture opcode; its header declares {} bytes",
+                        records.len(),
+                        declared.unwrap_or(0)
+                    ),
+                }
             });
         } else if ended && offset < picture.len() {
             warnings.push(PictParserWarning {
@@ -672,13 +698,30 @@ pub(super) mod tests {
     }
 
     #[test]
-    fn missing_end_is_noncanonical_and_truncation_is_reported() {
+    fn missing_end_is_noncanonical_only_at_the_declared_size() {
         let mut records = Vec::new();
         records.extend_from_slice(&0x0003u16.to_be_bytes());
         records.extend_from_slice(&1u16.to_be_bytes());
-        let data = version2_picture([0, 0, 10, 10], &records);
+        let mut data = version2_picture([0, 0, 10, 10], &records);
         let parser = PictParser::new(&data, &crate::Limits::default()).unwrap();
         assert_eq!(parser.records.len(), 3);
+        // The picture ends before the size its header declares.
+        assert_eq!(parser.warnings()[0].code, "pict-truncated");
+        // It ends where its header says, or just before the end opcode.
+        for declared in [data.len(), data.len() + 2] {
+            data[..2].copy_from_slice(&u16::try_from(declared).unwrap().to_be_bytes());
+            let parser = PictParser::new(&data, &crate::Limits::default()).unwrap();
+            assert_eq!(parser.warnings()[0].code, "noncanonical-pict-missing-end");
+        }
+        // Version 2 keeps only the low 16 bits of the size.
+        let mut long = records.clone();
+        while long.len() < 0x1_0000 {
+            long.extend_from_slice(&0u16.to_be_bytes()); // NOP
+        }
+        let mut data = version2_picture([0, 0, 10, 10], &long);
+        let declared = u16::try_from(data.len() & 0xFFFF).unwrap();
+        data[..2].copy_from_slice(&declared.to_be_bytes());
+        let parser = PictParser::new(&data, &crate::Limits::default()).unwrap();
         assert_eq!(parser.warnings()[0].code, "noncanonical-pict-missing-end");
 
         records.extend_from_slice(&0x0020u16.to_be_bytes()); // Line needs 8 bytes

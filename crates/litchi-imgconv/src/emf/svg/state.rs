@@ -287,71 +287,222 @@ impl RenderState {
         Ok(id)
     }
 
-    /// Combines `path` with the current clip under the RGN_* `mode` and makes
-    /// the result the current clip. Returns `false` for a combine mode that
-    /// SVG clipping cannot express exactly.
-    pub fn install_clip(&mut self, path: &str, rule: ClipRule, mode: u32) -> bool {
-        let previous = self.dc.clip_id.clone();
-        let id = self.fresh_id("clip");
-        let mut definition = String::from("<clipPath id=\"");
-        definition.push_str(&id);
-        definition.push_str("\" clipPathUnits=\"userSpaceOnUse\"><path d=\"");
-        definition.push_str(path);
-        definition.push('"');
-        if rule == ClipRule::EvenOdd {
-            definition.push_str(" clip-rule=\"evenodd\"");
-        }
-        match (mode, previous) {
-            (5, _) | (1 | 2, None) => {},
-            // RGN_AND. The clipPath content model admits shape elements but
-            // not `<g>`, so the previous clip is referenced from the child
-            // shape; renderers drop a clip path that holds a group and then
-            // clip everything away.
-            (1, Some(old)) => {
-                definition.push_str(" clip-path=\"url(#");
-                definition.push_str(&old);
-                definition.push_str(")\"");
-            },
+    /// Combines `shape` with the current clip under the RGN_* `mode` and
+    /// makes the result the current clip. Returns `false` for a combine mode
+    /// that SVG clipping cannot express exactly.
+    ///
+    /// Rectangles intersect geometrically, so only other clip paths chain
+    /// clip references; renderers mask every clipped element once per link.
+    /// Past [`MAX_CLIP_CHAIN_DEPTH`] links a further clip path is not applied
+    /// and a lossy diagnostic reports it.
+    pub fn install_clip(&mut self, shape: ClipShape<'_>, mode: u32, canvas: Canvas) -> bool {
+        let previous = self.dc.clip_region.clone();
+        let mut region = match (mode, previous.is_unclipped()) {
+            (5, _) | (1 | 2, true) => ClipRegion::default(),
+            (1, false) => previous,
             // OR, XOR and DIFF need a stored copy of the old geometry or mask
             // semantics; do not pretend a lossy clip is equivalent.
             _ => return false,
+        };
+        match shape {
+            ClipShape::Rect(rect) => {
+                region.rect = Some(match region.rect {
+                    Some(old) => intersect_rects(old, rect),
+                    None => normalized_rect(rect),
+                });
+            },
+            ClipShape::Path(path, rule) => {
+                let depth = region.chain.as_ref().map_or(0, |(_, depth)| *depth);
+                if depth >= MAX_CLIP_CHAIN_DEPTH {
+                    self.note(
+                        "emf-clip-depth-approximated",
+                        format!(
+                            "a clip region intersecting more than {MAX_CLIP_CHAIN_DEPTH} clip paths was drawn without the later ones"
+                        ),
+                    );
+                    return true;
+                }
+                let id = self.fresh_id("clip");
+                let mut definition = String::from("<clipPath id=\"");
+                definition.push_str(&id);
+                definition.push_str("\" clipPathUnits=\"userSpaceOnUse\"><path d=\"");
+                definition.push_str(path);
+                definition.push('"');
+                if rule == ClipRule::EvenOdd {
+                    definition.push_str(" clip-rule=\"evenodd\"");
+                }
+                // The clipPath content model admits shape elements but not
+                // `<g>`, so the earlier clip paths are referenced from the
+                // child shape; renderers drop a clip path that holds a group
+                // and then clip everything away.
+                push_clip_reference(&mut definition, region.chain.as_ref());
+                definition.push_str("/></clipPath>");
+                self.add_definition(definition);
+                region.chain = Some((id, depth + 1));
+            },
         }
-        definition.push_str("/></clipPath>");
-        self.add_definition(definition);
-        self.dc.clip_id = Some(id);
+        self.set_clip_region(region, canvas);
         true
     }
 
     /// Moves the current clip by the device-space vector `(x, y)`.
     pub fn offset_clip(&mut self, x: f64, y: f64, canvas: Canvas) {
-        let Some(old) = self.dc.clip_id.clone() else {
+        let mut region = self.dc.clip_region.clone();
+        if region.is_unclipped() {
             return;
-        };
-        let id = self.fresh_id("clip");
-        // The translate moves the previous clip; the rectangle that carries
-        // the reference stands in for "every point" and is placed so that it
-        // covers the canvas after the translate. The reference sits on a shape
-        // element because the clipPath content model does not admit `<g>`.
-        let mut definition = String::from("<clipPath id=\"");
-        definition.push_str(&id);
-        definition.push_str("\" clipPathUnits=\"userSpaceOnUse\" transform=\"translate(");
-        write_num(&mut definition, x);
-        definition.push(' ');
-        write_num(&mut definition, y);
-        definition.push_str(")\"><rect x=\"");
-        write_num(&mut definition, canvas.left - x);
-        definition.push_str("\" y=\"");
-        write_num(&mut definition, canvas.top - y);
-        definition.push_str("\" width=\"");
-        write_num(&mut definition, canvas.right - canvas.left);
-        definition.push_str("\" height=\"");
-        write_num(&mut definition, canvas.bottom - canvas.top);
-        definition.push_str("\" clip-path=\"url(#");
-        definition.push_str(&old);
-        definition.push_str(")\"/></clipPath>");
-        self.add_definition(definition);
-        self.dc.clip_id = Some(id);
+        }
+        if let Some(rect) = &mut region.rect {
+            *rect = [rect[0] + x, rect[1] + y, rect[2] + x, rect[3] + y];
+        }
+        if let Some((old, depth)) = region.chain.clone() {
+            if depth >= MAX_CLIP_CHAIN_DEPTH {
+                self.note(
+                    "emf-clip-depth-approximated",
+                    format!(
+                        "a clip region intersecting more than {MAX_CLIP_CHAIN_DEPTH} clip paths was not moved by OffsetClipRgn"
+                    ),
+                );
+                return;
+            }
+            let id = self.fresh_id("clip");
+            // The translate moves the previous clip; the rectangle that carries
+            // the reference stands in for "every point" and is placed so that it
+            // covers the canvas after the translate. The reference sits on a shape
+            // element because the clipPath content model does not admit `<g>`.
+            let mut definition = String::from("<clipPath id=\"");
+            definition.push_str(&id);
+            definition.push_str("\" clipPathUnits=\"userSpaceOnUse\" transform=\"translate(");
+            write_num(&mut definition, x);
+            definition.push(' ');
+            write_num(&mut definition, y);
+            definition.push_str(")\"><rect x=\"");
+            write_num(&mut definition, canvas.left - x);
+            definition.push_str("\" y=\"");
+            write_num(&mut definition, canvas.top - y);
+            definition.push_str("\" width=\"");
+            write_num(&mut definition, canvas.right - canvas.left);
+            definition.push_str("\" height=\"");
+            write_num(&mut definition, canvas.bottom - canvas.top);
+            definition.push_str("\" clip-path=\"url(#");
+            definition.push_str(&old);
+            definition.push_str(")\"/></clipPath>");
+            self.add_definition(definition);
+            region.chain = Some((id, depth + 1));
+        }
+        self.set_clip_region(region, canvas);
     }
+
+    /// Removes the clip region, so that drawing reaches the whole canvas.
+    pub fn clear_clip(&mut self) {
+        self.dc.clip_region = ClipRegion::default();
+        self.dc.clip_id = None;
+    }
+
+    /// Makes `region` the current clip, defining the clip that elements
+    /// reference.
+    fn set_clip_region(&mut self, region: ClipRegion, canvas: Canvas) {
+        if region == self.dc.clip_region {
+            // Elements that share a clip reference share one mask.
+            return;
+        }
+        self.dc.clip_id = match (&region.rect, &region.chain) {
+            (None, None) => None,
+            (None, Some((chain, _))) => Some(chain.clone()),
+            // Nothing outside the canvas is visible, so a rectangle that
+            // holds the canvas clips nothing away. Leaving it out keeps one
+            // mask per drawn element out of the rasterizer.
+            (Some(rect), None) if rect_holds_canvas(*rect, canvas) => None,
+            (Some(rect), Some((chain, _))) if rect_holds_canvas(*rect, canvas) => {
+                Some(chain.clone())
+            },
+            (Some(rect), chain) => {
+                let id = self.fresh_id("clip");
+                let mut definition = String::from("<clipPath id=\"");
+                definition.push_str(&id);
+                definition.push_str("\" clipPathUnits=\"userSpaceOnUse\"><path d=\"");
+                let mut outline = PathBuilder::new();
+                outline.move_to(rect[0], rect[1]);
+                outline.line_to(rect[2], rect[1]);
+                outline.line_to(rect[2], rect[3]);
+                outline.line_to(rect[0], rect[3]);
+                outline.close();
+                definition.push_str(&outline.build());
+                definition.push('"');
+                push_clip_reference(&mut definition, chain.as_ref());
+                definition.push_str("/></clipPath>");
+                self.add_definition(definition);
+                Some(id)
+            },
+        };
+        self.dc.clip_region = region;
+    }
+}
+
+/// Most clip paths, other than rectangles, that one clip region intersects
+/// through chained clip references.
+pub const MAX_CLIP_CHAIN_DEPTH: usize = 16;
+
+/// The geometry a clip record combines with the current clip.
+#[derive(Debug, Clone, Copy)]
+pub enum ClipShape<'a> {
+    /// A device-space rectangle `[left, top, right, bottom]`.
+    Rect([f64; 4]),
+    /// SVG path data in device space and the rule that fills it.
+    Path(&'a str, ClipRule),
+}
+
+/// The clip region of a device context: a device-space rectangle
+/// intersected with a chain of other clip paths. `None` for both clips
+/// nothing away.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct ClipRegion {
+    /// Device-space rectangle `[left, top, right, bottom]`, normalized.
+    pub rect: Option<[f64; 4]>,
+    /// The clip definition that intersects the other clip paths, and how
+    /// many clip paths it chains.
+    pub chain: Option<(String, usize)>,
+}
+
+impl ClipRegion {
+    fn is_unclipped(&self) -> bool {
+        self.rect.is_none() && self.chain.is_none()
+    }
+}
+
+fn push_clip_reference(definition: &mut String, chain: Option<&(String, usize)>) {
+    if let Some((chain, _)) = chain {
+        definition.push_str(" clip-path=\"url(#");
+        definition.push_str(chain);
+        definition.push_str(")\"");
+    }
+}
+
+fn normalized_rect(rect: [f64; 4]) -> [f64; 4] {
+    [
+        rect[0].min(rect[2]),
+        rect[1].min(rect[3]),
+        rect[0].max(rect[2]),
+        rect[1].max(rect[3]),
+    ]
+}
+
+/// The intersection of two rectangles; an empty one keeps zero size.
+fn intersect_rects(old: [f64; 4], new: [f64; 4]) -> [f64; 4] {
+    let new = normalized_rect(new);
+    let (left, top) = (old[0].max(new[0]), old[1].max(new[1]));
+    [
+        left,
+        top,
+        old[2].min(new[2]).max(left),
+        old[3].min(new[3]).max(top),
+    ]
+}
+
+fn rect_holds_canvas(rect: [f64; 4], canvas: Canvas) -> bool {
+    rect[0] <= canvas.left
+        && rect[1] <= canvas.top
+        && rect[2] >= canvas.right
+        && rect[3] >= canvas.bottom
 }
 
 impl Default for RenderState {
@@ -391,7 +542,9 @@ pub struct DeviceContext {
     pub arc_direction: bool,
     pub miter_limit: f64,
     pub layout: u32,
+    /// The clip definition that drawn elements reference.
     pub clip_id: Option<String>,
+    pub clip_region: ClipRegion,
 }
 
 impl Default for DeviceContext {
@@ -430,6 +583,7 @@ impl DeviceContext {
             miter_limit: 10.0,
             layout: 0,
             clip_id: None,
+            clip_region: ClipRegion::default(),
         }
     }
 
@@ -896,6 +1050,10 @@ mod tests {
         assert!(state.dc_stack.is_empty());
     }
 
+    fn path(data: &str) -> ClipShape<'_> {
+        ClipShape::Path(data, ClipRule::NonZero)
+    }
+
     fn canvas_rect() -> Canvas {
         Canvas {
             left: 0.0,
@@ -935,8 +1093,8 @@ mod tests {
     #[test]
     fn intersected_clip_keeps_both_regions() {
         let mut state = RenderState::new();
-        assert!(state.install_clip("M0 0L10 0 10 10 0 10Z", ClipRule::NonZero, 1));
-        assert!(state.install_clip("M0 0L5 0 5 10 0 10Z", ClipRule::NonZero, 1));
+        assert!(state.install_clip(path("M0 0L10 0 10 10 0 10Z"), 1, canvas_rect()));
+        assert!(state.install_clip(path("M0 0L5 0 5 10 0 10Z"), 1, canvas_rect()));
         let clip = state.dc.clip_id.clone().unwrap();
 
         // The intersection covers the left half, not nothing and not all.
@@ -946,7 +1104,7 @@ mod tests {
     #[test]
     fn offset_clip_moves_the_region() {
         let mut state = RenderState::new();
-        assert!(state.install_clip("M0 0L2 0 2 2 0 2Z", ClipRule::NonZero, 1));
+        assert!(state.install_clip(path("M0 0L2 0 2 2 0 2Z"), 1, canvas_rect()));
         state.offset_clip(4.0, 3.0, canvas_rect());
         let clip = state.dc.clip_id.clone().unwrap();
 
@@ -956,7 +1114,7 @@ mod tests {
     #[test]
     fn offset_clip_brings_an_off_canvas_region_onto_the_canvas() {
         let mut state = RenderState::new();
-        assert!(state.install_clip("M-6 0L-2 0 -2 2 -6 2Z", ClipRule::NonZero, 1));
+        assert!(state.install_clip(path("M-6 0L-2 0 -2 2 -6 2Z"), 1, canvas_rect()));
         state.offset_clip(6.0, 0.0, canvas_rect());
         let clip = state.dc.clip_id.clone().unwrap();
 
@@ -967,12 +1125,71 @@ mod tests {
     fn even_odd_clip_cuts_out_an_equally_oriented_inner_rectangle() {
         let mut state = RenderState::new();
         assert!(state.install_clip(
-            "M0 0L10 0 10 10 0 10Z M2 2L8 2 8 8 2 8Z",
-            ClipRule::EvenOdd,
-            1
+            ClipShape::Path("M0 0L10 0 10 10 0 10Z M2 2L8 2 8 8 2 8Z", ClipRule::EvenOdd),
+            1,
+            canvas_rect()
         ));
         let clip = state.dc.clip_id.clone().unwrap();
 
         assert_eq!(covered_pixels(&state, &clip), 100 - 36);
+    }
+
+    #[test]
+    fn rectangle_clips_intersect_without_chaining_references() {
+        let mut state = RenderState::new();
+        for step in 0..10_000 {
+            let inset = f64::from(step % 4);
+            assert!(state.install_clip(
+                ClipShape::Rect([inset, 0.0, 10.0 - inset, 8.0]),
+                1,
+                canvas_rect()
+            ));
+        }
+        let clip = state.dc.clip_id.clone().unwrap();
+        assert!(
+            state
+                .defs
+                .iter()
+                .all(|definition| !definition.contains("url("))
+        );
+        // Every rectangle intersected: x 3..7, y 0..8.
+        assert_eq!(covered_pixels(&state, &clip), 32);
+
+        // A rectangle that holds the canvas needs no clip reference, but
+        // still bounds the clip paths intersected with it later.
+        let mut state = RenderState::new();
+        assert!(state.install_clip(ClipShape::Rect([-5.0, -5.0, 20.0, 20.0]), 1, canvas_rect()));
+        assert_eq!(state.dc.clip_id, None);
+        assert!(state.install_clip(ClipShape::Rect([0.0, 0.0, 4.0, 4.0]), 1, canvas_rect()));
+        assert!(state.install_clip(path("M2 0L10 0 10 10 2 10Z"), 1, canvas_rect()));
+        let clip = state.dc.clip_id.clone().unwrap();
+        assert_eq!(covered_pixels(&state, &clip), 8);
+        state.offset_clip(1.0, 0.0, canvas_rect());
+        let clip = state.dc.clip_id.clone().unwrap();
+        assert_eq!(covered_pixels(&state, &clip), 8);
+    }
+
+    #[test]
+    fn clip_path_chain_stops_growing_at_its_depth_limit() {
+        let mut state = RenderState::new();
+        for _ in 0..MAX_CLIP_CHAIN_DEPTH + 100 {
+            assert!(state.install_clip(path("M0 0L5 0 5 10 0 10Z"), 1, canvas_rect()));
+            state.offset_clip(0.0, 0.0, canvas_rect());
+        }
+        assert_eq!(
+            state.dc.clip_region.chain.as_ref().unwrap().1,
+            MAX_CLIP_CHAIN_DEPTH
+        );
+        assert!(state.defs.len() <= MAX_CLIP_CHAIN_DEPTH);
+        assert_eq!(
+            state
+                .diagnostics
+                .iter()
+                .map(|(code, _)| *code)
+                .collect::<Vec<_>>(),
+            ["emf-clip-depth-approximated", "emf-clip-depth-approximated"]
+        );
+        let clip = state.dc.clip_id.clone().unwrap();
+        assert_eq!(covered_pixels(&state, &clip), 50);
     }
 }
