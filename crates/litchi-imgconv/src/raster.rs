@@ -1,7 +1,7 @@
 //! Bounded, deterministic SVG rasterization.
 
 use std::io::{Cursor, Write};
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use image::{ExtendedColorType, ImageEncoder, ImageFormat, ImageReader, Rgba};
 use litchi_core::error::{Error, Result};
@@ -90,11 +90,24 @@ pub(crate) fn rasterize_svg(
 ) -> Result<Vec<u8>> {
     validate_request(svg, width, height, format, limits)?;
 
-    let mut options = usvg::Options {
+    let fonts = system_fonts();
+    let fallback_faces = Arc::clone(&fonts.fallback);
+    let options = usvg::Options {
         image_href_resolver: bounded_image_resolver(*limits),
+        fontdb: Arc::clone(&fonts.database),
+        font_resolver: usvg::FontResolver {
+            select_font: usvg::FontResolver::default_font_selector(),
+            // Offer each resident face once; shaping skips faces that still
+            // lack the character, so the search stays bounded.
+            select_fallback: Box::new(move |_, used, _| {
+                fallback_faces
+                    .iter()
+                    .copied()
+                    .find(|face| !used.contains(face))
+            }),
+        },
         ..usvg::Options::default()
     };
-    load_system_fonts(&mut options);
     let tree = usvg::Tree::from_str(svg, &options)
         .map_err(|error| parse(format!("failed to parse SVG: {error}")))?;
 
@@ -213,21 +226,143 @@ fn encode_pixels(
     Ok(output.into_inner())
 }
 
-fn load_system_fonts(options: &mut usvg::Options<'_>) {
-    let font_database = options.fontdb_mut();
-    font_database.load_system_fonts();
-    let fallback_family = font_database
+/// System fonts shared by every rasterization in the process.
+struct SystemFonts {
+    database: Arc<usvg::fontdb::Database>,
+    /// Memory-resident faces consulted for characters the requested font lacks.
+    fallback: Arc<[usvg::fontdb::ID]>,
+}
+
+const SANS_SERIF_FAMILIES: &[&str] = &[
+    "Arial",
+    "Liberation Sans",
+    "Arimo",
+    "Helvetica",
+    "DejaVu Sans",
+    "Noto Sans",
+    "FreeSans",
+];
+const SERIF_FAMILIES: &[&str] = &[
+    "Times New Roman",
+    "Liberation Serif",
+    "Tinos",
+    "Times",
+    "DejaVu Serif",
+    "Noto Serif",
+    "FreeSerif",
+];
+const MONOSPACE_FAMILIES: &[&str] = &[
+    "Courier New",
+    "Liberation Mono",
+    "Cousine",
+    "Courier",
+    "DejaVu Sans Mono",
+    "Noto Sans Mono",
+    "FreeMono",
+];
+/// Largest font file kept resident in memory for generic-family fallback.
+const MAX_RESIDENT_FONT_BYTES: u64 = 32 * 1024 * 1024;
+
+/// Returns the process-wide system font set.
+///
+/// Enumerating every installed font costs far more than rendering a typical
+/// metafile, so the database is built once. fontdb re-reads a file-backed
+/// face on every glyph lookup, so the generic-family faces are loaded into
+/// memory, and per-character fallback consults only those faces instead of
+/// reading every installed font for each missing glyph.
+fn system_fonts() -> &'static SystemFonts {
+    static FONTS: OnceLock<SystemFonts> = OnceLock::new();
+    FONTS.get_or_init(build_system_fonts)
+}
+
+fn build_system_fonts() -> SystemFonts {
+    let mut database = usvg::fontdb::Database::new();
+    database.load_system_fonts();
+    let deterministic = database
         .faces()
         .flat_map(|face| face.families.iter().map(|family| &family.0))
         .min()
         .cloned();
-    if let Some(family) = fallback_family {
-        font_database.set_serif_family(family.clone());
-        font_database.set_sans_serif_family(family.clone());
-        font_database.set_cursive_family(family.clone());
-        font_database.set_fantasy_family(family.clone());
-        font_database.set_monospace_family(family);
+    let sans_serif = preferred_family(&database, SANS_SERIF_FAMILIES).or(deterministic.clone());
+    let serif = preferred_family(&database, SERIF_FAMILIES).or(deterministic.clone());
+    let monospace = preferred_family(&database, MONOSPACE_FAMILIES).or(deterministic);
+    if let Some(family) = &sans_serif {
+        database.set_sans_serif_family(family.clone());
+        database.set_cursive_family(family.clone());
+        database.set_fantasy_family(family.clone());
     }
+    if let Some(family) = &serif {
+        database.set_serif_family(family.clone());
+    }
+    if let Some(family) = &monospace {
+        database.set_monospace_family(family.clone());
+    }
+    let families: Vec<String> = [serif, sans_serif, monospace]
+        .into_iter()
+        .flatten()
+        .collect();
+    let fallback = make_resident(&mut database, &families);
+    SystemFonts {
+        database: Arc::new(database),
+        fallback: fallback.into(),
+    }
+}
+
+fn preferred_family(database: &usvg::fontdb::Database, candidates: &[&str]) -> Option<String> {
+    candidates
+        .iter()
+        .find(|candidate| {
+            database.faces().any(|face| {
+                face.families
+                    .iter()
+                    .any(|family| family.0.eq_ignore_ascii_case(candidate))
+            })
+        })
+        .map(|family| (*family).to_string())
+}
+
+/// Replaces the file-backed faces of `families` with in-memory copies and
+/// returns their identifiers in family order.
+fn make_resident(
+    database: &mut usvg::fontdb::Database,
+    families: &[String],
+) -> Vec<usvg::fontdb::ID> {
+    let mut paths = Vec::new();
+    for family in families {
+        for face in database.faces() {
+            if !face
+                .families
+                .iter()
+                .any(|name| name.0.eq_ignore_ascii_case(family))
+            {
+                continue;
+            }
+            if let usvg::fontdb::Source::File(path) = &face.source
+                && !paths.contains(path)
+            {
+                paths.push(path.clone());
+            }
+        }
+    }
+    let mut resident = Vec::new();
+    for path in paths {
+        let small_enough = std::fs::metadata(&path)
+            .map(|metadata| metadata.len() <= MAX_RESIDENT_FONT_BYTES)
+            .unwrap_or(false);
+        let Some(data) = small_enough.then(|| std::fs::read(&path).ok()).flatten() else {
+            continue;
+        };
+        let stale: Vec<_> = database
+            .faces()
+            .filter(|face| matches!(&face.source, usvg::fontdb::Source::File(old) if *old == path))
+            .map(|face| face.id)
+            .collect();
+        for id in stale {
+            database.remove_face(id);
+        }
+        resident.extend(database.load_font_source(usvg::fontdb::Source::Binary(Arc::new(data))));
+    }
+    resident
 }
 
 fn dimensions_fit(width: u32, height: u32, limits: &RasterLimits) -> Result<()> {
@@ -311,6 +446,15 @@ fn validate_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn system_fonts_are_loaded_once_per_process() {
+        assert!(std::ptr::eq(system_fonts(), system_fonts()));
+        assert!(Arc::ptr_eq(
+            &system_fonts().database,
+            &system_fonts().database
+        ));
+    }
 
     const RECT: &str = concat!(
         r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" "#,
