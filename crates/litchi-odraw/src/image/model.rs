@@ -314,6 +314,7 @@ pub struct Meta<'data> {
     pub(super) uids: Uids,
     pub(super) header: MetaHeader,
     pub(super) data: &'data [u8],
+    pub(super) trailing: usize,
 }
 
 impl<'data> Meta<'data> {
@@ -336,9 +337,23 @@ impl<'data> Meta<'data> {
     }
 
     /// Returns the stored, possibly compressed metafile bytes.
+    ///
+    /// This is exactly the `cbSave` payload. Bytes a producer appended after
+    /// it are not part of the image and are reported by
+    /// [`Meta::trailing_len`].
     #[must_use]
     pub const fn data(&self) -> &'data [u8] {
         self.data
+    }
+
+    /// Returns the number of record bytes after the stored payload.
+    ///
+    /// Office and LibreOffice read the declared payload of a metafile BLIP
+    /// and ignore anything that follows, so these bytes are accepted but
+    /// never decoded.
+    #[must_use]
+    pub const fn trailing_len(&self) -> usize {
+        self.trailing
     }
 
     /// Returns the underlying `OfficeArt` record.
@@ -487,6 +502,18 @@ impl<'data> Blip<'data> {
                 bitmap.data()
             },
             Self::Opaque(opaque) => opaque.data(),
+        }
+    }
+
+    /// Returns the number of record bytes that follow the stored file data.
+    ///
+    /// Only metafile BLIPs carry such bytes; bitmap layouts end with their
+    /// payload.
+    #[must_use]
+    pub const fn trailing_len(&self) -> usize {
+        match self {
+            Self::Emf(meta) | Self::Wmf(meta) | Self::Pict(meta) => meta.trailing_len(),
+            Self::Jpeg(_) | Self::Png(_) | Self::Dib(_) | Self::Tiff(_) | Self::Opaque(_) => 0,
         }
     }
 

@@ -70,6 +70,36 @@ fn validates_metafile_sizes_and_compression() {
 }
 
 #[test]
+fn accepts_metafile_payloads_with_trailing_record_bytes() {
+    let mut body = vec![0; 16];
+    body.extend_from_slice(&3u32.to_le_bytes());
+    body.extend_from_slice(&[0; 24]);
+    body.extend_from_slice(&3u32.to_le_bytes());
+    body.extend_from_slice(&[0xFE, 0xFE]);
+    body.extend_from_slice(b"wmf");
+    body.extend_from_slice(b"stale");
+    let bytes = record(0, 0x216, 0xF01B, &body);
+    let Blip::Wmf(meta) = Blip::parse(&bytes, Default::default()).expect("valid WMF") else {
+        panic!("expected WMF")
+    };
+    assert_eq!(meta.header().saved, 3);
+    assert_eq!(meta.data(), b"wmf");
+    assert_eq!(meta.trailing_len(), 5);
+
+    // A payload shorter than its declared size stays malformed.
+    let mut truncated = bytes;
+    truncated[8 + 16 + 28] = 9;
+    assert!(matches!(
+        Blip::parse(&truncated, Default::default()),
+        Err(Error::ImageSizeMismatch {
+            field: "cbSave",
+            declared: 9,
+            actual: 8,
+        })
+    ));
+}
+
+#[test]
 fn preserves_unknown_file_block_kinds() {
     let bytes = record(7, 0x123, 0xF020, b"future");
     let Blip::Opaque(opaque) = Blip::parse(&bytes, Default::default()).expect("opaque BLIP") else {
@@ -250,11 +280,70 @@ fn resolves_delay_offset_zero_and_rejects_missing_context() {
 }
 
 #[test]
-fn detects_store_count_mismatch_on_iteration() {
-    let bytes = record(0x0F, 1, 0xF001, &[]);
+fn delayed_blip_accepts_an_fbse_size_that_counts_the_image_data_only() {
+    let png = record(0, 0x6E0, 0xF01E, &png_body(false, b"pixels"));
+    for size in [png.len(), b"pixels".len()] {
+        let mut fbse_body = Vec::new();
+        fbse_body.extend_from_slice(&[Kind::Png.raw(), Kind::Png.raw()]);
+        fbse_body.extend_from_slice(&[1; 16]);
+        fbse_body.extend_from_slice(&0u16.to_le_bytes());
+        fbse_body.extend_from_slice(&u32::try_from(size).unwrap().to_le_bytes());
+        fbse_body.extend_from_slice(&1u32.to_le_bytes());
+        fbse_body.extend_from_slice(&0u32.to_le_bytes());
+        fbse_body.extend_from_slice(&[0; 4]);
+        let fbse = record(2, u16::from(Kind::Png.raw()), 0xF007, &fbse_body);
+        let store_record = record(0x0F, 1, 0xF001, &fbse);
+        let store = Store::parse(&store_record, Default::default()).unwrap();
+        let resolved = store
+            .resolve(
+                Id::new(1).unwrap(),
+                Context::new().with_delay(Delay::new(&png, Default::default())),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(resolved.data(), b"pixels");
+    }
+}
+
+#[test]
+fn store_holds_the_children_it_contains_whatever_recinstance_says() {
+    let png = record(0, 0x6E0, 0xF01E, &png_body(false, b"x"));
+    let mut children = png.clone();
+    children.extend_from_slice(&png);
+    children.extend_from_slice(&png);
+
+    for instance in [0, 1, 3, 9] {
+        let bytes = record(0x0F, instance, 0xF001, &children);
+        let store = Store::parse(&bytes, Default::default()).expect("store with any recInstance");
+        assert_eq!(store.len(), 3);
+        let blocks = store.iter().collect::<Result<Vec<_>, _>>().expect("blocks");
+        assert_eq!(blocks.len(), 3);
+        let id = Id::new(3).expect("identifier");
+        assert!(store.get(id).expect("lookup").is_some());
+        assert!(
+            store
+                .get(Id::new(4).expect("identifier"))
+                .expect("lookup")
+                .is_none()
+        );
+    }
+
+    let empty = record(0x0F, 1, 0xF001, &[]);
+    let store = Store::parse(&empty, Default::default()).expect("empty store");
+    assert!(store.is_empty());
+
+    let bytes = record(0x0F, 3, 0xF001, &children);
+    let strict = Limits {
+        max_store_entries: 2,
+        ..Limits::default()
+    };
     assert!(matches!(
-        Store::parse(&bytes, Default::default()),
-        Err(Error::MalformedImage { .. })
+        Store::parse(&bytes, strict),
+        Err(Error::ImageLimitExceeded {
+            limit: LimitKind::StoreEntries,
+            maximum: 2,
+            ..
+        })
     ));
 }
 

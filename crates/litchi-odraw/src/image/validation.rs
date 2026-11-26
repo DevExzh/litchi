@@ -81,7 +81,13 @@ impl<'data> Entry<'data> {
                 .ok_or(Error::ArithmeticOverflow {
                     context: "resolved BLIP wire length",
                 })?;
-            if actual != self.size {
+            // The delay offset and the BLIP's own record header locate the
+            // image; the FBSE size is a redundant hint. Some producers write
+            // the length of the image data alone instead of the record's wire
+            // length, and readers that locate the record from its header
+            // accept that, so both spellings are admitted.
+            let data_only = u32::try_from(blip.data().len()).ok();
+            if actual != self.size && data_only != Some(self.size) {
                 let actual_size =
                     usize::try_from(actual).map_err(|_err| Error::ArithmeticOverflow {
                         context: "resolved BLIP wire length",
@@ -116,9 +122,15 @@ impl<'data> Store<'data> {
     /// # Errors
     ///
     /// Returns `Error::MalformedImage` when the record is not an `OfficeArt`
-    /// `BStore` container, contains an invalid child, or its file-block count
-    /// does not match `recInstance`, and `Error::ImageLimitExceeded` when the
-    /// raw record or entry count exceeds its configured image limit.
+    /// `BStore` container or contains an invalid child, and
+    /// `Error::ImageLimitExceeded` when the raw record or file-block count
+    /// exceeds its configured image limit.
+    ///
+    /// The store holds the file blocks its container actually contains. Some
+    /// producers write a `recInstance` that disagrees with that number, and
+    /// Office, LibreOffice and Apache POI all walk the children without
+    /// consulting it, so a mismatch is accepted. Image IDs are positions among
+    /// the children.
     pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
         let effective_records = record.limits().constrained_by(limits.records);
         if record.len() > effective_records.max_record_bytes {
@@ -134,14 +146,6 @@ impl<'data> Store<'data> {
         {
             return Err(Error::MalformedImage {
                 reason: "record is not an OfficeArt BStore container",
-            });
-        }
-        let count = record.instance();
-        if count > limits.max_store_entries {
-            return Err(Error::ImageLimitExceeded {
-                limit: LimitKind::StoreEntries,
-                observed: u64::from(count),
-                maximum: u64::from(limits.max_store_entries),
             });
         }
         // Keep the image validator in charge of classifying its raw record
@@ -170,11 +174,13 @@ impl<'data> Store<'data> {
             actual = actual.checked_add(1).ok_or(Error::MalformedImage {
                 reason: "BStore file-block count exceeds 4095",
             })?;
-        }
-        if actual != count {
-            return Err(Error::MalformedImage {
-                reason: "BStore file-block count does not match recInstance",
-            });
+            if actual > limits.max_store_entries {
+                return Err(Error::ImageLimitExceeded {
+                    limit: LimitKind::StoreEntries,
+                    observed: u64::from(actual),
+                    maximum: u64::from(limits.max_store_entries),
+                });
+            }
         }
         // A caller may validate an already admitted record under a different
         // policy. Rebind the borrowed view after admission to the exact
@@ -183,7 +189,7 @@ impl<'data> Store<'data> {
         let record = record.with_limits(effective_records);
         Ok(Self {
             record,
-            count,
+            count: actual,
             max_blip_bytes: limits.max_blip_bytes,
             max_store_entries: limits.max_store_entries,
             max_files: limits.max_files,

@@ -5,7 +5,7 @@ use std::{
 
 use image::{DynamicImage, ImageFormat, ImageReader};
 use litchi_core::error::{Error, Result};
-use litchi_odraw::image::{Blip, Compression, Meta};
+use litchi_odraw::image::{Blip, Compression, Meta, MetaHeader};
 
 use crate::raster::{RasterLimits, rasterize_svg};
 
@@ -116,6 +116,11 @@ pub struct Limits {
     /// Maximum decompressed metafile bytes.
     pub max_uncompressed_bytes: usize,
     /// Maximum decoded or rendered width.
+    ///
+    /// A vector picture rendered without a requested size is scaled down,
+    /// keeping its aspect ratio, to fit the width, height and pixel ceilings;
+    /// an explicitly requested size, or a decoded bitmap, that exceeds them is
+    /// rejected.
     pub max_width: u32,
     /// Maximum decoded or rendered height.
     pub max_height: u32,
@@ -198,10 +203,26 @@ pub fn convert_metafile(
     output: OutputFormat,
     options: Options,
 ) -> Result<ConvertedImage> {
+    convert_metafile_at(data, input, output, options, None)
+}
+
+/// Shared conversion core.
+///
+/// `natural_size` replaces the size the metafile declares for itself. A BLIP
+/// carries the size its host document displays, which is not necessarily the
+/// coordinate extent of the embedded metafile.
+fn convert_metafile_at(
+    data: &[u8],
+    input: InputFormat,
+    output: OutputFormat,
+    options: Options,
+    natural_size: Option<(u32, u32)>,
+) -> Result<ConvertedImage> {
     validate_limits(&options.limits)?;
     check_encoded(data.len(), &options.limits)?;
     let (svg, source_width, source_height, bitmap_only, mut diagnostics) =
         raw_metafile_svg(data, input, &options.limits)?;
+    let (source_width, source_height) = natural_size.unwrap_or((source_width, source_height));
     let selected = match output {
         OutputFormat::Auto if bitmap_only => ConvertedFormat::Png,
         OutputFormat::Auto | OutputFormat::Svg => ConvertedFormat::Svg,
@@ -268,17 +289,31 @@ pub(crate) fn rasterize_raw_metafile(
     format: ImageFormat,
     options: Options,
 ) -> Result<Vec<u8>> {
+    rasterize_metafile_at(data, input, format, options, None)
+}
+
+/// Rasterizes a metafile at an explicit natural size rather than the size the
+/// metafile declares for itself.
+fn rasterize_metafile_at(
+    data: &[u8],
+    input: InputFormat,
+    format: ImageFormat,
+    options: Options,
+    natural_size: Option<(u32, u32)>,
+) -> Result<Vec<u8>> {
     let output = match format {
         ImageFormat::Png => OutputFormat::Png,
         ImageFormat::Jpeg => OutputFormat::Jpeg,
-        ImageFormat::WebP => return rasterize_raw_metafile_webp(data, input, options),
+        ImageFormat::WebP => {
+            return rasterize_raw_metafile_webp(data, input, options, natural_size);
+        },
         _ => {
             return Err(Error::Unsupported(format!(
                 "unsupported metafile raster output: {format:?}"
             )));
         },
     };
-    let converted = convert_metafile(data, input, output, options)?;
+    let converted = convert_metafile_at(data, input, output, options, natural_size)?;
     reject_lossy_diagnostics(&converted.report)?;
     Ok(converted.bytes)
 }
@@ -313,8 +348,9 @@ fn rasterize_raw_metafile_webp(
     data: &[u8],
     input: InputFormat,
     options: Options,
+    natural_size: Option<(u32, u32)>,
 ) -> Result<Vec<u8>> {
-    let converted = convert_metafile(data, input, OutputFormat::Png, options)?;
+    let converted = convert_metafile_at(data, input, OutputFormat::Png, options, natural_size)?;
     reject_lossy_diagnostics(&converted.report)?;
     let png = converted.bytes;
     let image = image::load_from_memory_with_format(&png, ImageFormat::Png)
@@ -898,13 +934,20 @@ fn decode_bitmap(blip: &Blip<'_>, options: Options) -> Result<DynamicImage> {
 
 fn render_emf(meta: &Meta<'_>, format: ImageFormat, options: Options) -> Result<Vec<u8>> {
     let data = inflate_checked(meta, &options.limits)?;
-    rasterize_raw_metafile(&data, InputFormat::Emf, format, options)
+    rasterize_metafile_at(
+        &data,
+        InputFormat::Emf,
+        format,
+        options,
+        blip_natural_size(meta),
+    )
 }
 
 fn render_wmf(meta: &Meta<'_>, format: ImageFormat, options: Options) -> Result<Vec<u8>> {
     let data = inflate_checked(meta, &options.limits)?;
+    let natural_size = blip_natural_size(meta);
     let data = wmf_with_header(meta, data, &options.limits)?;
-    rasterize_raw_metafile(&data, InputFormat::Wmf, format, options)
+    rasterize_metafile_at(&data, InputFormat::Wmf, format, options, natural_size)
 }
 
 fn render_pict(meta: &Meta<'_>, options: Options) -> Result<DynamicImage> {
@@ -941,6 +984,29 @@ fn positive(value: i32) -> u32 {
     value.unsigned_abs().max(1)
 }
 
+const EMU_PER_INCH: u64 = 914_400;
+
+/// Returns the pixel size at which the host document displays this metafile
+/// BLIP, or `None` when the record declares no usable size.
+///
+/// `OfficeArt` spells the display size in English Metric Units, so it is the
+/// size a document reader shows at 100% zoom. The metafile's own coordinate
+/// extent describes its drawing space instead, which for producer-written
+/// records can be one to two orders of magnitude larger than the picture.
+fn blip_natural_size(meta: &Meta<'_>) -> Option<(u32, u32)> {
+    let extent = meta.header().extent;
+    Some((emu_to_pixels(extent.x)?, emu_to_pixels(extent.y)?))
+}
+
+/// Converts an `OfficeArt` English Metric Unit extent into a 96-DPI pixel
+/// extent, or `None` when the record declares no size that reaches one pixel.
+fn emu_to_pixels(value: i32) -> Option<u32> {
+    const PIXELS_PER_INCH: u64 = 96;
+    let emu = u64::try_from(value).ok().filter(|emu| *emu > 0)?;
+    let rounded = (emu * PIXELS_PER_INCH + EMU_PER_INCH / 2) / EMU_PER_INCH;
+    u32::try_from(rounded).ok().filter(|pixels| *pixels > 0)
+}
+
 fn target_dimensions(
     source_width: u32,
     source_height: u32,
@@ -961,10 +1027,61 @@ fn target_dimensions(
             let width = proportional(source_width, height, source_height)?;
             (width, height)
         },
-        (None, None) => (source_width, source_height),
+        (None, None) => fitted_dimensions(source_width, source_height, limits),
     };
     check_dimensions(width, height, limits)?;
     Ok((width, height))
+}
+
+/// Shrinks a natural size until it satisfies the raster limits.
+///
+/// A caller that requests no size gets the largest aspect-preserving raster the
+/// limits admit instead of a rejection: the vector picture is unchanged, only
+/// its sampling resolution differs. An explicitly requested size is never
+/// adjusted, so it still has to fit.
+fn fitted_dimensions(source_width: u32, source_height: u32, limits: &Limits) -> (u32, u32) {
+    let mut width = source_width.max(1);
+    let mut height = source_height.max(1);
+    if within_limits(width, height, limits) {
+        return (width, height);
+    }
+    if width > limits.max_width {
+        height = proportional(height, limits.max_width, width)
+            .unwrap_or(1)
+            .min(height);
+        width = limits.max_width;
+    }
+    if height > limits.max_height {
+        width = proportional(width, limits.max_height, height)
+            .unwrap_or(1)
+            .min(width);
+        height = limits.max_height;
+    }
+    if u64::from(width) * u64::from(height) > limits.max_pixels {
+        // The aspect-preserving width only grows with the height, so the
+        // tallest height inside the pixel budget is a binary search away.
+        let (mut low, mut high) = (1_u32, height);
+        while low < high {
+            let candidate_height = low + (high - low).div_ceil(2);
+            let candidate_width = proportional(width, candidate_height, height)
+                .unwrap_or(u32::MAX)
+                .max(1);
+            if u64::from(candidate_width) * u64::from(candidate_height) <= limits.max_pixels {
+                low = candidate_height;
+            } else {
+                high = candidate_height - 1;
+            }
+        }
+        width = proportional(width, low, height).unwrap_or(1).max(1);
+        height = low;
+    }
+    (width, height)
+}
+
+fn within_limits(width: u32, height: u32, limits: &Limits) -> bool {
+    width <= limits.max_width
+        && height <= limits.max_height
+        && u64::from(width) * u64::from(height) <= limits.max_pixels
 }
 
 fn proportional(source_other: u32, target: u32, source_axis: u32) -> Result<u32> {
@@ -997,17 +1114,41 @@ fn check_dimensions(width: u32, height: u32, limits: &Limits) -> Result<()> {
     Ok(())
 }
 
+/// Wraps the headerless WMF a BLIP stores so it plays the way a document
+/// viewer plays it.
+///
+/// A viewer plays the metafile into the picture's frame: it maps the BLIP's
+/// `rcBounds` rectangle onto the frame, and the metafile's own mapping records
+/// then override the window while the frame stays the viewport. The converter
+/// frames a picture with a device-space placeable rectangle and applies a
+/// metafile's window origin on top of it, so the frame is expressed as a
+/// placeable rectangle at the origin plus the mapping records a viewer would
+/// have set before the first record. Without a usable rectangle the metafile
+/// is left bare and the converter frames it from its own records.
 fn wmf_with_header<'data>(
     meta: &Meta<'data>,
     data: Cow<'data, [u8]>,
     limits: &Limits,
 ) -> Result<Cow<'data, [u8]>> {
+    const PLACEABLE_LEN: usize = 22;
+    const STANDARD_HEADER_LEN: usize = 18;
+
     if data.starts_with(&0x9AC6_CDD7u32.to_le_bytes()) {
         return Ok(data);
     }
+    let Some(window) = placeable_bounds(&meta.header()) else {
+        return Ok(data);
+    };
+    let has_standard_header =
+        data.len() >= STANDARD_HEADER_LEN && read_u16_at(&data, 2) == Some(WMF_HEADER_WORDS);
+    let frame_records = if has_standard_header {
+        frame_records(window)
+    } else {
+        Vec::new()
+    };
     let total = data
         .len()
-        .checked_add(22)
+        .checked_add(PLACEABLE_LEN + frame_records.len())
         .ok_or_else(|| parse("WMF placeable-header length overflows"))?;
     if total > limits.max_uncompressed_bytes {
         return Err(limit(
@@ -1015,26 +1156,14 @@ fn wmf_with_header<'data>(
             limits.max_uncompressed_bytes,
         ));
     }
-    let header = meta.header();
-    let bounds = if header.bounds == litchi_odraw::image::Rect::default() {
-        let width = emu_to_twips(header.extent.x)?;
-        let height = emu_to_twips(header.extent.y)?;
-        (0, 0, width, height)
-    } else {
-        (
-            checked_i16(header.bounds.left, "WMF left bound")?,
-            checked_i16(header.bounds.top, "WMF top bound")?,
-            checked_i16(header.bounds.right, "WMF right bound")?,
-            checked_i16(header.bounds.bottom, "WMF bottom bound")?,
-        )
-    };
+    let (left, top, right, bottom) = window;
+    let (width, height) = (frame_extent(left, right), frame_extent(top, bottom));
     let mut output = Vec::with_capacity(total);
     output.extend_from_slice(&0x9AC6_CDD7u32.to_le_bytes());
     output.extend_from_slice(&0u16.to_le_bytes());
-    output.extend_from_slice(&bounds.0.to_le_bytes());
-    output.extend_from_slice(&bounds.1.to_le_bytes());
-    output.extend_from_slice(&bounds.2.to_le_bytes());
-    output.extend_from_slice(&bounds.3.to_le_bytes());
+    for coordinate in [0, 0, width, height] {
+        output.extend_from_slice(&coordinate.to_le_bytes());
+    }
     output.extend_from_slice(&1440u16.to_le_bytes());
     output.extend_from_slice(&0u32.to_le_bytes());
     let checksum = output[..20]
@@ -1045,20 +1174,118 @@ fn wmf_with_header<'data>(
             sum ^ u16::from_le_bytes([bytes[0], bytes[1]])
         });
     output.extend_from_slice(&checksum.to_le_bytes());
-    output.extend_from_slice(&data);
+    if has_standard_header {
+        output.extend_from_slice(&data[..STANDARD_HEADER_LEN]);
+        output.extend_from_slice(&frame_records);
+        output.extend_from_slice(&data[STANDARD_HEADER_LEN..]);
+        // The standard header counts the metafile in 16-bit words and states
+        // its largest record; both include the records inserted above.
+        let inserted_words = u32::try_from(frame_records.len() / 2).unwrap_or(0);
+        let metafile_words = read_u32_at(&data, 6)
+            .unwrap_or(0)
+            .saturating_add(inserted_words);
+        let largest = read_u32_at(&data, 12)
+            .unwrap_or(0)
+            .max(FRAME_RECORD_MAX_WORDS);
+        let header = &mut output[PLACEABLE_LEN..PLACEABLE_LEN + STANDARD_HEADER_LEN];
+        header[6..10].copy_from_slice(&metafile_words.to_le_bytes());
+        header[12..16].copy_from_slice(&largest.to_le_bytes());
+    } else {
+        output.extend_from_slice(&data);
+    }
     Ok(Cow::Owned(output))
 }
 
-fn emu_to_twips(value: i32) -> Result<i16> {
-    let scaled = i64::from(value)
-        .checked_mul(1440)
-        .ok_or_else(|| parse("EMU-to-twips conversion overflows"))?
-        / 914_400;
-    i16::try_from(scaled).map_err(|_| parse("WMF extent does not fit a placeable header"))
+/// Size in 16-bit words of a `META_HEADER`, as stored in its `HeaderSize`.
+const WMF_HEADER_WORDS: u16 = 9;
+/// Size in words of the largest record `frame_records` emits.
+const FRAME_RECORD_MAX_WORDS: u32 = 5;
+
+/// Returns the length of one side of the frame, bounded to the 16-bit range
+/// the placeable header and the mapping records use.
+fn frame_extent(low: i16, high: i16) -> i16 {
+    let extent = i32::from(high) - i32::from(low);
+    i16::try_from(extent).unwrap_or(i16::MAX)
 }
 
-fn checked_i16(value: i32, field: &str) -> Result<i16> {
-    i16::try_from(value).map_err(|_| parse(format!("{field} does not fit i16")))
+/// Returns the records that set the playback mapping a viewer starts from:
+/// anisotropic mode, the BLIP rectangle as the window, and a viewport that is
+/// the frame at the origin.
+fn frame_records(window: (i16, i16, i16, i16)) -> Vec<u8> {
+    const SET_MAP_MODE: u16 = 0x0103;
+    const SET_WINDOW_ORG: u16 = 0x020B;
+    const SET_WINDOW_EXT: u16 = 0x020C;
+    const SET_VIEWPORT_ORG: u16 = 0x020D;
+    const SET_VIEWPORT_EXT: u16 = 0x020E;
+    const MM_ANISOTROPIC: i16 = 8;
+
+    let (left, top, right, bottom) = window;
+    let (width, height) = (frame_extent(left, right), frame_extent(top, bottom));
+    let mut records = Vec::new();
+    // Origin and extent records store their y operand first.
+    for (function, parameters) in [
+        (SET_MAP_MODE, &[MM_ANISOTROPIC][..]),
+        (SET_WINDOW_ORG, &[top, left][..]),
+        (SET_WINDOW_EXT, &[height, width][..]),
+        (SET_VIEWPORT_ORG, &[0, 0][..]),
+        (SET_VIEWPORT_EXT, &[height, width][..]),
+    ] {
+        let words = u32::try_from(3 + parameters.len()).unwrap_or(3);
+        records.extend_from_slice(&words.to_le_bytes());
+        records.extend_from_slice(&function.to_le_bytes());
+        for parameter in parameters {
+            records.extend_from_slice(&parameter.to_le_bytes());
+        }
+    }
+    records
+}
+
+/// Returns the rectangle a BLIP's metafile is framed with, ordered left, top,
+/// right, bottom with `left < right` and `top < bottom`, or `None` when the
+/// record gives no usable one.
+///
+/// Each `rcBounds` coordinate is 32 bits wide in the record, but the metafile
+/// coordinates it describes are 16 bits wide. Some producers write each
+/// coordinate through a 16-bit intermediate, so a coordinate outside the
+/// 16-bit range carries the metafile's own window rectangle in its low 16
+/// bits. A record without bounds takes the displayed size from `ptSize`,
+/// scaled into the 16-bit range.
+fn placeable_bounds(header: &MetaHeader) -> Option<(i16, i16, i16, i16)> {
+    let bounds = header.bounds;
+    let coordinates = [bounds.left, bounds.top, bounds.right, bounds.bottom];
+    if coordinates != [0; 4] {
+        let [left, top, right, bottom] = match coordinates.map(|value| i16::try_from(value).ok()) {
+            [Some(left), Some(top), Some(right), Some(bottom)] => [left, top, right, bottom],
+            _ => coordinates.map(low_i16),
+        };
+        let rectangle = (
+            left.min(right),
+            top.min(bottom),
+            left.max(right),
+            top.max(bottom),
+        );
+        return (rectangle.0 != rectangle.2 && rectangle.1 != rectangle.3).then_some(rectangle);
+    }
+    let width = u64::try_from(header.extent.x).ok().filter(|emu| *emu > 0)?;
+    let height = u64::try_from(header.extent.y).ok().filter(|emu| *emu > 0)?;
+    let twips = |emu: u64| emu * 1440 / EMU_PER_INCH;
+    let (width, height) = (twips(width), twips(height));
+    let largest = width.max(height).max(1);
+    let limit = u64::from(i16::MAX.unsigned_abs());
+    let fit = |value: u64| {
+        let scaled = if largest > limit {
+            value * limit / largest
+        } else {
+            value
+        };
+        i16::try_from(scaled.max(1)).unwrap_or(i16::MAX)
+    };
+    Some((0, 0, fit(width), fit(height)))
+}
+
+fn low_i16(value: i32) -> i16 {
+    let bytes = value.to_le_bytes();
+    i16::from_le_bytes([bytes[0], bytes[1]])
 }
 
 fn dib_to_bmp<'data>(data: &'data [u8], limits: &Limits) -> Result<Cow<'data, [u8]>> {
@@ -1232,7 +1459,7 @@ mod tests {
         Compression as Level,
         write::{DeflateEncoder, ZlibEncoder},
     };
-    use litchi_odraw::image::Blip;
+    use litchi_odraw::image::{Blip, Point, Rect};
 
     fn empty_emf(width: i32, height: i32) -> Vec<u8> {
         let mut data = vec![0_u8; 88];
@@ -1349,6 +1576,80 @@ mod tests {
         body.extend_from_slice(&[0x00, 0xFE]);
         body.extend_from_slice(compressed);
         record(0x3D4, 0xF01A, &body)
+    }
+
+    fn wmf_record(function: u16, params: &[u8]) -> Vec<u8> {
+        let mut record = Vec::new();
+        record.extend_from_slice(&u32::try_from((params.len() + 6) / 2).unwrap().to_le_bytes());
+        record.extend_from_slice(&function.to_le_bytes());
+        record.extend_from_slice(params);
+        record
+    }
+
+    /// Joins records into a headerless WMF, the layout documents store inside
+    /// a BLIP.
+    fn wmf_from_records(records: &[Vec<u8>]) -> Vec<u8> {
+        let eof = wmf_record(0x0000, &[]);
+        let largest = records
+            .iter()
+            .chain([&eof])
+            .map(|record| u32::try_from(record.len() / 2).unwrap())
+            .max()
+            .unwrap();
+        let body: Vec<u8> = records.iter().chain([&eof]).flatten().copied().collect();
+        let words = u32::try_from((18 + body.len()) / 2).unwrap();
+        let mut data = Vec::new();
+        data.extend_from_slice(&1_u16.to_le_bytes());
+        data.extend_from_slice(&9_u16.to_le_bytes());
+        data.extend_from_slice(&0x0300_u16.to_le_bytes());
+        data.extend_from_slice(&words.to_le_bytes());
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        data.extend_from_slice(&largest.to_le_bytes());
+        data.extend_from_slice(&0_u16.to_le_bytes());
+        data.extend_from_slice(&body);
+        data
+    }
+
+    fn wmf_params(values: &[i16]) -> Vec<u8> {
+        values
+            .iter()
+            .flat_map(|value| value.to_le_bytes())
+            .collect()
+    }
+
+    /// Builds a headerless WMF that draws one rectangle at the origin.
+    fn wmf_metafile(width: i16, height: i16) -> Vec<u8> {
+        let rectangle = wmf_record(0x041B, &wmf_params(&[height, width, 0, 0]));
+        wmf_from_records(&[rectangle])
+    }
+
+    /// Builds a headerless WMF whose window starts at a nonzero origin and
+    /// that draws one rectangle covering the whole window.
+    fn wmf_metafile_with_window(left: i16, top: i16, width: i16, height: i16) -> Vec<u8> {
+        wmf_from_records(&[
+            wmf_record(0x0103, &wmf_params(&[8])),
+            wmf_record(0x020B, &wmf_params(&[top, left])),
+            wmf_record(0x020C, &wmf_params(&[height, width])),
+            wmf_record(
+                0x041B,
+                &wmf_params(&[top + height, left + width, top, left]),
+            ),
+        ])
+    }
+
+    fn wmf_blip(bounds: Rect, extent: Point, metafile: &[u8]) -> Vec<u8> {
+        let declared = u32::try_from(metafile.len()).unwrap();
+        let mut body = vec![0; 16];
+        body.extend_from_slice(&declared.to_le_bytes());
+        for coordinate in [bounds.left, bounds.top, bounds.right, bounds.bottom] {
+            body.extend_from_slice(&coordinate.to_le_bytes());
+        }
+        body.extend_from_slice(&extent.x.to_le_bytes());
+        body.extend_from_slice(&extent.y.to_le_bytes());
+        body.extend_from_slice(&declared.to_le_bytes());
+        body.extend_from_slice(&[0xFE, 0xFE]);
+        body.extend_from_slice(metafile);
+        record(0x216, 0xF01B, &body)
     }
 
     #[test]
@@ -1542,5 +1843,273 @@ mod tests {
             )
             .is_err()
         );
+    }
+
+    #[test]
+    fn unrequested_raster_sizes_are_fitted_to_the_limits() {
+        let limits = Limits {
+            max_width: 50,
+            max_height: 30,
+            max_pixels: 24 * 24,
+            ..Limits::default()
+        };
+        assert_eq!(fitted_dimensions(200, 100, &limits), (32, 16));
+        assert_eq!(fitted_dimensions(10, 10, &limits), (10, 10));
+        assert_eq!(fitted_dimensions(200, 10, &limits), (50, 3));
+        assert_eq!(fitted_dimensions(10, 200, &limits), (2, 30));
+
+        // An explicitly requested size still has to fit.
+        let emf = rectangle_emf(200, 100);
+        assert!(
+            convert_metafile(
+                &emf,
+                InputFormat::Emf,
+                OutputFormat::Png,
+                Options::default().limits(limits).width(60),
+            )
+            .is_err()
+        );
+        let converted = convert_metafile(
+            &emf,
+            InputFormat::Emf,
+            OutputFormat::Png,
+            Options::default().limits(limits),
+        )
+        .unwrap();
+        let rendered =
+            image::load_from_memory_with_format(&converted.bytes, ImageFormat::Png).unwrap();
+        assert_eq!((rendered.width(), rendered.height()), (32, 16));
+    }
+
+    #[test]
+    fn metafile_blips_raster_at_the_size_their_document_declares() {
+        // rcBounds describe a 12480x1792 drawing space; the record states a
+        // 520x75 pixel display size in EMUs.
+        let bytes = wmf_blip(
+            Rect {
+                left: 0,
+                top: 0,
+                right: 12480,
+                bottom: 1792,
+            },
+            Point {
+                x: 4_952_880,
+                y: 711_000,
+            },
+            &wmf_metafile(200, 100),
+        );
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        let png = to_png(&blip, Options::default()).unwrap();
+        let rendered = image::load_from_memory_with_format(&png, ImageFormat::Png).unwrap();
+        assert_eq!((rendered.width(), rendered.height()), (520, 75));
+
+        // A record without a declared size keeps the metafile's own extent.
+        let bytes = wmf_blip(
+            Rect {
+                left: 0,
+                top: 0,
+                right: 40,
+                bottom: 20,
+            },
+            Point::default(),
+            &wmf_metafile(40, 20),
+        );
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        let png = to_png(&blip, Options::default()).unwrap();
+        let rendered = image::load_from_memory_with_format(&png, ImageFormat::Png).unwrap();
+        assert_eq!((rendered.width(), rendered.height()), (40, 20));
+    }
+
+    #[test]
+    fn wmf_bounds_written_through_a_16_bit_field_frame_the_picture() {
+        // The record stores each placeable coordinate through a 16-bit
+        // intermediate, so the 8091x3516 drawing rectangle appears as values
+        // that do not fit the placeable fields.
+        let bytes = wmf_blip(
+            Rect {
+                left: 61_571,
+                top: 2_296,
+                right: 69_662,
+                bottom: 64_316,
+            },
+            Point {
+                x: 1_000_000,
+                y: 500_000,
+            },
+            &wmf_metafile(200, 100),
+        );
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        // The recovered 8091x3516 rectangle keeps its aspect ratio in the
+        // SVG, which the converter scales to its 768-unit design width.
+        let svg = to_svg(&blip, Options::default()).unwrap();
+        assert!(
+            svg.starts_with(r#"<svg width="768" height="333.74""#),
+            "{svg}"
+        );
+
+        // A rectangle that cannot be recovered leaves the picture to be
+        // framed by the coordinates of its own records instead of failing.
+        let bytes = wmf_blip(
+            Rect {
+                left: 0,
+                top: 40_000,
+                right: 40_000,
+                bottom: 40_000,
+            },
+            Point {
+                x: 1_000_000,
+                y: 500_000,
+            },
+            &wmf_metafile(200, 100),
+        );
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        assert!(to_svg(&blip, Options::default()).is_ok());
+    }
+
+    #[test]
+    fn oversized_natural_sizes_are_fitted_for_blips() {
+        let limits = Limits {
+            max_width: 64,
+            max_height: 64,
+            max_pixels: 64 * 64,
+            ..Limits::default()
+        };
+        // A 200000x100000 pixel display size, far outside the raster limits.
+        let bytes = wmf_blip(
+            Rect {
+                left: 0,
+                top: 0,
+                right: 200,
+                bottom: 100,
+            },
+            Point {
+                x: 1_905_000_000,
+                y: 952_500_000,
+            },
+            &wmf_metafile(200, 100),
+        );
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        let png = to_png(&blip, Options::default().limits(limits)).unwrap();
+        let rendered = image::load_from_memory_with_format(&png, ImageFormat::Png).unwrap();
+        assert_eq!((rendered.width(), rendered.height()), (64, 32));
+        assert!(to_png(&blip, Options::default().limits(limits).width(65)).is_err());
+    }
+
+    #[test]
+    fn placeable_rectangle_uses_the_declared_size_only_without_bounds() {
+        let header = |bounds: Rect, x: i32, y: i32| MetaHeader {
+            size: 0,
+            bounds,
+            extent: Point { x, y },
+            saved: 0,
+            compression: Compression::None,
+        };
+        let zero = Rect::default();
+        // 100 inches by 50 inches does not fit 16-bit twips, so it is scaled.
+        assert_eq!(
+            placeable_bounds(&header(zero, 91_440_000, 45_720_000)),
+            Some((0, 0, 32767, 16383))
+        );
+        assert_eq!(
+            placeable_bounds(&header(zero, 914_400, 457_200)),
+            Some((0, 0, 1440, 720))
+        );
+        assert_eq!(placeable_bounds(&header(zero, 0, 457_200)), None);
+        assert_eq!(placeable_bounds(&header(zero, -5, -5)), None);
+        let degenerate = Rect {
+            left: 5,
+            top: 0,
+            right: 5,
+            bottom: 9,
+        };
+        assert_eq!(
+            placeable_bounds(&header(degenerate, 914_400, 457_200)),
+            None
+        );
+        let declared = Rect {
+            left: -4,
+            top: 3,
+            right: 90,
+            bottom: 50,
+        };
+        assert_eq!(
+            placeable_bounds(&header(declared, 914_400, 457_200)),
+            Some((-4, 3, 90, 50))
+        );
+    }
+
+    /// Returns whether a dark pixel lies in each of the four quarters of the
+    /// raster along its width and its height.
+    fn dark_pixels_span_the_raster(png: &[u8]) -> bool {
+        let image = image::load_from_memory_with_format(png, ImageFormat::Png)
+            .unwrap()
+            .to_luma8();
+        let (width, height) = image.dimensions();
+        let dark = |x: u32, y: u32| image.get_pixel(x, y).0[0] < 128;
+        let column =
+            |range: std::ops::Range<u32>| range.clone().any(|x| (0..height).any(|y| dark(x, y)));
+        let row =
+            |range: std::ops::Range<u32>| range.clone().any(|y| (0..width).any(|x| dark(x, y)));
+        column(0..width / 4)
+            && column(width * 3 / 4..width)
+            && row(0..height / 4)
+            && row(height * 3 / 4..height)
+    }
+
+    #[test]
+    fn metafiles_with_a_nonzero_window_origin_fill_their_frame() {
+        // The record's rectangle is the metafile's own window, which does not
+        // start at the origin; the picture must still fill the frame.
+        for (left, top) in [(-100, -50), (300, 200), (0, 0)] {
+            let bytes = wmf_blip(
+                Rect {
+                    left: i32::from(left),
+                    top: i32::from(top),
+                    right: i32::from(left) + 200,
+                    bottom: i32::from(top) + 100,
+                },
+                Point {
+                    x: 1_905_000,
+                    y: 952_500,
+                },
+                &wmf_metafile_with_window(left, top, 200, 100),
+            );
+            let blip = Blip::parse(&bytes, Default::default()).unwrap();
+            let png = to_png(&blip, Options::default()).unwrap();
+            let rendered = image::load_from_memory_with_format(&png, ImageFormat::Png).unwrap();
+            assert_eq!((rendered.width(), rendered.height()), (200, 100));
+            assert!(
+                dark_pixels_span_the_raster(&png),
+                "window origin {left},{top}"
+            );
+        }
+    }
+
+    #[test]
+    fn frame_records_keep_the_standard_header_consistent() {
+        let metafile = wmf_metafile(40, 20);
+        let bytes = wmf_blip(
+            Rect {
+                left: 0,
+                top: 0,
+                right: 40,
+                bottom: 20,
+            },
+            Point::default(),
+            &metafile,
+        );
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        let framed = wmf_with_header(
+            match &blip {
+                Blip::Wmf(meta) => meta,
+                _ => unreachable!(),
+            },
+            Cow::Owned(metafile.clone()),
+            &Limits::default(),
+        )
+        .unwrap();
+        // 22 placeable bytes plus five 8- or 10-byte mapping records.
+        assert_eq!(framed.len(), metafile.len() + 22 + 8 + 4 * 10);
+        assert!(crate::wmf::WmfParser::new(&framed, &Limits::default()).is_ok());
     }
 }

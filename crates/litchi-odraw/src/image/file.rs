@@ -26,6 +26,7 @@ enum Source<'data> {
     Owned {
         record: Vec<u8>,
         data_start: usize,
+        data_len: usize,
         raw_limits: crate::Limits,
         max_blip_bytes: u32,
         kind: Kind,
@@ -119,6 +120,9 @@ impl<'data> File<'data> {
 
     /// Borrows the stored native image bytes without decoding them.
     ///
+    /// The slice is exactly the declared image payload; record bytes that
+    /// follow a metafile payload are not image data.
+    ///
     /// # Errors
     ///
     /// Returns `Error::MalformedImage` when the owned BLIP data range is
@@ -127,10 +131,20 @@ impl<'data> File<'data> {
         match &self.source {
             Source::View { blip, .. } => Ok(blip.data()),
             Source::Owned {
-                record, data_start, ..
-            } => record.get(*data_start..).ok_or(Error::MalformedImage {
-                reason: "owned BLIP data range is invalid",
-            }),
+                record,
+                data_start,
+                data_len,
+                ..
+            } => {
+                let end = data_start
+                    .checked_add(*data_len)
+                    .ok_or(Error::ArithmeticOverflow {
+                        context: "owned BLIP data range",
+                    })?;
+                record.get(*data_start..end).ok_or(Error::MalformedImage {
+                    reason: "owned BLIP data range is invalid",
+                })
+            },
         }
     }
 
@@ -144,14 +158,15 @@ impl<'data> File<'data> {
     /// the owned data range underflows.
     pub fn into_owned(self) -> Result<File<'static>> {
         let kind = self.kind();
-        let (record, data_start, raw_limits, max_blip_bytes) = match self.source {
+        let (record, data_start, data_len, raw_limits, max_blip_bytes) = match self.source {
             Source::Owned {
                 record,
                 data_start,
+                data_len,
                 raw_limits,
                 max_blip_bytes,
                 ..
-            } => (record, data_start, raw_limits, max_blip_bytes),
+            } => (record, data_start, data_len, raw_limits, max_blip_bytes),
             Source::View {
                 blip,
                 max_blip_bytes,
@@ -184,20 +199,23 @@ impl<'data> File<'data> {
                         reason: "owned BLIP framing could not be encoded",
                     }
                 })?;
-                let data_start =
-                    record
-                        .len()
-                        .checked_sub(data_len)
-                        .ok_or(Error::ArithmeticOverflow {
-                            context: "owned BLIP data range",
-                        })?;
-                (record, data_start, raw_limits, max_blip_bytes)
+                // The copy keeps the whole record body, including any bytes a
+                // producer appended after a metafile payload.
+                let data_start = record
+                    .len()
+                    .checked_sub(data_len)
+                    .and_then(|start| start.checked_sub(blip.trailing_len()))
+                    .ok_or(Error::ArithmeticOverflow {
+                        context: "owned BLIP data range",
+                    })?;
+                (record, data_start, data_len, raw_limits, max_blip_bytes)
             },
         };
         Ok(File {
             source: Source::Owned {
                 record,
                 data_start,
+                data_len,
                 raw_limits,
                 max_blip_bytes,
                 kind,
@@ -593,6 +611,94 @@ mod tests {
         record
     }
 
+    fn wmf_blip(data: &[u8], trailing: &[u8]) -> Vec<u8> {
+        let declared = u32::try_from(data.len()).expect("payload length fits in u32");
+        let mut payload = vec![0; 16];
+        payload.extend_from_slice(&declared.to_le_bytes());
+        payload.extend_from_slice(&[0; 24]);
+        payload.extend_from_slice(&declared.to_le_bytes());
+        payload.extend_from_slice(&[0xfe, 0xfe]);
+        payload.extend_from_slice(data);
+        payload.extend_from_slice(trailing);
+        let mut record = Vec::new();
+        record.extend_from_slice(&(0x216u16 << 4).to_le_bytes());
+        record.extend_from_slice(&0xf01bu16.to_le_bytes());
+        record.extend_from_slice(
+            &u32::try_from(payload.len())
+                .expect("payload length fits in u32")
+                .to_le_bytes(),
+        );
+        record.extend_from_slice(&payload);
+        record
+    }
+
+    #[test]
+    fn delay_keeps_record_bytes_after_the_payload_out_of_the_image() {
+        let bytes = wmf_blip(b"wmf", b"stale");
+        let files = delay(&bytes, Limits::default()).expect("valid delay stream");
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].data().expect("image data"), b"wmf");
+        let owned = files
+            .into_iter()
+            .next()
+            .expect("one image")
+            .into_owned()
+            .expect("detach image");
+        assert_eq!(owned.kind(), Kind::Wmf);
+        assert_eq!(owned.data().expect("owned image data"), b"wmf");
+        assert_eq!(
+            owned.blip().expect("owned BLIP").trailing_len(),
+            5,
+            "the detached record keeps the bytes the producer appended"
+        );
+    }
+
+    #[test]
+    fn every_entry_point_accepts_a_metafile_blip_with_bytes_after_the_payload() {
+        let blip = wmf_blip(b"wmf", b"stale");
+        let mut container = Vec::new();
+        container.extend_from_slice(&0x1fu16.to_le_bytes());
+        container.extend_from_slice(&0xf001u16.to_le_bytes());
+        container.extend_from_slice(
+            &u32::try_from(blip.len() * 2)
+                .expect("container length fits in u32")
+                .to_le_bytes(),
+        );
+        // The container declares one child while holding two.
+        container[0..2].copy_from_slice(&((1u16 << 4) | 0x0f).to_le_bytes());
+        container.extend_from_slice(&blip);
+        container.extend_from_slice(&blip);
+
+        let limits = Limits::default();
+        let store = store(&container, limits)
+            .expect("store scan")
+            .expect("one BStore");
+        assert_eq!(store.len(), 2);
+        let files = all(&store, None).expect("all store images");
+        assert_eq!(files.len(), 2);
+        for file in &files {
+            assert_eq!(file.data().expect("image data"), b"wmf");
+        }
+        let one = get(&store, Id::new(2).expect("identifier"), None)
+            .expect("lookup")
+            .expect("second image");
+        assert_eq!(one.data().expect("image data"), b"wmf");
+
+        let scanned = scan(&container, limits).expect("scan");
+        assert_eq!(scanned.len(), 2);
+        assert!(
+            scanned
+                .iter()
+                .all(|file| file.data().expect("image data") == b"wmf")
+        );
+
+        let (parsed, _) = Record::parse(&blip, 0, limits.record_limits()).expect("record");
+        let file = record(&parsed, limits).expect("direct record");
+        assert_eq!(file.data().expect("image data"), b"wmf");
+        let file = record_with_delay(&parsed, None, limits).expect("direct record with delay");
+        assert_eq!(file.blip().expect("blip").trailing_len(), 5);
+    }
+
     #[test]
     fn owned_file_reparses_without_a_self_reference() {
         let bytes = png_blip(b"png");
@@ -620,6 +726,7 @@ mod tests {
             source: Source::Owned {
                 record: bytes,
                 data_start: 25,
+                data_len: 3,
                 raw_limits: limits.records,
                 max_blip_bytes: limits.max_blip_bytes,
                 kind: Kind::Png,
