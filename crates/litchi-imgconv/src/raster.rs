@@ -137,14 +137,66 @@ pub(crate) fn rasterize_svg(
         ));
 
         let source = tree.size();
-        let transform = tiny_skia::Transform::from_scale(
+        let (scale_x, scale_y) = (
             width as f32 / source.width(),
             height as f32 / source.height(),
         );
+        if !group_fits(tree.root(), scale_x, scale_y) {
+            return Err(Error::Unsupported(
+                "picture geometry extends beyond the rasterizer's numeric range".to_string(),
+            ));
+        }
+        let transform = tiny_skia::Transform::from_scale(scale_x, scale_y);
         resvg::render(&tree, transform, &mut pixmap);
     }
 
     encode_pixels(pixels, width, height, format, limits.max_output_bytes)
+}
+
+/// Largest coordinate magnitude, in output pixels, accepted for rendering.
+///
+/// tiny-skia's edge builder overflows its fixed-point arithmetic, and panics,
+/// for geometry about a billion pixels away; real pictures stay far inside
+/// this bound, which leaves two orders of magnitude of margin.
+const MAX_RASTER_COORDINATE: f32 = 1.0e7;
+
+/// Whether every node, clip path, mask and pattern under `group` stays within
+/// [`MAX_RASTER_COORDINATE`] once scaled to output pixels.
+fn group_fits(group: &usvg::Group, scale_x: f32, scale_y: f32) -> bool {
+    let fits = |rect: usvg::Rect| {
+        [
+            rect.left() * scale_x,
+            rect.right() * scale_x,
+            rect.top() * scale_y,
+            rect.bottom() * scale_y,
+        ]
+        .iter()
+        .all(|value| value.is_finite() && value.abs() <= MAX_RASTER_COORDINATE)
+    };
+    let paint_fits = |paint: Option<&usvg::Paint>| match paint {
+        Some(usvg::Paint::Pattern(pattern)) => group_fits(pattern.root(), scale_x, scale_y),
+        _ => true,
+    };
+    if group
+        .clip_path()
+        .is_some_and(|clip| !group_fits(clip.root(), scale_x, scale_y))
+        || group
+            .mask()
+            .is_some_and(|mask| !group_fits(mask.root(), scale_x, scale_y))
+    {
+        return false;
+    }
+    group.children().iter().all(|node| {
+        fits(node.abs_stroke_bounding_box())
+            && match node {
+                usvg::Node::Group(child) => group_fits(child, scale_x, scale_y),
+                usvg::Node::Path(path) => {
+                    paint_fits(path.fill().map(usvg::Fill::paint))
+                        && paint_fits(path.stroke().map(usvg::Stroke::paint))
+                },
+                usvg::Node::Image(_) | usvg::Node::Text(_) => true,
+            }
+    })
 }
 
 fn bounded_image_resolver(limits: RasterLimits) -> usvg::ImageHrefResolver<'static> {
@@ -446,6 +498,23 @@ fn validate_request(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn geometry_far_outside_the_canvas_is_rejected_instead_of_panicking() {
+        let svg = concat!(
+            r#"<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 10 10">"#,
+            r#"<path d="M0 0L0 -2147483590" stroke="black" stroke-width="846725122"/></svg>"#,
+        );
+        let result = rasterize_svg(
+            svg,
+            10,
+            10,
+            Rgba([255, 255, 255, 255]),
+            ImageFormat::Png,
+            &RasterLimits::default(),
+        );
+        assert!(matches!(result, Err(Error::Unsupported(_))), "{result:?}");
+    }
 
     #[test]
     fn system_fonts_are_loaded_once_per_process() {

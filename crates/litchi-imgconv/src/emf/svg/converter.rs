@@ -582,7 +582,7 @@ impl<'a> EmfSvgConverter<'a> {
                     value.object_index,
                     GdiObject::Pen(Pen::from_create_pen(
                         value.pen_style,
-                        value.width,
+                        logpen_width(value.width),
                         value.color,
                     )),
                     kind,
@@ -2971,6 +2971,12 @@ fn arc_path(arc: EmrArc, kind: EmrType, dc: &DeviceContext) -> Result<(PathBuild
     Ok((b, logical_end))
 }
 
+/// Width of an [MS-EMF] 2.2.19 LogPen, whose `Width` is the signed `x` of a
+/// PointL; a negative width draws like a zero-width (cosmetic) pen.
+fn logpen_width(raw: u32) -> u32 {
+    u32::try_from(i32::from_le_bytes(raw.to_le_bytes())).unwrap_or(0)
+}
+
 fn angle_arc_path(arc: EmrAngleArc, dc: &DeviceContext) -> Result<(PathBuilder, (f64, f64))> {
     if arc.radius == 0 || !arc.start_angle.is_finite() || !arc.sweep_angle.is_finite() {
         return Err(Error::ParseError("invalid AngleArc".into()));
@@ -2979,7 +2985,14 @@ fn angle_arc_path(arc: EmrAngleArc, dc: &DeviceContext) -> Result<(PathBuilder, 
     let cy = f64::from(arc.center.y);
     let radius = f64::from(arc.radius);
     let start = f64::from(arc.start_angle).to_radians();
-    let sweep = f64::from(arc.sweep_angle).to_radians();
+    let full_sweep = f64::from(arc.sweep_angle).to_radians();
+    // A sweep beyond one turn retraces the circle. One full turn plus the
+    // remainder draws the same outline and ends at the same point.
+    let sweep = if full_sweep.abs() > 2.0 * PI {
+        full_sweep.signum() * (2.0 * PI + full_sweep.abs() % (2.0 * PI))
+    } else {
+        full_sweep
+    };
     let steps = ((sweep.abs() / (PI / 16.0)).ceil() as usize).max(1);
     let first = (cx + radius * start.cos(), cy - radius * start.sin());
     let end_angle = start + sweep;
@@ -4655,5 +4668,41 @@ mod tests {
         emf[12..16].copy_from_slice(&7_i32.to_le_bytes());
         let (svg, _) = convert(&emf);
         assert!(svg.contains("viewBox=\"5 7 95 93\""), "{svg}");
+    }
+
+    #[test]
+    fn angle_arc_sweeps_beyond_one_turn_stay_bounded() {
+        let mut arc = point(50, 50);
+        arc.extend_from_slice(&20_u32.to_le_bytes());
+        arc.extend_from_slice(&0.0_f32.to_le_bytes());
+        arc.extend_from_slice(&3.9e11_f32.to_le_bytes());
+        let (svg, codes) = convert_codes(vec![
+            record(EmrType::MoveToEx, &point(70, 50)),
+            record(EmrType::AngleArc, &arc),
+        ]);
+        assert!(codes.is_empty(), "{codes:?}");
+        // One turn plus the remainder: at most 64 segments.
+        let segments = svg.matches(' ').count();
+        assert!(segments < 400, "{} bytes of SVG", svg.len());
+    }
+
+    #[test]
+    fn a_negative_logpen_width_draws_a_cosmetic_pen() {
+        let mut pen = Vec::new();
+        pen.extend_from_slice(&1_u32.to_le_bytes());
+        pen.extend_from_slice(&0_u32.to_le_bytes());
+        pen.extend_from_slice(&(-1_i32).to_le_bytes());
+        pen.extend_from_slice(&0_u32.to_le_bytes());
+        pen.extend_from_slice(&0_u32.to_le_bytes());
+        let mut select = Vec::new();
+        select.extend_from_slice(&1_u32.to_le_bytes());
+        let (svg, _) = convert_codes(vec![
+            record(EmrType::CreatePen, &pen),
+            record(EmrType::SelectObject, &select),
+            record(EmrType::MoveToEx, &point(0, 0)),
+            line_to(30, 30),
+        ]);
+        assert!(!svg.contains("stroke-width=\"4294967295\""), "{svg}");
+        assert!(!svg.contains("e9"), "{svg}");
     }
 }
