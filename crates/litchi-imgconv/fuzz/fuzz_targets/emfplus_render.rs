@@ -3,7 +3,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{fuzz_mutator, fuzz_target};
 use litchi_imgconv::emfplus::ParserLimits;
 use litchi_imgconv::emfplus::objects::DecodeLimits;
 use litchi_imgconv::emfplus::playback::PlaybackLimits;
@@ -55,4 +55,8 @@ fuzz_target!(|data: &[u8]| {
     if let Ok(svg) = convert_metafile(&emf, InputFormat::Emf, OutputFormat::Svg, options) {
         common::assert_well_formed_svg(&svg.bytes, options.limits.max_output_bytes);
     }
+});
+
+fuzz_mutator!(|data: &mut [u8], size: usize, max_size: usize, seed: u32| {
+    common::mutate::mutate::<common::mutate::EmfPlus>(data, size, max_size, seed)
 });

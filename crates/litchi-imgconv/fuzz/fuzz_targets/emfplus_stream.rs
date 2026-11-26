@@ -3,7 +3,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{fuzz_mutator, fuzz_target};
 use litchi_imgconv::emfplus::{
     EmfPlusRecordIter, ParserLimits, try_extract_emfplus_comment_body, validate_complete_stream,
 };
@@ -27,4 +27,8 @@ fuzz_target!(|data: &[u8]| {
         let _ = record.bytes();
         let _ = record.object_fragment(limits);
     }
+});
+
+fuzz_mutator!(|data: &mut [u8], size: usize, max_size: usize, seed: u32| {
+    common::mutate::mutate::<common::mutate::EmfPlus>(data, size, max_size, seed)
 });

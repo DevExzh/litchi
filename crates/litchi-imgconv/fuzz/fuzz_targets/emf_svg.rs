@@ -3,7 +3,7 @@
 #[path = "common/mod.rs"]
 mod common;
 
-use libfuzzer_sys::fuzz_target;
+use libfuzzer_sys::{fuzz_mutator, fuzz_target};
 use litchi_imgconv::{InputFormat, Options, OutputFormat, convert_metafile};
 
 fuzz_target!(|data: &[u8]| {
@@ -28,4 +28,8 @@ fuzz_target!(|data: &[u8]| {
             _ => panic!("repeating a conversion changed its outcome"),
         }
     }
+});
+
+fuzz_mutator!(|data: &mut [u8], size: usize, max_size: usize, seed: u32| {
+    common::mutate::mutate::<common::mutate::Emf>(data, size, max_size, seed)
 });

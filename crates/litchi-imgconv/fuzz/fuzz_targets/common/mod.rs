@@ -2,6 +2,8 @@
 
 #![allow(dead_code)]
 
+pub mod mutate;
+
 /// A raster-sized conversion budget: a 256x256 render, 1 MiB of encoded
 /// output and 20 000 metafile records.
 pub fn small_limits() -> litchi_imgconv::Limits {
