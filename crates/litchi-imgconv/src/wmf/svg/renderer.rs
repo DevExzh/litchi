@@ -1032,7 +1032,8 @@ impl<'hook> SvgRenderer<'hook> {
         let y = read_i16_le(&rec.params, 4).unwrap_or(0);
         let x = read_i16_le(&rec.params, 6).unwrap_or(0);
         let (x, y) = self.transform.point(&self.state.mapping, x, y);
-        let size = self.transform.device_width(1.0).max(1.0);
+        // One device pixel; the SVG canvas stands for the playback device.
+        let size = 1.0;
         let mut output = String::with_capacity(144);
         output.push_str(r#"<rect x=""#);
         write_num(&mut output, x - size / 2.0);
@@ -2146,8 +2147,16 @@ mod tests {
     }
 
     fn renderer() -> SvgRenderer<'static> {
+        renderer_with(CoordinateTransform::new(
+            (0.0, 0.0, 100.0, 100.0),
+            100.0,
+            100.0,
+        ))
+    }
+
+    fn renderer_with(transform: CoordinateTransform) -> SvgRenderer<'static> {
         SvgRenderer::new(
-            CoordinateTransform::new((0.0, 0.0, 100.0, 100.0), 100.0, 100.0),
+            transform,
             None,
             DibLimits::default(),
             crate::Limits::default().max_state_depth,
@@ -2262,6 +2271,18 @@ mod tests {
             .unwrap();
         assert!(output.contains(r##"fill="#112233""##));
         assert_eq!(renderer.state.position, (9, 8));
+    }
+
+    #[test]
+    fn set_pixel_paints_one_canvas_unit_under_a_magnifying_transform() {
+        // The whole 1-by-1 device extent fills a 100-unit canvas.
+        let mut renderer =
+            renderer_with(CoordinateTransform::new((0.0, 0.0, 1.0, 1.0), 100.0, 100.0));
+        let output = renderer
+            .render_record(&rec(record::SET_PIXEL, &[0, 0, 0, 0, 0, 0, 0, 0]))
+            .unwrap();
+
+        assert!(output.contains(r#"width="1" height="1""#));
     }
 
     #[test]
