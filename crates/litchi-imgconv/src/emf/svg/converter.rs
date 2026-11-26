@@ -854,8 +854,8 @@ impl<'a> EmfSvgConverter<'a> {
             | StretchPolicy::WhiteOnBlack
             | StretchPolicy::ColorOnColor => "optimizeSpeed",
         };
-        Ok(vec![format!(
-            "<g transform=\"matrix({} {} {} {} {} {})\" image-rendering=\"{}\" {}>{}</g>",
+        let element = format!(
+            "<g transform=\"matrix({} {} {} {} {} {})\" image-rendering=\"{}\">{}</g>",
             fmt(matrix[0]),
             fmt(matrix[1]),
             fmt(matrix[2]),
@@ -863,9 +863,14 @@ impl<'a> EmfSvgConverter<'a> {
             fmt(matrix[4]),
             fmt(matrix[5]),
             interpolation,
-            state.dc.clip_attr(),
             image.element
-        )])
+        );
+        let clip = state.dc.clip_attr();
+        Ok(vec![if clip.is_empty() {
+            element
+        } else {
+            device_clipped(&clip, &element)
+        }])
     }
 
     fn poly_record(
@@ -1788,6 +1793,21 @@ fn angle_arc_path(arc: EmrAngleArc, dc: &DeviceContext) -> Result<(PathBuilder, 
     Ok((b, end))
 }
 
+/// Wraps an element that carries its own `transform` in a group that applies
+/// the device-space `clip` attribute.
+///
+/// A `clip-path` on the transformed element itself would be read in that
+/// element's transformed user space, not in device space.
+fn device_clipped(clip: &str, element: &str) -> String {
+    let mut output = String::with_capacity(clip.len() + element.len() + 8);
+    output.push_str("<g ");
+    output.push_str(clip);
+    output.push('>');
+    output.push_str(element);
+    output.push_str("</g>");
+    output
+}
+
 /// The canvas with `rect` cut out, to be filled with the even-odd rule so that
 /// the result does not depend on the orientation the transforms give `rect`.
 fn exclusion_path(rect: RectL, dc: &DeviceContext, canvas: Canvas) -> Result<String> {
@@ -1902,8 +1922,7 @@ fn render_text_element(
     } else {
         "ltr"
     };
-    let mut attrs = String::new();
-    if options & text_options::CLIPPED != 0 {
+    let clip = if options & text_options::CLIPPED != 0 {
         let rect = rectangle.ok_or_else(|| {
             Error::ParseError(format!("{} ETO_CLIPPED without rectangle", kind.name()))
         })?;
@@ -1913,11 +1932,16 @@ fn render_text_element(
             id,
             rectangle_path(rect, &state.dc)?.build()
         ));
-        write!(&mut attrs, " clip-path=\"url(#{})\"", id).ok();
+        format!("clip-path=\"url(#{})\"", id)
     } else {
-        write!(&mut attrs, " {}", state.dc.clip_attr()).ok();
+        state.dc.clip_attr()
+    };
+    let rotated = state.dc.font.escapement != 0.0;
+    let mut attrs = String::new();
+    if !rotated && !clip.is_empty() {
+        write!(&mut attrs, " {}", clip).ok();
     }
-    if state.dc.font.escapement != 0.0 {
+    if rotated {
         write!(
             &mut attrs,
             " transform=\"rotate({} {} {})\"",
@@ -1960,7 +1984,23 @@ fn render_text_element(
         .join(" ");
     let mut escaped_text = String::with_capacity(text.len());
     write_xml_escaped(&mut escaped_text, text);
-    output.push(format!("<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",x,y,state.dc.text_color.to_svg_color(),state.dc.font.to_svg_attrs(),anchor,baseline,direction,attrs,escaped_text));
+    let element = format!(
+        "<text x=\"{}\" y=\"{}\" fill=\"{}\" {} text-anchor=\"{}\" dominant-baseline=\"{}\" direction=\"{}\"{}>{}</text>",
+        x,
+        y,
+        state.dc.text_color.to_svg_color(),
+        state.dc.font.to_svg_attrs(),
+        anchor,
+        baseline,
+        direction,
+        attrs,
+        escaped_text
+    );
+    output.push(if rotated && !clip.is_empty() {
+        device_clipped(&clip, &element)
+    } else {
+        element
+    });
     if update {
         let estimated = if let Some(values) = dx {
             let stride = if options & text_options::PDY != 0 {
@@ -2605,6 +2645,19 @@ mod tests {
         assert!(svg.contains("data:image/png;base64,"));
         assert!(svg.contains("transform=\"matrix(0 1 -1 0 7 9)\""));
         assert!(svg.contains("x=\"10\" y=\"20\" width=\"20\" height=\"30\""));
+    }
+
+    #[test]
+    fn clipped_bitmap_reads_its_clip_in_device_space() {
+        let bytes = classic_emf(vec![
+            clip_rect(0, 0, 50, 50),
+            record(EmrType::StretchDIBits, &stretch_dib_payload()),
+        ]);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        let svg = EmfSvgConverter::new(&parser).convert().unwrap();
+
+        // The clip sits outside the group that carries the bitmap transform.
+        assert!(svg.contains("<g clip-path=\"url(#emf-clip-0)\"><g transform=\"matrix("));
     }
 
     #[test]
