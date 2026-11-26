@@ -43,16 +43,14 @@ pub(super) fn stroke_attrs(
         return r#" stroke="none""#.to_owned();
     }
 
-    let (width_x, width_y) = transform.logical_vector(
-        mapping,
-        f64::from(pen_value.width.0).abs(),
-        f64::from(pen_value.width.1).abs(),
-    );
-    let width = match (width_x > 0.0, width_y > 0.0) {
-        (true, true) => (width_x + width_y) / 2.0,
-        (true, false) => width_x,
-        (false, true) => width_y,
-        (false, false) => transform.device_width(1.0).max(0.01),
+    // [MS-WMF] 2.2.1.4: the x-coordinate of the Width point is the pen
+    // width and the y-coordinate is ignored. Programs leave arbitrary values
+    // there, so reading it would draw strokes far wider than Windows does.
+    let (width_x, _) = transform.logical_vector(mapping, f64::from(pen_value.width.0).abs(), 0.0);
+    let width = if width_x > 0.0 {
+        width_x
+    } else {
+        transform.device_width(1.0).max(0.01)
     };
 
     let mut attrs = String::with_capacity(128);
@@ -204,5 +202,28 @@ mod tests {
         assert!(attrs.contains(r#"stroke-linecap="square""#));
         assert!(attrs.contains(r#"stroke-linejoin="bevel""#));
         assert!(attrs.contains(r#"stroke-dasharray="6,2""#));
+    }
+
+    #[test]
+    fn pen_width_ignores_the_y_coordinate() {
+        let transform = CoordinateTransform::new((0.0, 0.0, 100.0, 100.0), 100.0, 100.0);
+        let wide_y = Pen {
+            style: pen::PS_SOLID,
+            width: (3, -12_860),
+            color: 0,
+        };
+        let only_y = Pen {
+            width: (0, 3_711),
+            ..wide_y.clone()
+        };
+
+        assert!(
+            stroke_attrs(&wide_y, &MappingState::default(), &transform)
+                .contains(r#"stroke-width="3""#)
+        );
+        assert!(
+            stroke_attrs(&only_y, &MappingState::default(), &transform)
+                .contains(r#"stroke-width="1""#)
+        );
     }
 }
