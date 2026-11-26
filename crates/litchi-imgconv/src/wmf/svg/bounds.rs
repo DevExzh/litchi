@@ -321,7 +321,8 @@ impl BoundsCalculator {
                 record::EXT_TEXT_OUT => Self::include_ext_text_out(rec, &mut state, &mut bounds),
 
                 record::PAT_BLT => {
-                    Self::include_bitmap_destination(rec, &state.mapping, &mut bounds, 4, 6, 8, 10)
+                    // ROP, then height, width, y and x ([MS-WMF] 2.3.3.3).
+                    Self::include_bitmap_destination(rec, &state.mapping, &mut bounds, 8, 10, 4, 6)
                 },
                 record::BIT_BLT | record::DIB_BIT_BLT => Self::include_bitmap_destination(
                     rec,
@@ -877,6 +878,16 @@ mod tests {
         assert_eq!(
             BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (-3.0, -2.0, 80.0, 70.0)
+        );
+    }
+
+    #[test]
+    fn pat_blt_reads_its_size_before_its_origin() {
+        // ROP (two words), height, width, y, x.
+        let records = [record(record::PAT_BLT, &[0, 0, 720, 960, 5, 7])];
+        assert_eq!(
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
+            (7.0, 5.0, 967.0, 725.0)
         );
     }
 
