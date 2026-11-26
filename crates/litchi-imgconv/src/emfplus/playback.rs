@@ -4,6 +4,8 @@
 //! assembles them into a 64-slot table and emits object references in drawing
 //! commands, leaving brush, pen, path, image, and font decoding to a renderer.
 
+use std::rc::Rc;
+
 use litchi_core::error::{Error, Result};
 
 use super::{EmfPlusRecord, ObjectId, ObjectType, ParserLimits, RecordType};
@@ -12,6 +14,7 @@ const SOLID_COLOR_FLAG: u16 = 0x8000;
 const COMPRESSED_FLAG: u16 = 0x4000;
 const RELATIVE_FLAG: u16 = 0x0800;
 const POST_MULTIPLY_FLAG: u16 = 0x2000;
+const WINDING_FILL_FLAG: u16 = 0x2000;
 
 /// A two-dimensional point in EMF+ world coordinates.
 #[derive(Clone, Copy, Debug, Default, PartialEq)]
@@ -84,7 +87,7 @@ pub enum Unit {
 }
 
 impl Unit {
-    fn parse(value: u8) -> Option<Self> {
+    pub(crate) fn parse(value: u8) -> Option<Self> {
         Some(match value {
             0 => Self::World,
             1 => Self::Display,
@@ -137,14 +140,48 @@ impl CombineMode {
     }
 }
 
-/// A clip expression.  Path and region values refer to the object table.
+/// The world and page transforms in effect when a clip was set.
+///
+/// GDI+ keeps the clip in device space, so later transform changes do not move
+/// it.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub struct ClipSpace {
+    pub world_transform: Matrix,
+    pub page_transform: PageTransform,
+}
+
+/// A clip expression.
+///
+/// Path and region clips keep the object they were set from, because a later
+/// object record may reuse the slot before the clip is used.
 #[derive(Clone, Debug, PartialEq)]
 pub enum Clip {
     Infinite,
-    Rect { mode: CombineMode, rect: Rect },
-    Path { mode: CombineMode, path: ObjectId },
-    Region { mode: CombineMode, region: ObjectId },
-    Offset { clip: Box<Self>, dx: f32, dy: f32 },
+    Rect {
+        mode: CombineMode,
+        rect: Rect,
+        space: ClipSpace,
+    },
+    Path {
+        mode: CombineMode,
+        path: Rc<ObjectBlob>,
+        space: ClipSpace,
+    },
+    Region {
+        mode: CombineMode,
+        region: Rc<ObjectBlob>,
+        space: ClipSpace,
+    },
+    /// The intersection of an earlier clip and a later intersected clip.
+    Intersect {
+        outer: Box<Self>,
+        inner: Box<Self>,
+    },
+    Offset {
+        clip: Box<Self>,
+        dx: f32,
+        dy: f32,
+    },
 }
 
 /// Source-over or source-copy compositing.
@@ -415,7 +452,7 @@ pub struct PlaybackEngine {
     state: GraphicsState,
     saves: Vec<SavedState>,
     containers: Vec<SavedState>,
-    objects: [Option<ObjectBlob>; 64],
+    objects: [Option<Rc<ObjectBlob>>; 64],
     pending: Option<PendingObject>,
     diagnostics: Vec<PlaybackDiagnostic>,
     output_count: usize,
@@ -457,7 +494,7 @@ impl PlaybackEngine {
     }
     #[must_use]
     pub fn object(&self, id: ObjectId) -> Option<&ObjectBlob> {
-        self.objects[usize::from(id.get())].as_ref()
+        self.objects[usize::from(id.get())].as_deref()
     }
     #[must_use]
     pub fn is_finished(&self) -> bool {
@@ -638,7 +675,9 @@ impl PlaybackEngine {
             let src = rect_at(record.data, 16)?;
             let index = u32_at(record.data, 32)?;
             self.push_saved_to(false, index, record.offset)?;
-            self.state.world_transform = self.state.world_transform.multiply(rect_map(dest, src));
+            // Container content maps from the source rectangle into the destination
+            // before the enclosing world transform applies.
+            self.state.world_transform = rect_map(dest, src).multiply(self.state.world_transform);
             return Ok(Vec::new());
         } else {
             self.require(record, 4)?;
@@ -716,22 +755,75 @@ impl PlaybackEngine {
     fn clip_rect(&mut self, record: EmfPlusRecord<'_>) -> Result<Vec<DrawCommand>> {
         self.require(record, 16)?;
         let mode = combine(record.header.flags.raw(), record.offset)?;
-        self.state.clip = Clip::Rect {
+        let clip = Clip::Rect {
             mode,
             rect: rect_at(record.data, 0)?,
+            space: self.clip_space(),
         };
+        self.set_clip(clip);
         Ok(Vec::new())
     }
     fn clip_object(&mut self, record: EmfPlusRecord<'_>, path: bool) -> Result<Vec<DrawCommand>> {
         self.require(record, 0)?;
         let mode = combine(record.header.flags.raw(), record.offset)?;
         let id = self.object_id(record)?;
-        self.state.clip = if path {
-            Clip::Path { mode, path: id }
-        } else {
-            Clip::Region { mode, region: id }
+        let Some(object) = self.objects[usize::from(id.get())].clone() else {
+            // GDI+ rejects the clip change and keeps the current clip.
+            self.diag(
+                PlaybackDiagnosticSeverity::Warning,
+                "noncanonical-emfplus-missing-clip-object",
+                format!("clip object {} is undefined; the clip was kept", id.get()),
+                record.offset,
+            );
+            return Ok(Vec::new());
         };
+        let space = self.clip_space();
+        let clip = if path {
+            Clip::Path {
+                mode,
+                path: object,
+                space,
+            }
+        } else {
+            Clip::Region {
+                mode,
+                region: object,
+                space,
+            }
+        };
+        self.set_clip(clip);
         Ok(Vec::new())
+    }
+    fn clip_space(&self) -> ClipSpace {
+        ClipSpace {
+            world_transform: self.state.world_transform,
+            page_transform: self.state.page_transform,
+        }
+    }
+    /// Combine a new clip with the current one. Replacing, or intersecting
+    /// with the infinite clip, keeps only the new clip.
+    fn set_clip(&mut self, clip: Clip) {
+        let intersect = matches!(
+            clip,
+            Clip::Rect {
+                mode: CombineMode::Intersect,
+                ..
+            } | Clip::Path {
+                mode: CombineMode::Intersect,
+                ..
+            } | Clip::Region {
+                mode: CombineMode::Intersect,
+                ..
+            }
+        );
+        self.state.clip = if intersect && self.state.clip != Clip::Infinite {
+            Clip::Intersect {
+                outer: Box::new(std::mem::replace(&mut self.state.clip, Clip::Infinite)),
+                inner: Box::new(clip),
+            }
+        } else {
+            clip
+        };
     }
     fn offset_clip(&mut self, record: EmfPlusRecord<'_>) -> Result<Vec<DrawCommand>> {
         self.require(record, 8)?;
@@ -856,17 +948,9 @@ impl PlaybackEngine {
                 );
             },
         }
-        if record.header.record_type != RecordType::SetCompositingMode {
-            self.diag(
-                PlaybackDiagnosticSeverity::Warning,
-                "rendering_property_not_represented",
-                format!(
-                    "{:?} is retained in playback state but has no exact SVG representation",
-                    record.header.record_type
-                ),
-                record.offset,
-            );
-        }
+        // Smoothing, text rendering, interpolation, pixel offset, and contrast
+        // settings select rasterization quality, not what is painted, so they
+        // are retained in playback state without a rendering diagnostic.
         Ok(Vec::new())
     }
 
@@ -969,11 +1053,11 @@ impl PlaybackEngine {
             return Err(Error::ParseError(message.into()));
         }
         self.object_bytes = new_total;
-        self.objects[usize::from(object.id.get())] = Some(ObjectBlob {
+        self.objects[usize::from(object.id.get())] = Some(Rc::new(ObjectBlob {
             id: object.id,
             object_type: object.object_type,
             bytes: object.bytes,
-        });
+        }));
         Ok(())
     }
 
@@ -1006,30 +1090,27 @@ impl PlaybackEngine {
             },
             RecordType::FillEllipse => DrawCommandKind::FillEllipse {
                 brush: self.brush(record, 0)?,
-                rect: rect_at(data, 4)?,
+                rect: self.rect_data(record, 4)?,
             },
-            RecordType::DrawEllipse => {
-                self.require(record, 16)?;
-                DrawCommandKind::DrawEllipse {
-                    pen: self.object_id(record)?,
-                    rect: rect_at(data, 0)?,
-                }
+            RecordType::DrawEllipse => DrawCommandKind::DrawEllipse {
+                pen: self.object_id(record)?,
+                rect: self.rect_data(record, 0)?,
             },
             RecordType::FillPie => {
-                self.require(record, 28)?;
+                self.require_at(record, 4, 8)?;
                 DrawCommandKind::FillPie {
                     brush: self.brush(record, 0)?,
                     start_angle: f32_at(data, 4)?,
                     sweep_angle: f32_at(data, 8)?,
-                    rect: rect_at(data, 12)?,
+                    rect: self.rect_data(record, 12)?,
                 }
             },
             RecordType::DrawPie | RecordType::DrawArc => {
-                self.require(record, 24)?;
+                self.require_at(record, 8, 8)?;
                 let pen = self.object_id(record)?;
                 let start_angle = f32_at(data, 0)?;
                 let sweep_angle = f32_at(data, 4)?;
-                let rect = rect_at(data, 8)?;
+                let rect = self.rect_data(record, 8)?;
                 if record.header.record_type == RecordType::DrawPie {
                     DrawCommandKind::DrawPie {
                         pen,
@@ -1073,7 +1154,9 @@ impl PlaybackEngine {
                     brush: self.brush(record, 0)?,
                     tension: f32_at(data, 4)?,
                     points,
-                    fill_mode: u8::from(((flags >> 8) & 1) != 0),
+                    // The `W` flag selects the winding fill; a clear flag
+                    // selects the alternate (even-odd) fill.
+                    fill_mode: u8::from(flags & WINDING_FILL_FLAG != 0),
                 }
             },
             RecordType::DrawClosedCurve => {
@@ -1154,15 +1237,9 @@ impl PlaybackEngine {
 
     fn draw_image(&mut self, record: EmfPlusRecord<'_>) -> Result<Vec<DrawCommand>> {
         let d = record.data;
-        self.require_at(
-            record,
-            0,
-            if record.header.record_type == RecordType::DrawImage {
-                40
-            } else {
-                28
-            },
-        )?;
+        // ImageAttributesID, SrcUnit, and an `EmfPlusRectF` source rectangle
+        // always precede the destination.
+        self.require_at(record, 0, 24)?;
         let image = self.object_id(record)?;
         let attributes = object_opt(self, u32_at(d, 0)?)?;
         let src_unit_raw = u8::try_from(u32_at(d, 4)?)
@@ -1176,7 +1253,7 @@ impl PlaybackEngine {
                 attributes,
                 src,
                 src_unit,
-                dest: rect_at(d, 24)?,
+                dest: self.rect_data(record, 24)?,
             }
         } else {
             let points = points_from(
@@ -1295,6 +1372,17 @@ impl PlaybackEngine {
             kind,
         });
         Ok(output)
+    }
+    /// One `RectData` field, either an `EmfPlusRect` or an `EmfPlusRectF`
+    /// according to the record's `C` flag.
+    fn rect_data(&self, record: EmfPlusRecord<'_>, start: usize) -> Result<Rect> {
+        if record.header.flags.raw() & COMPRESSED_FLAG != 0 {
+            self.require_at(record, start, 8)?;
+            rect_s_at(record.data, start)
+        } else {
+            self.require_at(record, start, 16)?;
+            rect_at(record.data, start)
+        }
     }
     fn rects(&self, record: EmfPlusRecord<'_>, start: usize) -> Result<Vec<Rect>> {
         self.require_at(record, start, 4)?;
@@ -1673,24 +1761,25 @@ fn points_from(
     }
     fixed_points(data, at, count)
 }
+/// The transform that maps the `src` rectangle onto the `dest` rectangle.
 fn rect_map(dest: Rect, src: Rect) -> Matrix {
-    let sx = if dest.width == 0.0 {
+    let sx = if src.width == 0.0 {
         1.0
     } else {
-        src.width / dest.width
+        dest.width / src.width
     };
-    let sy = if dest.height == 0.0 {
+    let sy = if src.height == 0.0 {
         1.0
     } else {
-        src.height / dest.height
+        dest.height / src.height
     };
     Matrix {
         m11: sx,
         m12: 0.0,
         m21: 0.0,
         m22: sy,
-        dx: src.x - dest.x * sx,
-        dy: src.y - dest.y * sy,
+        dx: dest.x - src.x * sx,
+        dy: dest.y - src.y * sy,
     }
 }
 
@@ -1807,6 +1896,94 @@ mod tests {
             "{error}"
         );
     }
+    #[test]
+    fn compressed_rect_data_is_decoded_as_emfplusrect() {
+        let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();
+        let mut data = Vec::new();
+        for value in [10_i16, 20, 30, 40] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        let commands = engine
+            .push(one(&record(
+                RecordType::DrawEllipse,
+                COMPRESSED_FLAG,
+                &data,
+            )))
+            .unwrap();
+        assert!(matches!(
+            commands[0].kind,
+            DrawCommandKind::DrawEllipse {
+                rect: Rect {
+                    x: 10.0,
+                    y: 20.0,
+                    width: 30.0,
+                    height: 40.0
+                },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn uncompressed_rect_data_stays_emfplusrect_f() {
+        let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();
+        let mut data = 0xff00_1122_u32.to_le_bytes().to_vec();
+        for value in [10_f32, 20.0, 30.0, 40.0] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        let commands = engine
+            .push(one(&record(
+                RecordType::FillEllipse,
+                SOLID_COLOR_FLAG,
+                &data,
+            )))
+            .unwrap();
+        assert!(matches!(
+            commands[0].kind,
+            DrawCommandKind::FillEllipse {
+                rect: Rect {
+                    x: 10.0,
+                    y: 20.0,
+                    width: 30.0,
+                    height: 40.0
+                },
+                ..
+            }
+        ));
+    }
+
+    #[test]
+    fn compressed_draw_image_reads_its_short_destination() {
+        let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();
+        let mut data = Vec::new();
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+        data.extend_from_slice(&2_u32.to_le_bytes());
+        for value in [0_f32, 0.0, 411.0, 388.0] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        for value in [0_i16, 0, 1000, 1000] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        let commands = engine
+            .push(one(&record(RecordType::DrawImage, COMPRESSED_FLAG, &data)))
+            .unwrap();
+        match commands[0].kind {
+            DrawCommandKind::DrawImage { src, dest, .. } => {
+                assert_eq!(src.width, 411.0);
+                assert_eq!(
+                    dest,
+                    Rect {
+                        x: 0.0,
+                        y: 0.0,
+                        width: 1000.0,
+                        height: 1000.0
+                    }
+                );
+            },
+            _ => panic!("expected a DrawImage command"),
+        }
+    }
+
     #[test]
     fn bad_container_is_diagnostic() {
         let mut engine = PlaybackEngine::new(PlaybackLimits::default()).unwrap();

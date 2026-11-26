@@ -1275,7 +1275,7 @@ mod tests {
         height: i32,
         dual: bool,
         get_dc: bool,
-        rendering_hint: bool,
+        approximated_brush: bool,
     ) -> Vec<u8> {
         fn plus_record(kind: u16, flags: u16, body: &[u8]) -> Vec<u8> {
             let size = 12_u32 + u32::try_from(body.len()).unwrap();
@@ -1290,8 +1290,23 @@ mod tests {
 
         let mut payload = plus_record(0x4001, u16::from(dual), &[0; 16]);
         payload.extend(plus_record(0x4009, 0, &0xff11_2233_u32.to_le_bytes()));
-        if rendering_hint {
-            payload.extend(plus_record(0x401e, 2, &[]));
+        if approximated_brush {
+            // A hatch brush is retained as its foreground color, which the
+            // conversion reports as an approximation.
+            let mut brush = Vec::new();
+            brush.extend_from_slice(&0xdbc0_1002_u32.to_le_bytes());
+            brush.extend_from_slice(&1_u32.to_le_bytes());
+            brush.extend_from_slice(&0_u32.to_le_bytes());
+            brush.extend_from_slice(&0xff00_0000_u32.to_le_bytes());
+            brush.extend_from_slice(&0xffff_ffff_u32.to_le_bytes());
+            payload.extend(plus_record(0x4008, 0x0100, &brush));
+
+            let mut fill = 0_u32.to_le_bytes().to_vec();
+            fill.extend_from_slice(&1_u32.to_le_bytes());
+            for value in [0.0_f32, 0.0, width as f32, height as f32] {
+                fill.extend_from_slice(&value.to_le_bytes());
+            }
+            payload.extend(plus_record(0x400a, 0, &fill));
         }
         if get_dc {
             payload.extend(plus_record(0x4004, 0, &[]));
@@ -1530,7 +1545,7 @@ mod tests {
                 .report
                 .diagnostics
                 .iter()
-                .any(|diagnostic| { diagnostic.code == "rendering_property_not_represented" })
+                .any(|diagnostic| { diagnostic.code == "hatch_approximation" })
         );
         assert!(crate::emf::convert_emf_to_svg(&bytes).is_err());
         assert!(
