@@ -103,5 +103,8 @@ bench = false
 debug = 1
 codegen-units = 1
 lto = "thin"
+# Arithmetic that wraps in a release build but panics in a debug build hides
+# overflow bugs from the sanitizer; check it here as well.
+overflow-checks = true
 
 [workspace]

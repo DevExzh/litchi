@@ -30,7 +30,10 @@ execution: encoded output never exceeds the requested `max_output_bytes`.
 ## Building
 
 `cargo +nightly fuzz build` builds every target with libFuzzer and the address
-sanitizer. The build output lives under `target/`, which is ignored.
+sanitizer. The build output lives under `target/`, which is ignored. The
+release profile also enables arithmetic overflow checks: a conversion that
+overflows is a panic in a debug build even when it wraps silently in release,
+so the campaigns must see it too.
 
 ## Running
 
