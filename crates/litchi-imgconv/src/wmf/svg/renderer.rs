@@ -2297,4 +2297,52 @@ mod tests {
         assert!(output.contains("\u{f061}"));
         assert!(output.contains("Wingdings"));
     }
+
+    fn region_params(left: i16, top: i16, right: i16, bottom: i16) -> Vec<u8> {
+        let mut params = vec![0u8; 22];
+        params[2..4].copy_from_slice(&6_u16.to_le_bytes());
+        params[10..12].copy_from_slice(&1_u16.to_le_bytes());
+        for value in [2_i16, top, bottom, left, right, 2] {
+            params.extend_from_slice(&value.to_le_bytes());
+        }
+        params
+    }
+
+    fn issue_codes(renderer: &SvgRenderer<'_>) -> Vec<&'static str> {
+        renderer.issues.iter().map(|issue| issue.code).collect()
+    }
+
+    #[test]
+    fn selecting_a_region_object_sets_the_clip_region() {
+        let mut renderer = renderer();
+        renderer.render_record(&rec(record::CREATE_REGION, &region_params(0, 0, 10, 10)));
+        assert!(renderer.state.clip.is_unbounded());
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        assert!(!renderer.state.clip.is_unbounded());
+        assert!(renderer.issues.is_empty());
+    }
+
+    #[test]
+    fn object_table_misuse_that_gdi_ignores_reports_noncanonical_codes() {
+        let mut renderer = renderer();
+        renderer.render_record(&rec(record::CREATE_PALETTE, &[0, 3, 1, 0, 1, 2, 3, 0]));
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[0, 0]));
+        renderer.render_record(&rec(record::SELECT_OBJECT, &[9, 0]));
+        renderer.render_record(&rec(record::DELETE_OBJECT, &[9, 0]));
+        renderer.render_record(&rec(record::SELECT_PALETTE, &[9, 0]));
+        renderer.render_record(&rec(record::RESTORE_DC, &[0xff, 0xff]));
+        renderer.render_record(&rec(record::SELECT_CLIP_REGION, &[9, 0]));
+        assert_eq!(
+            issue_codes(&renderer),
+            [
+                "noncanonical-wmf-select-palette-object",
+                "noncanonical-wmf-select-missing-object",
+                "noncanonical-wmf-delete-missing-object",
+                "noncanonical-wmf-select-missing-palette",
+                "noncanonical-wmf-restore-dc-level",
+                "noncanonical-wmf-select-missing-region",
+            ]
+        );
+        assert!(renderer.issues.iter().all(|issue| !issue.fatal));
+    }
 }
