@@ -10,6 +10,7 @@ license = "Apache-2.0"
 cargo-fuzz = true
 
 [dependencies]
+image = { version = "0.25.10", default-features = false }
 libfuzzer-sys = "0.4.13"
 litchi-imgconv = { path = ".." }
 litchi-odraw = { path = "../../litchi-odraw" }
@@ -45,6 +46,13 @@ bench = false
 [[bin]]
 name = "pict_png"
 path = "fuzz_targets/pict_png.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pict_convert"
+path = "fuzz_targets/pict_convert.rs"
 test = false
 doc = false
 bench = false

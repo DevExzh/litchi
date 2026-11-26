@@ -769,6 +769,7 @@ dependencies = [
 name = "litchi-imgconv-fuzz"
 version = "0.0.0"
 dependencies = [
+ "image",
  "libfuzzer-sys",
  "litchi-imgconv",
  "litchi-odraw",
