@@ -324,11 +324,12 @@ impl<'hook> SvgRenderer<'hook> {
             | record::SET_REL_ABS
             | record::ESCAPE => None,
 
+            // PlayMetaFile skips a function number it does not know.
             _ => {
-                self.fatal(format!(
-                    "unsupported output-affecting WMF record 0x{:04X}",
-                    rec.function
-                ));
+                self.note(
+                    "noncanonical-wmf-unknown-record",
+                    format!("ignored unknown WMF record 0x{:04X}", rec.function),
+                );
                 None
             },
         };
@@ -959,9 +960,17 @@ impl<'hook> SvgRenderer<'hook> {
             self.malformed(function, "point count");
             return None;
         };
-        let minimum = if closed { 2 } else { 2 };
-        if count < minimum || rec.params.len() < 2 + count.saturating_mul(4) {
+        if rec.params.len() < 2 + count.saturating_mul(4) {
             self.malformed(function, "points");
+            return None;
+        }
+        if count < 2 {
+            // GDI refuses a Polygon or Polyline with fewer than two points
+            // and draws nothing.
+            self.note(
+                "noncanonical-wmf-degenerate-polyline",
+                format!("ignored WMF record 0x{function:04X} with {count} points"),
+            );
             return None;
         }
         let mut xs = Vec::with_capacity(count);
@@ -1366,10 +1375,13 @@ impl<'hook> SvgRenderer<'hook> {
         let length = usize::from(read_u16_le(&rec.params, 4).unwrap_or(0));
         let options = read_u16_le(&rec.params, 6).unwrap_or(0);
         if options & ext_text_out::ETO_GLYPH_INDEX != 0 {
-            self.fatal("ExtTextOut glyph-index strings are unsupported".to_owned());
-        }
-        if options & ext_text_out::ETO_PDY != 0 {
-            self.fatal("ExtTextOut ETO_PDY displacements are unsupported".to_owned());
+            // The string holds glyph numbers of the recording system's font,
+            // which no character mapping can recover; the text is omitted.
+            self.note(
+                "wmf-glyph-index-text-omitted",
+                "ExtTextOut text given as font glyph indices is not drawn".to_owned(),
+            );
+            return None;
         }
         let has_rect = options & (ext_text_out::ETO_CLIPPED | ext_text_out::ETO_OPAQUE) != 0;
         let (rect, string_offset) = if has_rect {
@@ -1391,9 +1403,19 @@ impl<'hook> SvgRenderer<'hook> {
         }
         let dx_offset = string_offset + ((length + 1) & !1);
         let dx_count = (rec.params.len().saturating_sub(dx_offset)) / 2;
+        // With ETO_PDY every character has an x and a y displacement.
+        let stride = if options & ext_text_out::ETO_PDY != 0 {
+            self.note(
+                "wmf-text-vertical-displacement-ignored",
+                "ExtTextOut ETO_PDY vertical displacements are not applied".to_owned(),
+            );
+            2
+        } else {
+            1
+        };
         let mut dx = Vec::with_capacity(dx_count.min(length));
-        for index in 0..dx_count.min(length) {
-            dx.push(read_i16_le(&rec.params, dx_offset + index * 2).unwrap_or(0));
+        for index in 0..(dx_count / stride).min(length) {
+            dx.push(read_i16_le(&rec.params, dx_offset + index * stride * 2).unwrap_or(0));
         }
         self.render_text_bytes(
             &rec.params[string_offset..string_offset + length],
@@ -2245,12 +2267,39 @@ mod tests {
             let mut renderer = renderer();
             renderer.render_record(&rec(function, &[]));
             assert!(
-                renderer.issues.iter().all(|issue| !issue
-                    .message
-                    .starts_with("unsupported output-affecting WMF record")),
+                renderer
+                    .issues
+                    .iter()
+                    .all(|issue| issue.code != "noncanonical-wmf-unknown-record"),
                 "record 0x{function:04X} fell through classification"
             );
         }
+    }
+
+    #[test]
+    fn unknown_records_and_degenerate_polylines_are_ignored_like_gdi() {
+        let mut renderer = renderer();
+        assert!(renderer.render_record(&rec(0x0d32, &[0; 8])).is_none());
+        // A Polyline of one point, a Polygon of none.
+        assert!(
+            renderer
+                .render_record(&rec(record::POLYLINE, &[1, 0, 5, 0, 5, 0]))
+                .is_none()
+        );
+        assert!(
+            renderer
+                .render_record(&rec(record::POLYGON, &[0, 0]))
+                .is_none()
+        );
+        assert_eq!(
+            issue_codes(&renderer),
+            [
+                "noncanonical-wmf-unknown-record",
+                "noncanonical-wmf-degenerate-polyline",
+                "noncanonical-wmf-degenerate-polyline",
+            ]
+        );
+        assert!(renderer.issues.iter().all(|issue| !issue.fatal));
     }
 
     #[test]
@@ -2343,6 +2392,19 @@ mod tests {
                 "noncanonical-wmf-select-missing-region",
             ]
         );
+        assert!(renderer.issues.iter().all(|issue| !issue.fatal));
+    }
+
+    #[test]
+    fn glyph_index_text_is_omitted_with_an_approximation_diagnostic() {
+        let mut renderer = renderer();
+        let params = [5, 0, 5, 0, 2, 0, 0x10, 0, 3, 0, 4, 0];
+        assert!(
+            renderer
+                .render_record(&rec(record::EXT_TEXT_OUT, &params))
+                .is_none()
+        );
+        assert_eq!(issue_codes(&renderer), ["wmf-glyph-index-text-omitted"]);
         assert!(renderer.issues.iter().all(|issue| !issue.fatal));
     }
 }
