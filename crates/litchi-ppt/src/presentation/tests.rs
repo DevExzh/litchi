@@ -685,3 +685,138 @@ fn duplicate_or_invalid_live_doc_info_owner_is_rejected() {
         ));
     }
 }
+
+/// A `PPDrawingGroup` record whose `OfficeArtDggContainer` stores one PNG.
+fn drawing_group_with_one_picture(payload: &[u8]) -> Vec<u8> {
+    use litchi_odraw::Limits;
+    use litchi_odraw::image::builder::{BlipBuilder, StoreBuilder};
+    use litchi_odraw::write::Container;
+
+    let mut store = StoreBuilder::new();
+    store
+        .add_embedded(
+            BlipBuilder::bitmap(litchi_odraw::image::Kind::Png, payload.to_vec()).unwrap(),
+        )
+        .unwrap();
+    let mut bstore = Vec::new();
+    store
+        .write_store(&mut bstore, litchi_odraw::image::Limits::default())
+        .unwrap();
+    let mut dgg = Vec::new();
+    litchi_odraw::write::container(&mut dgg, 0, Container::Dgg, &bstore, Limits::default())
+        .unwrap();
+    record_bytes(0xf, 0, RecordType::PPDrawingGroup, &dgg)
+}
+
+/// A stream whose live `DocumentContainer` follows a superseded version, as
+/// an incremental save leaves it. Both arguments are `DocumentContainer`
+/// child records.
+fn presentation_with_superseded_document(stale: &[u8], live: &[u8]) -> Presentation {
+    let mut bytes = record_bytes(0xf, 0, RecordType::Document, stale);
+    let offset = bytes.len();
+    bytes.extend_from_slice(&record_bytes(0xf, 0, RecordType::Document, live));
+    let mut parser = RecordParser::new();
+    parser
+        .parse_document(&bytes, &crate::SourceLimits::default())
+        .unwrap();
+    let mut persist_mapping = PersistMapping::new();
+    persist_mapping.add_mapping(1, u32::try_from(offset).unwrap());
+    Presentation::from_data(PresentationData {
+        powerpoint_document: std::sync::Arc::new(bytes),
+        parser,
+        persist_mapping,
+        slide_directory: SlideDirectory::new_for_test(offset),
+        pictures_data: None,
+        pictures_source: None,
+        source_limits: crate::SourceLimits::default(),
+        #[cfg(feature = "vba-inspection")]
+        vba_project_limits: crate::VbaProjectLimits::default(),
+        tolerance: crate::leniency::ToleranceReport::default(),
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption: None,
+        shape_memo: crate::slide::ShapeMemo::default(),
+        equation_memo: crate::equation::Memo::default(),
+    })
+}
+
+#[test]
+fn image_store_reads_only_the_live_document_drawing_group() {
+    let p = presentation_with_superseded_document(
+        &drawing_group_with_one_picture(b"superseded"),
+        &drawing_group_with_one_picture(b"live"),
+    );
+    let images = p.images().unwrap();
+    assert_eq!(images.len(), 1);
+    assert_eq!(images[0].data().unwrap(), b"live");
+    assert_eq!(p.image_at(1).unwrap().unwrap().data().unwrap(), b"live");
+}
+
+#[test]
+fn image_store_ignores_a_superseded_drawing_group_the_live_document_lacks() {
+    let p =
+        presentation_with_superseded_document(&drawing_group_with_one_picture(b"superseded"), &[]);
+    assert!(p.image_store().unwrap().is_none());
+    assert!(p.images().unwrap().is_empty());
+}
+
+#[test]
+fn duplicate_live_document_drawing_groups_still_refuse() {
+    let group = drawing_group_with_one_picture(b"live");
+    let p = presentation_with_superseded_document(&[], &[group.clone(), group].concat());
+    assert!(matches!(p.image_store(), Err(Error::Corrupted(_))));
+}
+
+/// `ppt_with_png.ppt` repackaged the way PowerPoint 95 saves a PowerPoint 97
+/// copy: the copy's streams in `PP97_DUALSTORAGE`, PowerPoint 95 streams at
+/// the root.
+fn dual_storage_presentation_bytes() -> (Vec<u8>, usize) {
+    use litchi_cfb::{OleFile, OleFileLimits, OleWriter};
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/ppt/ppt_with_png.ppt");
+    let source = std::fs::read(path).unwrap();
+    let images = crate::Package::from_bytes(&source)
+        .unwrap()
+        .presentation()
+        .unwrap()
+        .images()
+        .unwrap()
+        .len();
+    let mut file = OleFile::open(std::io::Cursor::new(source), OleFileLimits::default()).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_storage(&["PP97_DUALSTORAGE"]).unwrap();
+    for name in ["PowerPoint Document", "Current User", "Pictures"] {
+        let data = file.open_stream(&[name]).unwrap();
+        writer
+            .create_stream(&["PP97_DUALSTORAGE", name], &data)
+            .unwrap();
+    }
+    // A PowerPoint 95 Current User is a length-prefixed user name, and its
+    // document stream is not PowerPoint 97 records.
+    writer
+        .create_stream(&["Current User"], b"\x04\0\0\0USER")
+        .unwrap();
+    writer
+        .create_stream(&["PowerPoint Document"], &[0; 64])
+        .unwrap();
+    let mut output = std::io::Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), images)
+}
+
+#[test]
+fn dual_storage_presentation_reads_the_powerpoint_97_copy() {
+    let (bytes, images) = dual_storage_presentation_bytes();
+    assert!(images > 0);
+    let shared = crate::Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
+        .unwrap();
+    assert_eq!(shared.images().unwrap().len(), images);
+    let mut reader = crate::raw::Reader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+    assert_eq!(
+        reader.presentation().unwrap().images().unwrap().len(),
+        images
+    );
+}

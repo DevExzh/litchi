@@ -47,22 +47,53 @@ impl Document {
         cp: u32,
         hint: u32,
     ) -> Result<Option<crate::image::Image>> {
-        let (header, relative, anchors) = if cp < self.0.fib.get_main_doc_range().1 {
-            (false, cp, self.shape_positions())
-        } else if let Some((start, _)) = self
-            .0
-            .fib
-            .get_header_range()
-            .filter(|(start, end)| cp >= *start && cp < *end)
-        {
-            (true, cp - start, self.header_shape_positions())
-        } else {
+        let Some((header, relative, anchors)) = self.floating_anchor_story(cp) else {
             return Ok(None);
         };
         self.0
             .drawing_images
             .at_anchor(header, relative, hint, anchors)
             .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
+    }
+
+    /// Every picture shown by the floating-shape anchor character at the
+    /// document CP `cp`: the anchored picture itself, or each picture inside
+    /// an anchored group, in drawing order.
+    ///
+    /// [`crate::Run::image`] covers a run that holds exactly one anchor of a
+    /// single picture. Consecutive anchors with the same character
+    /// properties share one run, and a group anchor shows several pictures;
+    /// this resolves each anchor character of such a run. A CP that is not a
+    /// floating-shape anchor shows no picture.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the document's drawing data is malformed or the
+    /// anchor names a shape the drawing does not contain.
+    pub fn floating_images_at(&self, cp: u32) -> Result<Vec<crate::image::Image>> {
+        let Some((header, relative, anchors)) = self.floating_anchor_story(cp) else {
+            return Ok(Vec::new());
+        };
+        self.0
+            .drawing_images
+            .pictures_at_anchor(header, relative, 0, anchors)
+            .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
+    }
+
+    /// The story (header or main), story-relative CP, and anchors for `cp`.
+    fn floating_anchor_story(
+        &self,
+        cp: u32,
+    ) -> Option<(bool, u32, &[crate::parts::spa::ShapeAnchor])> {
+        if cp < self.0.fib.get_main_doc_range().1 {
+            Some((false, cp, self.shape_positions()))
+        } else {
+            self.0
+                .fib
+                .get_header_range()
+                .filter(|(start, end)| cp >= *start && cp < *end)
+                .map(|(start, _)| (true, cp - start, self.header_shape_positions()))
+        }
     }
 
     /// Get a reference to the `WordDocument` stream.

@@ -13,6 +13,9 @@ struct Index {
     group_end: usize,
     // None is a real non-picture shape, not a failed image lookup.
     shapes: HashMap<(bool, u32), Option<Range<usize>>>,
+    // The shapes inside each top-level group, in drawing order. Anchors name
+    // top-level shapes only, so every shape belongs to at most one list.
+    groups: HashMap<(bool, u32), Vec<u32>>,
 }
 
 impl DrawingSource {
@@ -48,6 +51,30 @@ impl DrawingSource {
         hint: u32,
         anchors: &[crate::parts::spa::ShapeAnchor],
     ) -> Result<Option<Image>, ImageError> {
+        match self.anchored_shape(header, cp, anchors)? {
+            Some(id) => self.image(header, id, hint),
+            None => Ok(None),
+        }
+    }
+    /// Every picture the anchor at `cp` shows; see [`Self::pictures`].
+    pub(crate) fn pictures_at_anchor(
+        &self,
+        header: bool,
+        cp: u32,
+        hint: u32,
+        anchors: &[crate::parts::spa::ShapeAnchor],
+    ) -> Result<Vec<Image>, ImageError> {
+        match self.anchored_shape(header, cp, anchors)? {
+            Some(id) => self.pictures(header, id, hint),
+            None => Ok(Vec::new()),
+        }
+    }
+    fn anchored_shape(
+        &self,
+        header: bool,
+        cp: u32,
+        anchors: &[crate::parts::spa::ShapeAnchor],
+    ) -> Result<Option<u32>, ImageError> {
         let lookup = self.anchors[usize::from(header)]
             .get_or_init(|| {
                 let mut lookup = HashMap::new();
@@ -65,10 +92,29 @@ impl DrawingSource {
             })
             .as_ref()
             .map_err(|e| ImageError::InvalidDrawing(e.clone()))?;
-        match lookup.get(&cp) {
-            Some(id) => self.image(header, *id, hint),
-            None => Ok(None),
+        Ok(lookup.get(&cp).copied())
+    }
+    /// Every picture an anchored shape shows: the shape itself when it is a
+    /// picture, or each picture inside it when it is a group, in drawing
+    /// order.
+    pub(crate) fn pictures(
+        &self,
+        header: bool,
+        shape_id: u32,
+        hint: u32,
+    ) -> Result<Vec<Image>, ImageError> {
+        if let Some(image) = self.image(header, shape_id, hint)? {
+            return Ok(vec![image]);
         }
+        let index = self.index()?;
+        let Some(members) = index.groups.get(&(header, shape_id)) else {
+            return Ok(Vec::new());
+        };
+        Ok(members
+            .iter()
+            .filter(|id| matches!(index.shapes.get(&(header, **id)), Some(Some(_))))
+            .map(|id| Image::from_drawing(hint, header, *id))
+            .collect())
     }
     pub(crate) fn image(
         &self,
@@ -108,8 +154,12 @@ impl DrawingSource {
             .ok_or(ImageError::NoPicture)?;
         let props = litchi_odraw::prop::Props::from_container(&shape, Default::default())
             .map_err(ImageError::DecodeOfficeArtRecord)?;
+        // A frame without pib stores no picture: a linked picture saved
+        // without its data names its file through pibName only.
         let id = props
             .prop(litchi_odraw::prop::Id::BlipToDisplay)
+            .ok_or(ImageError::NoPicture)?;
+        let id = Some(id)
             .filter(|p| p.is_blip() && !p.is_complex() && p.raw_value() > 0)
             .ok_or_else(|| ImageError::InvalidDrawing("picture frame has no usable pib".into()))?;
         let raw_id = u32::try_from(id.raw_value())
@@ -132,6 +182,7 @@ impl Index {
             return Err("OfficeArtContent has no DggContainer".into());
         }
         let mut shapes = HashMap::new();
+        let mut groups = HashMap::new();
         let mut offset = group_end;
         let mut count = 0usize;
         while offset < bytes.len() {
@@ -155,14 +206,7 @@ impl Index {
                 return Err("drawing image index exceeds record limit".into());
             }
             for record in records {
-                let container = Container::try_new(record.clone()).map_err(|e| e.to_string())?;
-                let atom = container
-                    .find(RecordKind::Sp)
-                    .map_err(|e| e.to_string())?
-                    .ok_or("shape has no FSP")?;
-                let raw: [u8; 8] = atom.data().try_into().map_err(|_| "invalid FSP length")?;
-                let id =
-                    u32::from_le_bytes(raw[..4].try_into().map_err(|_| "invalid shape identity")?);
+                let (id, atom) = shape_identity(&record)?;
                 let range = if atom.instance() == litchi_odraw::shape::Native::PICTURE.raw() {
                     let begin = record
                         .data_offset(bytes)
@@ -183,9 +227,64 @@ impl Index {
                     return Err(format!("duplicate shape identity {id} in drawing story"));
                 }
             }
+            index_groups(&drawing, label == 1, limits, &mut groups)?;
         }
-        Ok(Self { group_end, shapes })
+        Ok(Self {
+            group_end,
+            shapes,
+            groups,
+        })
     }
+}
+
+/// The `spid` and FSP atom of one shape container.
+fn shape_identity<'data>(record: &Record<'data>) -> Result<(u32, Record<'data>), String> {
+    let container = Container::try_new(record.clone()).map_err(|e| e.to_string())?;
+    let atom = container
+        .find(RecordKind::Sp)
+        .map_err(|e| e.to_string())?
+        .ok_or("shape has no FSP")?;
+    let raw: [u8; 8] = atom.data().try_into().map_err(|_| "invalid FSP length")?;
+    let id = u32::from_le_bytes(raw[..4].try_into().map_err(|_| "invalid shape identity")?);
+    Ok((id, atom))
+}
+
+/// Record the shapes inside each top-level group of one drawing. A group is
+/// an `SpgrContainer` whose first shape container describes the group itself.
+fn index_groups(
+    drawing: &Record<'_>,
+    header: bool,
+    limits: litchi_odraw::Limits,
+    groups: &mut HashMap<(bool, u32), Vec<u32>>,
+) -> Result<(), String> {
+    let drawing = Container::try_new(drawing.clone()).map_err(|e| e.to_string())?;
+    let Some(patriarch) = drawing
+        .find(RecordKind::SpgrContainer)
+        .map_err(|e| e.to_string())?
+    else {
+        return Ok(());
+    };
+    let patriarch = Container::try_new(patriarch).map_err(|e| e.to_string())?;
+    for child in patriarch.children() {
+        let child = child.map_err(|e| e.to_string())?;
+        if child.kind() != RecordKind::SpgrContainer {
+            continue;
+        }
+        let group = Container::try_new(child).map_err(|e| e.to_string())?;
+        let mut shapes = group
+            .find_recursive(RecordKind::SpContainer, limits)
+            .map_err(|e| e.to_string())?
+            .into_iter();
+        let Some(own) = shapes.next() else {
+            continue;
+        };
+        let (group_id, _) = shape_identity(&own)?;
+        let members = shapes
+            .map(|shape| shape_identity(&shape).map(|(id, _)| id))
+            .collect::<Result<Vec<_>, _>>()?;
+        groups.insert((header, group_id), members);
+    }
+    Ok(())
 }
 
 #[cfg(test)]
@@ -240,6 +339,44 @@ mod tests {
         assert!(
             matches!(source.data(false,7,&[]),Err(ImageError::InvalidDrawing(message)) if message=="picture frame has no image store")
         );
+    }
+
+    #[test]
+    fn group_anchor_shows_every_picture_inside_the_group() {
+        let group =
+            |own: u32, members: Vec<u8>| record(0xF003, 15, 0, &[shape(own, 0), members].concat());
+        let inner = group(13, shape(14, 75));
+        let outer = group(10, [shape(11, 75), shape(12, 1), inner].concat());
+        let patriarch = record(0xF003, 15, 0, &[shape(1, 0), outer, shape(20, 75)].concat());
+        let source = source(&[(0, patriarch)]);
+        let ids = |images: Vec<Image>| {
+            images
+                .iter()
+                .map(|image| image.drawing_shape_id().unwrap())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(ids(source.pictures(false, 10, 0).unwrap()), [11, 14]);
+        assert_eq!(ids(source.pictures(false, 20, 0).unwrap()), [20]);
+        assert!(source.pictures(false, 12, 0).unwrap().is_empty());
+        // Run::image keeps describing only a single anchored picture.
+        assert!(source.image(false, 10, 0).unwrap().is_none());
+    }
+
+    #[test]
+    fn linked_picture_frame_without_pib_stores_no_picture() {
+        let mut fsp = 7u32.to_le_bytes().to_vec();
+        fsp.extend_from_slice(&0xA00u32.to_le_bytes());
+        let mut children = record(0xF00A, 2, 75, &fsp);
+        // pibFlags = msoblipflagFile; the file name itself is not needed.
+        let mut flags = 0x0106u16.to_le_bytes().to_vec();
+        flags.extend_from_slice(&1u32.to_le_bytes());
+        children.extend(record(0xF00B, 3, 1, &flags));
+        let source = source(&[(0, record(0xF004, 15, 0, &children))]);
+        assert!(source.image(false, 7, 0).unwrap().is_some());
+        assert!(matches!(
+            source.data(false, 7, &[]),
+            Err(ImageError::NoPicture)
+        ));
     }
 
     #[test]
