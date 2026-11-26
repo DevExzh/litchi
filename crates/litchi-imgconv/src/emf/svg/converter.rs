@@ -26,6 +26,20 @@ pub struct EmfSvgConverter<'a> {
     limits: crate::Limits,
 }
 
+/// One completed classic EMF playback.
+struct ClassicTrack {
+    svg: String,
+    diagnostics: Vec<crate::emfplus::renderer::RendererDiagnostic>,
+    /// Body elements emitted; zero means the track draws an empty picture.
+    elements: usize,
+}
+
+impl ClassicTrack {
+    fn into_parts(self) -> (String, Vec<crate::emfplus::renderer::RendererDiagnostic>) {
+        (self.svg, self.diagnostics)
+    }
+}
+
 impl<'a> EmfSvgConverter<'a> {
     pub fn new(parser: &'a EmfParser) -> Self {
         Self {
@@ -56,13 +70,39 @@ impl<'a> EmfSvgConverter<'a> {
     pub fn convert_with_diagnostics(
         &self,
     ) -> Result<(String, Vec<crate::emfplus::renderer::RendererDiagnostic>)> {
-        if let Some(output) = self.convert_emfplus_track()? {
-            return Ok((output.document.into_string(), output.diagnostics));
+        let facts = crate::emfplus::track::scan_stream(
+            self.parser
+                .records
+                .iter()
+                .map(|record| (record.record_type, &record.data[..])),
+            emfplus_limits(self.limits).parser,
+        );
+        let choice = crate::emfplus::track::choose_track(facts)
+            .map_err(|message| Error::Unsupported(message.into()))?;
+        match choice {
+            crate::emfplus::track::TrackChoice::Classic { note } => Ok(self
+                .convert_classic_track(note.map(|(code, message)| diagnostic(code, message)))?
+                .into_parts()),
+            crate::emfplus::track::TrackChoice::EmfPlus { classic_fallback } => {
+                self.convert_emfplus_track(classic_fallback)
+            },
         }
+    }
+
+    /// Play every classic EMF record, with any selection facts reported first.
+    fn convert_classic_track(
+        &self,
+        selection: Option<crate::emfplus::renderer::RendererDiagnostic>,
+    ) -> Result<ClassicTrack> {
         let header = &self.parser.header;
         let dpi_x = dpi(header.device_width, header.device_width_mm);
         let dpi_y = dpi(header.device_height, header.device_height_mm);
         let mut state = RenderState::with_device_metrics(dpi_x, dpi_y);
+        if let Some(selection) = selection {
+            state
+                .diagnostics
+                .insert(0, (selection.code, selection.message));
+        }
         let mut buffer = ElementBuffer::new();
         let mut generated_bytes = 0usize;
         let mut generated_elements = 0usize;
@@ -152,16 +192,78 @@ impl<'a> EmfSvgConverter<'a> {
                 },
             )
             .collect();
-        Ok((svg, diagnostics))
+        Ok(ClassicTrack {
+            svg,
+            diagnostics,
+            elements: buffer.elements.len(),
+        })
     }
 
-    /// Select one complete EMF+ rendering track before classic playback.
+    /// Play the EMF+ records, falling back to the complete classic track of a
+    /// dual metafile when EMF+ playback fails or would need an approximation.
     ///
-    /// Dual metafiles deliberately use the EMF+ track so the equivalent
-    /// classic fallback is not painted a second time. EMF+-only streams that
-    /// use GetDC require true record-level interleaving; reject those until the
-    /// two renderers share a common ordered sink.
-    fn convert_emfplus_track(&self) -> Result<Option<crate::emfplus::renderer::RenderOutput>> {
+    /// [MS-EMFPLUS] 1.3.1: a dual metafile's classic records alone define the
+    /// whole picture, and EMF+ playback of a dual metafile is the same as that
+    /// of an EMF+-only metafile. EMF+-only metafiles have no complete classic
+    /// rendering, so their EMF+ failures stay failures.
+    fn convert_emfplus_track(
+        &self,
+        classic_fallback: bool,
+    ) -> Result<(String, Vec<crate::emfplus::renderer::RendererDiagnostic>)> {
+        match self.render_emfplus_track() {
+            Ok(output) => {
+                let approximated = output
+                    .diagnostics
+                    .iter()
+                    .find(|diagnostic| crate::codec::is_lossy_diagnostic(diagnostic.code))
+                    .map(|diagnostic| diagnostic.code);
+                let Some(approximated) = approximated.filter(|_| classic_fallback) else {
+                    return Ok((output.document.into_string(), output.diagnostics));
+                };
+                let mut diagnostics = output.diagnostics;
+                let message = format!(
+                    "EMF+ playback needs the reported approximation {approximated}; the complete classic EMF track of the dual metafile was rendered instead"
+                );
+                let selection = diagnostic("noncanonical-emfplus-approximated", &message);
+                let classic = match self.convert_classic_track(Some(selection)) {
+                    Ok(classic) if classic.elements > 0 => classic,
+                    Ok(_) => {
+                        diagnostics.push(diagnostic(
+                            "noncanonical-classic-track-empty",
+                            "the classic EMF track of the dual metafile draws nothing, so the EMF+ picture is kept",
+                        ));
+                        return Ok((output.document.into_string(), diagnostics));
+                    },
+                    Err(error) => {
+                        // The EMF+ picture is still the better answer than no
+                        // picture, but the failed fallback must be reported.
+                        diagnostics.push(diagnostic(
+                            "noncanonical-classic-track-failed",
+                            &error.to_string(),
+                        ));
+                        return Ok((output.document.into_string(), diagnostics));
+                    },
+                };
+                Ok(classic.into_parts())
+            },
+            Err(error) if classic_fallback => {
+                let message = format!(
+                    "EMF+ playback failed ({error}); the complete classic EMF track of the dual metafile was rendered instead"
+                );
+                match self.convert_classic_track(Some(diagnostic(
+                    "noncanonical-emfplus-unreadable",
+                    &message,
+                ))) {
+                    Ok(classic) if classic.elements > 0 => Ok(classic.into_parts()),
+                    Ok(_) => Err(error),
+                    Err(classic_error) => Err(classic_error),
+                }
+            },
+            Err(error) => Err(error),
+        }
+    }
+
+    fn render_emfplus_track(&self) -> Result<crate::emfplus::renderer::RenderOutput> {
         let mut renderer = None;
         for record in &self.parser.records {
             if record.record_type != crate::emfplus::EMR_COMMENT
@@ -173,25 +275,26 @@ impl<'a> EmfSvgConverter<'a> {
                 value
             } else {
                 let header = &self.parser.header;
-                renderer.insert(crate::emfplus::renderer::EmfPlusSvgRenderer::new(
-                    f64::from(header.width().unsigned_abs().max(1)),
-                    f64::from(header.height().unsigned_abs().max(1)),
-                    emfplus_limits(self.limits),
-                )?)
+                // EMF+ device space is the EMF device space, so the EMF+
+                // picture shares the bounds of the classic picture.
+                renderer.insert(
+                    crate::emfplus::renderer::EmfPlusSvgRenderer::new(
+                        f64::from(header.width().unsigned_abs().max(1)),
+                        f64::from(header.height().unsigned_abs().max(1)),
+                        emfplus_limits(self.limits),
+                    )?
+                    .with_view_origin(f64::from(header.bounds.0), f64::from(header.bounds.1)),
+                )
             };
             emfplus.push_comment_body(&record.data)?;
         }
 
         let Some(renderer) = renderer else {
-            return Ok(None);
-        };
-        let output = renderer.finish()?;
-        if output.mux.get_dc_count != 0 {
-            return Err(Error::Unsupported(
-                "EMF+ GetDC requires ordered classic/EMF+ SVG interleaving".into(),
+            return Err(Error::ParseError(
+                "EMF+ track requires at least one EMF+ comment".into(),
             ));
-        }
-        Ok(Some(output))
+        };
+        renderer.finish()
     }
 
     fn process_record(&self, record: &EmfRecord, state: &mut RenderState) -> Result<Vec<String>> {
@@ -776,9 +879,8 @@ impl<'a> EmfSvgConverter<'a> {
                 if size > data.len().saturating_sub(4) {
                     return malformed(kind, "comment data exceeds payload");
                 }
-                if data.get(4..8) == Some(&[0x45, 0x4d, 0x46, 0x2b]) {
-                    return unsupported(kind, "EMF+ comment requires EMF+ playback");
-                }
+                // An EMF player ignores the EMF+ records embedded in comments;
+                // playing them is the job of the EMF+ track.
                 Ok(Vec::new())
             },
 
@@ -1470,6 +1572,15 @@ fn dib_limits(limits: crate::Limits) -> DibLimits {
             .unwrap_or(usize::MAX)
             .min(limits.max_uncompressed_bytes),
         max_output_bytes: limits.max_output_bytes,
+    }
+}
+
+/// A classic-playback diagnostic with no EMF+ record offset.
+fn diagnostic(code: &'static str, message: &str) -> crate::emfplus::renderer::RendererDiagnostic {
+    crate::emfplus::renderer::RendererDiagnostic {
+        code,
+        message: message.to_owned(),
+        record_offset: None,
     }
 }
 
@@ -2640,5 +2751,167 @@ mod tests {
         // Consecutive LineTo commands share one `L` command in compact SVG
         // grammar: M0 0L0 10 -20 10 -20 0z.
         assert!(path.contains("-20 10"), "{path}");
+    }
+
+    fn emfplus_record(kind: u16, flags: u16, data: &[u8]) -> Vec<u8> {
+        let mut out = Vec::new();
+        out.extend_from_slice(&kind.to_le_bytes());
+        out.extend_from_slice(&flags.to_le_bytes());
+        dword(&mut out, u32::try_from(12 + data.len()).unwrap());
+        dword(&mut out, u32::try_from(data.len()).unwrap());
+        out.extend_from_slice(data);
+        out
+    }
+
+    fn emfplus_comment(records: &[Vec<u8>]) -> Vec<u8> {
+        let payload = records.concat();
+        let mut body = Vec::new();
+        dword(&mut body, u32::try_from(4 + payload.len()).unwrap());
+        dword(&mut body, crate::emfplus::EMFPLUS_COMMENT_IDENTIFIER);
+        body.extend_from_slice(&payload);
+        record(EmrType::Comment, &body)
+    }
+
+    /// An `EmfPlusHeader` of a dual metafile recorded for a 96 DPI display.
+    fn dual_header() -> Vec<u8> {
+        let mut data = Vec::new();
+        for value in [0xdbc0_1002_u32, 1, 96, 96] {
+            dword(&mut data, value);
+        }
+        emfplus_record(0x4001, 1, &data)
+    }
+
+    fn emfplus_eof() -> Vec<u8> {
+        emfplus_record(0x4002, 0, &[])
+    }
+
+    /// An `EmfPlusFillRects` record with one solid rectangle.
+    fn emfplus_fill() -> Vec<u8> {
+        let mut data = Vec::new();
+        dword(&mut data, 0xff12_3456);
+        dword(&mut data, 1);
+        for value in [0.0_f32, 0.0, 50.0, 50.0] {
+            data.extend_from_slice(&value.to_le_bytes());
+        }
+        emfplus_record(0x400a, 0x8000, &data)
+    }
+
+    fn classic_rectangle() -> Vec<u8> {
+        let mut data = Vec::new();
+        for value in [10, 10, 60, 60] {
+            sdword(&mut data, value);
+        }
+        record(EmrType::Rectangle, &data)
+    }
+
+    fn convert(emf: &[u8]) -> (String, Vec<&'static str>) {
+        let parser = EmfParser::new(emf, &crate::Limits::default()).unwrap();
+        let (svg, diagnostics) = EmfSvgConverter::new(&parser)
+            .convert_with_diagnostics()
+            .unwrap();
+        (
+            svg,
+            diagnostics
+                .iter()
+                .map(|diagnostic| diagnostic.code)
+                .collect(),
+        )
+    }
+
+    #[test]
+    fn dual_metafile_plays_its_exact_emfplus_track_once() {
+        let emf = classic_emf(vec![
+            emfplus_comment(&[dual_header(), emfplus_fill(), emfplus_eof()]),
+            classic_rectangle(),
+        ]);
+        let (svg, codes) = convert(&emf);
+        assert!(svg.contains("#123456"), "{svg}");
+        assert!(!svg.contains("<rect x=\"10\""), "{svg}");
+        assert!(codes.is_empty(), "{codes:?}");
+    }
+
+    #[test]
+    fn dual_metafile_with_get_dc_plays_its_classic_track() {
+        let emf = classic_emf(vec![
+            emfplus_comment(&[
+                dual_header(),
+                emfplus_fill(),
+                emfplus_record(0x4004, 0, &[]),
+            ]),
+            classic_rectangle(),
+            emfplus_comment(&[emfplus_eof()]),
+        ]);
+        let (svg, codes) = convert(&emf);
+        assert!(!svg.contains("#123456") && svg.contains("M10 10"), "{svg}");
+        assert_eq!(codes, vec!["noncanonical-emfplus-dual-getdc"]);
+        assert!(
+            EmfSvgConverter::new(&EmfParser::new(&emf, &crate::Limits::default()).unwrap())
+                .convert()
+                .is_ok()
+        );
+    }
+
+    #[test]
+    fn approximated_emfplus_track_falls_back_to_the_classic_track() {
+        // A hatch brush is only approximated by EMF+ playback.
+        let mut brush = Vec::new();
+        for value in [0xdbc0_1002_u32, 1, 0, 0xff00_0000, 0xffff_ffff] {
+            dword(&mut brush, value);
+        }
+        let mut fill = Vec::new();
+        dword(&mut fill, 0);
+        dword(&mut fill, 1);
+        for value in [0.0_f32, 0.0, 50.0, 50.0] {
+            fill.extend_from_slice(&value.to_le_bytes());
+        }
+        let emf = classic_emf(vec![
+            emfplus_comment(&[
+                dual_header(),
+                emfplus_record(0x4008, 0x0100, &brush),
+                emfplus_record(0x400a, 0, &fill),
+                emfplus_eof(),
+            ]),
+            classic_rectangle(),
+        ]);
+        let (svg, codes) = convert(&emf);
+        assert!(svg.contains("M10 10"), "{svg}");
+        assert_eq!(codes, vec!["noncanonical-emfplus-approximated"]);
+    }
+
+    #[test]
+    fn unreadable_emfplus_track_falls_back_to_the_classic_track() {
+        // The EMF+ stream never ends.
+        let emf = classic_emf(vec![
+            emfplus_comment(&[dual_header(), emfplus_fill()]),
+            classic_rectangle(),
+        ]);
+        let (svg, codes) = convert(&emf);
+        assert!(!svg.contains("#123456") && svg.contains("M10 10"), "{svg}");
+        assert_eq!(codes, vec!["noncanonical-emfplus-unreadable"]);
+    }
+
+    #[test]
+    fn emfplus_records_after_classic_records_are_ignored() {
+        let emf = classic_emf(vec![
+            classic_rectangle(),
+            emfplus_comment(&[dual_header(), emfplus_fill(), emfplus_eof()]),
+        ]);
+        let (svg, codes) = convert(&emf);
+        assert!(!svg.contains("#123456") && svg.contains("M10 10"), "{svg}");
+        assert_eq!(codes, vec!["noncanonical-emfplus-not-leading"]);
+    }
+
+    #[test]
+    fn emfplus_track_shares_the_classic_view_box() {
+        let mut emf = classic_emf(vec![emfplus_comment(&[
+            dual_header(),
+            emfplus_fill(),
+            emfplus_eof(),
+        ])]);
+        // Bounds from (5, 7) to (100, 100).
+        emf[8..12].copy_from_slice(&5_i32.to_le_bytes());
+        emf[12..16].copy_from_slice(&7_i32.to_le_bytes());
+        let (svg, _) = convert(&emf);
+        assert!(svg.contains("viewBox=\"5 7 95 93\""), "{svg}");
     }
 }

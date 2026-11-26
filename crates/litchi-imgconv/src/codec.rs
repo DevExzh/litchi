@@ -1520,14 +1520,25 @@ mod tests {
         .unwrap_err();
         assert!(matches!(error, Error::Unsupported(message) if message.contains("GetDC")));
 
-        let dual_error = convert_metafile(
-            &emfplus_metafile(10, 20, true, true, false),
+        // A dual metafile's classic records define the whole picture on their
+        // own, so a GetDC interval renders them instead of requiring ordered
+        // classic/EMF+ interleaving; that selection is not a picture change.
+        let dual = emfplus_metafile(10, 20, true, true, false);
+        let converted = convert_metafile(
+            &dual,
             InputFormat::Emf,
             OutputFormat::Svg,
             Options::default(),
         )
-        .unwrap_err();
-        assert!(matches!(dual_error, Error::Unsupported(message) if message.contains("GetDC")));
+        .unwrap();
+        assert!(
+            converted
+                .report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| diagnostic.code == "noncanonical-emfplus-dual-getdc")
+        );
+        assert!(crate::emf::convert_emf_to_svg(&dual).is_ok());
     }
 
     #[test]

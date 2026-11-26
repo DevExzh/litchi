@@ -10,6 +10,7 @@ mod parser;
 pub mod playback;
 pub mod renderer;
 pub mod svg;
+pub mod track;
 mod types;
 
 pub use comment::{
