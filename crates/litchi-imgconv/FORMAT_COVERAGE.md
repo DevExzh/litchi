@@ -39,12 +39,16 @@ specific flags or payload require semantics SVG cannot reproduce—for example,
 destination-dependent raster operations, unsupported bitmap masks,
 device-dependent bitmaps, or non-representable clip combinations.
 
-EMF+ `GetDC` requires ordered interleaving with classic EMF records. Both
-EMF+-only and dual streams containing it are rejected until the two playback
-engines share one ordered drawing sink; accepting them would silently reorder
-paint operations. Legal but inexact EMF+ features such as complex brushes,
-some clip combinations, effects, or curve approximations produce stable public
-diagnostics rather than disappearing silently.
+EMF+ records play only when an `EmfPlusHeader` is the first record after the
+EMF header, as in GDI+; otherwise the metafile plays as classic EMF. A dual
+metafile plays its EMF+ records and falls back to its classic records when the
+EMF+ records fail or need an approximation; a dual metafile containing
+`GetDC` plays its classic records, which hold the complete picture. An
+EMF+-only metafile containing `GetDC` is rejected, because it needs its
+classic and EMF+ records interleaved in one drawing order. Legal but inexact
+EMF+ features such as complex brushes, some clip combinations, effects, or
+curve approximations produce stable public diagnostics rather than
+disappearing silently.
 
 ## Bitmap coverage
 
