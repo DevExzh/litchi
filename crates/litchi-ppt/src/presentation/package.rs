@@ -13,12 +13,22 @@ use litchi_ole_common::property_set::{PropertySetReader as _, SharedPropertySetR
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
+// A PowerPoint 95 file saved with a PowerPoint 97 copy keeps the copy's
+// streams in `PP97_DUALSTORAGE`; its root streams hold PowerPoint 95 data.
+// LibreOffice (`SdPPTFilter::Import`) and POI read the dual storage whenever
+// it holds a document, and take its Current User and Pictures streams from
+// the same storage.
 const DOCUMENT_PATHS: [&[&str]; 2] = [
-    &["PowerPoint Document"],
     &["PP97_DUALSTORAGE", "PowerPoint Document"],
+    &["PowerPoint Document"],
 ];
-const CURRENT_USER_PATHS: [&[&str]; 2] = [&["Current User"], &["PP97_DUALSTORAGE", "Current User"]];
-const PICTURES_PATHS: [&[&str]; 1] = [&["Pictures"]];
+/// Per `DOCUMENT_PATHS` entry, the Current User candidates.
+const CURRENT_USER_PATHS: [&[&[&str]]; 2] = [
+    &[&["PP97_DUALSTORAGE", "Current User"]],
+    &[&["Current User"], &["PP97_DUALSTORAGE", "Current User"]],
+];
+/// Per `DOCUMENT_PATHS` entry, the Pictures candidates.
+const PICTURES_PATHS: [&[&[&str]]; 2] = [&[&["PP97_DUALSTORAGE", "Pictures"]], &[&["Pictures"]]];
 
 impl Presentation {
     /// Create a new Presentation from an OLE file with password-to-open options.
@@ -41,13 +51,13 @@ impl Presentation {
         .ok_or_else(|| Error::InvalidFormat("PowerPoint Document stream not found".to_string()))?;
         let current_user = locate_stream(
             ole,
-            &CURRENT_USER_PATHS,
+            CURRENT_USER_PATHS[document.0],
             source_limits.max_input_bytes,
             "Current User",
         )?;
         let pictures = locate_stream(
             ole,
-            &PICTURES_PATHS,
+            PICTURES_PATHS[document.0],
             source_limits.max_input_bytes,
             "Pictures",
         )?;
@@ -73,7 +83,7 @@ impl Presentation {
         #[cfg(not(feature = "encryption"))]
         let powerpoint_document = ole.open_stream(DOCUMENT_PATHS[document.0])?;
         let current_user_data = current_user
-            .map(|(index, _)| ole.open_stream(CURRENT_USER_PATHS[index]))
+            .map(|(index, _)| ole.open_stream(CURRENT_USER_PATHS[document.0][index]))
             .transpose()?;
         #[cfg(feature = "encryption")]
         let encrypted = decrypt_powerpoint_document(
@@ -163,7 +173,7 @@ impl Presentation {
         let pictures_data = if let Some((index, _)) = pictures {
             #[cfg(feature = "encryption")]
             {
-                let mut stream = ole.open_stream(PICTURES_PATHS[index])?;
+                let mut stream = ole.open_stream(PICTURES_PATHS[document.0][index])?;
                 if let Some(encryption) = &encrypted {
                     decrypt_pictures(&mut stream, &encryption.crypto, source_limits)?;
                 }
@@ -171,7 +181,7 @@ impl Presentation {
             }
             #[cfg(not(feature = "encryption"))]
             {
-                Some(ole.open_stream(PICTURES_PATHS[index])?)
+                Some(ole.open_stream(PICTURES_PATHS[document.0][index])?)
             }
         } else {
             None
@@ -235,15 +245,19 @@ impl Presentation {
             "PowerPoint Document",
         )?
         .ok_or_else(|| Error::InvalidFormat("PowerPoint Document stream not found".to_string()))?;
+        let storage = DOCUMENT_PATHS
+            .iter()
+            .position(|path| *path == document.0)
+            .ok_or_else(|| Error::InvalidFormat("PowerPoint Document stream not found".into()))?;
         let current_user = locate_shared_stream(
             &shared,
-            &CURRENT_USER_PATHS,
+            CURRENT_USER_PATHS[storage],
             source_limits.max_input_bytes,
             "Current User",
         )?;
         let pictures = locate_shared_stream(
             &shared,
-            &PICTURES_PATHS,
+            PICTURES_PATHS[storage],
             source_limits.max_input_bytes,
             "Pictures",
         )?;

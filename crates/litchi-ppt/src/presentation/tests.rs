@@ -766,3 +766,57 @@ fn duplicate_live_document_drawing_groups_still_refuse() {
     let p = presentation_with_superseded_document(&[], &[group.clone(), group].concat());
     assert!(matches!(p.image_store(), Err(Error::Corrupted(_))));
 }
+
+/// `ppt_with_png.ppt` repackaged the way PowerPoint 95 saves a PowerPoint 97
+/// copy: the copy's streams in `PP97_DUALSTORAGE`, PowerPoint 95 streams at
+/// the root.
+fn dual_storage_presentation_bytes() -> (Vec<u8>, usize) {
+    use litchi_cfb::{OleFile, OleFileLimits, OleWriter};
+
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/ppt/ppt_with_png.ppt");
+    let source = std::fs::read(path).unwrap();
+    let images = crate::Package::from_bytes(&source)
+        .unwrap()
+        .presentation()
+        .unwrap()
+        .images()
+        .unwrap()
+        .len();
+    let mut file = OleFile::open(std::io::Cursor::new(source), OleFileLimits::default()).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_storage(&["PP97_DUALSTORAGE"]).unwrap();
+    for name in ["PowerPoint Document", "Current User", "Pictures"] {
+        let data = file.open_stream(&[name]).unwrap();
+        writer
+            .create_stream(&["PP97_DUALSTORAGE", name], &data)
+            .unwrap();
+    }
+    // A PowerPoint 95 Current User is a length-prefixed user name, and its
+    // document stream is not PowerPoint 97 records.
+    writer
+        .create_stream(&["Current User"], b"\x04\0\0\0USER")
+        .unwrap();
+    writer
+        .create_stream(&["PowerPoint Document"], &[0; 64])
+        .unwrap();
+    let mut output = std::io::Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), images)
+}
+
+#[test]
+fn dual_storage_presentation_reads_the_powerpoint_97_copy() {
+    let (bytes, images) = dual_storage_presentation_bytes();
+    assert!(images > 0);
+    let shared = crate::Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
+        .unwrap();
+    assert_eq!(shared.images().unwrap().len(), images);
+    let mut reader = crate::raw::Reader::from_reader(std::io::Cursor::new(bytes)).unwrap();
+    assert_eq!(
+        reader.presentation().unwrap().images().unwrap().len(),
+        images
+    );
+}
