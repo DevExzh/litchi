@@ -16,6 +16,9 @@ pub enum InputFormat {
     Emf,
     /// Windows Metafile.
     Wmf,
+    /// Macintosh QuickDraw picture (PICT), with or without the 512-byte file
+    /// header.
+    Pict,
 }
 
 /// A requested representation for a raw metafile.
@@ -191,7 +194,8 @@ impl Options {
     }
 }
 
-/// Converts raw EMF or WMF bytes into a bounded, typed image representation.
+/// Converts raw EMF, WMF or PICT bytes into a bounded, typed image
+/// representation.
 ///
 /// `Auto` keeps vector content as SVG. It chooses PNG only for a metafile
 /// whose parsed records are exclusively bitmap-painting operations; this
@@ -425,6 +429,17 @@ fn raw_metafile_svg(
                     .map(|(code, message)| ConversionDiagnostic { code, message }),
             );
             Ok((svg, width, height, bitmap_only, diagnostics))
+        },
+        InputFormat::Pict => {
+            let parser = crate::pict::PictParser::new(data, limits)?;
+            let rendered = crate::pict::render(&parser, limits)?;
+            Ok((
+                rendered.svg,
+                rendered.width,
+                rendered.height,
+                rendered.bitmap_only,
+                rendered.diagnostics,
+            ))
         },
     }
 }
@@ -821,10 +836,7 @@ pub fn convert(blip: &Blip<'_>, format: ImageFormat, options: Options) -> Result
     match blip {
         Blip::Emf(meta) => return render_emf(meta, format, options),
         Blip::Wmf(meta) => return render_wmf(meta, format, options),
-        Blip::Pict(meta) => {
-            let image = render_pict(meta, options)?;
-            return encode(&image, format, options.limits.max_output_bytes);
-        },
+        Blip::Pict(meta) => return render_pict(meta, format, options),
         Blip::Jpeg(_) | Blip::Png(_) | Blip::Dib(_) | Blip::Tiff(_) => {
             let image = decode_bitmap(blip, options)?;
             return encode(&image, format, options.limits.max_output_bytes);
@@ -848,7 +860,8 @@ pub fn to_webp(blip: &Blip<'_>, options: Options) -> Result<Vec<u8>> {
     convert(blip, ImageFormat::WebP, options)
 }
 
-/// Converts an EMF or WMF BLIP to SVG under explicit input/output limits.
+/// Converts an EMF, WMF or PICT BLIP to SVG under explicit input/output
+/// limits.
 pub fn to_svg(blip: &Blip<'_>, options: Options) -> Result<String> {
     validate_limits(&options.limits)?;
     let data = decode_data(blip, &options.limits)?;
@@ -858,8 +871,8 @@ pub fn to_svg(blip: &Blip<'_>, options: Options) -> Result<String> {
             let data = wmf_with_header(meta, data, &options.limits)?;
             crate::wmf::convert_wmf_to_svg_with_options(&data, options)?
         },
-        Blip::Pict(_) => return Err(parse("PICT to SVG rendering is not implemented")),
-        _ => return Err(parse("SVG conversion requires an EMF or WMF BLIP")),
+        Blip::Pict(_) => crate::pict::convert_pict_to_svg_with_options(&data, options)?,
+        _ => return Err(parse("SVG conversion requires an EMF, WMF or PICT BLIP")),
     };
     if svg.len() > options.limits.max_output_bytes {
         return Err(limit("SVG output", options.limits.max_output_bytes));
@@ -1029,29 +1042,9 @@ fn render_wmf(meta: &Meta<'_>, format: ImageFormat, options: Options) -> Result<
     rasterize_metafile_at(&data, InputFormat::Wmf, format, options, natural_size)
 }
 
-fn render_pict(meta: &Meta<'_>, options: Options) -> Result<DynamicImage> {
+fn render_pict(meta: &Meta<'_>, format: ImageFormat, options: Options) -> Result<Vec<u8>> {
     let data = inflate_checked(meta, &options.limits)?;
-    let parser = crate::pict::PictParser::new(&data, &options.limits)?;
-    let (width, height) = target_dimensions(
-        positive(parser.width()),
-        positive(parser.height()),
-        options.width,
-        options.height,
-        &options.limits,
-    )?;
-    crate::pict::PictConverter::new(
-        parser,
-        crate::pict::PictToRasterOptions {
-            width: Some(width),
-            height: Some(height),
-            background_color: image::Rgba([255, 255, 255, 255]),
-            max_width: options.limits.max_width,
-            max_height: options.limits.max_height,
-            max_pixels: options.limits.max_pixels,
-            max_output_bytes: options.limits.max_output_bytes,
-        },
-    )
-    .convert_to_image()
+    rasterize_raw_metafile(&data, InputFormat::Pict, format, options)
 }
 
 fn inflate_checked<'data>(meta: &Meta<'data>, limits: &Limits) -> Result<Cow<'data, [u8]>> {
@@ -2284,5 +2277,112 @@ mod tests {
         // 22 placeable bytes plus five 8- or 10-byte mapping records.
         assert_eq!(framed.len(), metafile.len() + 22 + 8 + 4 * 10);
         assert!(crate::wmf::WmfParser::new(&framed, &Limits::default()).is_ok());
+    }
+
+    /// A 72-dpi extended version 2 PICT of `records` in a 6x4 frame.
+    fn pict(records: &[u8]) -> Vec<u8> {
+        let mut data = vec![0, 0, 0, 0, 0, 0, 0, 4, 0, 6];
+        data.extend_from_slice(&[0x00, 0x11, 0x02, 0xFF, 0x0C, 0x00, 0xFF, 0xFE, 0, 0]);
+        data.extend_from_slice(&0x0048_0000u32.to_be_bytes());
+        data.extend_from_slice(&0x0048_0000u32.to_be_bytes());
+        data.extend_from_slice(&[0, 0, 0, 0, 0, 4, 0, 6, 0, 0, 0, 0]);
+        data.extend_from_slice(records);
+        data.extend_from_slice(&0x00FFu16.to_be_bytes());
+        data
+    }
+
+    fn pict_paint_rect() -> Vec<u8> {
+        pict(&[0x00, 0x31, 0, 0, 0, 0, 0, 2, 0, 6])
+    }
+
+    /// A PICT whose only painting is a one-bit `BitsRect`.
+    fn pict_bits_rect() -> Vec<u8> {
+        let mut records = vec![0x00, 0x90, 0, 2];
+        for _ in 0..3 {
+            records.extend_from_slice(&[0, 0, 0, 0, 0, 1, 0, 6]);
+        }
+        records.extend_from_slice(&[0, 0, 0b1111_1100, 0]);
+        pict(&records)
+    }
+
+    fn pict_blip(data: &[u8]) -> Vec<u8> {
+        let mut body = vec![0; 16];
+        body.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        body.extend_from_slice(&[0; 24]);
+        body.extend_from_slice(&(data.len() as u32).to_le_bytes());
+        body.extend_from_slice(&[0xFE, 0xFE]);
+        body.extend_from_slice(data);
+        record(0x542, 0xF01C, &body)
+    }
+
+    #[test]
+    fn pict_auto_output_is_vector_first_and_raster_for_bitmap_pictures() {
+        let vector = convert_metafile(
+            &pict_paint_rect(),
+            InputFormat::Pict,
+            OutputFormat::Auto,
+            Options::default(),
+        )
+        .unwrap();
+        assert_eq!(vector.format, ConvertedFormat::Svg);
+        assert_eq!(vector.report.input, InputFormat::Pict);
+        assert_eq!(vector.report.diagnostics[0].code, "auto-vector-first");
+
+        let raster = convert_metafile(
+            &pict_bits_rect(),
+            InputFormat::Pict,
+            OutputFormat::Auto,
+            Options::default(),
+        )
+        .unwrap();
+        assert_eq!(raster.format, ConvertedFormat::Png);
+        assert_eq!(
+            raster.report.diagnostics[0].code,
+            "auto-raster-only-metafile"
+        );
+        let image = image::load_from_memory(&raster.bytes).unwrap().to_rgba8();
+        assert_eq!(image.dimensions(), (6, 4));
+        assert_eq!(image.get_pixel(0, 0).0, [0, 0, 0, 255]);
+        assert_eq!(image.get_pixel(0, 3).0, [255, 255, 255, 255]);
+    }
+
+    #[test]
+    fn pict_strict_helpers_reject_approximations() {
+        // invertRect can only be approximated.
+        let inverted = pict(&[0x00, 0x33, 0, 0, 0, 0, 0, 2, 0, 6]);
+        let converted = convert_metafile(
+            &inverted,
+            InputFormat::Pict,
+            OutputFormat::Png,
+            Options::default(),
+        )
+        .unwrap();
+        assert!(
+            converted
+                .report
+                .diagnostics
+                .iter()
+                .any(|diagnostic| is_lossy_diagnostic(diagnostic.code))
+        );
+        assert!(crate::pict::convert_pict_to_png(&inverted, None, None).is_err());
+        assert!(crate::pict::convert_pict_to_svg(&inverted).is_err());
+        assert!(crate::pict::convert_pict_to_png(&pict_paint_rect(), Some(12), None).is_ok());
+    }
+
+    #[test]
+    fn pict_blips_convert_to_svg_and_png() {
+        let bytes = pict_blip(&pict_paint_rect());
+        let blip = Blip::parse(&bytes, Default::default()).unwrap();
+        assert!(matches!(blip, Blip::Pict(_)));
+        let svg = to_svg(&blip, Options::default()).unwrap();
+        assert!(svg.contains(r##"<path d="M0 0H6V2H0Z" fill="#000000"/>"##));
+        let png = to_png(&blip, Options::default().width(12)).unwrap();
+        let image = image::load_from_memory(&png).unwrap();
+        assert_eq!((image.width(), image.height()), (12, 8));
+
+        let inverted = pict_blip(&pict(&[0x00, 0x33, 0, 0, 0, 0, 0, 2, 0, 6]));
+        let blip = Blip::parse(&inverted, Default::default()).unwrap();
+        assert!(to_png(&blip, Options::default()).is_err());
+        assert!(to_svg(&blip, Options::default()).is_err());
     }
 }

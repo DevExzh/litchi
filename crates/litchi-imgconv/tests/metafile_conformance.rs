@@ -530,6 +530,7 @@ impl CorpusCounts {
         match input {
             InputFormat::Emf => self.emf_success += 1,
             InputFormat::Wmf => self.wmf_success += 1,
+            InputFormat::Pict => {},
         }
     }
 

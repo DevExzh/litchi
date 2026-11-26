@@ -5,8 +5,12 @@ Bounded vector-first conversion for image formats embedded in Microsoft Office d
 OfficeArt BLIP and BStore grammar lives in `litchi-odraw`. This crate consumes
 its borrowed `image::Blip` views and performs RFC1950 decompression, DIB/WMF
 adaptation, EMF/WMF/PICT conversion, resizing, and raster encoding under explicit
-resource ceilings. EMF and WMF raster output is produced by first generating SVG
-and rasterizing that SVG; the crate never substitutes a placeholder image.
+resource ceilings. EMF, WMF and PICT raster output is produced by first generating
+SVG and rasterizing that SVG; the crate never substitutes a placeholder image.
+Macintosh PICT pictures (version 1, version 2 and extended version 2) are played
+back like QuickDraw draws them; a picture that cannot be drawn exactly is rejected
+by the strict helpers instead of being replaced by a placeholder image, and
+`convert_metafile` returns its approximation together with diagnostics.
 
 Host crates can expose borrowed or move-owned `litchi_odraw::image::File`
 values. Import `litchi_imgconv::Convert` to add the short `decode`, `png`,
@@ -24,8 +28,8 @@ fn render(blip_bytes: &[u8]) -> litchi_core::error::Result<Vec<u8>> {
 }
 ```
 
-For raw metafiles, use `convert_metafile` for a typed result that carries its
-actual format, MIME type, extension, and selection report. `OutputFormat::Auto`
+For raw metafiles (EMF, WMF or PICT), use `convert_metafile` for a typed result
+that carries its actual format, MIME type, extension, and selection report. `OutputFormat::Auto`
 is vector-first: it selects SVG unless the parsed metafile is exclusively bitmap
 painting, in which case it selects PNG.
 

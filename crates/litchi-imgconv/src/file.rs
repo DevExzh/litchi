@@ -24,7 +24,7 @@ pub trait Convert {
     /// Converts this file to WebP under explicit sizing and resource limits.
     fn webp(&self, options: Options) -> Result<Vec<u8>>;
 
-    /// Converts an EMF or WMF file to SVG under explicit limits.
+    /// Converts an EMF, WMF or PICT file to SVG under explicit limits.
     fn svg(&self, options: Options) -> Result<String>;
 
     /// Extracts the recommended representation under explicit limits.
