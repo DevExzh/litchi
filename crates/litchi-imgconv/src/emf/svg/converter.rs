@@ -3,7 +3,7 @@
 use super::{
     buffer::ElementBuffer,
     path::PathBuilder,
-    state::{Brush, DeviceContext, Font, GdiObject, Pen, RenderState},
+    state::{Brush, Canvas, ClipRule, DeviceContext, Font, GdiObject, Pen, RenderState},
 };
 use crate::emf::{
     parser::{EmfParser, EmfRecord},
@@ -192,6 +192,21 @@ impl<'a> EmfSvgConverter<'a> {
             ));
         }
         Ok(Some(output))
+    }
+
+    /// Device-space rectangle covered by the SVG canvas the converter emits.
+    ///
+    /// Clips are bounded by it instead of by an unbounded sentinel box.
+    fn canvas(&self) -> Canvas {
+        let bounds = self.parser.header.bounds;
+        Canvas {
+            left: f64::from(bounds.0),
+            top: f64::from(bounds.1),
+            right: f64::from(bounds.0)
+                + f64::from(self.parser.header.width().unsigned_abs().max(1)),
+            bottom: f64::from(bounds.1)
+                + f64::from(self.parser.header.height().unsigned_abs().max(1)),
+        }
     }
 
     fn process_record(&self, record: &EmfRecord, state: &mut RenderState) -> Result<Vec<String>> {
@@ -549,7 +564,7 @@ impl<'a> EmfSvgConverter<'a> {
                 let builder = state.take_path().ok_or_else(|| {
                     Error::ParseError("SelectClipPath without a completed path".into())
                 })?;
-                if !state.install_clip(&builder.build(), mode) {
+                if !state.install_clip(&builder.build(), ClipRule::NonZero, mode) {
                     return unsupported(
                         kind,
                         "requested region combine mode is not faithfully representable",
@@ -629,12 +644,15 @@ impl<'a> EmfSvgConverter<'a> {
             // Clipping and regions.
             EmrType::IntersectClipRect | EmrType::ExcludeClipRect => {
                 let rect = read_record::<RectL>(data, kind)?;
-                let path = if kind == EmrType::IntersectClipRect {
-                    rectangle_path(rect, &state.dc)?.build()
+                let (path, rule) = if kind == EmrType::IntersectClipRect {
+                    (rectangle_path(rect, &state.dc)?.build(), ClipRule::NonZero)
                 } else {
-                    exclusion_path(rect, &state.dc)?
+                    (
+                        exclusion_path(rect, &state.dc, self.canvas())?,
+                        ClipRule::EvenOdd,
+                    )
                 };
-                if !state.install_clip(&path, 1) {
+                if !state.install_clip(&path, rule, 1) {
                     return unsupported(kind, "clip combine mode");
                 }
                 Ok(Vec::new())
@@ -644,7 +662,7 @@ impl<'a> EmfSvgConverter<'a> {
                 let transformed = state
                     .dc
                     .transform_vector(f64::from(offset.x), f64::from(offset.y));
-                state.offset_clip(transformed.0, transformed.1);
+                state.offset_clip(transformed.0, transformed.1, self.canvas());
                 Ok(Vec::new())
             },
             EmrType::SetMetaRgn => {
@@ -677,7 +695,7 @@ impl<'a> EmfSvgConverter<'a> {
                     self.limits.max_path_points,
                     self.limits.max_output_bytes,
                 )?;
-                if !state.install_clip(&path, mode) {
+                if !state.install_clip(&path, ClipRule::NonZero, mode) {
                     return unsupported(
                         kind,
                         "requested region combine mode is not faithfully representable",
@@ -1770,12 +1788,15 @@ fn angle_arc_path(arc: EmrAngleArc, dc: &DeviceContext) -> Result<(PathBuilder, 
     Ok((b, end))
 }
 
-fn exclusion_path(rect: RectL, dc: &DeviceContext) -> Result<String> {
+/// The canvas with `rect` cut out, to be filled with the even-odd rule so that
+/// the result does not depend on the orientation the transforms give `rect`.
+fn exclusion_path(rect: RectL, dc: &DeviceContext, canvas: Canvas) -> Result<String> {
     let mut outer = PathBuilder::new();
-    outer.move_to(-1e9, -1e9);
-    outer.line_to(1e9, -1e9);
-    outer.line_to(1e9, 1e9);
-    outer.line_to(-1e9, 1e9);
+    // "Everything outside `rect`" only has to cover the canvas.
+    outer.move_to(canvas.left, canvas.top);
+    outer.line_to(canvas.right, canvas.top);
+    outer.line_to(canvas.right, canvas.bottom);
+    outer.line_to(canvas.left, canvas.bottom);
     outer.close();
     let inner = rectangle_path(
         RectL {
@@ -2360,6 +2381,59 @@ mod tests {
         record(EmrType::LineTo, &point(x, y))
     }
 
+    fn offset_clip(x: i32, y: i32) -> Vec<u8> {
+        record(EmrType::OffsetClipRgn, &point(x, y))
+    }
+
+    /// A solid black brush selected into every DC of the record list that
+    /// follows, and a polygon covering far more than the canvas.
+    fn black_filled_canvas() -> Vec<Vec<u8>> {
+        let mut brush = Vec::new();
+        dword(&mut brush, 1); // explicit handle
+        dword(&mut brush, 0); // BS_SOLID
+        dword(&mut brush, 0); // black COLORREF
+        dword(&mut brush, 0);
+        let mut select = Vec::new();
+        dword(&mut select, 1);
+        let mut polygon = Vec::new();
+        for value in [-50, -50, 150, 150] {
+            sdword(&mut polygon, value);
+        }
+        dword(&mut polygon, 4);
+        for (x, y) in [(-50, -50), (150, -50), (150, 150), (-50, 150)] {
+            polygon.extend_from_slice(&point(x, y));
+        }
+        vec![
+            record(EmrType::CreateBrushIndirect, &brush),
+            record(EmrType::SelectObject, &select),
+            record(EmrType::Polygon, &polygon),
+        ]
+    }
+
+    /// Converts a classic EMF and counts the non-white pixels its own SVG
+    /// produces at canvas size. The synthetic canvas is 100 by 100 units, so
+    /// one unit is one pixel.
+    fn painted_pixels(records: Vec<Vec<u8>>) -> usize {
+        let bytes = classic_emf(records);
+        let parser = EmfParser::new(&bytes, &crate::Limits::default()).unwrap();
+        let svg = EmfSvgConverter::new(&parser).convert().unwrap();
+        let png = crate::raster::rasterize_svg(
+            &svg,
+            100,
+            100,
+            image::Rgba([255, 255, 255, 255]),
+            image::ImageFormat::Png,
+            &crate::raster::RasterLimits::default(),
+        )
+        .expect("converted EMF SVG must rasterize");
+        image::load_from_memory_with_format(&png, image::ImageFormat::Png)
+            .expect("rasterized PNG must decode")
+            .to_rgba8()
+            .pixels()
+            .filter(|pixel| pixel.0 != [255; 4])
+            .count()
+    }
+
     /// The stroked elements of a converted classic EMF (every `<line` and
     /// every `<path` with a stroke, so not the clip definitions), in document
     /// order.
@@ -2459,6 +2533,28 @@ mod tests {
                 r#"<path d="M10 40L10 60L30 60L30 80" fill="none" stroke="black" stroke-linecap="round" stroke-linejoin="round" stroke-miterlimit="10"/>"#,
             ]
         );
+    }
+
+    #[test]
+    fn excluded_clip_rect_paints_everything_but_its_rect() {
+        let mut payload = Vec::new();
+        for value in [20, 20, 80, 80] {
+            sdword(&mut payload, value);
+        }
+        let mut records = vec![record(EmrType::ExcludeClipRect, &payload)];
+        records.extend(black_filled_canvas());
+
+        // 100 by 100 canvas minus the excluded 60 by 60 rectangle.
+        assert_eq!(painted_pixels(records), 10_000 - 3_600);
+    }
+
+    #[test]
+    fn offset_clip_moves_the_installed_region() {
+        let mut records = vec![clip_rect(0, 0, 50, 50), offset_clip(80, 80)];
+        records.extend(black_filled_canvas());
+
+        // The 50 by 50 region keeps only its 20 by 20 corner on the canvas.
+        assert_eq!(painted_pixels(records), 400);
     }
 
     #[test]
