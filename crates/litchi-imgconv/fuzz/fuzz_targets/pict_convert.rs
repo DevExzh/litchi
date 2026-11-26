@@ -20,6 +20,6 @@ fuzz_target!(|data: &[u8]| {
         ..Options::default()
     };
     if let Ok(png) = convert_pict_with_options(data, ImageFormat::Png, options) {
-        assert!(png.len() <= limits.max_output_bytes);
+        common::assert_decodable_png(&png, &limits);
     }
 });

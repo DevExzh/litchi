@@ -12,7 +12,20 @@ fuzz_target!(|data: &[u8]| {
         limits,
         ..Options::default()
     };
-    if let Ok(svg) = convert_metafile(data, InputFormat::Wmf, OutputFormat::Svg, options) {
+    let first = convert_metafile(data, InputFormat::Wmf, OutputFormat::Svg, options);
+    if let Ok(svg) = &first {
         common::assert_well_formed_svg(&svg.bytes, limits.max_output_bytes);
+    }
+    // Conversion is a pure function of its input. Repeating it costs a second
+    // playback, so only a quarter of the inputs check it.
+    if data.len() % 4 == 0 {
+        let second = convert_metafile(data, InputFormat::Wmf, OutputFormat::Svg, options);
+        match (&first, &second) {
+            (Ok(first), Ok(second)) => {
+                assert!(first.bytes == second.bytes && first.report == second.report)
+            },
+            (Err(first), Err(second)) => assert_eq!(first.to_string(), second.to_string()),
+            _ => panic!("repeating a conversion changed its outcome"),
+        }
     }
 });

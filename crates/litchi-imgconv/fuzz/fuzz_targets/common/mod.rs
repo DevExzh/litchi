@@ -46,6 +46,19 @@ pub fn assert_well_formed_svg(bytes: &[u8], max_output_bytes: usize) {
     assert_eq!(document.root_element().tag_name().name(), "svg");
 }
 
+/// Asserts what every successful PNG conversion promises: the output stays
+/// within `max_output_bytes`, decodes, and fits the render budget.
+pub fn assert_decodable_png(bytes: &[u8], limits: &litchi_imgconv::Limits) {
+    assert!(
+        bytes.len() <= limits.max_output_bytes,
+        "PNG exceeds the output limit"
+    );
+    let image = image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
+        .unwrap_or_else(|error| panic!("PNG output does not decode: {error}"));
+    assert!(image.width() <= limits.max_width && image.height() <= limits.max_height);
+    assert!(u64::from(image.width()) * u64::from(image.height()) <= limits.max_pixels);
+}
+
 /// The `OfficeArt` traversal budget: 20 000 records, 1 MiB per record body and
 /// 256 image files per scanner.
 pub fn art_limits() -> litchi_odraw::image::Limits {

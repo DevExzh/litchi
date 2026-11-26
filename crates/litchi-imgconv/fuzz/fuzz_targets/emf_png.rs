@@ -14,6 +14,6 @@ fuzz_target!(|data: &[u8]| {
     };
     let png = convert_metafile(data, InputFormat::Emf, OutputFormat::Png, options);
     if let Ok(image) = png {
-        assert!(image.bytes.len() <= limits.max_output_bytes);
+        common::assert_decodable_png(&image.bytes, &limits);
     }
 });

@@ -18,7 +18,7 @@ fuzz_target!(|data: &[u8]| {
         ..Options::default()
     };
     if let Ok(png) = to_png(&blip, options) {
-        assert!(png.len() <= limits.max_output_bytes);
+        common::assert_decodable_png(&png, &limits);
     }
     if let Ok(svg) = to_svg(&blip, options) {
         common::assert_well_formed_svg(svg.as_bytes(), limits.max_output_bytes);
