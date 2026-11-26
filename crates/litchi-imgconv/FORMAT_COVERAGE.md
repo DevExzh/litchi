@@ -68,6 +68,23 @@ device-dependent `Bitmap16` sources, and CMYK decode fail explicitly.
   image. Pixels that still depend on the destination are painted as on a white
   destination and reported as an approximation.
 
+## Text and pens
+
+- Characters of `ExtTextOut` records are placed at the origins their advance
+  arrays give, including vertical advances and double-byte characters, and
+  aligned as GDI aligns the whole string.
+- Font heights and pen widths in logical units follow the world transform
+  and page mapping; zero-width and cosmetic pens stay one device pixel wide.
+- Symbol faces (Symbol, MT Extra, Wingdings, Wingdings 3, Webdings, Marlett,
+  Monotype Sorts, Zapf Dingbats) draw the Unicode characters their glyphs
+  represent where one exists; other glyphs keep their private-use code point.
+- `font-family` names the recorded face, then the generic family of its
+  LOGFONT family class.
+- PNG and JPEG output draws missing Windows faces with installed
+  metric-compatible families and symbols with installed symbol faces.
+- A raw WMF without a placeable header rasterizes at the size of its SVG
+  canvas, which keeps the aspect ratio of its frame.
+
 ## Macintosh PICT
 
 PICT version 1, version 2 and extended version 2 pictures are read with or
