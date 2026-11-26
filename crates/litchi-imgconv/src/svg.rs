@@ -15,7 +15,9 @@ fn write_compact_xml_escaped(output: &mut String, value: &str) {
             '\t' => output.push_str("&#x9;"),
             '\n' => output.push_str("&#xA;"),
             '\r' => output.push_str("&#xD;"),
-            '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{10ffff}' => output.push(ch),
+            '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}' => {
+                output.push(ch);
+            },
             _ => output.push('\u{fffd}'),
         }
     }
@@ -749,6 +751,13 @@ pub mod color {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn compact_escaping_replaces_the_noncharacters_xml_forbids() {
+        let mut output = String::new();
+        write_compact_xml_escaped(&mut output, "a\u{fffe}b\u{ffff}c\u{fffd}d\u{10ffff}e\u{1}");
+        assert_eq!(output, "a\u{fffd}b\u{fffd}c\u{fffd}d\u{10ffff}e\u{fffd}");
+    }
 
     #[test]
     fn element_helpers_emit_compact_exact_bytes() {

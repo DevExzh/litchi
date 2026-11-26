@@ -112,6 +112,16 @@ where
 }
 
 fn check_svg(svg: &str) -> Result<(), String> {
+    // XML 1.0 forbids most control characters and U+FFFE/U+FFFF in a document;
+    // the event reader below does not check for them.
+    if let Some(character) = svg.chars().find(|character| {
+        !matches!(character, '\t' | '\n' | '\r' | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}' | '\u{10000}'..='\u{10ffff}')
+    }) {
+        return Err(format!(
+            "SVG contains the character U+{:04X}, which XML forbids",
+            u32::from(character)
+        ));
+    }
     let mut reader = Reader::from_str(svg);
     let mut depth = 0usize;
     let mut roots = 0usize;
