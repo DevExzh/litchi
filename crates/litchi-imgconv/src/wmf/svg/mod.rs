@@ -14,6 +14,7 @@ use crate::svg_utils::{ClipGrouper, write_num};
 use bounds::BoundsCalculator;
 use litchi_core::error::{Error, Result};
 use renderer::SvgRenderer;
+use state::MappingState;
 use transform::CoordinateTransform;
 
 pub(super) type BitmapHook =
@@ -133,15 +134,24 @@ impl WmfConverter {
     }
 
     fn render(&self) -> (String, Vec<renderer::RenderIssue>) {
-        let bbox = if let Some(placeable) = &self.parser.placeable {
-            normalized_bbox((
+        let (bbox, mapping) = if let Some(placeable) = &self.parser.placeable {
+            let bbox = normalized_bbox((
                 f64::from(placeable.left),
                 f64::from(placeable.top),
                 f64::from(placeable.right),
                 f64::from(placeable.bottom),
-            ))
+            ));
+            // The placeable rectangle is the frame, in logical units of the
+            // window the metafile is designed for.
+            let mapping =
+                MappingState::playback((bbox.0, bbox.1), (bbox.2 - bbox.0, bbox.3 - bbox.1));
+            (bbox, mapping)
         } else {
-            BoundsCalculator::scan_records(&self.parser.records).as_tuple()
+            let extent =
+                BoundsCalculator::first_window_extent(&self.parser.records).unwrap_or((1.0, 1.0));
+            let mapping = MappingState::playback((0.0, 0.0), extent);
+            let bbox = BoundsCalculator::scan_records(&self.parser.records, mapping).as_tuple();
+            (bbox, mapping)
         };
         let (svg_width, svg_height) = Self::calculate_dimensions(bbox);
         let transform = CoordinateTransform::new(bbox, svg_width, svg_height);
@@ -155,6 +165,7 @@ impl WmfConverter {
             self.limits.max_output_bytes,
             self.limits.max_uncompressed_bytes,
         );
+        renderer.set_initial_mapping(mapping);
         let mut elements = String::with_capacity(4096);
         let mut groups = ClipGrouper::new();
         let mut element_count = 0usize;

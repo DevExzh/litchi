@@ -6,8 +6,8 @@ use super::super::constants::{bk_mode, brush, ext_text_out, record, rop3, stock,
 use super::super::parser::WmfRecord;
 use super::BitmapHook;
 use super::state::{
-    Brush, ClipRegion, DeviceRect, Font, GdiObject, GraphicsState, ObjectTable, Palette, Pen,
-    Region,
+    Brush, ClipRegion, DeviceRect, Font, GdiObject, GraphicsState, MappingState, ObjectTable,
+    Palette, Pen, Region,
 };
 use super::style::{
     escape_xml_attr_into, escape_xml_text_into, fill_attrs, hatch_definition, map_font_family,
@@ -64,6 +64,12 @@ pub(super) struct SvgRenderer<'hook> {
 }
 
 impl<'hook> SvgRenderer<'hook> {
+    /// Starts playback under `mapping` instead of the default device context
+    /// mapping.
+    pub(super) fn set_initial_mapping(&mut self, mapping: MappingState) {
+        self.state.mapping = mapping;
+    }
+
     pub(super) fn new(
         transform: CoordinateTransform,
         bitmap_hook: Option<&'hook BitmapHook>,
@@ -2113,7 +2119,7 @@ fn decode_text(bytes: &[u8], charset: u8) -> (String, bool) {
 fn bitmap_destination(
     function: u16,
     data: &[u8],
-    mapping: &super::state::MappingState,
+    mapping: &MappingState,
     transform: &CoordinateTransform,
 ) -> Option<DeviceRect> {
     let (height_offset, width_offset, y_offset, x_offset) = match function {

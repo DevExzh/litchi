@@ -104,6 +104,26 @@ impl Default for MappingState {
 }
 
 impl MappingState {
+    /// Mapping a player establishes before it plays a metafile.
+    ///
+    /// Applications play a WMF into an MM_ANISOTROPIC device context whose
+    /// window and viewport both describe the picture frame, and the metafile
+    /// then sets only its window ([MS-WMF] placeable header; METAFILEPICT).
+    /// Logical units therefore start out as frame units, a window the
+    /// metafile sets is stretched onto the frame, and SetWindowExt applies
+    /// even when the metafile never selects a mapping mode itself.
+    pub(super) fn playback(origin: (f64, f64), extent: (f64, f64)) -> Self {
+        let extent = (non_zero_or_one(extent.0), non_zero_or_one(extent.1));
+        Self {
+            mode: map_mode::MM_ANISOTROPIC,
+            window_origin: origin,
+            window_extent: extent,
+            viewport_origin: origin,
+            viewport_extent: extent,
+            layout: layout::LTR,
+        }
+    }
+
     pub(super) fn set_mode(&mut self, mode: u16) {
         if (map_mode::MM_TEXT..=map_mode::MM_ANISOTROPIC).contains(&mode) {
             self.mode = mode;
@@ -162,6 +182,14 @@ impl MappingState {
 
     pub(super) fn scalable_extents(&self) -> bool {
         matches!(self.mode, map_mode::MM_ISOTROPIC | map_mode::MM_ANISOTROPIC)
+    }
+}
+
+fn non_zero_or_one(value: f64) -> f64 {
+    if value == 0.0 || !value.is_finite() {
+        1.0
+    } else {
+        value
     }
 }
 

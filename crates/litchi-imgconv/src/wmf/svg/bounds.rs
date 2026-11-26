@@ -140,8 +140,11 @@ pub(super) struct BoundsCalculator;
 impl BoundsCalculator {
     /// Scan records in playback order.  The result is always finite and has
     /// normalized edges, even for reversed rectangles and `i16` extrema.
-    pub(super) fn scan_records(records: &[WmfRecord]) -> Bounds {
-        let mut state = ReplayState::default();
+    pub(super) fn scan_records(records: &[WmfRecord], mapping: MappingState) -> Bounds {
+        let mut state = ReplayState {
+            mapping,
+            ..ReplayState::default()
+        };
         let mut saves = Vec::<ReplaySnapshot>::new();
         let mut bounds: Option<Bounds> = None;
 
@@ -371,6 +374,15 @@ impl BoundsCalculator {
         bounds
             .unwrap_or_else(Bounds::fallback)
             .normalized_or_fallback()
+    }
+
+    /// Window extent of the first SetWindowExt record, the extent a player
+    /// gives the frame of a metafile without a placeable header.
+    pub(super) fn first_window_extent(records: &[WmfRecord]) -> Option<(f64, f64)> {
+        records
+            .iter()
+            .find(|rec| record::canonical(rec.function) == record::SET_WINDOW_EXT)
+            .and_then(|rec| point_at(rec, 0))
     }
 
     fn restore_dc(state: &mut ReplayState, saves: &mut Vec<ReplaySnapshot>, rec: &WmfRecord) {
@@ -808,7 +820,7 @@ mod tests {
             // bottom, right, top, left (both axes deliberately reversed)
             record(record::RECTANGLE, &[10, 20, 90, 180]),
         ];
-        let bounds = BoundsCalculator::scan_records(&records);
+        let bounds = BoundsCalculator::scan_records(&records, MappingState::default());
         assert_eq!(bounds.as_tuple(), (40.0, -180.0, 360.0, -20.0));
     }
 
@@ -819,7 +831,7 @@ mod tests {
             record(record::LINE_TO, &[40, 30]),
         ];
         assert_eq!(
-            BoundsCalculator::scan_records(&records).as_tuple(),
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (10.0, 20.0, 30.0, 40.0)
         );
     }
@@ -834,7 +846,7 @@ mod tests {
             record(record::ARC, &[7, 11, 3, 2, 20, 10, 30, -10]),
         ];
         assert_eq!(
-            BoundsCalculator::scan_records(&records).as_tuple(),
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (-10.0, -5.0, 120.0, 110.0)
         );
     }
@@ -849,7 +861,7 @@ mod tests {
             record(record::EXT_TEXT_OUT, &[5, 6, 1, 2, 50, 60, 10, 20, 0x0041]),
         ];
         assert_eq!(
-            BoundsCalculator::scan_records(&records).as_tuple(),
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (6.0, 5.0, 80.0, 60.0)
         );
     }
@@ -863,7 +875,7 @@ mod tests {
             record(record::FLOOD_FILL, &[0, 0, 70, 80]),
         ];
         assert_eq!(
-            BoundsCalculator::scan_records(&records).as_tuple(),
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (-3.0, -2.0, 80.0, 70.0)
         );
     }
@@ -881,7 +893,7 @@ mod tests {
             record(record::STRETCH_DIB, &[0, 0, 0, 1, 1, 0, 0, 10, 14, 80, 90]),
         ];
         assert_eq!(
-            BoundsCalculator::scan_records(&records).as_tuple(),
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (20.0, 30.0, 104.0, 90.0)
         );
     }
@@ -893,7 +905,7 @@ mod tests {
             record(record::SET_WINDOW_EXT, &[0, 0]),
             record(record::RECTANGLE, &[i16::MIN, i16::MIN, i16::MAX, i16::MAX]),
         ];
-        let bounds = BoundsCalculator::scan_records(&records);
+        let bounds = BoundsCalculator::scan_records(&records, MappingState::default());
         assert_eq!(bounds.as_tuple(), (-32768.0, -32768.0, 32767.0, 32767.0));
         assert!(
             bounds.left.is_finite()
@@ -914,7 +926,7 @@ mod tests {
             record(record::SET_PIXEL, &[0, 0, 3, 4]),
         ];
         assert_eq!(
-            BoundsCalculator::scan_records(&records).as_tuple(),
+            BoundsCalculator::scan_records(&records, MappingState::default()).as_tuple(),
             (8.0, 6.0, 8.0, 6.0)
         );
     }
