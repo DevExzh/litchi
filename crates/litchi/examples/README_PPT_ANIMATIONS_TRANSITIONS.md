@@ -62,13 +62,13 @@ A comprehensive example combining animations and transitions:
 
 ```bash
 # Animation showcase
-cargo run --example ppt_animations_example
+cargo run -p litchi-ppt --example ppt_animations_example
 
 # Transition showcase
-cargo run --example ppt_transitions_example
+cargo run -p litchi-ppt --example ppt_transitions_example
 
 # Combined demonstration
-cargo run --example ppt_animations_transitions_combined
+cargo run -p litchi-ppt --example ppt_animations_transitions_combined
 ```
 
 ## Output Files
@@ -146,7 +146,7 @@ The examples also save raw binary data (`.bin` files) showing the actual PPT rec
 ### Creating Animations
 
 ```rust
-use litchi::ole::ppt::animation::{
+use litchi_ppt::animation::{
     AnimationInfo, BuildInfo, BuildLevel, BuildType,
     AnimationEffect, EffectSpeed, EffectDirection, AnimationTrigger,
 };
@@ -170,7 +170,7 @@ animation.build_list = Some(build_list);
 ### Creating Transitions
 
 ```rust
-use litchi::ole::ppt::transition::{
+use litchi_ppt::transition::{
     TransitionInfo, TransitionType, TransitionSpeed,
     TransitionDirection, AdvanceMode,
 };

@@ -1,0 +1,74 @@
+//! Primary API for presentation consumers.
+
+/// Unified source-checked presentation package transactions and history.
+pub mod edit {
+    pub use crate::authoring::edit::{
+        Commit, CryptoCapability, CryptoOperation, CryptoRefusal, Diagnostics, Domain, Edit,
+        History, LimitKind, MAX_MEDIA_CHANGES, MediaChange, MergePlan, PackageError as Error,
+        Patch, SecurityPolicy, Selector, SlidePosition,
+    };
+}
+
+/// Bounded, inert embedded-object discovery.
+pub mod embedded {
+    pub use litchi_odf_common::embedded::{Kind, Object, Parameter, Root, Source};
+}
+
+/// Validated image-authoring values shared by builders and transactions.
+pub mod image {
+    pub use litchi_odf_common::drawing::authoring::Length;
+    pub use litchi_odf_common::media::authoring::Format;
+}
+
+/// Named presentation page-layout definitions and their XML codec.
+pub mod layout {
+    pub use crate::model::page_layout::{
+        Collection, Layout, Measure, Placeholder, Role, Unit, parse, remove_xml, set_xml,
+    };
+}
+
+/// Typed inert drawing-layer declarations and source-owner selectors.
+pub mod layer {
+    pub use crate::model::layer::{Layer, LayerInventory, LayerOwner, LayerSet};
+}
+
+/// Presentation master pages and their shared ODF regions/children.
+pub mod master {
+    pub use crate::package::MasterPage;
+    pub use crate::package::layout_master::{
+        MasterSummary as Summary, list_masters as list, parse_masters as parse,
+    };
+    pub use litchi_odf_common::style::master::{Child, ChildKind, Kind, Master, Region};
+}
+
+/// Static metadata attached to presentation pages.
+pub mod page {
+    pub use crate::model::page_metadata::{Collection, Page, parse};
+}
+
+/// Inert slide-show settings and ordered custom shows.
+pub mod settings {
+    pub use crate::model::settings::{CustomShow, Settings, parse};
+}
+
+/// Slide-owned semantic values.
+pub mod slide {
+    pub use crate::model::slide::{
+        DrawingAttribute, DrawingAttributeNamespace, DrawingShapeKind, EnhancedGeometry,
+        EnhancedGeometryChild, EnhancedGeometryChildKind, Shape, Slide,
+    };
+}
+
+pub use crate::authoring::Builder;
+pub use crate::package::{
+    MasterPage, Presentation, SlideCatalogEntry, SourceBackedPresentation,
+    SourceBackedPresentationCatalog,
+};
+
+/// Bounded fresh publication of plain titled slides.
+pub mod streaming {
+    pub use crate::streaming::{
+        PlainSlide, PublicationError, PublicationFailureKind, SlideStreamReport, StreamingError,
+        StreamingLimits, XmlAuditLimits, stream_plain_slides_to, try_stream_plain_slides_to,
+    };
+}

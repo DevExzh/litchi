@@ -1,0 +1,375 @@
+use std::borrow::Cow;
+use std::io::Read;
+
+use crate::consts::RecordType;
+use crate::package::{Error, Result};
+use crate::records::Record;
+
+use super::model::{Compression, Kind, MAX_DECLARED_BYTES, MAX_STORED_BYTES, Ref, Storage};
+#[cfg(feature = "vba-inspection")]
+use super::snapshot::Metadata;
+use super::snapshot::Snapshot;
+
+impl<'a> Ref<'a> {
+    /// Resolve one strict `ExOleObjStg` record directly from presentation bytes.
+    #[cfg(any(test, feature = "vba-inspection"))]
+    pub(crate) fn parse_at(document: &'a [u8], offset: usize, kind: Kind) -> Result<Self> {
+        let header_end = offset
+            .checked_add(8)
+            .ok_or_else(|| Error::Corrupted("ExOleObjStg header offset overflows".into()))?;
+        let header: &[u8; 8] = document
+            .get(offset..header_end)
+            .and_then(|bytes| bytes.try_into().ok())
+            .ok_or_else(|| Error::Corrupted("truncated ExOleObjStg header".into()))?;
+        let version_instance = u16::from_le_bytes([header[0], header[1]]);
+        let version = version_instance & 0x000f;
+        let instance = (version_instance >> 4) & 0x0fff;
+        let record_type = u16::from_le_bytes([header[2], header[3]]);
+        let stored_len = usize::try_from(u32::from_le_bytes([
+            header[4], header[5], header[6], header[7],
+        ]))
+        .map_err(|_err| Error::Corrupted("ExOleObjStg size exceeds usize".into()))?;
+        if version != 0 || record_type != RecordType::ExternalOleObjectStg.as_u16() {
+            return corrupted("persisted storage is not a strict ExOleObjStg record");
+        }
+        if stored_len > MAX_STORED_BYTES {
+            return corrupted("ExOleObjStg exceeds 128 MiB stored data");
+        }
+        let payload_end = header_end
+            .checked_add(stored_len)
+            .ok_or_else(|| Error::Corrupted("ExOleObjStg payload size overflows".into()))?;
+        let payload = document
+            .get(header_end..payload_end)
+            .ok_or_else(|| Error::Corrupted("truncated ExOleObjStg payload".into()))?;
+        match instance {
+            0 => Ok(Self {
+                kind,
+                compression: Compression::Uncompressed,
+                declared_uncompressed_len: None,
+                data: payload,
+            }),
+            1 => {
+                let prefix: &[u8; 4] = payload
+                    .get(..4)
+                    .and_then(|bytes| bytes.try_into().ok())
+                    .ok_or_else(|| {
+                        Error::Corrupted("compressed ExOleObjStg is missing its size prefix".into())
+                    })?;
+                let declared_uncompressed_len = u32::from_le_bytes(*prefix);
+                if declared_uncompressed_len > MAX_DECLARED_BYTES {
+                    return corrupted("compressed ExOleObjStg declares more than 256 MiB");
+                }
+                Ok(Self {
+                    kind,
+                    compression: Compression::from_zlib_bytes(&payload[4..]),
+                    declared_uncompressed_len: Some(declared_uncompressed_len),
+                    data: payload.get(4..).ok_or_else(|| {
+                        Error::Corrupted("compressed ExOleObjStg is missing its payload".into())
+                    })?,
+                })
+            },
+            _ => corrupted("ExOleObjStg has an invalid storage instance"),
+        }
+    }
+
+    #[cfg(feature = "vba-inspection")]
+    pub(crate) fn metadata(self) -> Metadata {
+        self.snapshot().metadata()
+    }
+
+    /// Reject a caller-specific stored-size ceiling before payload allocation.
+    #[cfg(any(test, feature = "vba-inspection"))]
+    pub(crate) fn check_stored_limit(self, maximum: usize) -> Result<Self> {
+        if self.data.len() > maximum {
+            return corrupted(format!(
+                "VbaProjectStg stores {} bytes above the {maximum}-byte limit",
+                self.data.len()
+            ));
+        }
+        Ok(self)
+    }
+
+    /// Return bounded CFB bytes, borrowing the uncompressed representation.
+    pub(crate) fn decompressed_bytes(self, maximum: usize) -> Result<Cow<'a, [u8]>> {
+        match self.compression {
+            Compression::Uncompressed => {
+                if self.data.len() > maximum {
+                    return corrupted(format!(
+                        "uncompressed ExOleObjStg exceeds the {maximum}-byte output limit"
+                    ));
+                }
+                Ok(Cow::Borrowed(self.data))
+            },
+            Compression::Zlib | Compression::ZlibSyncFlush => {
+                let declared = self.declared_uncompressed_len.ok_or_else(|| {
+                    Error::Corrupted("compressed ExOleObjStg is missing its size".into())
+                })?;
+                let declared_len = usize::try_from(declared).map_err(|_err| {
+                    Error::Corrupted(
+                        "compressed ExOleObjStg size does not fit in memory".to_string(),
+                    )
+                })?;
+                if declared_len > maximum {
+                    return corrupted(format!(
+                        "compressed ExOleObjStg declares {declared_len} bytes above the {maximum}-byte output limit"
+                    ));
+                }
+                if self.compression == Compression::ZlibSyncFlush {
+                    return decode_sync_flush(self.data, declared_len).map(Cow::Owned);
+                }
+                let read_limit = maximum.checked_add(1).ok_or_else(|| {
+                    Error::Corrupted("ExOleObjStg output limit overflows".to_string())
+                })?;
+                let read_limit_u64 = u64::try_from(read_limit).map_err(|_err| {
+                    Error::Corrupted("ExOleObjStg output limit exceeds u64".into())
+                })?;
+                let decoder = flate2::read::ZlibDecoder::new(self.data);
+                let mut limited = decoder.take(read_limit_u64);
+                let mut output = Vec::with_capacity(declared_len.min(64 * 1024));
+                limited.read_to_end(&mut output).map_err(|error| {
+                    Error::Corrupted(format!("invalid ExOleObjStg zlib payload: {error}"))
+                })?;
+                let finished_decoder = limited.into_inner();
+                if output.len() > maximum {
+                    return corrupted(format!(
+                        "decompressed ExOleObjStg exceeds the {maximum}-byte output limit"
+                    ));
+                }
+                if output.len() != declared_len {
+                    return corrupted(format!(
+                        "ExOleObjStg decompressed to {} bytes instead of declared {declared_len}",
+                        output.len()
+                    ));
+                }
+                let stored_len = u64::try_from(self.data.len()).map_err(|_err| {
+                    Error::Corrupted("ExOleObjStg stored size exceeds u64".into())
+                })?;
+                if finished_decoder.total_in() != stored_len {
+                    return corrupted("ExOleObjStg zlib payload has trailing bytes");
+                }
+                Ok(Cow::Owned(output))
+            },
+        }
+    }
+}
+
+impl Storage {
+    /// Parse an embedded OLE-object storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse(record: &Record) -> Result<Self> {
+        Self::parse_as(record, Kind::OleObject)
+    }
+
+    /// Parse a persisted storage using its referencing record's kind.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse_as(record: &Record, kind: Kind) -> Result<Self> {
+        if record.version != 0
+            || record.record_type_raw != RecordType::ExternalOleObjectStg.as_u16()
+            || usize::try_from(record.data_length).ok() != Some(record.data.len())
+            || record.data.len() > MAX_STORED_BYTES
+        {
+            return corrupted("ExOleObjStg has an invalid header or stored size");
+        }
+        match record.instance {
+            0 => Self::uncompressed(kind, record.data.to_vec()),
+            1 => {
+                let prefix: &[u8; 4] = record
+                    .data
+                    .get(..4)
+                    .and_then(|bytes| bytes.try_into().ok())
+                    .ok_or_else(|| {
+                        Error::Corrupted("compressed ExOleObjStg is missing its size prefix".into())
+                    })?;
+                let declared = u32::from_le_bytes(*prefix);
+                Self::compressed(
+                    kind,
+                    declared,
+                    record
+                        .data
+                        .get(4..)
+                        .ok_or_else(|| {
+                            Error::Corrupted("compressed ExOleObjStg is missing its payload".into())
+                        })?
+                        .to_vec(),
+                )
+            },
+            _ => corrupted("ExOleObjStg has an invalid storage instance"),
+        }
+    }
+
+    /// Return the uncompressed structured-storage bytes with an explicit cap.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn decompressed_bytes(&self, maximum: usize) -> Result<Vec<u8>> {
+        Ref {
+            kind: self.kind,
+            compression: self.compression,
+            declared_uncompressed_len: self.declared_uncompressed_len,
+            data: &self.data,
+        }
+        .decompressed_bytes(maximum)
+        .map(Cow::into_owned)
+    }
+
+    /// Encode the complete `ExOleObjStg` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn to_record(&self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
+    }
+
+    /// Encode the complete record without an intermediate parsed view.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn to_record_bytes(&self) -> Result<Vec<u8>> {
+        self.snapshot().to_record_bytes()
+    }
+}
+
+impl Snapshot<'_> {
+    /// Encode the complete `ExOleObjStg` record represented by this view.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn to_record_bytes(self) -> Result<Vec<u8>> {
+        let (instance, declared) = match self.compression() {
+            Compression::Uncompressed => (0u16, None),
+            Compression::Zlib | Compression::ZlibSyncFlush => (
+                1u16,
+                Some(self.declared_uncompressed_len().ok_or_else(|| {
+                    Error::Corrupted("compressed ExOleObjStg is missing its size".into())
+                })?),
+            ),
+        };
+        let data_len = self.record_payload_len();
+        if data_len > MAX_STORED_BYTES {
+            return corrupted("ExOleObjStg exceeds 128 MiB stored data");
+        }
+        if let Some(declared_len) = declared
+            && declared_len > MAX_DECLARED_BYTES
+        {
+            return corrupted("compressed ExOleObjStg declares more than 256 MiB");
+        }
+        let length = u32::try_from(data_len)
+            .map_err(|_err| Error::Corrupted("ExOleObjStg payload exceeds u32".into()))?;
+        let mut bytes = Vec::with_capacity(self.record_len());
+        bytes.extend_from_slice(&(instance << 4).to_le_bytes());
+        bytes.extend_from_slice(&RecordType::ExternalOleObjectStg.as_u16().to_le_bytes());
+        bytes.extend_from_slice(&length.to_le_bytes());
+        if let Some(declared_len) = declared {
+            bytes.extend_from_slice(&declared_len.to_le_bytes());
+        }
+        bytes.extend_from_slice(self.stored_bytes());
+        Ok(bytes)
+    }
+
+    /// Parse the encoded view as a complete `PowerPoint` record.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the view fails to serialize or if the encoded
+    /// record cannot be re-parsed.
+    pub fn to_record(self) -> Result<Record> {
+        Ok(Record::parse(&self.to_record_bytes()?, 0, &crate::SourceLimits::default())?.0)
+    }
+}
+
+/// Native Mac PowerPoint can store Z_SYNC_FLUSH output instead of a finished
+/// zlib stream. Require the exact output size and a real byte-aligned block
+/// boundary. Appending an empty final block and a computed Adler trailer only
+/// to the decoder proves that boundary; it never changes the retained source.
+fn decode_sync_flush(data: &[u8], declared: usize) -> Result<Vec<u8>> {
+    use flate2::{Decompress, FlushDecompress, Status};
+    if !data.ends_with(&[0, 0, 0xff, 0xff]) {
+        return corrupted("ExOleObjStg sync-flush marker is missing");
+    }
+    let ceiling = declared
+        .checked_add(1)
+        .ok_or_else(|| Error::Corrupted("ExOleObjStg output limit overflows".into()))?;
+    let mut decoder = Decompress::new(true);
+    let mut output = Vec::new();
+    let mut buffer = [0u8; 32 * 1024];
+    loop {
+        let input_before = decoder.total_in();
+        let output_before = decoder.total_out();
+        let offset = usize::try_from(input_before)
+            .map_err(|_| Error::Corrupted("ExOleObjStg input offset overflows".into()))?;
+        let available = (ceiling - output.len()).min(buffer.len());
+        let status = decoder
+            .decompress(
+                &data[offset..],
+                &mut buffer[..available],
+                FlushDecompress::Sync,
+            )
+            .map_err(|error| {
+                Error::Corrupted(format!("invalid ExOleObjStg sync-flushed payload: {error}"))
+            })?;
+        if status == Status::StreamEnd {
+            return corrupted(
+                "ExOleObjStg sync-flushed payload has trailing data after a finished stream",
+            );
+        }
+        let produced = usize::try_from(decoder.total_out() - output_before)
+            .map_err(|_| Error::Corrupted("ExOleObjStg output size overflows".into()))?;
+        if produced > declared.saturating_sub(output.len()) {
+            return corrupted("ExOleObjStg sync-flushed payload exceeds its declared size");
+        }
+        output
+            .try_reserve_exact(produced)
+            .map_err(|_| Error::AllocationFailed("ExOleObjStg sync-flush output"))?;
+        output.extend_from_slice(&buffer[..produced]);
+        if decoder.total_in() == input_before && produced == 0 {
+            if offset != data.len() {
+                return corrupted("ExOleObjStg sync-flushed payload is truncated");
+            }
+            break;
+        }
+    }
+    if output.len() != declared {
+        return corrupted("ExOleObjStg sync-flushed payload does not match its declared size");
+    }
+    let mut a = 1u32;
+    let mut b = 0u32;
+    // RFC 1950 Adler-32, with zlib's bounded chunk size to avoid overflow.
+    for chunk in output.chunks(5552) {
+        for byte in chunk {
+            a += u32::from(*byte);
+            b += a;
+        }
+        a %= 65521;
+        b %= 65521;
+    }
+    let mut suffix = [1, 0, 0, 0xff, 0xff, 0, 0, 0, 0];
+    suffix[5..].copy_from_slice(&((b << 16) | a).to_be_bytes());
+    let input_before = decoder.total_in();
+    let output_before = decoder.total_out();
+    let status = decoder
+        .decompress(&suffix, &mut buffer[..1], FlushDecompress::Finish)
+        .map_err(|error| {
+            Error::Corrupted(format!("invalid ExOleObjStg sync-flush boundary: {error}"))
+        })?;
+    if status != Status::StreamEnd
+        || decoder.total_in() - input_before != suffix.len() as u64
+        || decoder.total_out() != output_before
+    {
+        return corrupted("ExOleObjStg payload does not end at a sync-flush boundary");
+    }
+    Ok(output)
+}
+
+fn corrupted<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::Corrupted(message.into()))
+}

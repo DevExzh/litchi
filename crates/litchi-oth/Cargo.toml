@@ -1,0 +1,20 @@
+[package]
+name = "litchi-oth"
+description = "Layered OpenDocument HTML Template package, model, and authoring API for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-core = { workspace = true }
+litchi-odf-common = { workspace = true }
+quick-xml = { workspace = true }
+
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+
+[lints]
+workspace = true

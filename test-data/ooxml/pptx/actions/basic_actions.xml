@@ -1,0 +1,65 @@
+<p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvGrpSpPr>
+    <p:cNvPr id="100" name="Actions"/>
+    <p:cNvGrpSpPr/>
+    <p:nvPr/>
+  </p:nvGrpSpPr>
+  <p:grpSpPr/>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="101" name="External presentation">
+        <a:hlinkClick r:id="rIdExternal" action="ppaction://hlinkpres?slideindex=2" tooltip="Open presentation" tgtFrame="_blank"/>
+        <a:hlinkHover action="ppaction://hlinkshowjump?jump=nextslide"/>
+      </p:cNvPr>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+  </p:sp>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="102" name="Internal slide">
+        <a:hlinkClick r:id="rIdSlide" action="ppaction://hlinksldjump"/>
+      </p:cNvPr>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+  </p:sp>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="103" name="Macro">
+        <a:hlinkClick action="ppaction://macro?name=Module1.Run"/>
+      </p:cNvPr>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+  </p:sp>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="104" name="Program">
+        <a:hlinkHover r:id="rIdExternal" action="ppaction://program"/>
+      </p:cNvPr>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+  </p:sp>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="105" name="Media">
+        <a:hlinkClick r:id="" action="ppaction://media"/>
+      </p:cNvPr>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+  </p:sp>
+  <p:sp>
+    <p:nvSpPr>
+      <p:cNvPr id="106" name="Unknown">
+        <a:hlinkClick action="urn:producer:unrecognized"/>
+      </p:cNvPr>
+      <p:cNvSpPr/>
+      <p:nvPr/>
+    </p:nvSpPr>
+  </p:sp>
+</p:grpSp>

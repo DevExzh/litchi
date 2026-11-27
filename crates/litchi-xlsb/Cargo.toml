@@ -1,0 +1,38 @@
+[package]
+name = "litchi-xlsb"
+description = "Strict, typed BIFF12 record and workbook semantics for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+sign = ["dep:litchi-sign", "litchi-opc/sign"]
+vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
+
+[dependencies]
+bitflags = { workspace = true }
+chrono = { workspace = true }
+litchi-core = { workspace = true }
+litchi-drawingml = { workspace = true }
+litchi-ooxml-common = { workspace = true }
+litchi-opc = { workspace = true }
+litchi-sheet = { workspace = true }
+litchi-sign = { workspace = true, optional = true }
+litchi-spreadsheet-drawing = { workspace = true }
+litchi-vba = { workspace = true, optional = true }
+litchi-xldm = { workspace = true }
+once_cell = { workspace = true }
+quick-xml = { workspace = true }
+sha2 = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

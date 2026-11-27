@@ -1,0 +1,14 @@
+// Wire-only projection of the generated chart non-style extension.
+//
+// The native `TSCH.Generated.ChartNonStyleArchive` stores the chart-title
+// controls in fields 21 and 23.  The outer `TSCH.ChartNonStyleArchive` and
+// its extension envelope remain caller-owned; this sidecar intentionally
+// carries only the two selected scalar fields.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message ChartTitleArchive {
+  optional bool tschchartinfodefaultshowtitle = 21;
+  optional string tschchartinfodefaulttitle = 23;
+}

@@ -1,0 +1,508 @@
+//! The tolerance contract: Word-compatible repairs are applied and recorded by
+//! default, opt-in repairs only under a named `Leniency`, and conformant input
+//! reports clean.
+
+use litchi_core::Position;
+use litchi_rtf::leniency::{
+    Defect, FontDefect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
+    UnicodeDefect,
+};
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{CompressionLimits, EmphasisMark, OpenOptions, Package, SourceLimits, compress};
+
+/// A conformant document touching the main destinations.
+const CONFORMANT: &str = concat!(
+    r"{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fswiss\fcharset0 Arial;}}",
+    r"{\colortbl;\red255\green0\blue0;}",
+    r"{\stylesheet{\s0 Normal;}{\s1\b Heading;}}",
+    r"{\info{\title Conformant}}",
+    r"\pard\s1\b\fs28 Title\b0\par",
+    r"\pard\plain\fs24 caf\'e9 \u233?\tab \i italic\i0\line next\par",
+    r"\trowd\cellx2000\cellx4000\pard\intbl A\cell B\cell\row",
+    r"\pard\hyphpar1\page{\*\unknowndest ignored}\par}",
+);
+
+fn assert_clean(report: &ToleranceReport) {
+    assert!(report.is_clean(), "{report:?}");
+    assert_eq!(report.total(), 0);
+    assert_eq!(report.unrecorded(), 0);
+    assert!(report.defects().is_empty());
+}
+
+#[test]
+fn conformant_input_reports_clean_through_every_entry_point() {
+    let strict = OpenOptions::new();
+    assert_eq!(strict, OpenOptions::default());
+    assert_eq!(strict.leniency_value(), Leniency::Strict);
+
+    let document = Package::parse(CONFORMANT).unwrap();
+    assert_clean(document.tolerance_report());
+    assert!(document.text().contains("Title"));
+
+    let document = Package::parse_with_options(CONFORMANT, strict).unwrap();
+    assert_clean(document.tolerance_report());
+    let document = Package::from_bytes_with_options(CONFORMANT.as_bytes(), strict).unwrap();
+    assert_clean(document.tolerance_report());
+    let document =
+        Package::from_owned_bytes_with_options(CONFORMANT.as_bytes().to_vec(), strict).unwrap();
+    assert_clean(document.tolerance_report());
+
+    let raw = Tree::parse_bytes(CONFORMANT.as_bytes(), strict).unwrap();
+    assert_clean(raw.tolerance_report());
+
+    let compressed = compress(CONFORMANT.as_bytes(), true, CompressionLimits::default()).unwrap();
+    let document = Package::from_bytes_with_options(&compressed, strict).unwrap();
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn conformant_non_ascii_transport_reports_clean() {
+    let mut bytes = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
+    bytes.push(0xE9);
+    bytes.extend_from_slice(br" bar\par}");
+    let document = Package::from_bytes(&bytes).unwrap();
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn options_carry_limits_into_the_parse() {
+    let limits = SourceLimits::builder()
+        .max_events(2)
+        .expect("event limit is representable")
+        .build()
+        .expect("event profile is consistent");
+    let options = OpenOptions::new().source_limits(limits);
+    assert_eq!(options.source_limits_value(), limits);
+    assert!(Package::parse_with_options(CONFORMANT, options).is_err());
+}
+
+#[test]
+fn opening_a_file_with_options_reports_clean() {
+    let directory =
+        std::env::temp_dir().join(format!("litchi-rtf-leniency-{}", std::process::id()));
+    std::fs::create_dir_all(&directory).unwrap();
+    let path = directory.join("conformant.rtf");
+    std::fs::write(&path, CONFORMANT).unwrap();
+    let document = Package::open_with_options(&path, OpenOptions::new()).unwrap();
+    assert_clean(document.tolerance_report());
+    std::fs::remove_dir_all(&directory).unwrap();
+}
+
+fn recorded(report: &ToleranceReport) -> Vec<(Defect, u64)> {
+    report.iter().map(|d| (d.defect, d.offset)).collect()
+}
+
+// Undefined control symbols are ignored the way Word and LibreOffice
+// ignore them, and every one is recorded.
+#[test]
+fn undefined_control_symbols_are_ignored_and_recorded_by_default() {
+    let source = r"{\rtf1\ansi\pard before\!after \;x\par}";
+    let document = Package::parse(source).unwrap();
+    assert_eq!(document.text(), "beforeafter x\n");
+    let unknown = Defect::Syntax(SyntaxDefect::UnknownControlSymbol);
+    let first = source.find(r"\!").unwrap() as u64;
+    let second = source.find(r"\;").unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(unknown, first), (unknown, second)]
+    );
+    assert!(!SyntaxDefect::UnknownControlSymbol.repair().is_empty());
+}
+
+#[test]
+fn undefined_control_symbols_are_tolerated_in_header_destinations() {
+    let source = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Arial\!;}}{\info{\title A\?B}}\pard x\1y\par}";
+    let document = Package::parse(source).unwrap();
+    assert_eq!(document.text(), "xy\n");
+    assert_eq!(document.fonts().iter().next().unwrap().name(), "Arial");
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 3);
+    assert!(report.iter().all(|tolerated| matches!(
+        tolerated,
+        ToleratedDefect {
+            defect: Defect::Syntax(SyntaxDefect::UnknownControlSymbol),
+            ..
+        }
+    )));
+}
+
+#[test]
+fn defined_control_symbols_without_a_model_are_not_defects() {
+    // `\|` (formula character) and `\:` (index subentry) are RTF 1.9.1
+    // control symbols; they are retained inertly and the report stays clean.
+    let document = Package::parse(r"{\rtf1\ansi\pard a\|b\:c\par}").unwrap();
+    assert_eq!(document.text(), "abc\n");
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn undefined_control_symbol_offsets_count_transport_bytes() {
+    let mut bytes = br"{\rtf1\ansi\ansicpg1252\pard caf".to_vec();
+    bytes.push(0xE9);
+    let offset = bytes.len() as u64;
+    bytes.extend_from_slice(br"\!\par}");
+    let document = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(document.text(), "caf\u{e9}\n");
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(Defect::Syntax(SyntaxDefect::UnknownControlSymbol), offset)]
+    );
+}
+
+// Unpaired UTF-16 surrogates decode to U+FFFD, as Word and LibreOffice
+// show them, and each substitution is recorded.
+#[test]
+fn unpaired_surrogates_become_replacement_characters_and_are_recorded() {
+    let source = r"{\rtf1\ansi\uc1\pard a\u-10179?b\u-9047?c\u-10179?\u-8694?d\u-10179?\u-10179?\u-8694?\par}";
+    let document = Package::parse(source).unwrap();
+    // Lone high, lone low, a valid pair (U+1F60A), then a high orphaned by
+    // the next high that does pair.
+    assert_eq!(
+        document.text(),
+        "a\u{fffd}b\u{fffd}c\u{1f60a}d\u{fffd}\u{1f60a}\n"
+    );
+    let surrogate = Defect::Unicode(UnicodeDefect::UnpairedSurrogate);
+    let lone_high = source.find(r"\u-10179?b").unwrap() as u64;
+    let lone_low = source.find(r"\u-9047").unwrap() as u64;
+    let orphan = source.find(r"\u-10179?\u-10179").unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (surrogate, lone_high),
+            (surrogate, lone_low),
+            (surrogate, orphan)
+        ]
+    );
+}
+
+#[test]
+fn unpaired_surrogates_are_repaired_in_destination_text() {
+    let source = concat!(
+        r"{\rtf1\ansi{\fonttbl{\f0\fnil A\u-10179?;}}",
+        r"{\info{\title T\u-10179?}}",
+        r"{\stylesheet{\s0 N\u-9047?;}}",
+        r"{\header H\u-10179?\par}",
+        r"\pard x{\footnote F\u-9047?}\par}",
+    );
+    let document = Package::parse(source).unwrap();
+    assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{fffd}");
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 5, "{report:?}");
+    assert!(
+        report
+            .iter()
+            .all(|tolerated| tolerated.defect == Defect::Unicode(UnicodeDefect::UnpairedSurrogate))
+    );
+}
+
+#[test]
+fn paired_surrogates_are_not_defects() {
+    let document = Package::parse(r"{\rtf1\ansi\uc1\pard \u-10179?\u-8694?\u233?\par}").unwrap();
+    assert_eq!(document.text(), "\u{1f60a}\u{e9}\n");
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn word_style_surrogate_pairs_with_fallbacks_decode_cleanly_in_destinations() {
+    // Word writes each surrogate half with its own `\ucN` fallback.
+    let pair = r"\u-10179?\u-8694?";
+    let source = format!(
+        r"{{\rtf1\ansi\uc1{{\fonttbl{{\f0\fnil A{pair};}}}}{{\info{{\title T{pair}}}}}\pard x{pair}y\par}}"
+    );
+    let document = Package::parse(&source).unwrap();
+    assert_eq!(document.text(), "x\u{1f60a}y\n");
+    assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{1f60a}");
+    assert_eq!(document.info().title.as_deref(), Some("T\u{1f60a}"));
+    assert_clean(document.tolerance_report());
+}
+
+// Malformed parameter shapes take Word's interpretation (LibreOffice's
+// `RTFTokenizer::dispatchKeyword`) and every repair is recorded.
+#[test]
+fn malformed_parameter_shapes_take_words_interpretation_and_are_recorded() {
+    let source =
+        r"{\rtf1\ansi\hyphauto2\deff0{\fonttbl{\f0 Arial;}}\pard\fs A\page2 B\accdot0 C\par}";
+    let document = Tree::parse(source, OpenOptions::default()).unwrap();
+
+    // A nonzero toggle parameter is on.
+    assert_eq!(document.hyphenation().automatic, Some(true));
+    // A missing value takes the keyword default (12 points).
+    let block = |text: &str| {
+        document
+            .blocks()
+            .iter()
+            .find(|block| block.text == text)
+            .unwrap_or_else(|| panic!("missing block {text:?}"))
+    };
+    assert_eq!(block("A").formatting.font_size.get(), 24);
+    // A flag ignores its parameter.
+    assert_eq!(document.page_breaks().count(), 1);
+    // A zero parameter on a toggled selector turns it off, so `C` keeps the
+    // formatting of `B` and shares its block.
+    assert_eq!(block("BC").formatting.emphasis_mark, EmphasisMark::None);
+
+    let at = |needle: &str| source.find(needle).unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (
+                Defect::Parameter(ParameterDefect::NonBinaryToggle),
+                at(r"\hyphauto2")
+            ),
+            (
+                Defect::Parameter(ParameterDefect::MissingParameter),
+                at(r"\fs ")
+            ),
+            (
+                Defect::Parameter(ParameterDefect::UnexpectedParameter),
+                at(r"\page2")
+            ),
+            (
+                Defect::Parameter(ParameterDefect::UnexpectedParameter),
+                at(r"\accdot0")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn well_formed_parameter_shapes_are_not_defects() {
+    let source = r"{\rtf1\ansi\hyphauto1\deff0{\fonttbl{\f0 Arial;}}\pard\fs24 A\page B\accdot C\accnone\par}";
+    let document = Tree::parse(source, OpenOptions::default()).unwrap();
+    assert_eq!(document.page_breaks().count(), 1);
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn parameter_shapes_in_destinations_are_repaired() {
+    // Stylesheet, table-row, and section controls share the lexer's repair.
+    let source = concat!(
+        r"{\rtf1\ansi{\stylesheet{\s0\sbauto Normal;}{\*\cs10\fs Char;}}",
+        r"\trowd\trgaph\trql2\cellx1000\pard\intbl X\cell\row",
+        r"\sectd\vertsect1\pard Y\par}",
+    );
+    let document = Tree::parse(source, OpenOptions::default()).unwrap();
+    let report = document.tolerance_report();
+    assert_eq!(report.total(), 5, "{report:?}");
+    assert!(
+        report
+            .iter()
+            .all(|tolerated| matches!(tolerated.defect, Defect::Parameter(_)))
+    );
+}
+
+// Content after the root group is ignored by default; groups left open
+// at end of input are closed only under the named opt-in.
+#[test]
+fn content_after_the_root_group_is_ignored_and_recorded_by_default() {
+    let source = "{\\rtf1\\ansi body}\r\n{\\rtf1 second}}junk";
+    let document = Package::parse(source).unwrap();
+    assert_eq!(document.text(), "body");
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(
+            Defect::Syntax(SyntaxDefect::TrailingContentAfterRoot),
+            source.find("{\\rtf1 second").unwrap() as u64
+        )]
+    );
+
+    let padded = Package::parse("{\\rtf1\\ansi body}\r\n\0\0").unwrap();
+    assert_clean(padded.tolerance_report());
+}
+
+#[test]
+fn unclosed_groups_are_rejected_by_default() {
+    for source in [
+        r"{\rtf1\ansi\pard body\par",
+        r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard{\b bold",
+    ] {
+        assert!(Package::parse(source).is_err(), "accepted {source}");
+        assert!(
+            Package::parse_with_options(source, OpenOptions::new().leniency(Leniency::Strict))
+                .is_err()
+        );
+    }
+}
+
+#[test]
+fn unclosed_groups_are_closed_and_recorded_under_the_opt_in() {
+    let options = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
+    assert!(options.leniency_value().tolerates_unclosed_groups());
+
+    let source = r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard plain {\b bold";
+    let document = Package::parse_with_options(source, options).unwrap();
+    assert_eq!(document.text(), "plain bold");
+    let end = source.len() as u64;
+    let unclosed = Defect::Syntax(SyntaxDefect::UnclosedGroup);
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(unclosed, end), (unclosed, end)]
+    );
+    assert!(!SyntaxDefect::UnclosedGroup.repair().is_empty());
+
+    // A balanced document is unaffected by the opt-in.
+    let document = Package::parse_with_options(CONFORMANT, options).unwrap();
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn the_opt_in_keeps_truncated_tokens_and_nesting_limits_fatal() {
+    let options = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
+    // A control word cut off by end of input and a truncated binary payload
+    // are not group structure.
+    assert!(Package::parse_with_options(r"{\rtf1 text\", options).is_err());
+    assert!(Package::parse_with_options(r"{\rtf1 {\bin8 abc", options).is_err());
+    // Nesting beyond the safety limit stays fatal even when never closed.
+    let deep = format!(r"{{\rtf1 {}", "{".repeat(400));
+    assert!(Package::parse_with_options(&deep, options).is_err());
+}
+
+// Malformed `\'hh` escapes stay fatal by default and decode the way
+// LibreOffice decodes them under the named opt-in.
+#[test]
+fn malformed_hex_escapes_are_rejected_by_default() {
+    for source in [
+        r"{\rtf1\ansi a\'g1 b}",
+        r"{\rtf1\ansi a\'zz b}",
+        r"{\rtf1\ansi a\'4}",
+        "{\\rtf1\\ansi a\\'4",
+    ] {
+        assert!(Package::parse(source).is_err(), "accepted {source}");
+        let groups_only = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
+        assert!(
+            Package::parse_with_options(source, groups_only).is_err(),
+            "accepted {source} without the hex opt-in"
+        );
+    }
+}
+
+#[test]
+fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
+    let options = OpenOptions::new().leniency(Leniency::TolerateMalformedHexEscapes);
+    assert!(options.leniency_value().tolerates_malformed_hex_escapes());
+    // `\'g1` keeps its one valid digit (byte 0x01, LibreOffice's
+    // "`\'<number><junk>` means `\'0<number>`"), `\'zz` has none and is
+    // dropped, `\'4` before a brace keeps its digit, and `\'41` is intact.
+    let source = r"{\rtf1\ansi a\'4gb\'zzc{\'4}d\'41\par}";
+    let document = Package::parse_with_options(source, options).unwrap();
+    assert_eq!(document.text(), "a\u{4}bc\u{4}dA\n");
+    let malformed = Defect::Syntax(SyntaxDefect::MalformedHexEscape);
+    let first = source.find(r"\'4g").unwrap() as u64;
+    let second = source.find(r"\'zz").unwrap() as u64;
+    let third = source.find(r"\'4}").unwrap() as u64;
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![(malformed, first), (malformed, second), (malformed, third)]
+    );
+    assert!(!SyntaxDefect::MalformedHexEscape.repair().is_empty());
+
+    // Well-formed escapes are unaffected by the opt-in.
+    let document = Package::parse_with_options(CONFORMANT, options).unwrap();
+    assert_clean(document.tolerance_report());
+}
+
+#[test]
+fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
+    let options = OpenOptions::new().leniency(Leniency::TolerateSyntaxDefects);
+    let source = "{\\rtf1\\ansi caf\\'e";
+    let document = Package::parse_with_options(source, options).unwrap();
+    assert_eq!(document.text(), "caf\u{e}");
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (
+                Defect::Syntax(SyntaxDefect::MalformedHexEscape),
+                source.find("\\'e").unwrap() as u64
+            ),
+            (
+                Defect::Syntax(SyntaxDefect::UnclosedGroup),
+                source.len() as u64
+            ),
+        ]
+    );
+}
+
+// Edits splice the original source and re-read it; the snapshot keeps the
+// options it was opened with, so an opt-in-opened document stays editable.
+#[test]
+fn documents_opened_through_an_opt_in_stay_editable() {
+    let options = OpenOptions::new().leniency(Leniency::TolerateSyntaxDefects);
+    let source = r"{\rtf1\ansi First\par caf\'e9 bad\'g1\par Third";
+    assert!(Package::parse(source).is_err());
+    let document = Package::parse_with_options(source, options).unwrap();
+    assert_eq!(document.paragraph_count(), 3);
+
+    for (index, expected) in [(0, "Second"), (2, "Last")] {
+        let mut edit = document.edit();
+        edit.replace_paragraph_text(Position::new(index), expected)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let snapshot = commit.package();
+        assert!(snapshot.text().contains(expected), "{:?}", snapshot.text());
+        assert!(snapshot.text().contains("caf\u{e9} bad\u{1}"));
+        // The re-read applies the original leniency: whatever defects the
+        // spliced source still carries are repaired and recorded again.
+        let report = snapshot.tolerance_report();
+        assert!(!report.is_clean());
+        assert!(
+            report
+                .iter()
+                .all(|tolerated| matches!(tolerated.defect, Defect::Syntax(_)))
+        );
+    }
+
+    let mut edit = document.edit();
+    edit.remove_paragraph(Position::new(0)).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().paragraph_count(), 2);
+}
+
+// Undefined or undecodable font charsets and code pages fall back to
+// the document code page, as LibreOffice does, and are recorded.
+#[test]
+fn unsupported_font_charsets_and_code_pages_fall_back_and_are_recorded() {
+    let source = concat!(
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset5 Old\'e9;}",
+        r"{\f1\fnil\cpg70000 Wide;}{\f2\fnil\fcharset2 Symbol;}{\f3\fnil\fcharset2 Unused;}}",
+        r"\f0 caf\'e9 \f1 x\f2 \'b7\f0 y\f2 z\par}",
+    );
+    let document = Package::parse(source).unwrap();
+    assert_eq!(document.text(), "caf\u{e9} x\u{b7}yz\n");
+    let names: Vec<_> = document
+        .fonts()
+        .iter()
+        .map(|font| font.name().to_string())
+        .collect();
+    assert_eq!(names, ["Old\u{e9}", "Wide", "Symbol", "Unused"]);
+    let at = |needle: &str| source.find(needle).unwrap() as u64;
+    // The Symbol font is recorded once, at its first use; the unused one is
+    // declared but never decodes text, so it conforms.
+    assert_eq!(
+        recorded(document.tolerance_report()),
+        vec![
+            (
+                Defect::Font(FontDefect::UnsupportedCharset),
+                at(r"\fcharset5")
+            ),
+            (
+                Defect::Font(FontDefect::UnsupportedCodePage),
+                at(r"\cpg70000")
+            ),
+            (
+                Defect::Font(FontDefect::UnmappedCharset),
+                at(r"\fcharset2 Symbol")
+            ),
+        ]
+    );
+}
+
+#[test]
+fn supported_font_charsets_are_not_defects() {
+    let source = concat!(
+        r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset204 Cyr;}{\f1\fnil\fcharset0 Arial;}",
+        r"{\f2\fnil\fcharset2 Symbol;}}\f0\'cf\'f0\f1 x\par}",
+    );
+    let document = Package::parse(source).unwrap();
+    assert_eq!(document.text(), "\u{41f}\u{440}x\n");
+    assert_clean(document.tolerance_report());
+}

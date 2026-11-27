@@ -1,0 +1,4499 @@
+//! Native Numbers package parsing.
+//!
+//! This adapter owns physical package ingress, IWA-object lookup, and
+//! protobuf-to-semantic conversion. [`Package`] is the immutable owner of
+//! every state verb; [`crate::Workbook`] is its read-only semantic
+//! projection (ADR 0034 §2).
+
+pub(crate) mod builder_synthesis;
+mod chart_arrangement;
+mod chart_data;
+mod chart_data_edit;
+mod chart_metadata;
+pub(crate) mod comments;
+#[allow(
+    dead_code,
+    reason = "Comment reply mutations reuse the strict metadata registry and prepared transitions as the owner lands."
+)]
+pub(crate) mod comments_metadata;
+#[allow(
+    dead_code,
+    reason = "The private native reply transition is reached through package::comments."
+)]
+pub(crate) mod conditional_highlight;
+mod document_locale;
+#[allow(
+    dead_code,
+    reason = "The parser keeps private native table helpers together so all IWA table variants share one bounded decoder."
+)]
+mod extractor;
+#[allow(
+    dead_code,
+    reason = "Formula-name reverse lookup is retained with the native token registry for future write support."
+)]
+mod function_map;
+mod image_adjustments;
+#[allow(
+    dead_code,
+    reason = "The compact index retains type probes used by the complete native table decoder."
+)]
+mod index;
+mod limits;
+mod metadata;
+/// Exact-source sheet and table name transactions.
+pub(crate) mod names;
+mod physical_entry_index;
+mod save;
+#[allow(
+    dead_code,
+    reason = "Decoded sheets expose only the construction path used at package ingress."
+)]
+mod sheet;
+pub(crate) mod sheet_chart_axis;
+pub(crate) mod sheet_chart_axis_title;
+pub(crate) mod sheet_chart_font;
+pub(crate) mod sheet_chart_legend_style;
+pub(crate) mod sheet_chart_lifecycle;
+pub(crate) mod sheet_chart_reference_lines;
+pub(crate) mod sheet_chart_series;
+mod sheet_chart_series_style;
+pub(crate) mod sheet_chart_style;
+pub(crate) mod sheet_chart_text;
+pub(crate) mod sheet_chart_title;
+pub(crate) mod sheet_chart_value_axis;
+pub(crate) mod sheet_drawable;
+pub(crate) mod sheet_drawable_annotation;
+mod sheet_drawable_author;
+pub(crate) mod sheet_drawable_caption;
+mod sheet_drawable_chart;
+pub(crate) mod sheet_drawable_comment;
+mod sheet_drawable_comment_graph;
+pub(crate) mod sheet_drawable_date_time;
+pub(crate) mod sheet_drawable_drop_cap;
+mod sheet_drawable_duplicate;
+mod sheet_drawable_graph;
+pub(crate) mod sheet_drawable_hyperlink;
+pub(crate) mod sheet_drawable_language;
+pub(crate) mod sheet_drawable_list;
+mod sheet_drawable_media;
+pub(crate) mod sheet_drawable_named_style;
+pub(crate) mod sheet_drawable_plain_text;
+pub(crate) mod sheet_drawable_properties;
+pub(crate) mod sheet_drawable_style;
+pub(crate) mod sheet_drawable_text;
+pub(crate) mod sheet_lifecycle;
+pub(crate) mod sheet_media;
+pub(crate) mod sheet_order;
+mod structure;
+mod style_graph;
+#[allow(
+    dead_code,
+    reason = "Private native tables retain sidecar helpers while the public surface exposes only semantic tables."
+)]
+mod table;
+pub(crate) mod table_appearance;
+pub(crate) mod table_cell_control;
+pub(crate) use litchi_iwa_table::cell_format::control as table_cell_control_native;
+pub(crate) mod table_cell_currency_format;
+pub(crate) mod table_cell_custom_format;
+pub(crate) mod table_cell_data_format;
+pub(crate) mod table_cell_date_time_format;
+pub(crate) use litchi_iwa_table::cell_format::display as table_cell_display_format_native;
+pub(crate) mod pivot_categories;
+pub(crate) mod table_cell_appearance;
+pub(crate) mod table_cell_duration_format;
+pub(crate) mod table_cell_edit;
+pub(crate) mod table_cell_fraction_format;
+pub(crate) mod table_cell_list;
+pub(crate) mod table_cell_number_format;
+pub(crate) mod table_cell_percentage_format;
+pub(crate) mod table_cell_pop_up_menu;
+pub(crate) mod table_cell_scientific_format;
+pub(crate) mod table_cell_text;
+pub(crate) mod table_cell_text_format;
+pub(crate) mod table_cell_text_style;
+pub(crate) mod table_cells;
+pub(crate) mod table_dimension;
+pub(crate) mod table_headers;
+pub(crate) mod table_hidden_axes;
+pub(crate) mod table_lifecycle;
+pub(crate) mod table_lock;
+pub(crate) mod table_merges;
+pub(crate) mod table_order;
+pub(crate) mod table_relocation;
+pub(crate) mod table_resize;
+pub(crate) mod table_sort;
+pub(crate) mod table_sort_execution;
+pub(crate) mod table_title;
+pub(crate) mod table_topology;
+
+use std::collections::HashSet;
+use std::fmt;
+use std::fs::{Metadata, OpenOptions as FsOpenOptions};
+use std::io::{self, Read, Write};
+use std::path::Path;
+use std::sync::Arc;
+
+use litchi_iwa_archive::package::SharedBytes;
+use litchi_iwa_archive::{ComponentCatalog, SourceCatalog};
+use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::wire::{WireDescent, preflight_wire_tree};
+use litchi_iwa_core::{Archive, RawMessage};
+use litchi_iwa_detect::{Format, PreparedSource};
+use litchi_iwa_protos::{numbers_sheet_order_codec, table_info_codec};
+use litchi_iwa_table::cell_format::control::PackageProofs;
+use plist::stream::{Event as PlistEvent, Reader as PlistReader};
+use thiserror::Error;
+
+use crate::limits::OpenOptions;
+use crate::workbook::Error as WorkbookError;
+use crate::{Sheet, SheetSelector, TableSelector, Workbook};
+use extractor::TableDataExtractor;
+use index::{Index, Resolved};
+use sheet::DecodedSheet;
+
+pub use crate::limits::{MAX_OBJECTS, MAX_REFERENCES, SemanticLimitKind, SemanticLimits};
+pub(crate) use limits::Profile;
+/// Physical ingress ceilings for a parsed Numbers package.
+pub(crate) use litchi_iwa_archive::Limits;
+pub use save::SaveError;
+
+/// The focused transaction families whose owners stay private to the
+/// package adapter; their public modules re-export these (ADR 0034 §3).
+pub(crate) mod families {
+    pub(crate) mod chart_arrangement {
+        pub use super::super::chart_arrangement::{
+            Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+        };
+    }
+    pub(crate) mod chart_data {
+        pub use super::super::chart_data::{Error, LimitKind, Refusal};
+        pub use super::super::chart_data_edit::{Commit, Diagnostics, Edit, Patch};
+    }
+    pub(crate) mod chart_metadata {
+        pub use super::super::chart_metadata::{Error, LimitKind};
+    }
+    pub(crate) mod image_adjustments {
+        pub use super::super::image_adjustments::{
+            Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+        };
+    }
+}
+
+pub use table_merges::MergeReader;
+
+const DOCUMENT_MESSAGE_TYPE: u32 = 1;
+const SHEET_MESSAGE_TYPE: u32 = 2;
+const FORM_BASED_SHEET_MESSAGE_TYPE: u32 = 3;
+const TABLE_INFO_MESSAGE_TYPE: u32 = 6_000;
+const TABLE_MODEL_MESSAGE_TYPE: u32 = 6_001;
+const LEGACY_TABLE_INFO_MESSAGE_TYPE: u32 = 6_003;
+const TABLE_INFO_PROJECTION_RECURSION_LIMIT: u32 = 2;
+const MAX_METADATA_EVENTS: usize = 1_024;
+const MAX_METADATA_NESTING: usize = 16;
+const MAX_METADATA_SCALAR_BYTES: usize = 16 * 1024;
+const MAX_METADATA_RETAINED_BYTES: usize = 64 * 1024;
+const MAX_BUILD_HISTORY_ENTRIES: usize = 128;
+
+#[derive(Debug, Clone, Copy)]
+struct MetadataBudget {
+    retained: usize,
+}
+
+impl MetadataBudget {
+    const fn new() -> Self {
+        Self { retained: 0 }
+    }
+
+    fn retain(&mut self, amount: usize) -> Result<()> {
+        self.retained = self.retained.checked_add(amount).ok_or_else(|| {
+            metadata_limit(
+                SemanticLimitKind::TextBytes,
+                usize::MAX,
+                MAX_METADATA_RETAINED_BYTES,
+            )
+        })?;
+        if self.retained > MAX_METADATA_RETAINED_BYTES {
+            return Err(metadata_limit(
+                SemanticLimitKind::TextBytes,
+                self.retained,
+                MAX_METADATA_RETAINED_BYTES,
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Content-free semantic location associated with a Numbers read failure.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SemanticPath {
+    /// Whole-package ingress or indexing.
+    Package,
+    /// The Numbers document root.
+    Document,
+    /// One rooted sheet at its zero-based source position.
+    Sheet { index: usize },
+    /// One rooted drawable at its zero-based position within a sheet.
+    Drawable { sheet: usize, index: usize },
+    /// The global compatibility table projection.
+    StructuredTables,
+}
+
+/// Bounded payload resource reported by the native Numbers decoder.
+///
+/// This Numbers-owned vocabulary prevents callers from depending on the
+/// format-neutral IWA implementation crate merely to classify package read
+/// failures.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum PayloadLimitKind {
+    /// Bytes inspected in one encoded payload.
+    InputBytes,
+    /// Protobuf fields inspected in one encoded payload.
+    Fields,
+    /// Bytes produced while rewriting one encoded payload.
+    OutputBytes,
+    /// Nested length-delimited traversal depth.
+    Nesting,
+    /// Aggregate payload traversal or rewrite work.
+    RewriteWork,
+    /// Addressable rows declared by a table payload.
+    TableRows,
+    /// Addressable columns declared by a table payload.
+    TableColumns,
+    /// Addressable cells implied by table dimensions.
+    TableCells,
+    /// Sparse cells materialized from table payloads.
+    MaterializedCells,
+}
+
+/// Content-free resource failure normalized at the Numbers package boundary.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ResourceError {
+    /// A finite native-payload resource ceiling was exceeded.
+    Limit {
+        /// Resource that exceeded its ceiling.
+        kind: PayloadLimitKind,
+        /// Observed or requested amount.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
+    /// A fallible allocation could not reserve the requested capacity.
+    Allocation {
+        /// Elements or bytes requested by the failed reservation.
+        amount: usize,
+    },
+}
+
+impl fmt::Display for SemanticPath {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Package => formatter.write_str("package"),
+            Self::Document => formatter.write_str("document"),
+            Self::Sheet { index } => write!(formatter, "sheet {index}"),
+            Self::Drawable { sheet, index } => {
+                write!(formatter, "sheet {sheet} drawable {index}")
+            },
+            Self::StructuredTables => formatter.write_str("structured tables"),
+        }
+    }
+}
+
+/// Errors returned while parsing a native Numbers package.
+#[derive(Debug, Error)]
+#[non_exhaustive]
+pub enum Error {
+    /// Reading a package from the filesystem failed.
+    #[error("could not read Numbers package: {0}")]
+    Io(#[from] io::Error),
+    /// ZIP or IWA package ingress failed.
+    #[error(transparent)]
+    Archive(#[from] litchi_iwa_archive::Error),
+    /// Semantic-only source preparation failed.
+    #[error(transparent)]
+    Detection(#[from] litchi_iwa_detect::Error),
+    /// A native payload could not be decoded at a stable semantic location.
+    #[error("malformed Numbers payload at {path}")]
+    MalformedPayload {
+        /// Content-free semantic location of the malformed payload.
+        path: SemanticPath,
+    },
+    /// The package is a recognized iWork document owned by another application.
+    #[error("the package is a {detected:?} document, not Numbers")]
+    UnexpectedFormat {
+        /// The format the package was recognized as.
+        detected: litchi_core::FileFormat,
+    },
+    /// A caller-selected limit is outside its valid range.
+    #[error("Numbers {kind} limit must be between 1 and {maximum}, got {value}")]
+    InvalidLimit {
+        /// The dimension being configured.
+        kind: crate::LimitKind,
+        /// The rejected value.
+        value: u64,
+        /// The hard ceiling for this dimension.
+        maximum: u64,
+    },
+    /// A native IWA value could not be decoded or validated.
+    #[error(transparent)]
+    Common(#[from] litchi_iwa_common::Error),
+    /// The package does not contain a valid Numbers document structure.
+    #[error("invalid Numbers package: {0}")]
+    InvalidFormat(String),
+    /// A table-cell record cannot be interpreted safely.
+    #[error("could not parse Numbers table data: {0}")]
+    ParseError(String),
+    /// Semantic ingress rejected the decoded sheet sequence.
+    #[error("invalid Numbers semantic workbook: {0}")]
+    Semantic(WorkbookError),
+    /// A package-wide semantic resource ceiling was exceeded.
+    #[error(
+        "Numbers semantic {kind} limit exceeded at {path}: observed {observed}, maximum {maximum}"
+    )]
+    SemanticLimit {
+        /// Resource category that exceeded its ceiling.
+        kind: SemanticLimitKind,
+        /// Observed or requested amount.
+        observed: usize,
+        /// Caller-selected or fixed adapter-owned maximum.
+        maximum: usize,
+        /// Content-free semantic location where the limit was encountered.
+        path: SemanticPath,
+    },
+    /// The source file exceeds the selected physical input ceiling.
+    #[error("Numbers package is {observed} bytes; maximum is {maximum}")]
+    InputTooLarge {
+        /// Source size observed before allocating the package buffer.
+        observed: u64,
+        /// Maximum input size selected by the caller.
+        maximum: u64,
+    },
+}
+
+/// Failure while streaming an exact Numbers package artifact to a caller-owned sink.
+///
+/// Its `Display` and `Debug` representations report only the offset reached
+/// by prior conforming successful writes and the sink error kind; they never
+/// include package bytes or sink error text.
+#[derive(Error)]
+#[error("could not write Numbers package after {bytes_written} bytes ({kind:?})")]
+pub struct WriteError {
+    source: io::Error,
+    kind: io::ErrorKind,
+    bytes_written: usize,
+}
+
+impl fmt::Debug for WriteError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("WriteError")
+            .field("bytes_written", &self.bytes_written)
+            .field("io_error_kind", &self.kind)
+            .finish_non_exhaustive()
+    }
+}
+
+impl WriteError {
+    /// Return the byte offset reached by prior conforming successful writes.
+    ///
+    /// A `WriteZero` or trait-violating over-report is detected at this offset;
+    /// it does not establish how many bytes that call's sink actually accepted.
+    #[must_use]
+    pub const fn bytes_written(&self) -> usize {
+        self.bytes_written
+    }
+
+    /// Borrow the underlying sink error.
+    #[must_use]
+    pub const fn io_error(&self) -> &io::Error {
+        &self.source
+    }
+
+    /// Consume this error and return the underlying sink error.
+    #[must_use]
+    pub fn into_io_error(self) -> io::Error {
+        self.source
+    }
+}
+
+impl Error {
+    /// Return the content-free bounded-resource classification, when present.
+    ///
+    /// The returned value carries neither authored content nor an internal
+    /// allocation-site label. Callers can therefore log or translate it
+    /// without exposing implementation details from the decoded document.
+    #[must_use]
+    pub const fn resource_error(&self) -> Option<ResourceError> {
+        match self {
+            Self::Common(error) => match error {
+                litchi_iwa_common::Error::LimitExceeded {
+                    kind,
+                    observed,
+                    limit,
+                } => Some(ResourceError::Limit {
+                    kind: match kind {
+                        litchi_iwa_common::LimitKind::InputBytes => PayloadLimitKind::InputBytes,
+                        litchi_iwa_common::LimitKind::Fields => PayloadLimitKind::Fields,
+                        litchi_iwa_common::LimitKind::OutputBytes => PayloadLimitKind::OutputBytes,
+                        litchi_iwa_common::LimitKind::Nesting => PayloadLimitKind::Nesting,
+                        litchi_iwa_common::LimitKind::RewriteWork => PayloadLimitKind::RewriteWork,
+                        litchi_iwa_common::LimitKind::TableRows => PayloadLimitKind::TableRows,
+                        litchi_iwa_common::LimitKind::TableColumns => {
+                            PayloadLimitKind::TableColumns
+                        },
+                        litchi_iwa_common::LimitKind::TableCells => PayloadLimitKind::TableCells,
+                        litchi_iwa_common::LimitKind::MaterializedCells => {
+                            PayloadLimitKind::MaterializedCells
+                        },
+                    },
+                    observed: *observed,
+                    maximum: *limit,
+                }),
+                litchi_iwa_common::Error::Allocation { amount, .. } => {
+                    Some(ResourceError::Allocation { amount: *amount })
+                },
+                _ => None,
+            },
+            Self::Io(_)
+            | Self::Archive(_)
+            | Self::Detection(_)
+            | Self::MalformedPayload { .. }
+            | Self::UnexpectedFormat { .. }
+            | Self::InvalidLimit { .. }
+            | Self::InvalidFormat(_)
+            | Self::ParseError(_)
+            | Self::Semantic(_)
+            | Self::SemanticLimit { .. }
+            | Self::InputTooLarge { .. } => None,
+        }
+    }
+
+    #[cfg(test)]
+    fn protobuf(_error: prost::DecodeError) -> Self {
+        Self::MalformedPayload {
+            path: SemanticPath::StructuredTables,
+        }
+    }
+}
+
+/// Result returned by native Numbers package operations.
+pub type Result<T> = std::result::Result<T, Error>;
+
+#[derive(Debug)]
+enum Components {
+    PhysicalShared(Box<SourceCatalog>),
+    Semantic(Arc<ComponentCatalog>),
+}
+
+impl Components {
+    fn from_bytes(bytes: &[u8], limits: Limits) -> Result<Self> {
+        Ok(Self::PhysicalShared(Box::new(SourceCatalog::from_bytes(
+            bytes, limits,
+        )?)))
+    }
+
+    fn from_shared_bytes(source: Arc<[u8]>, limits: Limits) -> Result<Self> {
+        Ok(Self::PhysicalShared(Box::new(
+            SourceCatalog::from_shared_bytes(source, limits)?,
+        )))
+    }
+
+    fn from_owned_bytes(source: Vec<u8>, limits: Limits) -> Result<Self> {
+        Ok(Self::PhysicalShared(Box::new(
+            SourceCatalog::from_owned_bytes(source, limits)?,
+        )))
+    }
+
+    fn from_source_owner(source: SharedBytes, limits: Limits) -> Result<Self> {
+        Ok(Self::PhysicalShared(Box::new(
+            SourceCatalog::from_source_owner(source, limits)?,
+        )))
+    }
+
+    fn from_catalog(catalog: Arc<ComponentCatalog>) -> Self {
+        Self::Semantic(catalog)
+    }
+
+    fn catalog(&self) -> &ComponentCatalog {
+        match self {
+            Self::PhysicalShared(source) => source.components(),
+            Self::Semantic(catalog) => catalog,
+        }
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        match self {
+            Self::PhysicalShared(source) => Some(source.as_ref()),
+            Self::Semantic(_) => None,
+        }
+    }
+
+    fn get_archive(&self, name: &str) -> Option<&Archive> {
+        self.catalog()
+            .get(name)
+            .map(litchi_iwa_archive::Component::archive)
+    }
+
+    fn iter_archives(&self) -> impl Iterator<Item = (&str, &Archive)> {
+        self.catalog()
+            .iter()
+            .map(|component| (component.name(), component.archive()))
+    }
+
+    fn iter_objects(&self) -> impl Iterator<Item = &litchi_iwa_core::ArchiveObject> {
+        self.iter_archives()
+            .flat_map(|(_name, archive)| archive.objects.iter())
+    }
+}
+
+/// The shared table engines (`litchi-iwa-table`) read the package through its
+/// catalog, physical source, object index and limits.
+impl litchi_iwa_table::TableSource for Package {
+    fn catalog(&self) -> &ComponentCatalog {
+        self.state.components.catalog()
+    }
+
+    fn physical(&self) -> Option<&SourceCatalog> {
+        self.state.components.physical()
+    }
+
+    fn resolve_object(
+        &self,
+        identifier: u64,
+    ) -> core::result::Result<
+        Option<litchi_iwa_table::ResolvedObject<'_>>,
+        litchi_iwa_table::ResolveError,
+    > {
+        self.state
+            .index
+            .resolve_ref_id(&self.state.components, identifier)
+            .map(|resolved| {
+                resolved.map(|resolved| litchi_iwa_table::ResolvedObject {
+                    messages: resolved.messages,
+                    component_index: resolved.component_index,
+                    object_index: resolved.object_index,
+                })
+            })
+            .map_err(|_| litchi_iwa_table::ResolveError)
+    }
+
+    fn source_bytes(&self) -> &[u8] {
+        self.state.source.as_ref()
+    }
+
+    fn archive_limits(&self) -> Limits {
+        self.state.options.archive()
+    }
+
+    fn proofs(&self) -> Option<&PackageProofs> {
+        Some(&self.state.proofs)
+    }
+
+    fn max_objects(&self) -> usize {
+        self.state.options.semantic().max_objects()
+    }
+
+    fn max_references(&self) -> usize {
+        self.state.options.semantic().max_references()
+    }
+}
+
+/// A parsed native Numbers package and its immutable semantic projection.
+///
+/// Cloning this value or calling [`Self::snapshot`] shares the physical IWA
+/// catalog, object index, and semantic sheet allocation without copying any
+/// ZIP member, protobuf payload, table, or cell value.
+#[derive(Clone)]
+pub struct Package {
+    state: Arc<State>,
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Package").finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug)]
+struct State {
+    source: SharedBytes,
+    components: Components,
+    index: Index,
+    document: Workbook,
+    options: Profile,
+    /// The cell-format engines' package-level proofs.
+    proofs: PackageProofs,
+}
+
+#[derive(Debug)]
+struct SemanticBudget {
+    limits: SemanticLimits,
+    references: usize,
+    tables: usize,
+}
+
+impl SemanticBudget {
+    const fn new(limits: SemanticLimits) -> Self {
+        Self {
+            limits,
+            references: 0,
+            tables: 0,
+        }
+    }
+
+    fn charge_references(&mut self, amount: usize, path: SemanticPath) -> Result<()> {
+        self.references = checked_charge(
+            self.references,
+            amount,
+            self.limits.max_references(),
+            SemanticLimitKind::References,
+            path,
+        )?;
+        Ok(())
+    }
+
+    const fn remaining_references(&self) -> usize {
+        self.limits.max_references().saturating_sub(self.references)
+    }
+
+    fn charge_table(&mut self, path: SemanticPath) -> Result<()> {
+        self.tables = checked_charge(
+            self.tables,
+            1,
+            self.limits.max_tables(),
+            SemanticLimitKind::Tables,
+            path,
+        )?;
+        Ok(())
+    }
+}
+
+impl Package {
+    /// Open a Numbers package from a filesystem path using default limits.
+    ///
+    /// The path is a regular file or an app-authored package directory. A
+    /// package directory (the bundle form Numbers writes when "Save as
+    /// package" is selected) is captured once and converted into its
+    /// single-file form ([`litchi_iwa_archive::bundle::capture`]): the
+    /// `Index.zip` members followed by every other file of the bundle in
+    /// byte order of its relative name. The result is an ordinary
+    /// exact-source package: it edits like a single-file package,
+    /// [`Self::save`] and [`Self::write_to`] publish the single-file form,
+    /// and [`Self::save_directory`] writes the bundle form back.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the path cannot be read, the package exceeds
+    /// a physical ceiling, or its IWA/Numbers contents are malformed.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open a Numbers package under explicit physical and semantic limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when either selected profile is exceeded, or when
+    /// the package cannot become a strict rooted semantic document.
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
+        let options = Profile::from_options(options)?;
+        let path = path.as_ref();
+        if litchi_iwa_archive::bundle::is_directory(path) {
+            let archive = options.archive();
+            let bytes = litchi_iwa_archive::bundle::capture(path, archive.into(), archive)
+                .map_err(litchi_iwa_archive::Error::from)?;
+            // The bundle's files were bounded while they were captured; the
+            // converted package adds only ZIP framing, so its own input bound
+            // is its length.
+            let archive = litchi_iwa_archive::bundle::converted_limits(archive, bytes.len())?;
+            return Self::from_shared_profile(
+                bytes.into(),
+                Profile::new(archive, options.semantic()),
+            );
+        }
+        let bytes = read_source(path, options.archive())?;
+        Self::from_shared_profile(bytes.into(), options)
+    }
+
+    /// Parse a Numbers package from an in-memory ZIP payload using defaults.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when physical ingress, IWA framing, protobuf
+    /// decoding, or semantic construction fails.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Parse a Numbers package from shared immutable bytes without copying
+    /// them: the package retains `bytes` as its exact source.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::from_bytes`].
+    pub fn from_shared_bytes(bytes: Arc<[u8]>) -> Result<Self> {
+        Self::from_shared_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Parse shared immutable bytes under explicit physical and semantic
+    /// limits, without copying them.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::from_bytes_with_options`].
+    pub fn from_shared_bytes_with_options(bytes: Arc<[u8]>, options: OpenOptions) -> Result<Self> {
+        Self::from_shared_profile(bytes, Profile::from_options(options)?)
+    }
+
+    /// Parse a Numbers package under explicit physical and semantic limits.
+    ///
+    /// Rooted document construction is failure-atomic: object, sheet,
+    /// reference, and table ceilings are checked before the semantic snapshot
+    /// is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the package exceeds either selected profile,
+    /// contains ambiguous rooted ownership, or cannot be decoded as Numbers.
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        let options = Profile::from_options(options)?;
+        let components = Components::from_bytes(bytes, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    /// Consume a package source prepared by a format coordinator.
+    ///
+    /// This adopts the coordinator's parsed container without a second ZIP
+    /// traversal or IWA component decode, exactly as the Pages and Keynote
+    /// owners' prepared-source ingress does. The source's physical profile
+    /// remains authoritative; `semantic` selects the semantic admission
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnexpectedFormat`] when the source belongs to another
+    /// application, an [`Error::InvalidFormat`] for a directory-backed or
+    /// semantic-only source, and the errors of [`Self::from_bytes_with_options`]
+    /// when the package cannot become a semantic document.
+    pub fn from_prepared_source(source: PreparedSource, semantic: SemanticLimits) -> Result<Self> {
+        if source.format() != Format::Numbers {
+            return Err(Error::UnexpectedFormat {
+                detected: crate::workbook::detected_format(source.format()),
+            });
+        }
+        let catalog = source.__into_source_catalog().ok_or_else(|| {
+            Error::InvalidFormat(
+                "directory-backed Numbers sources support semantic projection only".to_owned(),
+            )
+        })?;
+        let limits = catalog.limits();
+        let components = Components::PhysicalShared(Box::new(catalog));
+        Self::from_components_with_options(components, Profile::new(limits, semantic))
+    }
+
+    pub(crate) fn from_shared_profile(source: Arc<[u8]>, options: Profile) -> Result<Self> {
+        let components = Components::from_shared_bytes(source, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    /// Reopen `candidate`, an edited reassembly of this package, under this
+    /// package's profile. Unchanged IWA members reuse this package's parsed
+    /// archives; the ZIP and every budget are still checked in full
+    /// (`SourceCatalog::reopen`).
+    pub(crate) fn reopen_candidate(&self, candidate: Arc<[u8]>) -> Result<Self> {
+        let components = match self.state.components.physical() {
+            Some(catalog) => Components::PhysicalShared(Box::new(catalog.reopen(candidate)?)),
+            None => Components::from_shared_bytes(candidate, self.state.options.archive())?,
+        };
+        let proofs = self
+            .state
+            .proofs
+            .reopened(self.state.components.catalog(), components.catalog());
+        Self::from_components_with_proofs(components, self.state.options, proofs)
+    }
+
+    pub(crate) fn from_owned_bytes_with_options(source: Vec<u8>, options: Profile) -> Result<Self> {
+        let components = Components::from_owned_bytes(source, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    pub(crate) fn from_source_owner_with_options(
+        source: SharedBytes,
+        options: Profile,
+    ) -> Result<Self> {
+        let components = Components::from_source_owner(source, options.archive())?;
+        Self::from_components_with_options(components, options)
+    }
+
+    fn from_components_with_options(components: Components, options: Profile) -> Result<Self> {
+        Self::from_components_with_proofs(components, options, PackageProofs::default())
+    }
+
+    fn from_components_with_proofs(
+        components: Components,
+        options: Profile,
+        proofs: PackageProofs,
+    ) -> Result<Self> {
+        let source = components
+            .physical()
+            .ok_or_else(|| {
+                Error::InvalidFormat(
+                    "semantic-only Numbers components cannot construct a package".to_owned(),
+                )
+            })?
+            .source_owner();
+        validate_numbers_application(&components, options.archive())?;
+        let semantic = options.semantic();
+        let index = Index::from_components(&components, semantic.max_objects())?;
+        let root = Self::root_sheet_order(&components, semantic)?;
+        let sheets = Self::decode_sheets(&components, &index, &root, semantic, true)?;
+        let document =
+            Workbook::from_sheets_with_limits(sheets, semantic).map_err(Error::Semantic)?;
+        Ok(Self {
+            state: Arc::new(State {
+                source,
+                components,
+                index,
+                document,
+                options,
+                proofs,
+            }),
+        })
+    }
+
+    /// Capture a cheap immutable handle to the same parsed package.
+    #[must_use]
+    pub fn snapshot(&self) -> Self {
+        self.clone()
+    }
+
+    /// Return whether two handles share the exact immutable package snapshot.
+    pub(crate) fn shares_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.state, &other.state)
+    }
+
+    /// Borrow the exact immutable package source retained by this snapshot.
+    ///
+    /// Unsupported ZIP members and unmodeled protobuf fields remain in this
+    /// source even though the ordinary package API exposes semantic values.
+    #[must_use]
+    pub(crate) fn source_bytes(&self) -> &[u8] {
+        self.state.source.as_ref()
+    }
+
+    /// Write this validated package artifact to a byte sink.
+    ///
+    /// The emitted bytes are the exact source retained by this immutable
+    /// snapshot, including unsupported ZIP members and unmodeled fields.
+    /// This streaming primitive does not flush or synchronize `writer`, and it
+    /// does not atomically publish a destination. Callers that need durable or
+    /// atomic replacement must provide that policy around the sink.
+    ///
+    /// # Costs
+    ///
+    /// Streams `O(package size)` bytes in one forward pass without constructing
+    /// another package-sized buffer. Partial or interrupted writes may call the
+    /// sink more than once.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`WriteError`] with the byte offset reached by prior conforming
+    /// successful writes. A zero-length write or over-report is detected at
+    /// that offset; an over-report does not establish its actual accepted-byte
+    /// count. Bytes accepted before an error remain in the caller-owned sink.
+    pub fn write_to<W: Write + ?Sized>(
+        &self,
+        writer: &mut W,
+    ) -> std::result::Result<(), WriteError> {
+        let source = self.source_bytes();
+        let mut bytes_written = 0_usize;
+        while bytes_written < source.len() {
+            let remaining = &source[bytes_written..];
+            match writer.write(remaining) {
+                Ok(0) => {
+                    return Err(WriteError {
+                        source: io::Error::new(
+                            io::ErrorKind::WriteZero,
+                            "sink accepted no package bytes",
+                        ),
+                        kind: io::ErrorKind::WriteZero,
+                        bytes_written,
+                    });
+                },
+                Ok(amount) if amount <= remaining.len() => bytes_written += amount,
+                Ok(_amount) => {
+                    return Err(WriteError {
+                        source: io::Error::new(
+                            io::ErrorKind::InvalidData,
+                            "sink reported accepting more bytes than supplied",
+                        ),
+                        kind: io::ErrorKind::InvalidData,
+                        bytes_written,
+                    });
+                },
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+                Err(write_error) => {
+                    let kind = write_error.kind();
+                    return Err(WriteError {
+                        source: write_error,
+                        kind,
+                        bytes_written,
+                    });
+                },
+            }
+        }
+        Ok(())
+    }
+
+    /// Durably save this exact immutable package artifact to a filesystem
+    /// path.
+    ///
+    /// The artifact is written to a private sibling temporary file, flushed
+    /// and synchronized, then atomically replaces the destination. Existing
+    /// ordinary regular-file permissions are preserved where supported; Unix
+    /// set-user-ID and set-group-ID bits are cleared. The containing directory
+    /// is synchronized where the platform supports it. The destination is
+    /// left untouched when staging fails.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SaveError::Write`] when the package cannot be written to the
+    /// staging file, or [`SaveError::Publication`] when the destination
+    /// cannot be safely replaced. A publication error may report that
+    /// replacement already committed through [`SaveError::was_committed`].
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
+        save::save(self, path)
+    }
+
+    /// Save this package as an app-style package directory at
+    /// `path`: `Index.zip` holds the `Index/` members with their
+    /// records unchanged, and every other member (metadata sidecars,
+    /// previews, `Data/` media) is a plain file. Opening the
+    /// directory again gives back this package's exact bytes.
+    ///
+    /// The bundle is written into a sibling staging directory; an existing
+    /// destination directory is swapped out only after the new one is
+    /// complete and synchronized.
+    ///
+    /// # Errors
+    ///
+    /// [`SaveError::Publication`] when the destination exists and is not a
+    /// directory or the staging, synchronization or swap fails;
+    /// [`SaveError::Bundling`] when a staged file cannot be written;
+    /// [`SaveError::Bundle`] when the package or its index archive cannot be
+    /// assembled or a member name cannot be a file.
+    pub fn save_directory(&self, path: impl AsRef<Path>) -> std::result::Result<(), SaveError> {
+        let limits = self.state.options.archive();
+        let package = litchi_iwa_archive::package::Catalog::from_bytes(self.source_bytes(), limits)
+            .map_err(SaveError::Bundle)?;
+        litchi_iwa_archive::bundle::save(
+            &package,
+            limits,
+            path.as_ref(),
+            SaveError::Bundle,
+            SaveError::Bundling,
+        )
+    }
+
+    /// Borrow decoded semantic sheets in stable source order.
+    #[must_use]
+    pub fn sheets(&self) -> &[Sheet] {
+        self.state.document.sheets()
+    }
+
+    /// Select a rooted semantic sheet by exact visible name or checked
+    /// zero-based position.
+    ///
+    /// This is the package-level convenience form of
+    /// [`Workbook::sheet`](crate::Workbook::sheet). Resolution runs only over
+    /// the immutable semantic snapshot; native object identifiers, archive
+    /// member names, and payloads are not part of this API.
+    ///
+    /// Missing names and out-of-range positions return `Ok(None)`. Validated
+    /// package snapshots currently make this lookup infallible, while the
+    /// document result type keeps the selector boundary compatible with
+    /// future semantic validation rules.
+    pub fn sheet<'a, S>(&self, selector: S) -> std::result::Result<Option<&Sheet>, WorkbookError>
+    where
+        S: Into<SheetSelector<'a>>,
+    {
+        self.state.document.sheet(selector)
+    }
+
+    /// Select a rooted semantic table by its sheet and table selectors.
+    ///
+    /// This is the package-level convenience form of
+    /// [`Workbook::table`](crate::Workbook::table). Resolution runs only over
+    /// the immutable semantic snapshot; native object identifiers, archive
+    /// member names, and payloads are not part of this API.
+    ///
+    /// Both selectors accept an exact visible name, a checked zero-based
+    /// position, or a typed semantic position conversion. Missing sheets and
+    /// tables return `Ok(None)`. A duplicate table name returns the same
+    /// [`crate::TableSelectorError`] as the document-level lookup.
+    pub fn table<'sheet, 'table, S, T>(
+        &self,
+        sheet: S,
+        table: T,
+    ) -> std::result::Result<Option<&crate::Table>, crate::TableSelectorError>
+    where
+        S: Into<SheetSelector<'sheet>>,
+        T: Into<TableSelector<'table>>,
+    {
+        self.state.document.table(sheet, table)
+    }
+
+    /// Clone the shared semantic sheet allocation without cloning sheet data.
+    #[must_use]
+    pub fn shared_sheets(&self) -> Arc<[Sheet]> {
+        self.state.document.shared_sheets()
+    }
+
+    /// The read-only semantic workbook projection (ADR 0034 §2): an owned,
+    /// cheap handle (one reference-count bump) to the decoded sheets.
+    #[must_use]
+    pub fn workbook(&self) -> Workbook {
+        self.state.document.clone()
+    }
+
+    /// Borrow the read-only semantic workbook projection.
+    #[must_use]
+    pub fn workbook_ref(&self) -> &Workbook {
+        &self.state.document
+    }
+
+    /// The resolved profile focused transactions reopen candidates under.
+    pub(crate) fn profile(&self) -> Profile {
+        self.state.options
+    }
+
+    /// Return the raw Numbers-wire profile selected by this package's
+    /// retained archive and semantic ingress limits (the table-topology
+    /// engine derives the same profile from `TableSource::archive_limits`).
+    #[cfg(test)]
+    pub(crate) fn numbers_wire_limits(&self) -> Result<litchi_numbers_wire::Limits> {
+        let maximum = self
+            .profile()
+            .archive()
+            .effective_archive_limits()?
+            .max_message_bytes();
+        let wire = WireLimits::default()
+            .with_input_bytes(maximum)?
+            .with_output_bytes(maximum)?;
+        Ok(litchi_numbers_wire::Limits::from_wire_limits(wire))
+    }
+
+    /// The physical and semantic ingress profile this package was read
+    /// under; focused transactions reopen candidates under it.
+    pub fn open_options(&self) -> OpenOptions {
+        self.state.options.options()
+    }
+
+    /// Extract the legacy-compatible global table projection.
+    ///
+    /// Unlike [`Self::workbook`], this allocating compatibility view scans
+    /// package objects by their primary native type. It preserves the former
+    /// structured extractor's deterministic order and includes valid detached
+    /// table models. Type-6001 models precede legacy type-6000 models; object
+    /// identity orders each group and duplicate candidates are emitted once.
+    /// Ordinary sheets never expose those detached models.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when a preferred table-model payload is malformed,
+    /// a referenced table sidecar is invalid, allocation fails, or the selected
+    /// semantic table ceiling would be exceeded.
+    pub fn extract_structured_tables(&self) -> Result<Vec<crate::Table>> {
+        project_compatibility_tables(
+            &self.state.components,
+            &self.state.index,
+            self.state.options.semantic(),
+        )
+    }
+
+    /// Decode the rooted sheet order through the generated-free Buffa
+    /// projection. The generated TN document is retained only by the legacy
+    /// transaction compatibility helpers below; package construction and the
+    /// archive-free semantic handoff consume this bounded snapshot instead.
+    fn root_sheet_order(
+        components: &Components,
+        limits: SemanticLimits,
+    ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+        let payload = Self::root_document_payload(components)?;
+        preflight_root_sheet_references_with_max(payload, limits.max_sheets())
+    }
+
+    fn root_document(
+        components: &Components,
+    ) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+        preflight_root_sheet_references_with_max(
+            Self::root_document_payload(components)?,
+            SemanticLimits::default().max_sheets(),
+        )
+    }
+
+    fn root_document_payload(components: &Components) -> Result<&[u8]> {
+        let object = components
+            .get_archive("Index/Document.iwa")
+            .and_then(|archive| archive.object(1))
+            .ok_or_else(|| {
+                Error::InvalidFormat("package does not contain a Numbers root document".to_owned())
+            })?;
+        let message = unique_message(
+            &object.messages,
+            DOCUMENT_MESSAGE_TYPE,
+            SemanticPath::Document,
+            "document",
+        )?
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "Numbers document root has no canonical document payload".to_owned(),
+            )
+        })?;
+        Ok(message.data.as_slice())
+    }
+
+    fn decode_sheets(
+        components: &Components,
+        index: &Index,
+        document: &numbers_sheet_order_codec::DocumentSheetOrderSnapshot,
+        limits: SemanticLimits,
+        retain_comments: bool,
+    ) -> Result<Vec<Sheet>> {
+        if document.sheet_references().len() > limits.max_sheets() {
+            return Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Sheets,
+                observed: document.sheet_references().len(),
+                maximum: limits.max_sheets(),
+                path: SemanticPath::Document,
+            });
+        }
+
+        let mut budget = SemanticBudget::new(limits);
+        budget.charge_references(document.sheet_references().len(), SemanticPath::Document)?;
+        let extractor = TableDataExtractor::new(components, index, limits);
+        let extractor = if retain_comments {
+            extractor.native_projection()
+        } else {
+            extractor.without_comments()
+        };
+        extractor.charge_references(document.sheet_references().len())?;
+        let mut sheets = Vec::new();
+        sheets
+            .try_reserve_exact(document.sheet_references().len())
+            .map_err(|_error| {
+                Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers semantic sheets",
+                    amount: document.sheet_references().len(),
+                })
+            })?;
+
+        let mut seen_sheets = HashSet::new();
+        seen_sheets
+            .try_reserve(document.sheet_references().len())
+            .map_err(|_error| {
+                allocation_error(
+                    "Numbers rooted sheet identities",
+                    document.sheet_references().len(),
+                )
+            })?;
+        let mut seen_drawables = HashSet::new();
+        let mut seen_models = HashSet::new();
+        for (position, reference) in document.sheet_references().iter().enumerate() {
+            let path = SemanticPath::Sheet { index: position };
+            let sheet_identifier = reference.identifier();
+            if !seen_sheets.insert(sheet_identifier) {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {path} repeats an earlier rooted sheet"
+                )));
+            }
+            let object = index
+                .resolve_ref_id(components, sheet_identifier)?
+                .ok_or_else(|| Error::InvalidFormat(format!("Numbers {path} is missing")))?;
+            let (message_type, payload) = sheet_payload(object.messages, path)?;
+            let consumed_references = limits
+                .max_references()
+                .saturating_sub(budget.remaining_references());
+            let (projected_name, projected_drawables) = names::preflight_sheet_payload(
+                message_type,
+                payload,
+                budget.remaining_references(),
+            )
+            .map_err(|error| map_sheet_preflight_error(error, path, consumed_references))?;
+            budget.charge_references(projected_drawables.len(), path)?;
+            extractor.charge_references(projected_drawables.len())?;
+            extractor.charge_output_text(projected_name.len())?;
+            seen_drawables
+                .try_reserve(projected_drawables.len())
+                .map_err(|_error| {
+                    allocation_error(
+                        "Numbers rooted drawable identities",
+                        projected_drawables.len(),
+                    )
+                })?;
+            let mut sheet = DecodedSheet::new(
+                try_owned_text(projected_name, "Numbers rooted sheet name")?,
+                position,
+            );
+            for (drawable_position, drawable_identifier) in
+                projected_drawables.into_iter().enumerate()
+            {
+                let drawable_path = SemanticPath::Drawable {
+                    sheet: position,
+                    index: drawable_position,
+                };
+                if !seen_drawables.insert(drawable_identifier) {
+                    return Err(Error::InvalidFormat(format!(
+                        "Numbers {drawable_path} repeats an earlier rooted drawable"
+                    )));
+                }
+                let Some(table) = Self::extract_table(
+                    components,
+                    index,
+                    drawable_identifier,
+                    &extractor,
+                    drawable_path,
+                    &mut budget,
+                    &mut seen_models,
+                )?
+                else {
+                    continue;
+                };
+                sheet.try_add_table(table)?;
+            }
+            sheets.push(sheet.into_semantic()?);
+        }
+        Ok(sheets)
+    }
+
+    fn extract_table(
+        components: &Components,
+        index: &Index,
+        drawable_id: u64,
+        extractor: &TableDataExtractor<'_>,
+        path: SemanticPath,
+        budget: &mut SemanticBudget,
+        seen_models: &mut HashSet<u64>,
+    ) -> Result<Option<table::Table>> {
+        let resolved = index
+            .resolve_ref_id(components, drawable_id)?
+            .ok_or_else(|| Error::InvalidFormat(format!("Numbers {path} is missing")))?;
+        let canonical = unique_message(
+            resolved.messages,
+            TABLE_INFO_MESSAGE_TYPE,
+            path,
+            "table-info",
+        )?;
+        let legacy = unique_message(
+            resolved.messages,
+            LEGACY_TABLE_INFO_MESSAGE_TYPE,
+            path,
+            "legacy table-info",
+        )?;
+        let message = match (canonical, legacy) {
+            (Some(_), Some(_)) => {
+                return Err(Error::InvalidFormat(format!(
+                    "Numbers {path} has ambiguous table-info payload ownership"
+                )));
+            },
+            (Some(message), None) | (None, Some(message)) => message,
+            (None, None) => return Ok(None),
+        };
+        let model_reference = table_info_codec::decode_table_model_reference(
+            message.data.as_slice(),
+            table_info_decode_options(message.data.as_slice()),
+        )
+        .map_err(|_error| Error::MalformedPayload { path })?;
+        let model_id = model_reference.identifier().get();
+        let model = index.resolve_ref_id(components, model_id)?.ok_or_else(|| {
+            Error::InvalidFormat(format!("Numbers {path} table model is missing"))
+        })?;
+        if seen_models.contains(&model_id) {
+            return Err(Error::InvalidFormat(format!(
+                "Numbers {path} reuses a table model owned by an earlier drawable"
+            )));
+        }
+        budget.charge_table(path)?;
+        budget.charge_references(1, path)?;
+        extractor.charge_references(1)?;
+        seen_models.try_reserve(1).map_err(|_error| {
+            allocation_error(
+                "Numbers rooted table model identities",
+                seen_models.len().saturating_add(1),
+            )
+        })?;
+        let inserted = seen_models.insert(model_id);
+        debug_assert!(
+            inserted,
+            "duplicate table models were rejected before admission"
+        );
+        extractor
+            .extract_reachable_table_from_object(&model, path)
+            .map(Some)
+    }
+}
+
+/// Bounded policy for the focused table-info reference projection.
+///
+/// The raw message was already admitted under the caller's physical IWA
+/// message ceiling. Its exact source width therefore bounds every projection
+/// budget, while the codec independently bounds strict and Buffa scans.
+pub(super) fn table_info_decode_options(source: &[u8]) -> table_info_codec::DecodeOptions {
+    table_info_codec::DecodeOptions::new(
+        source.len().max(1),
+        source.len().max(1),
+        source.len().saturating_mul(4).max(1),
+        TABLE_INFO_PROJECTION_RECURSION_LIMIT,
+    )
+}
+
+/// Extract the allocating, legacy-compatible global table projection from
+/// complete Numbers package bytes under default limits.
+///
+/// This entry point validates Numbers application ownership and indexes the
+/// physical package, but deliberately does not construct the strict rooted
+/// [`Workbook`]. It therefore remains usable for migration callers that need
+/// detached historical table models even when unrelated rooted topology is
+/// incomplete. New application code should normally use [`Package::workbook`].
+///
+/// # Errors
+///
+/// Returns a typed error when the bytes are not an unambiguous Numbers package,
+/// physical or semantic limits are exceeded, or a selected table is malformed.
+pub fn compatibility_tables_from_bytes(bytes: &[u8]) -> Result<Vec<crate::Table>> {
+    compatibility_tables_from_bytes_with_options(bytes, OpenOptions::new())
+}
+
+/// Extract the allocating global compatibility projection under explicit
+/// physical and semantic limits.
+///
+/// This path does not construct the strict rooted [`Workbook`]. It may lazily
+/// resolve source sheet and drawable names when enriching a non-empty formula
+/// sidecar. The object and table portions of [`SemanticLimits`] are consumed
+/// directly; its reference ceiling applies to unique source-derived
+/// formula-enrichment entries. Formula discovery separately has fixed
+/// aggregate category-wire, work, and text ceilings plus a fixed
+/// category-depth ceiling. The sheet ceiling applies only when constructing a
+/// strict [`Package`].
+///
+/// # Errors
+///
+/// Returns a typed error when application ownership, package ingress, object
+/// indexing, table decoding, or a selected resource ceiling fails.
+pub fn compatibility_tables_from_bytes_with_options(
+    bytes: &[u8],
+    options: OpenOptions,
+) -> Result<Vec<crate::Table>> {
+    let options = Profile::from_options(options)?;
+    let components = Components::from_bytes(bytes, options.archive())?;
+    compatibility_tables_from_components(&components, options.archive(), options.semantic())
+}
+
+pub(crate) fn semantic_document_from_prepared_source(
+    source: PreparedSource,
+    semantic: SemanticLimits,
+) -> Result<Workbook> {
+    if source.format() != Format::Numbers {
+        return Err(Error::UnexpectedFormat {
+            detected: crate::workbook::detected_format(source.format()),
+        });
+    }
+    let prepared = source.__into_numbers_semantic_source()?;
+    let (catalog, source_limits, sidecars) = prepared.__into_parts();
+    let metadata = metadata_from_sidecars(&sidecars)?;
+    let components = Components::from_catalog(catalog);
+    validate_numbers_application(&components, source_limits)?;
+    let index = Index::from_components(&components, semantic.max_objects())?;
+    let source_record_count = index.object_count();
+    let root_payload = Package::root_document_payload(&components)?;
+    let root = preflight_root_sheet_references(root_payload, semantic)?;
+    let sheets = Package::decode_sheets(&components, &index, &root, semantic, false)?;
+    let table_count = sheets
+        .iter()
+        .try_fold(0usize, |count, sheet| {
+            count.checked_add(sheet.tables().len())
+        })
+        .ok_or(Error::SemanticLimit {
+            kind: SemanticLimitKind::Tables,
+            observed: usize::MAX,
+            maximum: semantic.max_tables(),
+            path: SemanticPath::Document,
+        })?;
+    let document = Workbook::from_sheets_with_limits(sheets, semantic).map_err(Error::Semantic)?;
+    let stats = crate::workbook::Stats {
+        source_record_count,
+        sheet_count: document.sheet_count(),
+        table_count,
+    };
+    Ok(Workbook::from_source(document, metadata, stats))
+}
+
+fn preflight_root_sheet_references(
+    payload: &[u8],
+    limits: SemanticLimits,
+) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+    preflight_root_sheet_references_with_max(payload, limits.max_sheets())
+}
+
+fn preflight_root_sheet_references_with_max(
+    payload: &[u8],
+    max_sheets: usize,
+) -> Result<numbers_sheet_order_codec::DocumentSheetOrderSnapshot> {
+    let max_sheets = max_sheets.min(SemanticLimits::MAXIMUM.max_sheets());
+    let options = numbers_sheet_order_codec::DecodeOptions::new(
+        payload.len().max(1),
+        payload.len().saturating_mul(2).max(1),
+        payload.len().saturating_mul(4).max(1),
+        2,
+        max_sheets.saturating_add(1),
+    );
+    numbers_sheet_order_codec::decode_document_sheet_order(payload, options).map_err(|error| {
+        if let Some(limit) = error.resource_limit() {
+            let (kind, observed, maximum) = match limit {
+                numbers_sheet_order_codec::DecodeLimit::Bytes { observed, maximum } => {
+                    (SemanticLimitKind::FormulaCategoryBytes, observed, maximum)
+                },
+                numbers_sheet_order_codec::DecodeLimit::References { observed, maximum } => (
+                    SemanticLimitKind::Sheets,
+                    observed.saturating_sub(1),
+                    maximum.saturating_sub(1),
+                ),
+                numbers_sheet_order_codec::DecodeLimit::Fields { observed, maximum } => {
+                    (SemanticLimitKind::Objects, observed, maximum)
+                },
+                numbers_sheet_order_codec::DecodeLimit::Work { observed, maximum } => {
+                    (SemanticLimitKind::FormulaWork, observed, maximum)
+                },
+                numbers_sheet_order_codec::DecodeLimit::Nesting { observed, maximum } => (
+                    SemanticLimitKind::FormulaDepth,
+                    observed as usize,
+                    maximum as usize,
+                ),
+                _ => {
+                    return Error::MalformedPayload {
+                        path: SemanticPath::Document,
+                    };
+                },
+            };
+            return Error::SemanticLimit {
+                kind,
+                observed,
+                maximum,
+                path: SemanticPath::Document,
+            };
+        }
+        if let Some(amount) = error.allocation_amount() {
+            return allocation_error("Numbers document sheet references", amount);
+        }
+        Error::MalformedPayload {
+            path: SemanticPath::Document,
+        }
+    })
+}
+
+fn metadata_from_sidecars(
+    sidecars: &litchi_iwa_detect::PreparedMetadataSidecars,
+) -> Result<litchi_core::Metadata> {
+    let mut budget = MetadataBudget::new();
+    let mut metadata = litchi_core::Metadata {
+        application: Some("Numbers".to_owned()),
+        ..Default::default()
+    };
+    let mut build_version = None;
+    if let Some(data) = sidecars.properties_plist() {
+        let diagnostic = parse_properties_diagnostic(data, &mut budget)?;
+        metadata.title = diagnostic.title.or(diagnostic.document_title);
+        metadata.author = diagnostic
+            .author
+            .or(diagnostic.document_author)
+            .or(diagnostic.sfwp_author);
+        metadata.keywords = diagnostic
+            .keywords
+            .as_deref()
+            .map(litchi_core::metadata::keywords::split)
+            .unwrap_or_default();
+        metadata.description = diagnostic.comments;
+        metadata.revision = diagnostic.revision;
+        build_version = diagnostic.build_version;
+        if let Some(version) = diagnostic.file_format_version {
+            const PREFIX: &str = "Numbers Format Version ";
+            budget.retain(PREFIX.len())?;
+            let required = PREFIX
+                .len()
+                .checked_add(version.len())
+                .ok_or_else(invalid_metadata)?;
+            let mut content_status = String::new();
+            content_status
+                .try_reserve_exact(required)
+                .map_err(|_allocation| {
+                    Error::Common(litchi_iwa_common::Error::Allocation {
+                        resource: "Numbers metadata content status",
+                        amount: required,
+                    })
+                })?;
+            content_status.push_str(PREFIX);
+            content_status.push_str(&version);
+            metadata.content_status = Some(content_status);
+        }
+    }
+    if let Some(data) = sidecars.build_version_history_plist() {
+        if let Some(history_version) = parse_build_history(data, &mut budget)? {
+            build_version = Some(history_version);
+        }
+    }
+    if let Some(data) = sidecars.document_identifier() {
+        let identifier = std::str::from_utf8(data)
+            .map_err(|_error| Error::InvalidFormat("invalid Numbers identifier".to_owned()))?
+            .trim();
+        if identifier.is_empty() {
+            return Err(Error::InvalidFormat(
+                "Numbers identifier must not be empty".to_owned(),
+            ));
+        }
+        if identifier.len() > MAX_METADATA_SCALAR_BYTES {
+            return Err(metadata_limit(
+                SemanticLimitKind::TextBytes,
+                identifier.len(),
+                MAX_METADATA_SCALAR_BYTES,
+            ));
+        }
+        budget.retain(identifier.len())?;
+        let mut retained = String::new();
+        retained
+            .try_reserve_exact(identifier.len())
+            .map_err(|_allocation| {
+                Error::Common(litchi_iwa_common::Error::Allocation {
+                    resource: "Numbers metadata identifier",
+                    amount: identifier.len(),
+                })
+            })?;
+        retained.push_str(identifier);
+        metadata.identifier = Some(retained);
+    }
+    metadata.version = build_version;
+    Ok(metadata)
+}
+
+#[derive(Debug, Default)]
+struct PropertiesDiagnostic {
+    title: Option<String>,
+    author: Option<String>,
+    keywords: Option<String>,
+    comments: Option<String>,
+    document_title: Option<String>,
+    document_author: Option<String>,
+    sfwp_author: Option<String>,
+    revision: Option<String>,
+    build_version: Option<String>,
+    file_format_version: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum PropertyKey {
+    Title,
+    Author,
+    Keywords,
+    Comments,
+    DocumentTitle,
+    DocumentAuthor,
+    SfwpAuthor,
+    Revision,
+    BuildVersion,
+    FileFormatVersion,
+    Ignored,
+}
+
+fn parse_properties_diagnostic(
+    data: &[u8],
+    budget: &mut MetadataBudget,
+) -> Result<PropertiesDiagnostic> {
+    preflight_binary_metadata(data)?;
+    let mut reader = PlistReader::new(io::Cursor::new(data));
+    let Some(Ok(PlistEvent::StartDictionary(_))) = reader.next() else {
+        return Err(invalid_metadata());
+    };
+    let mut result = PropertiesDiagnostic::default();
+    let mut depth = 1usize;
+    let mut events = 1usize;
+    let mut pending = None;
+    let mut skipping_value_depth = None;
+    for event in reader {
+        let event = event.map_err(|_error| invalid_metadata())?;
+        check_metadata_event_scalar(&event)?;
+        events = events.checked_add(1).ok_or_else(invalid_metadata)?;
+        if events > MAX_METADATA_EVENTS {
+            return Err(metadata_limit(
+                SemanticLimitKind::Objects,
+                events,
+                MAX_METADATA_EVENTS,
+            ));
+        }
+        match event {
+            PlistEvent::StartArray(_) | PlistEvent::StartDictionary(_) => {
+                depth = depth.checked_add(1).ok_or_else(invalid_metadata)?;
+                if depth > MAX_METADATA_NESTING {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::FormulaDepth,
+                        depth,
+                        MAX_METADATA_NESTING,
+                    ));
+                }
+                if depth == 2 {
+                    if !matches!(pending, Some(PropertyKey::Ignored)) {
+                        return Err(invalid_metadata());
+                    }
+                    skipping_value_depth = Some(depth);
+                }
+            },
+            PlistEvent::EndCollection => {
+                if depth == 1 {
+                    if pending.is_some() || skipping_value_depth.is_some() {
+                        return Err(invalid_metadata());
+                    }
+                    return Ok(result);
+                }
+                if skipping_value_depth == Some(depth) {
+                    skipping_value_depth = None;
+                    pending = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(invalid_metadata)?;
+            },
+            PlistEvent::String(value) if depth == 1 && pending.is_none() => {
+                pending = Some(property_key(&value));
+            },
+            scalar if depth == 1 => {
+                let key = pending.take().ok_or_else(invalid_metadata)?;
+                if !matches!(key, PropertyKey::Ignored) {
+                    let value = metadata_scalar(scalar)?;
+                    budget.retain(value.len())?;
+                    assign_property(&mut result, key, value)?;
+                }
+            },
+            _ => {},
+        }
+    }
+    Err(invalid_metadata())
+}
+
+fn parse_build_history(data: &[u8], budget: &mut MetadataBudget) -> Result<Option<String>> {
+    preflight_binary_metadata(data)?;
+    let mut reader = PlistReader::new(io::Cursor::new(data));
+    let Some(Ok(PlistEvent::StartArray(_))) = reader.next() else {
+        return Err(invalid_metadata());
+    };
+    let mut depth = 1usize;
+    let mut events = 1usize;
+    let mut entries = 0usize;
+    let mut latest = None;
+    let mut pending_key: Option<BuildHistoryKey> = None;
+    let mut version: Option<String> = None;
+    let mut build: Option<String> = None;
+    for event in reader {
+        let event = event.map_err(|_error| invalid_metadata())?;
+        check_metadata_event_scalar(&event)?;
+        events = events.checked_add(1).ok_or_else(invalid_metadata)?;
+        if events > MAX_METADATA_EVENTS {
+            return Err(metadata_limit(
+                SemanticLimitKind::Objects,
+                events,
+                MAX_METADATA_EVENTS,
+            ));
+        }
+        match event {
+            PlistEvent::StartDictionary(_) if depth == 1 => {
+                depth = 2;
+                entries = entries.checked_add(1).ok_or_else(invalid_metadata)?;
+                if entries > MAX_BUILD_HISTORY_ENTRIES {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::Objects,
+                        entries,
+                        MAX_BUILD_HISTORY_ENTRIES,
+                    ));
+                }
+                version = None;
+                build = None;
+            },
+            PlistEvent::EndCollection if depth == 2 => {
+                let selected = version
+                    .take()
+                    .or_else(|| build.take())
+                    .ok_or_else(invalid_metadata)?;
+                budget.retain(selected.len())?;
+                latest = Some(selected);
+                pending_key = None;
+                depth = 1;
+            },
+            PlistEvent::EndCollection if depth == 1 => return Ok(latest),
+            PlistEvent::String(value) if depth == 1 => {
+                entries = entries.checked_add(1).ok_or_else(invalid_metadata)?;
+                if entries > MAX_BUILD_HISTORY_ENTRIES {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::Objects,
+                        entries,
+                        MAX_BUILD_HISTORY_ENTRIES,
+                    ));
+                }
+                let selected = checked_metadata_string(value.into_owned())?;
+                budget.retain(selected.len())?;
+                latest = Some(selected);
+            },
+            PlistEvent::String(value) if depth == 2 && pending_key.is_none() => {
+                pending_key = Some(match value.as_ref() {
+                    "Version" => BuildHistoryKey::Version,
+                    "Build" => BuildHistoryKey::Build,
+                    _ => BuildHistoryKey::Ignored,
+                });
+            },
+            scalar if depth == 2 => match pending_key.take().ok_or_else(invalid_metadata)? {
+                BuildHistoryKey::Version => {
+                    let selected = metadata_scalar(scalar)?;
+                    if version.replace(selected).is_some() {
+                        return Err(invalid_metadata());
+                    }
+                },
+                BuildHistoryKey::Build => {
+                    let selected = metadata_scalar(scalar)?;
+                    if build.replace(selected).is_some() {
+                        return Err(invalid_metadata());
+                    }
+                },
+                BuildHistoryKey::Ignored => {},
+            },
+            PlistEvent::StartArray(_) | PlistEvent::StartDictionary(_) => {
+                return Err(invalid_metadata());
+            },
+            _ => return Err(invalid_metadata()),
+        }
+    }
+    Err(invalid_metadata())
+}
+
+fn preflight_binary_metadata(data: &[u8]) -> Result<()> {
+    if !data.starts_with(b"bplist00") {
+        return Ok(());
+    }
+    let trailer_offset = data.len().checked_sub(32).ok_or_else(invalid_metadata)?;
+    let trailer = data.get(trailer_offset..).ok_or_else(invalid_metadata)?;
+    let offset_width = usize::from(trailer[6]);
+    let reference_width = usize::from(trailer[7]);
+    if !(1..=8).contains(&offset_width) || !(1..=8).contains(&reference_width) {
+        return Err(invalid_metadata());
+    }
+    let objects = usize::try_from(binary_u64(&trailer[8..16])).map_err(|_| invalid_metadata())?;
+    if objects == 0 || objects > MAX_METADATA_EVENTS {
+        return Err(metadata_limit(
+            SemanticLimitKind::Objects,
+            objects,
+            MAX_METADATA_EVENTS,
+        ));
+    }
+    let root = usize::try_from(binary_u64(&trailer[16..24])).map_err(|_| invalid_metadata())?;
+    if root >= objects {
+        return Err(invalid_metadata());
+    }
+    let offset_table =
+        usize::try_from(binary_u64(&trailer[24..32])).map_err(|_| invalid_metadata())?;
+    let table_bytes = objects
+        .checked_mul(offset_width)
+        .ok_or_else(invalid_metadata)?;
+    if offset_table < 8
+        || offset_table
+            .checked_add(table_bytes)
+            .filter(|end| *end <= trailer_offset)
+            .is_none()
+    {
+        return Err(invalid_metadata());
+    }
+    for index in 0..objects {
+        let begin = offset_table
+            .checked_add(
+                index
+                    .checked_mul(offset_width)
+                    .ok_or_else(invalid_metadata)?,
+            )
+            .ok_or_else(invalid_metadata)?;
+        let end = begin
+            .checked_add(offset_width)
+            .ok_or_else(invalid_metadata)?;
+        let offset = usize::try_from(binary_uint(
+            data.get(begin..end).ok_or_else(invalid_metadata)?,
+        ))
+        .map_err(|_| invalid_metadata())?;
+        if offset < 8 || offset >= offset_table {
+            return Err(invalid_metadata());
+        }
+        let marker = *data.get(offset).ok_or_else(invalid_metadata)?;
+        let marker_kind = marker >> 4;
+        if matches!(marker_kind, 0x4 | 0x5 | 0x6 | 0xa | 0xc | 0xd) {
+            let (count, payload_offset) = binary_object_count(data, offset, marker)?;
+            if matches!(marker_kind, 0x4..=0x6) {
+                let scalar_bytes = if marker_kind == 0x6 {
+                    count.checked_mul(2).ok_or_else(invalid_metadata)?
+                } else {
+                    count
+                };
+                if scalar_bytes > MAX_METADATA_SCALAR_BYTES {
+                    return Err(metadata_limit(
+                        SemanticLimitKind::TextBytes,
+                        scalar_bytes,
+                        MAX_METADATA_SCALAR_BYTES,
+                    ));
+                }
+                if payload_offset
+                    .checked_add(scalar_bytes)
+                    .filter(|end| *end <= offset_table)
+                    .is_none()
+                {
+                    return Err(invalid_metadata());
+                }
+                continue;
+            }
+            if count > MAX_METADATA_EVENTS {
+                return Err(metadata_limit(
+                    SemanticLimitKind::Objects,
+                    count,
+                    MAX_METADATA_EVENTS,
+                ));
+            }
+            let multiplier = if marker_kind == 0xd { 2 } else { 1 };
+            let reference_bytes = count
+                .checked_mul(multiplier)
+                .and_then(|value| value.checked_mul(reference_width))
+                .ok_or_else(invalid_metadata)?;
+            if payload_offset
+                .checked_add(reference_bytes)
+                .filter(|end| *end <= offset_table)
+                .is_none()
+            {
+                return Err(invalid_metadata());
+            }
+        }
+    }
+    Ok(())
+}
+
+fn binary_object_count(data: &[u8], offset: usize, marker: u8) -> Result<(usize, usize)> {
+    let inline = usize::from(marker & 0x0f);
+    if inline < 15 {
+        return Ok((inline, offset.saturating_add(1)));
+    }
+    let size_marker_offset = offset.checked_add(1).ok_or_else(invalid_metadata)?;
+    let size_marker = *data.get(size_marker_offset).ok_or_else(invalid_metadata)?;
+    if size_marker >> 4 != 1 || size_marker & 0x0f > 3 {
+        return Err(invalid_metadata());
+    }
+    let width = 1usize << (size_marker & 0x0f);
+    let begin = size_marker_offset
+        .checked_add(1)
+        .ok_or_else(invalid_metadata)?;
+    let end = begin.checked_add(width).ok_or_else(invalid_metadata)?;
+    let count = usize::try_from(binary_uint(
+        data.get(begin..end).ok_or_else(invalid_metadata)?,
+    ))
+    .map_err(|_| invalid_metadata())?;
+    Ok((count, end))
+}
+
+fn binary_uint(bytes: &[u8]) -> u64 {
+    bytes
+        .iter()
+        .fold(0u64, |value, byte| (value << 8) | u64::from(*byte))
+}
+
+fn binary_u64(bytes: &[u8]) -> u64 {
+    let mut fixed = [0u8; 8];
+    fixed.copy_from_slice(bytes);
+    u64::from_be_bytes(fixed)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum BuildHistoryKey {
+    Version,
+    Build,
+    Ignored,
+}
+
+fn property_key(value: &str) -> PropertyKey {
+    match value {
+        "Title" => PropertyKey::Title,
+        "Author" => PropertyKey::Author,
+        "Keywords" => PropertyKey::Keywords,
+        "Comments" => PropertyKey::Comments,
+        "kDocumentTitleKey" => PropertyKey::DocumentTitle,
+        "kDocumentAuthorKey" => PropertyKey::DocumentAuthor,
+        "kSFWPAuthorPropertyKey" => PropertyKey::SfwpAuthor,
+        "revision" => PropertyKey::Revision,
+        "buildVersion" => PropertyKey::BuildVersion,
+        "fileFormatVersion" => PropertyKey::FileFormatVersion,
+        _ => PropertyKey::Ignored,
+    }
+}
+
+fn assign_property(
+    result: &mut PropertiesDiagnostic,
+    key: PropertyKey,
+    value: String,
+) -> Result<()> {
+    let slot = match key {
+        PropertyKey::Title => &mut result.title,
+        PropertyKey::Author => &mut result.author,
+        PropertyKey::Keywords => &mut result.keywords,
+        PropertyKey::Comments => &mut result.comments,
+        PropertyKey::DocumentTitle => &mut result.document_title,
+        PropertyKey::DocumentAuthor => &mut result.document_author,
+        PropertyKey::SfwpAuthor => &mut result.sfwp_author,
+        PropertyKey::Revision => &mut result.revision,
+        PropertyKey::BuildVersion => &mut result.build_version,
+        PropertyKey::FileFormatVersion => &mut result.file_format_version,
+        PropertyKey::Ignored => return Ok(()),
+    };
+    if slot.replace(value).is_some() {
+        return Err(invalid_metadata());
+    }
+    Ok(())
+}
+
+fn metadata_scalar(event: PlistEvent<'static>) -> Result<String> {
+    let value = match event {
+        PlistEvent::String(value) => value.into_owned(),
+        PlistEvent::Integer(value) => value.to_string(),
+        PlistEvent::Real(value) if value.is_finite() => ryu::Buffer::new().format(value).to_owned(),
+        PlistEvent::Boolean(value) => value.to_string(),
+        PlistEvent::Date(value) => value.to_xml_format(),
+        _ => return Err(invalid_metadata()),
+    };
+    checked_metadata_string(value)
+}
+
+fn checked_metadata_string(value: String) -> Result<String> {
+    if value.len() > MAX_METADATA_SCALAR_BYTES {
+        return Err(metadata_limit(
+            SemanticLimitKind::TextBytes,
+            value.len(),
+            MAX_METADATA_SCALAR_BYTES,
+        ));
+    }
+    Ok(value)
+}
+
+fn check_metadata_event_scalar(event: &PlistEvent<'_>) -> Result<()> {
+    let observed = match event {
+        PlistEvent::String(value) => value.len(),
+        PlistEvent::Data(value) => value.len(),
+        _ => return Ok(()),
+    };
+    if observed > MAX_METADATA_SCALAR_BYTES {
+        return Err(metadata_limit(
+            SemanticLimitKind::TextBytes,
+            observed,
+            MAX_METADATA_SCALAR_BYTES,
+        ));
+    }
+    Ok(())
+}
+
+fn invalid_metadata() -> Error {
+    Error::InvalidFormat("invalid Numbers metadata diagnostic".to_owned())
+}
+
+fn metadata_limit(kind: SemanticLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::SemanticLimit {
+        kind,
+        observed,
+        maximum,
+        path: SemanticPath::Package,
+    }
+}
+
+fn compatibility_tables_from_components(
+    components: &Components,
+    archive_limits: Limits,
+    semantic: SemanticLimits,
+) -> Result<Vec<crate::Table>> {
+    validate_numbers_application(components, archive_limits)?;
+    let index = Index::from_components(components, semantic.max_objects())?;
+    project_compatibility_tables(components, &index, semantic)
+}
+
+fn validate_numbers_application(components: &Components, archive_limits: Limits) -> Result<()> {
+    let root = components
+        .get_archive("Index/Document.iwa")
+        .and_then(|archive| archive.object(1))
+        .ok_or_else(|| {
+            Error::InvalidFormat("package has no canonical iWork document root".to_owned())
+        })?;
+    let canonical_message = unique_message(
+        &root.messages,
+        DOCUMENT_MESSAGE_TYPE,
+        SemanticPath::Document,
+        "document",
+    )?;
+    let Some(canonical) = canonical_message else {
+        let mut foreign = 0usize;
+        let mut detected = None;
+        for message in &root.messages {
+            if let Some(format @ (Format::Pages | Format::Keynote)) =
+                litchi_iwa_detect::__classify_application_payload(&message.data)?
+            {
+                foreign = foreign.saturating_add(1);
+                detected = Some(format);
+            }
+        }
+        if let (1, Some(format)) = (foreign, detected) {
+            return Err(Error::UnexpectedFormat {
+                detected: crate::workbook::detected_format(format),
+            });
+        }
+        return Err(Error::InvalidFormat(
+            "iWork document root has no canonical Numbers payload".to_owned(),
+        ));
+    };
+    preflight_application_payload(&canonical.data, archive_limits)?;
+    let application = litchi_iwa_detect::__classify_application_payload(&canonical.data)?
+        .ok_or_else(|| {
+            Error::InvalidFormat(
+                "canonical iWork document payload has no unambiguous application shape".to_owned(),
+            )
+        })?;
+    match application {
+        Format::Numbers => Ok(()),
+        format @ (Format::Pages | Format::Keynote) => Err(Error::UnexpectedFormat {
+            detected: crate::workbook::detected_format(format),
+        }),
+    }
+}
+
+fn preflight_application_payload(payload: &[u8], archive_limits: Limits) -> Result<()> {
+    let source_ceiling = payload.len().min(archive_limits.max_iwa_stream_bytes());
+    let input_bytes = source_ceiling
+        .saturating_mul(3)
+        .clamp(1, WireLimits::MAX_INPUT_BYTES);
+    let fields = source_ceiling
+        .saturating_mul(2)
+        .clamp(1, WireLimits::default().max_fields());
+    let wire_limits = WireLimits::default()
+        .with_input_bytes(input_bytes)?
+        .with_fields(fields)?;
+    preflight_wire_tree(payload, wire_limits, |visit| {
+        let field = visit.field().number();
+        let descend = match visit.path() {
+            [] => matches!(field, 2 | 3 | 4 | 5 | 6 | 8 | 15) && visit.field().wire_type() == 2,
+            [3 | 8 | 15] => field == 1 && visit.field().wire_type() == 2,
+            _ => false,
+        };
+        Ok(if descend {
+            WireDescent::Descend
+        } else {
+            WireDescent::Skip
+        })
+    })?;
+    Ok(())
+}
+
+fn project_compatibility_tables(
+    components: &Components,
+    index: &Index,
+    limits: SemanticLimits,
+) -> Result<Vec<crate::Table>> {
+    if !TableDataExtractor::has_table_models(index) {
+        return Ok(Vec::new());
+    }
+    TableDataExtractor::new(components, index, limits)
+        .extract_all_semantic_tables(limits.max_tables())
+}
+
+fn checked_charge(
+    current: usize,
+    amount: usize,
+    maximum: usize,
+    kind: SemanticLimitKind,
+    path: SemanticPath,
+) -> Result<usize> {
+    let observed = current.checked_add(amount).ok_or(Error::SemanticLimit {
+        kind,
+        observed: usize::MAX,
+        maximum,
+        path,
+    })?;
+    if observed > maximum {
+        return Err(Error::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            path,
+        });
+    }
+    Ok(observed)
+}
+
+fn unique_message<'a>(
+    messages: &'a [RawMessage],
+    message_type: u32,
+    path: SemanticPath,
+    label: &str,
+) -> Result<Option<&'a RawMessage>> {
+    let mut matches = messages
+        .iter()
+        .filter(|message| message.type_ == message_type);
+    let Some(message) = matches.next() else {
+        return Ok(None);
+    };
+    if matches.next().is_some() {
+        return Err(Error::InvalidFormat(format!(
+            "Numbers {path} contains duplicate {label} payloads"
+        )));
+    }
+    Ok(Some(message))
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SheetProjection {
+    pub(super) name: String,
+    pub(super) drawable_infos: Vec<DrawableProjection>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct DrawableProjection {
+    pub(super) identifier: u64,
+}
+
+fn sheet_projection(messages: &[RawMessage], path: SemanticPath) -> Result<SheetProjection> {
+    let (message_type, payload) = sheet_payload(messages, path)?;
+    let consumed_references = 0;
+    let (name, identifiers) = names::preflight_sheet_payload(
+        message_type,
+        payload,
+        SemanticLimits::default().max_references(),
+    )
+    .map_err(|error| map_sheet_preflight_error(error, path, consumed_references))?;
+    let mut drawable_infos = Vec::new();
+    drawable_infos
+        .try_reserve_exact(identifiers.len())
+        .map_err(|_error| {
+            allocation_error("Numbers sheet drawable projection", identifiers.len())
+        })?;
+    for identifier in identifiers {
+        drawable_infos.push(DrawableProjection { identifier });
+    }
+    Ok(SheetProjection {
+        name: try_owned_text(name, "Numbers sheet name")?,
+        drawable_infos,
+    })
+}
+
+fn sheet_payload(messages: &[RawMessage], path: SemanticPath) -> Result<(u32, &[u8])> {
+    let sheet = unique_message(messages, SHEET_MESSAGE_TYPE, path, "sheet")?;
+    let form = unique_message(
+        messages,
+        FORM_BASED_SHEET_MESSAGE_TYPE,
+        path,
+        "form-based sheet",
+    )?;
+    match (sheet, form) {
+        (Some(_), Some(_)) => Err(Error::InvalidFormat(format!(
+            "Numbers {path} has ambiguous sheet payload ownership"
+        ))),
+        (Some(message), None) => Ok((message.type_, message.data.as_slice())),
+        (None, Some(message)) => Ok((message.type_, message.data.as_slice())),
+        (None, None) => Err(Error::InvalidFormat(format!(
+            "Numbers {path} has no canonical sheet payload"
+        ))),
+    }
+}
+
+fn map_sheet_preflight_error(
+    error: names::Error,
+    path: SemanticPath,
+    consumed_references: usize,
+) -> Error {
+    match error {
+        names::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::SemanticLimit {
+            kind: match kind {
+                names::LimitKind::PayloadReferences => SemanticLimitKind::References,
+                names::LimitKind::WireBytes => SemanticLimitKind::FormulaCategoryBytes,
+                names::LimitKind::WireFields => SemanticLimitKind::Objects,
+                names::LimitKind::WireNesting => SemanticLimitKind::FormulaDepth,
+                names::LimitKind::WireWork => SemanticLimitKind::FormulaWork,
+                _ => return Error::MalformedPayload { path },
+            },
+            observed: usize::try_from(observed)
+                .unwrap_or(usize::MAX)
+                .saturating_add(if matches!(kind, names::LimitKind::PayloadReferences) {
+                    consumed_references
+                } else {
+                    0
+                }),
+            maximum: usize::try_from(maximum)
+                .unwrap_or(usize::MAX)
+                .saturating_add(if matches!(kind, names::LimitKind::PayloadReferences) {
+                    consumed_references
+                } else {
+                    0
+                }),
+            path,
+        },
+        names::Error::Allocation { amount } => {
+            allocation_error("Numbers rooted drawable reference projection", amount)
+        },
+        _ => Error::MalformedPayload { path },
+    }
+}
+
+fn allocation_error(resource: &'static str, amount: usize) -> Error {
+    Error::Common(litchi_iwa_common::Error::Allocation { resource, amount })
+}
+
+fn try_owned_text(source: &str, resource: &'static str) -> Result<String> {
+    let mut text = String::new();
+    text.try_reserve_exact(source.len())
+        .map_err(|_error| allocation_error(resource, source.len()))?;
+    text.push_str(source);
+    Ok(text)
+}
+
+fn read_source(path: &Path, limits: Limits) -> Result<Vec<u8>> {
+    let mut open_options = FsOpenOptions::new();
+    open_options.read(true);
+    #[cfg(unix)]
+    {
+        use std::os::unix::fs::OpenOptionsExt;
+        open_options.custom_flags(libc::O_NONBLOCK);
+    }
+    let mut file = open_options.open(path)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(Error::InvalidFormat(
+            "Numbers package source is not a regular file".to_owned(),
+        ));
+    }
+    let reported_length = metadata.len();
+    let bytes = read_source_with_reported_length(&mut file, reported_length, limits)?;
+    ensure_source_unchanged(&metadata, &file.metadata()?)?;
+    Ok(bytes)
+}
+
+fn ensure_source_unchanged(before: &Metadata, after: &Metadata) -> Result<()> {
+    let modified = matches!(
+        (before.modified(), after.modified()),
+        (Ok(before_modified), Ok(after_modified)) if before_modified != after_modified
+    );
+    if before.len() != after.len() || modified {
+        return Err(Error::InvalidFormat(
+            "Numbers package source changed while it was being read".to_owned(),
+        ));
+    }
+    Ok(())
+}
+
+fn read_source_with_reported_length(
+    reader: &mut impl Read,
+    reported_length: u64,
+    limits: Limits,
+) -> Result<Vec<u8>> {
+    if reported_length > limits.max_input_bytes() {
+        return Err(input_too_large(reported_length, limits));
+    }
+
+    let maximum = usize::try_from(limits.max_input_bytes()).map_err(|_error| {
+        Error::InvalidFormat("Numbers input ceiling does not fit usize".to_owned())
+    })?;
+    let reported_capacity = usize::try_from(reported_length).map_err(|_error| {
+        Error::InvalidFormat("Numbers input length does not fit usize".to_owned())
+    })?;
+    // File metadata is advisory: a sparse or concurrently truncated source
+    // must not force one allocation proportional to its reported logical size.
+    let capacity = reported_capacity.min(64 * 1024);
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(capacity)
+        .map_err(|_error| allocation_error("Numbers package input", capacity))?;
+    loop {
+        let remaining = maximum
+            .checked_sub(bytes.len())
+            .ok_or_else(|| Error::InvalidFormat("Numbers input length exceeds usize".to_owned()))?;
+        if remaining == 0 {
+            let mut extra = [0u8; 1];
+            if reader.read(&mut extra)? != 0 {
+                return Err(input_too_large(
+                    limits.max_input_bytes().saturating_add(1),
+                    limits,
+                ));
+            }
+            break;
+        }
+
+        if bytes.len() == bytes.capacity() {
+            // Probe EOF before growing beyond the descriptor's advisory
+            // length. If one byte exists, retain it and grow geometrically.
+            let mut extra = [0u8; 1];
+            if reader.read(&mut extra)? == 0 {
+                break;
+            }
+            let growth = bytes.capacity().max(8 * 1024).min(remaining);
+            let target = bytes.len().checked_add(growth).ok_or_else(|| {
+                Error::InvalidFormat("Numbers input length exceeds usize".to_owned())
+            })?;
+            reserve_source_growth(&mut bytes, target, maximum)?;
+            bytes.push(extra[0]);
+            continue;
+        }
+
+        let writable = bytes.capacity().saturating_sub(bytes.len()).min(remaining);
+        let read_limit = u64::try_from(writable).map_err(|_error| {
+            Error::InvalidFormat("Numbers input read size does not fit u64".to_owned())
+        })?;
+        // The standard `read_to_end` implementation fills `Vec` spare capacity
+        // directly. Limiting it to the already-reserved region avoids both a
+        // zero-fill pass and an infallible growth step.
+        let read = reader.by_ref().take(read_limit).read_to_end(&mut bytes)?;
+        if read < writable {
+            break;
+        }
+    }
+    Ok(bytes)
+}
+
+fn reserve_source_growth(bytes: &mut Vec<u8>, required: usize, maximum: usize) -> Result<()> {
+    if required <= bytes.capacity() {
+        return Ok(());
+    }
+    let doubled = bytes.capacity().checked_mul(2).unwrap_or(maximum);
+    let target = required.max(doubled).min(maximum);
+    let additional = target
+        .checked_sub(bytes.len())
+        .ok_or_else(|| Error::InvalidFormat("Numbers input length exceeds usize".to_owned()))?;
+    bytes
+        .try_reserve_exact(additional)
+        .map_err(|_error| allocation_error("Numbers package input", target))
+}
+
+const fn input_too_large(observed: u64, limits: Limits) -> Error {
+    Error::InputTooLarge {
+        observed,
+        maximum: limits.max_input_bytes(),
+    }
+}
+
+#[cfg(test)]
+#[allow(deprecated)]
+mod tests {
+    use super::*;
+    use litchi_iwa_common::{decode_varint_from_bytes, encode_varint_into};
+    use litchi_iwa_core::{ArchiveObject, RawMessage, SnappyStream};
+    use litchi_iwa_protos::{kn, tn, tp, tsa, tsce, tsk, tst};
+    use prost::Message;
+    use std::io::Write;
+
+    #[test]
+    fn write_to_accepts_a_dynamically_dispatched_sink() -> Result<()> {
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let package = Package::from_bytes(&bytes)?;
+        let mut written = Vec::new();
+        let sink: &mut dyn Write = &mut written;
+
+        package
+            .write_to(sink)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+
+        assert_eq!(written, bytes);
+        Ok(())
+    }
+
+    #[test]
+    fn shared_source_handoff_preserves_the_input_allocation() -> Result<()> {
+        let source: Arc<[u8]> = package_bytes(&tn::DocumentArchive::default())?.into();
+        let source_pointer = source.as_ptr();
+        let package =
+            Package::from_shared_bytes_with_options(Arc::clone(&source), OpenOptions::new())?;
+        assert_eq!(package.state.source.as_ref().as_ptr(), source_pointer);
+        assert_eq!(package.state.source.as_ref().len(), source.len());
+        Ok(())
+    }
+
+    #[test]
+    fn write_to_reports_progress_and_handles_adversarial_sinks() -> Result<()> {
+        struct FailingWriter {
+            remaining: usize,
+            output: Vec<u8>,
+            flushes: usize,
+        }
+
+        impl Write for FailingWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if self.remaining == 0 {
+                    return Err(io::Error::other("authored secret"));
+                }
+                let amount = bytes.len().min(self.remaining);
+                self.output.extend_from_slice(&bytes[..amount]);
+                self.remaining -= amount;
+                Ok(amount)
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+
+        struct InterruptedWriter {
+            interrupted: bool,
+            output: Vec<u8>,
+            flushes: usize,
+        }
+
+        impl Write for InterruptedWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                if !self.interrupted {
+                    self.interrupted = true;
+                    return Err(io::Error::from(io::ErrorKind::Interrupted));
+                }
+                self.output.extend_from_slice(bytes);
+                Ok(bytes.len())
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                self.flushes += 1;
+                Ok(())
+            }
+        }
+
+        struct ZeroWriter;
+
+        impl Write for ZeroWriter {
+            fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+                Ok(0)
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        struct OverReportingWriter;
+
+        impl Write for OverReportingWriter {
+            fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+                Ok(bytes.len().saturating_add(1))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let package = Package::from_bytes(&bytes)?;
+
+        let mut failing = FailingWriter {
+            remaining: 7,
+            output: Vec::new(),
+            flushes: 0,
+        };
+        let error = package.write_to(&mut failing).unwrap_err();
+        assert_eq!(error.bytes_written(), 7);
+        assert_eq!(error.io_error().kind(), io::ErrorKind::Other);
+        assert_eq!(failing.output, bytes[..7]);
+        assert_eq!(failing.flushes, 0);
+        assert!(!format!("{error:?}").contains("authored secret"));
+        assert!(!error.to_string().contains("authored secret"));
+
+        let mut interrupted = InterruptedWriter {
+            interrupted: false,
+            output: Vec::new(),
+            flushes: 0,
+        };
+        package
+            .write_to(&mut interrupted)
+            .map_err(|error| Error::Io(error.into_io_error()))?;
+        assert!(interrupted.interrupted);
+        assert_eq!(interrupted.output, bytes);
+        assert_eq!(interrupted.flushes, 0);
+
+        let zero_error = package.write_to(&mut ZeroWriter).unwrap_err();
+        assert_eq!(zero_error.bytes_written(), 0);
+        assert_eq!(zero_error.io_error().kind(), io::ErrorKind::WriteZero);
+
+        let over_report_error = package.write_to(&mut OverReportingWriter).unwrap_err();
+        assert_eq!(over_report_error.bytes_written(), 0);
+        assert_eq!(
+            over_report_error.io_error().kind(),
+            io::ErrorKind::InvalidData
+        );
+
+        Ok(())
+    }
+
+    #[test]
+    fn common_limits_normalize_to_every_numbers_payload_resource() {
+        let kinds = [
+            (
+                litchi_iwa_common::LimitKind::InputBytes,
+                PayloadLimitKind::InputBytes,
+            ),
+            (
+                litchi_iwa_common::LimitKind::Fields,
+                PayloadLimitKind::Fields,
+            ),
+            (
+                litchi_iwa_common::LimitKind::OutputBytes,
+                PayloadLimitKind::OutputBytes,
+            ),
+            (
+                litchi_iwa_common::LimitKind::Nesting,
+                PayloadLimitKind::Nesting,
+            ),
+            (
+                litchi_iwa_common::LimitKind::RewriteWork,
+                PayloadLimitKind::RewriteWork,
+            ),
+            (
+                litchi_iwa_common::LimitKind::TableRows,
+                PayloadLimitKind::TableRows,
+            ),
+            (
+                litchi_iwa_common::LimitKind::TableColumns,
+                PayloadLimitKind::TableColumns,
+            ),
+            (
+                litchi_iwa_common::LimitKind::TableCells,
+                PayloadLimitKind::TableCells,
+            ),
+            (
+                litchi_iwa_common::LimitKind::MaterializedCells,
+                PayloadLimitKind::MaterializedCells,
+            ),
+        ];
+
+        for (common, normalized) in kinds {
+            let error = Error::from(litchi_iwa_common::Error::LimitExceeded {
+                kind: common,
+                observed: 9,
+                limit: 8,
+            });
+            assert_eq!(
+                error.resource_error(),
+                Some(ResourceError::Limit {
+                    kind: normalized,
+                    observed: 9,
+                    maximum: 8,
+                })
+            );
+        }
+    }
+
+    #[test]
+    fn common_allocation_normalization_preserves_amount_and_discards_label() {
+        const PRIVATE: &str = "private-path/member/authored-value";
+        let error = Error::from(litchi_iwa_common::Error::Allocation {
+            resource: PRIVATE,
+            amount: 17,
+        });
+        let normalized = error.resource_error();
+        assert_eq!(normalized, Some(ResourceError::Allocation { amount: 17 }));
+        assert!(!format!("{normalized:?}").contains(PRIVATE));
+    }
+
+    #[test]
+    fn non_resource_common_failures_do_not_acquire_resource_metadata() {
+        for error in [
+            litchi_iwa_common::Error::InvalidFormat("private".to_owned()),
+            litchi_iwa_common::Error::InvalidLimit {
+                field: "private",
+                value: 9,
+                maximum: 8,
+            },
+        ] {
+            assert_eq!(Error::from(error).resource_error(), None);
+        }
+    }
+
+    fn reference(identifier: u64) -> litchi_iwa_protos::tsp::Reference {
+        litchi_iwa_protos::tsp::Reference {
+            identifier,
+            ..Default::default()
+        }
+    }
+
+    fn shared_document() -> tsa::DocumentArchive {
+        tsa::DocumentArchive {
+            super_: tsk::DocumentArchive::default(),
+            ..Default::default()
+        }
+    }
+
+    fn package_bytes(root: &tn::DocumentArchive) -> Result<Vec<u8>> {
+        package_bytes_from_archive(Archive {
+            objects: vec![object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?],
+        })
+    }
+
+    fn package_with_two_materialized_empty_tables() -> Result<Vec<u8>> {
+        let sidecars = ArchiveObject::new(
+            20,
+            [
+                tst::table_data_list::ListType::String,
+                tst::table_data_list::ListType::Formula,
+            ]
+            .into_iter()
+            .map(|list_type| RawMessage {
+                type_: 6_005,
+                data: tst::TableDataList {
+                    list_type: list_type as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            })
+            .collect(),
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let empty_cell = crate::cell::wire::BncCell::minimal()
+            .encode(&crate::cell::wire::Limits::DEFAULT)
+            .expect("minimal BNC cell encodes under default limits");
+        let mut objects = vec![
+            object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?,
+            sidecars,
+        ];
+        for (model_id, tile_id, name) in [(10, 30, "A"), (11, 31, "B")] {
+            let model = tst::TableModelArchive {
+                table_name: name.to_owned(),
+                number_of_rows: 1,
+                number_of_columns: 1,
+                base_data_store: tst::DataStore {
+                    tiles: tst::TileStorage {
+                        tiles: vec![tst::tile_storage::Tile {
+                            tileid: 0,
+                            tile: reference(tile_id),
+                        }],
+                        tile_size: Some(256),
+                        ..Default::default()
+                    },
+                    string_table: reference(20),
+                    formula_table: reference(20),
+                    ..Default::default()
+                },
+                ..Default::default()
+            };
+            let tile = tst::Tile {
+                numrows: 1,
+                row_infos: vec![tst::TileRowInfo {
+                    tile_row_index: 0,
+                    cell_count: 1,
+                    storage_version: Some(5),
+                    cell_storage_buffer: Some(empty_cell.clone()),
+                    cell_offsets: Some(vec![0, 0]),
+                    ..Default::default()
+                }],
+                ..Default::default()
+            };
+            objects.push(object(
+                model_id,
+                TABLE_MODEL_MESSAGE_TYPE,
+                model.encode_to_vec(),
+            )?);
+            objects.push(object(tile_id, 6_002, tile.encode_to_vec())?);
+        }
+        package_bytes_from_archive(Archive { objects })
+    }
+
+    fn rooted_two_table_package(
+        second_model_id: u64,
+        second_model_payload: Vec<u8>,
+    ) -> Result<Vec<u8>> {
+        let sidecars = ArchiveObject::new(
+            7,
+            [
+                tst::table_data_list::ListType::String,
+                tst::table_data_list::ListType::Formula,
+            ]
+            .into_iter()
+            .map(|list_type| RawMessage {
+                type_: 6_005,
+                data: tst::TableDataList {
+                    list_type: list_type as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            })
+            .collect(),
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let first_model = tst::TableModelArchive {
+            table_name: "First".to_owned(),
+            base_data_store: tst::DataStore {
+                string_table: reference(7),
+                formula_table: reference(7),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let table_info = |model_id| {
+            tst::TableInfoArchive {
+                table_model: reference(model_id),
+                ..Default::default()
+            }
+            .encode_to_vec()
+        };
+        let mut objects = vec![
+            object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                tn::DocumentArchive {
+                    sheets: vec![reference(2)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            )?,
+            object(
+                2,
+                SHEET_MESSAGE_TYPE,
+                tn::SheetArchive {
+                    name: "Admission".to_owned(),
+                    drawable_infos: vec![reference(3), reference(4)],
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            )?,
+            object(3, TABLE_INFO_MESSAGE_TYPE, table_info(5))?,
+            object(4, TABLE_INFO_MESSAGE_TYPE, table_info(second_model_id))?,
+            object(5, TABLE_MODEL_MESSAGE_TYPE, first_model.encode_to_vec())?,
+            sidecars,
+        ];
+        if second_model_id != 5 {
+            objects.push(object(
+                second_model_id,
+                TABLE_MODEL_MESSAGE_TYPE,
+                second_model_payload,
+            )?);
+        }
+        package_bytes_from_archive(Archive { objects })
+    }
+
+    fn package_with_formula_reference(table_info_data: Vec<u8>) -> Result<Vec<u8>> {
+        const OWNER_WORDS: [u32; 4] = [0x89ab_cdef, 0x0123_4567, 0x7654_3210, 0xfedc_ba98];
+        let owner_uuid = litchi_iwa_protos::tsp::Uuid {
+            lower: u64::from(OWNER_WORDS[0]) | (u64::from(OWNER_WORDS[1]) << 32),
+            upper: u64::from(OWNER_WORDS[2]) | (u64::from(OWNER_WORDS[3]) << 32),
+        };
+        let cross_table_id = litchi_iwa_protos::tsp::CfuuidArchive {
+            uuid_w0: Some(OWNER_WORDS[0]),
+            uuid_w1: Some(OWNER_WORDS[1]),
+            uuid_w2: Some(OWNER_WORDS[2]),
+            uuid_w3: Some(OWNER_WORDS[3]),
+            ..Default::default()
+        };
+        let formula = tsce::FormulaArchive {
+            ast_node_array: tsce::AstNodeArrayArchive {
+                ast_node: vec![tsce::ast_node_array_archive::AstNodeArchive {
+                    ast_node_type: tsce::ast_node_array_archive::AstNodeType::CellReferenceNode
+                        as i32,
+                    ast_column: Some(tsce::ast_node_array_archive::AstColumnCoordinateArchive {
+                        column: 0,
+                        absolute: Some(false),
+                    }),
+                    ast_row: Some(tsce::ast_node_array_archive::AstRowCoordinateArchive {
+                        row: 0,
+                        absolute: Some(false),
+                    }),
+                    ast_cross_table_reference_extra_info: Some(
+                        tsce::ast_node_array_archive::AstCrossTableReferenceExtraInfoArchive {
+                            table_id: cross_table_id,
+                            ..Default::default()
+                        },
+                    ),
+                    ..Default::default()
+                }],
+            },
+            ..Default::default()
+        };
+        let sidecars = ArchiveObject::new(
+            5,
+            [
+                tst::TableDataList {
+                    list_type: tst::table_data_list::ListType::String as i32,
+                    next_list_id: 1,
+                    ..Default::default()
+                },
+                tst::TableDataList {
+                    list_type: tst::table_data_list::ListType::Formula as i32,
+                    next_list_id: 2,
+                    entries: vec![tst::table_data_list::ListEntry {
+                        key: 1,
+                        refcount: 1,
+                        formula: Some(formula),
+                        ..Default::default()
+                    }],
+                    ..Default::default()
+                },
+            ]
+            .into_iter()
+            .map(|list| RawMessage {
+                type_: 6_005,
+                data: list.encode_to_vec(),
+            })
+            .collect(),
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let mut formula_cell = crate::cell::wire::BncCell::minimal();
+        formula_cell.set_formula_reference(1);
+        let model = tst::TableModelArchive {
+            table_name: "Table".to_owned(),
+            number_of_rows: 1,
+            number_of_columns: 1,
+            base_data_store: tst::DataStore {
+                tiles: tst::TileStorage {
+                    tiles: vec![tst::tile_storage::Tile {
+                        tileid: 0,
+                        tile: reference(6),
+                    }],
+                    tile_size: Some(256),
+                    ..Default::default()
+                },
+                string_table: reference(5),
+                formula_table: reference(5),
+                ..Default::default()
+            },
+            ..Default::default()
+        };
+        let tile = tst::Tile {
+            numrows: 1,
+            row_infos: vec![tst::TileRowInfo {
+                tile_row_index: 0,
+                cell_count: 1,
+                storage_version: Some(5),
+                cell_storage_buffer: Some(
+                    formula_cell
+                        .encode(&crate::cell::wire::Limits::DEFAULT)
+                        .expect("formula BNC cell encodes under default limits"),
+                ),
+                cell_offsets: Some(vec![0, 0]),
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let formula_owner = tsce::FormulaOwnerDependenciesArchive {
+            formula_owner_uid: owner_uuid,
+            internal_formula_owner_id: 1,
+            formula_owner: Some(reference(3)),
+            ..Default::default()
+        };
+
+        package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive {
+                        sheets: vec![reference(2)],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )?,
+                object(
+                    2,
+                    SHEET_MESSAGE_TYPE,
+                    tn::SheetArchive {
+                        name: "Sheet".to_owned(),
+                        drawable_infos: vec![reference(3)],
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )?,
+                object(3, TABLE_INFO_MESSAGE_TYPE, table_info_data)?,
+                object(4, TABLE_MODEL_MESSAGE_TYPE, model.encode_to_vec())?,
+                sidecars,
+                object(6, 6_002, tile.encode_to_vec())?,
+                object(7, 4_008, formula_owner.encode_to_vec())?,
+            ],
+        })
+    }
+
+    fn package_bytes_from_archive(archive: Archive) -> Result<Vec<u8>> {
+        package_bytes_from_archives([("Index/Document.iwa", archive)])
+    }
+
+    fn package_bytes_from_archives(
+        archives: impl IntoIterator<Item = (&'static str, Archive)>,
+    ) -> Result<Vec<u8>> {
+        let mut entries = Vec::new();
+        for (name, archive) in archives {
+            let iwa = SnappyStream::compress(
+                &archive
+                    .to_bytes(Default::default())
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                Default::default(),
+            )
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            entries.push((name, iwa));
+        }
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().map(|(name, data)| (*name, data.as_slice())),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn exact_cross_component_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Aliased".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        package_bytes_from_archives([
+            (
+                "Index/Document.iwa",
+                Archive {
+                    objects: vec![root],
+                },
+            ),
+            (
+                "Index/Sheet.iwa",
+                Archive {
+                    objects: vec![sheet.clone()],
+                },
+            ),
+            (
+                "Index/Alias.iwa",
+                Archive {
+                    objects: vec![sheet],
+                },
+            ),
+        ])
+    }
+
+    fn exact_alias_with_unaliased_sheet_package_bytes() -> Result<Vec<u8>> {
+        let mut root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2), reference(3)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        root.archive_info.message_infos[0].object_references = vec![2, 3];
+        let aliased_sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Aliased".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let unaliased_sheet = object(
+            3,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Unaliased".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let metadata = object(
+            100,
+            11_006,
+            litchi_iwa_protos::tsp::PackageMetadata {
+                last_object_identifier: 100,
+                components: [
+                    (10, "Document"),
+                    (11, "Sheet"),
+                    (12, "Alias"),
+                    (13, "Other"),
+                ]
+                .into_iter()
+                .map(
+                    |(identifier, locator)| litchi_iwa_protos::tsp::ComponentInfo {
+                        identifier,
+                        preferred_locator: locator.to_owned(),
+                        save_token: Some(1),
+                        ..Default::default()
+                    },
+                )
+                .collect(),
+                save_token: Some(1),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        package_bytes_from_archives([
+            (
+                "Index/Document.iwa",
+                Archive {
+                    objects: vec![root],
+                },
+            ),
+            (
+                "Index/Sheet.iwa",
+                Archive {
+                    objects: vec![aliased_sheet.clone()],
+                },
+            ),
+            (
+                "Index/Alias.iwa",
+                Archive {
+                    objects: vec![aliased_sheet],
+                },
+            ),
+            (
+                "Index/Other.iwa",
+                Archive {
+                    objects: vec![unaliased_sheet],
+                },
+            ),
+            (
+                "Index/Metadata.iwa",
+                Archive {
+                    objects: vec![metadata],
+                },
+            ),
+        ])
+    }
+
+    fn divergent_cross_component_alias_package_bytes(reverse: bool) -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let first = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "First".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let second = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Second".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let mut archives = vec![(
+            "Index/Document.iwa",
+            Archive {
+                objects: vec![root],
+            },
+        )];
+        if reverse {
+            archives.extend([
+                (
+                    "Index/Second.iwa",
+                    Archive {
+                        objects: vec![second],
+                    },
+                ),
+                (
+                    "Index/First.iwa",
+                    Archive {
+                        objects: vec![first],
+                    },
+                ),
+            ]);
+        } else {
+            archives.extend([
+                (
+                    "Index/First.iwa",
+                    Archive {
+                        objects: vec![first],
+                    },
+                ),
+                (
+                    "Index/Second.iwa",
+                    Archive {
+                        objects: vec![second],
+                    },
+                ),
+            ]);
+        }
+        package_bytes_from_archives(archives)
+    }
+
+    fn same_component_duplicate_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Duplicated".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let mut decompressed = Archive {
+            objects: vec![root, sheet.clone()],
+        }
+        .to_bytes(Default::default())
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let duplicate = Archive {
+            objects: vec![sheet],
+        }
+        .to_bytes(Default::default())
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        decompressed.extend_from_slice(&duplicate);
+        let iwa = SnappyStream::compress(&decompressed, Default::default())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        litchi_iwa_archive::package::to_bytes(
+            [("Index/Document.iwa", iwa.as_slice())]
+                .iter()
+                .map(|(name, data)| (*name, *data)),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn mixed_cross_and_same_component_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = object(
+            1,
+            DOCUMENT_MESSAGE_TYPE,
+            tn::DocumentArchive {
+                sheets: vec![reference(2)],
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Duplicated".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let mut duplicate_component = Archive {
+            objects: vec![sheet.clone()],
+        }
+        .to_bytes(Default::default())
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        duplicate_component.extend_from_slice(
+            &Archive {
+                objects: vec![sheet.clone()],
+            }
+            .to_bytes(Default::default())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+        );
+        let entries = [
+            (
+                "Index/Alias.iwa",
+                SnappyStream::compress(
+                    &Archive {
+                        objects: vec![sheet],
+                    }
+                    .to_bytes(Default::default())
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                    Default::default(),
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            ),
+            (
+                "Index/Document.iwa",
+                SnappyStream::compress(
+                    &Archive {
+                        objects: vec![root],
+                    }
+                    .to_bytes(Default::default())
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+                    Default::default(),
+                )
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            ),
+            (
+                "Index/Sheet.iwa",
+                SnappyStream::compress(&duplicate_component, Default::default())
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            ),
+        ];
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().map(|(name, data)| (*name, data.as_slice())),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn raw_header_alias_package_bytes() -> Result<Vec<u8>> {
+        let root = Archive {
+            objects: vec![object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?],
+        }
+        .to_bytes(Default::default())
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let sheet = object(
+            2,
+            SHEET_MESSAGE_TYPE,
+            tn::SheetArchive {
+                name: "Raw alias".to_owned(),
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        let canonical = Archive {
+            objects: vec![sheet],
+        }
+        .to_bytes(Default::default())
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let (header_length, prefix_length) = decode_varint_from_bytes(&canonical)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let header_length = usize::try_from(header_length)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let header_end = prefix_length
+            .checked_add(header_length)
+            .ok_or_else(|| Error::InvalidFormat("archive header range overflow".to_owned()))?;
+        let header = canonical
+            .get(prefix_length..header_end)
+            .ok_or_else(|| Error::InvalidFormat("archive header is truncated".to_owned()))?;
+        let payload = canonical
+            .get(header_end..)
+            .ok_or_else(|| Error::InvalidFormat("archive payload is truncated".to_owned()))?;
+
+        let mut raw_alias = Vec::new();
+        let mut raw_header = header.to_vec();
+        // ArchiveInfo field 100 is intentionally unknown to the generated
+        // owner. Its retained raw framing makes this alias divergent from
+        // the canonical object even though decoded fields are identical.
+        raw_header.extend_from_slice(&[0xa0, 0x06, 0x01]);
+        encode_varint_into(
+            &mut raw_alias,
+            u64::try_from(raw_header.len())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+        );
+        raw_alias.extend_from_slice(&raw_header);
+        raw_alias.extend_from_slice(payload);
+
+        let compressed_root = SnappyStream::compress(&root, Default::default())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let compressed_canonical = SnappyStream::compress(&canonical, Default::default())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let compressed_alias = SnappyStream::compress(&raw_alias, Default::default())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let entries = [
+            ("Index/Document.iwa", compressed_root),
+            ("Index/Canonical.iwa", compressed_canonical),
+            ("Index/RawAlias.iwa", compressed_alias),
+        ];
+        litchi_iwa_archive::package::to_bytes(
+            entries.iter().map(|(name, data)| (*name, data.as_slice())),
+            Limits::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    fn object(identifier: u64, message_type: u32, data: Vec<u8>) -> Result<ArchiveObject> {
+        ArchiveObject::new(
+            identifier,
+            vec![RawMessage {
+                type_: message_type,
+                data,
+            }],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))
+    }
+
+    #[test]
+    fn parses_a_minimal_package_into_shared_empty_semantics() -> Result<()> {
+        fn assert_send_sync<T: Send + Sync>() {}
+        assert_send_sync::<Package>();
+
+        let package = Package::from_bytes(&package_bytes(&tn::DocumentArchive::default())?)?;
+        let snapshot = package.snapshot();
+
+        assert_eq!(package.state.index.object_count(), 1);
+        assert!(package.sheets().is_empty());
+        assert!(package.shared_sheets().is_empty());
+        assert!(package.workbook_ref().is_empty());
+        assert!(package.workbook().is_empty());
+        assert_eq!(package.open_options(), OpenOptions::new());
+        assert!(Arc::ptr_eq(&package.state, &snapshot.state));
+        Ok(())
+    }
+
+    #[test]
+    fn retained_physical_catalog_uses_selected_public_snappy_profile() -> Result<()> {
+        let bytes = package_bytes(&tn::DocumentArchive::default())?;
+        let source_catalog =
+            litchi_iwa_archive::package::Catalog::from_bytes(&bytes, Limits::default())?;
+        let selected_entry_bytes = source_catalog
+            .iter()
+            .map(|entry| entry.data().len())
+            .max()
+            .ok_or_else(|| Error::InvalidFormat("source has no entries".to_owned()))?;
+        let selected_entry_bytes = u64::try_from(selected_entry_bytes)
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let source_limits = crate::SourceLimits::builder()
+            .max_entry_bytes(selected_entry_bytes)
+            .and_then(|builder| builder.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let package = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().source_limits(source_limits),
+        )?;
+        let physical =
+            package.state.components.physical().ok_or_else(|| {
+                Error::InvalidFormat("package has no physical catalog".to_owned())
+            })?;
+        let physical_limits = physical.limits();
+
+        assert_eq!(
+            physical_limits.max_entry_bytes(),
+            selected_entry_bytes,
+            "the retained physical catalog must use the selected public entry ceiling"
+        );
+        assert_eq!(
+            physical_limits
+                .snappy_limits()
+                .map_err(Error::Archive)?
+                .max_compressed_stream(),
+            usize::try_from(selected_entry_bytes)
+                .map_err(|error| Error::InvalidFormat(error.to_string()))?,
+            "the retained physical catalog must derive Snappy from that same ceiling"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn direct_package_requires_unambiguous_numbers_application_ownership() -> Result<()> {
+        let mut pages = tp::DocumentArchive {
+            super_: shared_document(),
+            ..Default::default()
+        };
+        pages.floating_drawables = Some(reference(7));
+        let keynote = kn::DocumentArchive {
+            show: reference(8),
+            super_: shared_document(),
+            ..Default::default()
+        };
+        for foreign_payload in [pages.encode_to_vec(), keynote.encode_to_vec()] {
+            let bytes = package_bytes_from_archive(Archive {
+                objects: vec![object(1, DOCUMENT_MESSAGE_TYPE, foreign_payload)?],
+            })?;
+            assert!(matches!(
+                Package::from_bytes(&bytes),
+                Err(Error::UnexpectedFormat { .. })
+            ));
+            assert!(matches!(
+                compatibility_tables_from_bytes(&bytes),
+                Err(Error::UnexpectedFormat { .. })
+            ));
+        }
+
+        let native_pages = package_bytes_from_archive(Archive {
+            objects: vec![object(1, 10_000, pages.encode_to_vec())?],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&native_pages),
+            Err(Error::UnexpectedFormat { .. })
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&native_pages),
+            Err(Error::UnexpectedFormat { .. })
+        ));
+
+        let unknown = package_bytes_from_archive(Archive {
+            objects: vec![object(1, DOCUMENT_MESSAGE_TYPE, vec![0x08, 0x01])?],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&unknown),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let mut mixed_payload = tn::DocumentArchive::default().encode_to_vec();
+        mixed_payload.extend_from_slice(&pages.encode_to_vec());
+        let mixed_root = object(1, DOCUMENT_MESSAGE_TYPE, mixed_payload)?;
+        let mixed = package_bytes_from_archive(Archive {
+            objects: vec![mixed_root],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&mixed),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let unrelated_sibling = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: DOCUMENT_MESSAGE_TYPE,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: 10_000,
+                    data: pages.encode_to_vec(),
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let unrelated = package_bytes_from_archive(Archive {
+            objects: vec![unrelated_sibling],
+        })?;
+        assert!(Package::from_bytes(&unrelated).is_ok());
+
+        #[allow(deprecated, reason = "Regression for a supported native field")]
+        let numbers_with_calculation_engine = tn::DocumentArchive {
+            calculation_engine: Some(reference(7)),
+            ..Default::default()
+        };
+        let calculation_engine = package_bytes(&numbers_with_calculation_engine)?;
+        assert!(Package::from_bytes(&calculation_engine).is_ok());
+        assert!(compatibility_tables_from_bytes(&calculation_engine)?.is_empty());
+
+        let mut numbers_with_scalar_collisions = tn::DocumentArchive::default().encode_to_vec();
+        numbers_with_scalar_collisions.extend_from_slice(&[0x10, 0x01, 0x78, 0x01]);
+        let scalar_collisions = package_bytes_from_archive(Archive {
+            objects: vec![object(
+                1,
+                DOCUMENT_MESSAGE_TYPE,
+                numbers_with_scalar_collisions,
+            )?],
+        })?;
+        assert!(Package::from_bytes(&scalar_collisions).is_ok());
+
+        let noncanonical_numbers = package_bytes_from_archive(Archive {
+            objects: vec![object(
+                1,
+                TABLE_INFO_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?],
+        })?;
+        assert!(matches!(
+            compatibility_tables_from_bytes(&noncanonical_numbers),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let masked_unknown = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: DOCUMENT_MESSAGE_TYPE,
+                    data: vec![0x08, 0x01],
+                },
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let masked = package_bytes_from_archive(Archive {
+            objects: vec![masked_unknown],
+        })?;
+        assert!(matches!(
+            compatibility_tables_from_bytes(&masked),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_projection_does_not_require_rooted_sheet_construction() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![reference(2)],
+            ..Default::default()
+        };
+        let bytes = package_bytes(&root)?;
+
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(compatibility_tables_from_bytes(&bytes)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn formula_reference_enrichment_is_not_built_without_formula_tables() -> Result<()> {
+        let group = tst::group_by_archive::GroupNodeArchive {
+            child: vec![tst::group_by_archive::GroupNodeArchive::default()],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(2, 6_383, group.encode_to_vec())?,
+            ],
+        })?;
+        let semantic = SemanticLimits::builder()
+            .max_objects(2)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(1))
+            .and_then(|b| b.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
+        assert!(package.workbook_ref().is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn formula_reference_enrichment_uses_table_info_projection_and_is_best_effort() -> Result<()> {
+        let valid_table_info = tst::TableInfoArchive {
+            table_model: reference(4),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        let valid =
+            compatibility_tables_from_bytes(&package_with_formula_reference(valid_table_info)?)?;
+        assert!(matches!(
+            valid.first().and_then(|table| table.get_a1("A1").ok().flatten()),
+            Some(crate::cell::Value::Formula(formula)) if formula == "=Sheet::Table::A1"
+        ));
+
+        // Canonical field 2 still points at the model, but required field 1
+        // is absent. Formula-name discovery must ignore this malformed
+        // best-effort metadata rather than aborting the table projection.
+        let malformed_table_info = vec![0x12, 0x02, 0x08, 0x04];
+        let malformed = compatibility_tables_from_bytes(&package_with_formula_reference(
+            malformed_table_info,
+        )?)?;
+        assert!(matches!(
+            malformed
+                .first()
+                .and_then(|table| table.get_a1("A1").ok().flatten()),
+            Some(crate::cell::Value::Formula(formula)) if formula == "=Table::A1"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn compact_index_rejects_the_null_object_identifier() -> Result<()> {
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(0, 99_999, Vec::new())?,
+            ],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn legacy_primary_candidates_cannot_promote_secondary_canonical_payloads() -> Result<()> {
+        let candidate = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: 6_000,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: tst::TableModelArchive::default().encode_to_vec(),
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                candidate,
+            ],
+        })?;
+
+        assert!(compatibility_tables_from_bytes(&bytes)?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_canonical_candidate_payloads_fail_closed() -> Result<()> {
+        let candidate = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: tst::TableModelArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_MODEL_MESSAGE_TYPE,
+                    data: tst::TableModelArchive::default().encode_to_vec(),
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                candidate,
+            ],
+        })?;
+
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_legacy_candidate_payloads_fail_closed() -> Result<()> {
+        let candidate = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: tst::TableInfoArchive::default().encode_to_vec(),
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                candidate,
+            ],
+        })?;
+
+        assert!(matches!(
+            compatibility_tables_from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn path_reader_bounds_descriptor_growth_and_reported_length() -> Result<()> {
+        let defaults = Limits::default();
+        let limits = Limits::new(
+            4,
+            defaults.max_entries(),
+            defaults.max_entry_bytes(),
+            defaults.max_total_bytes(),
+            defaults.max_iwa_stream_bytes(),
+        )?;
+
+        let mut exact = io::Cursor::new([1, 2, 3, 4]);
+        assert_eq!(
+            read_source_with_reported_length(&mut exact, 4, limits)?,
+            vec![1, 2, 3, 4]
+        );
+
+        let mut grew = io::Cursor::new([1, 2, 3, 4, 5]);
+        assert!(matches!(
+            read_source_with_reported_length(&mut grew, 4, limits),
+            Err(Error::InputTooLarge {
+                observed: 5,
+                maximum: 4,
+            })
+        ));
+
+        let mut oversized = io::Cursor::new([1, 2, 3, 4, 5]);
+        assert!(matches!(
+            read_source_with_reported_length(&mut oversized, 5, limits),
+            Err(Error::InputTooLarge {
+                observed: 5,
+                maximum: 4,
+            })
+        ));
+
+        #[cfg(unix)]
+        assert!(matches!(
+            read_source(Path::new(env!("CARGO_MANIFEST_DIR")), limits),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let mut changed = tempfile::NamedTempFile::new()?;
+        changed.write_all(&[1])?;
+        changed.flush()?;
+        let before = changed.as_file().metadata()?;
+        changed.write_all(&[2])?;
+        changed.flush()?;
+        let after = changed.as_file().metadata()?;
+        assert!(matches!(
+            ensure_source_unchanged(&before, &after),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let version_before = changed.as_file().metadata()?;
+        let changed_time = version_before
+            .modified()?
+            .checked_add(std::time::Duration::from_secs(1))
+            .ok_or_else(|| Error::InvalidFormat("test timestamp overflow".to_owned()))?;
+        changed
+            .as_file()
+            .set_times(std::fs::FileTimes::new().set_modified(changed_time))?;
+        let version_after = changed.as_file().metadata()?;
+        assert_eq!(version_before.len(), version_after.len());
+        assert!(matches!(
+            ensure_source_unchanged(&version_before, &version_after),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn root_requires_one_canonical_document_payload() -> Result<()> {
+        let wrong_type = package_bytes_from_archive(Archive {
+            objects: vec![object(
+                1,
+                TABLE_INFO_MESSAGE_TYPE,
+                tn::DocumentArchive::default().encode_to_vec(),
+            )?],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&wrong_type),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let duplicate_object = ArchiveObject::new(
+            1,
+            vec![
+                RawMessage {
+                    type_: DOCUMENT_MESSAGE_TYPE,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                },
+                RawMessage {
+                    type_: DOCUMENT_MESSAGE_TYPE,
+                    data: tn::DocumentArchive::default().encode_to_vec(),
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let duplicate_bytes = package_bytes_from_archive(Archive {
+            objects: vec![duplicate_object],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&duplicate_bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes(&duplicate_bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn object_budget_is_checked_before_index_allocation() -> Result<()> {
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(2, 99_999, Vec::new())?,
+            ],
+        })?;
+        let exact = SemanticLimits::builder()
+            .max_objects(2)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let exact_options = OpenOptions::new().semantic_limits(exact);
+        let exact_package = Package::from_bytes_with_options(&bytes, exact_options)?;
+        assert_eq!(exact_package.state.index.object_count(), 2);
+        assert_eq!(exact_package.open_options(), exact_options);
+
+        let exceeded = SemanticLimits::builder()
+            .max_objects(1)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        assert!(matches!(
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(exceeded)),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                observed: 2,
+                maximum: 1,
+                path: SemanticPath::Package,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn compatibility_cell_and_text_budgets_span_all_tables() -> Result<()> {
+        let bytes = package_with_two_materialized_empty_tables()?;
+        let limits = |cells, text| {
+            SemanticLimits::default()
+                .to_builder()
+                .max_materialized_cells(cells)
+                .and_then(|b| b.max_output_text_bytes(text))
+                .and_then(|b| b.build())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))
+        };
+
+        let exact = compatibility_tables_from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().semantic_limits(limits(2, 2)?),
+        )?;
+        assert_eq!(exact.len(), 2);
+        assert_eq!(exact.iter().map(crate::Table::cell_count).sum::<usize>(), 2);
+
+        assert!(matches!(
+            compatibility_tables_from_bytes_with_options(
+                &bytes,
+                OpenOptions::new().semantic_limits(limits(1, 2)?),
+            ),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::MaterializedCells,
+                observed: 2,
+                maximum: 1,
+                ..
+            })
+        ));
+        assert!(matches!(
+            compatibility_tables_from_bytes_with_options(
+                &bytes,
+                OpenOptions::new().semantic_limits(limits(2, 1)?),
+            ),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::OutputTextBytes,
+                observed: 2,
+                maximum: 1,
+                ..
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_reference_budget_is_inclusive() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![litchi_iwa_protos::tsp::Reference {
+                identifier: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let sheet = tn::SheetArchive {
+            name: "Budgeted".to_owned(),
+            drawable_infos: vec![
+                litchi_iwa_protos::tsp::Reference {
+                    identifier: 3,
+                    ..Default::default()
+                },
+                litchi_iwa_protos::tsp::Reference {
+                    identifier: 4,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?,
+                object(2, SHEET_MESSAGE_TYPE, sheet.encode_to_vec())?,
+                object(3, 99_998, Vec::new())?,
+                object(4, 99_999, Vec::new())?,
+            ],
+        })?;
+        let limits = |max_references| {
+            SemanticLimits::builder()
+                .max_objects(4)
+                .and_then(|b| b.max_sheets(1))
+                .and_then(|b| b.max_tables(crate::MAX_TABLES))
+                .and_then(|b| b.max_references(max_references))
+                .and_then(|b| b.build())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))
+        };
+
+        let exact = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().semantic_limits(limits(3)?),
+        )?;
+        assert_eq!(exact.sheets().len(), 1);
+        assert_eq!(exact.sheets()[0].tables().len(), 0);
+
+        let exceeded = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().semantic_limits(limits(2)?),
+        );
+        assert!(matches!(
+            exceeded,
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::References,
+                observed: 3,
+                maximum: 2,
+                path: SemanticPath::Sheet { index: 0 },
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn materialized_cell_budget_does_not_become_raw_item_width() -> Result<()> {
+        let bytes = package_with_two_materialized_empty_tables()?;
+        let semantic = SemanticLimits::default()
+            .to_builder()
+            .max_materialized_cells(1)
+            .and_then(|builder| builder.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let package =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))?;
+        let raw = package.numbers_wire_limits()?;
+        assert_eq!(raw.max_items(), litchi_numbers_wire::Limits::MAX_ITEMS);
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_sheet_budget_is_inclusive() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![
+                litchi_iwa_protos::tsp::Reference {
+                    identifier: 2,
+                    ..Default::default()
+                },
+                litchi_iwa_protos::tsp::Reference {
+                    identifier: 3,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?,
+                object(
+                    2,
+                    SHEET_MESSAGE_TYPE,
+                    tn::SheetArchive {
+                        name: "First".to_owned(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )?,
+                object(
+                    3,
+                    SHEET_MESSAGE_TYPE,
+                    tn::SheetArchive {
+                        name: "Second".to_owned(),
+                        ..Default::default()
+                    }
+                    .encode_to_vec(),
+                )?,
+            ],
+        })?;
+        let limits = |max_sheets| {
+            SemanticLimits::builder()
+                .max_objects(3)
+                .and_then(|b| b.max_sheets(max_sheets))
+                .and_then(|b| b.max_tables(crate::MAX_TABLES))
+                .and_then(|b| b.max_references(2))
+                .and_then(|b| b.build())
+                .map_err(|error| Error::InvalidFormat(error.to_string()))
+        };
+
+        let exact = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().semantic_limits(limits(2)?),
+        )?;
+        assert_eq!(exact.sheets().len(), 2);
+
+        let exceeded = Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::new().semantic_limits(limits(1)?),
+        );
+        assert!(matches!(
+            exceeded,
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Sheets,
+                observed: 2,
+                maximum: 1,
+                path: SemanticPath::Document,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_duplicate_model_precedes_an_exhausted_table_budget() -> Result<()> {
+        let bytes = rooted_two_table_package(5, Vec::new())?;
+        let semantic = SemanticLimits::builder()
+            .max_objects(7)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(5))
+            .and_then(|b| b.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+
+        let error =
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic))
+                .expect_err("the second drawable must not reuse the first table model");
+        assert!(matches!(
+            error,
+            Error::InvalidFormat(message)
+                if message
+                    == "Numbers sheet 0 drawable 1 reuses a table model owned by an earlier drawable"
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_table_budget_is_charged_before_model_decoding() -> Result<()> {
+        let bytes = rooted_two_table_package(6, vec![0xff])?;
+        let semantic = SemanticLimits::builder()
+            .max_objects(7)
+            .and_then(|b| b.max_sheets(1))
+            .and_then(|b| b.max_tables(1))
+            .and_then(|b| b.max_references(5))
+            .and_then(|b| b.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+
+        assert!(matches!(
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic),),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Tables,
+                observed: 2,
+                maximum: 1,
+                path: SemanticPath::Drawable { sheet: 0, index: 1 },
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn structured_candidates_use_only_the_primary_message_type() -> Result<()> {
+        let secondary = ArchiveObject::new(
+            2,
+            vec![
+                RawMessage {
+                    type_: 99_999,
+                    data: Vec::new(),
+                },
+                RawMessage {
+                    type_: 6_001,
+                    data: vec![0xff],
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                secondary,
+            ],
+        })?;
+        let package = Package::from_bytes(&bytes)?;
+        assert!(package.extract_structured_tables()?.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_primary_table_model_is_not_silently_skipped() -> Result<()> {
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(2, 6_001, vec![0xff])?,
+            ],
+        })?;
+        let package = Package::from_bytes(&bytes)?;
+        assert!(matches!(
+            package.extract_structured_tables(),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn valid_table_info_bytes_under_an_unrelated_type_are_not_tables() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![litchi_iwa_protos::tsp::Reference {
+                identifier: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let sheet = tn::SheetArchive {
+            name: "Strict".to_owned(),
+            drawable_infos: vec![litchi_iwa_protos::tsp::Reference {
+                identifier: 3,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?,
+                object(2, SHEET_MESSAGE_TYPE, sheet.encode_to_vec())?,
+                object(3, 99_999, tst::TableInfoArchive::default().encode_to_vec())?,
+            ],
+        })?;
+        let package = Package::from_bytes(&bytes)?;
+        assert_eq!(package.sheets().len(), 1);
+        assert_eq!(package.sheets()[0].tables().len(), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_malformed_table_info_reports_a_content_free_location() -> Result<()> {
+        let root = tn::DocumentArchive {
+            sheets: vec![reference(2)],
+            ..Default::default()
+        };
+        let sheet = tn::SheetArchive {
+            name: "Strict".to_owned(),
+            drawable_infos: vec![reference(3)],
+            ..Default::default()
+        };
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?,
+                object(2, SHEET_MESSAGE_TYPE, sheet.encode_to_vec())?,
+                // `super` is valid opaque framing, but field 2 is absent.
+                object(3, TABLE_INFO_MESSAGE_TYPE, vec![0x0a, 0x00])?,
+            ],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::MalformedPayload {
+                path: SemanticPath::Drawable { sheet: 0, index: 0 },
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn rooted_sheet_ownership_rejects_duplicates_and_ambiguous_table_info() -> Result<()> {
+        let duplicated_root = tn::DocumentArchive {
+            sheets: vec![
+                litchi_iwa_protos::tsp::Reference {
+                    identifier: 2,
+                    ..Default::default()
+                },
+                litchi_iwa_protos::tsp::Reference {
+                    identifier: 2,
+                    ..Default::default()
+                },
+            ],
+            ..Default::default()
+        };
+        let empty_sheet = tn::SheetArchive {
+            name: "Strict".to_owned(),
+            ..Default::default()
+        };
+        let duplicate = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, duplicated_root.encode_to_vec())?,
+                object(2, SHEET_MESSAGE_TYPE, empty_sheet.encode_to_vec())?,
+            ],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&duplicate),
+            Err(Error::InvalidFormat(_))
+        ));
+
+        let root = tn::DocumentArchive {
+            sheets: vec![litchi_iwa_protos::tsp::Reference {
+                identifier: 2,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let sheet = tn::SheetArchive {
+            name: "Strict".to_owned(),
+            drawable_infos: vec![litchi_iwa_protos::tsp::Reference {
+                identifier: 3,
+                ..Default::default()
+            }],
+            ..Default::default()
+        };
+        let info = tst::TableInfoArchive::default().encode_to_vec();
+        let ambiguous_object = ArchiveObject::new(
+            3,
+            vec![
+                RawMessage {
+                    type_: TABLE_INFO_MESSAGE_TYPE,
+                    data: info.clone(),
+                },
+                RawMessage {
+                    type_: LEGACY_TABLE_INFO_MESSAGE_TYPE,
+                    data: info,
+                },
+            ],
+            Default::default(),
+        )
+        .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        let ambiguous_bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(1, DOCUMENT_MESSAGE_TYPE, root.encode_to_vec())?,
+                object(2, SHEET_MESSAGE_TYPE, sheet.encode_to_vec())?,
+                ambiguous_object,
+            ],
+        })?;
+        assert!(matches!(
+            Package::from_bytes(&ambiguous_bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn duplicate_identities_across_components_fail_before_lookup() -> Result<()> {
+        let bytes = package_bytes_from_archives([
+            (
+                "Index/Document.iwa",
+                Archive {
+                    objects: vec![object(
+                        1,
+                        DOCUMENT_MESSAGE_TYPE,
+                        tn::DocumentArchive::default().encode_to_vec(),
+                    )?],
+                },
+            ),
+            (
+                "Index/Other.iwa",
+                Archive {
+                    objects: vec![object(1, 99_999, Vec::new())?],
+                },
+            ),
+        ])?;
+        assert!(matches!(
+            Package::from_bytes(&bytes),
+            Err(Error::InvalidFormat(_))
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn exact_cross_component_aliases_are_coalesced_for_projection_and_lookup() -> Result<()> {
+        let bytes = exact_cross_component_alias_package_bytes()?;
+        let package = Package::from_bytes(&bytes)?;
+
+        assert_eq!(package.state.index.object_count(), 3);
+        assert_eq!(package.sheets().len(), 1);
+        assert_eq!(package.sheets()[0].name(), "Aliased");
+        let entries = package
+            .state
+            .index
+            .iter_entries_by_type(SHEET_MESSAGE_TYPE)
+            .collect::<Vec<_>>();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(entries[0].id(), 2);
+        let resolved = package
+            .state
+            .index
+            .resolve_ref_id(&package.state.components, 2)?
+            .expect("rooted sheet alias must resolve");
+        assert_eq!(resolved.messages.len(), 1);
+        assert_eq!(resolved.messages[0].type_, SHEET_MESSAGE_TYPE);
+        Ok(())
+    }
+
+    #[test]
+    fn divergent_cross_component_aliases_are_rejected_regardless_of_component_order() {
+        for reverse in [false, true] {
+            let bytes = divergent_cross_component_alias_package_bytes(reverse)
+                .expect("synthetic divergent alias package");
+            assert!(
+                Package::from_bytes(&bytes).is_err(),
+                "divergent aliases must fail closed (reverse={reverse})"
+            );
+        }
+    }
+
+    #[test]
+    fn identical_same_component_aliases_are_rejected() -> Result<()> {
+        let bytes = same_component_duplicate_alias_package_bytes()?;
+        assert!(Package::from_bytes(&bytes).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn same_component_duplicates_are_rejected_inside_cross_component_alias_groups() -> Result<()> {
+        let bytes = mixed_cross_and_same_component_alias_package_bytes()?;
+        assert!(Package::from_bytes(&bytes).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn physical_object_limit_counts_cross_component_aliases() -> Result<()> {
+        let bytes = exact_cross_component_alias_package_bytes()?;
+        let semantic = SemanticLimits::builder()
+            .max_objects(2)
+            .and_then(|b| b.max_sheets(crate::MAX_SHEETS))
+            .and_then(|b| b.max_tables(crate::MAX_TABLES))
+            .and_then(|b| b.max_references(MAX_REFERENCES))
+            .and_then(|b| b.build())
+            .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+        assert!(matches!(
+            Package::from_bytes_with_options(&bytes, OpenOptions::new().semantic_limits(semantic),),
+            Err(Error::SemanticLimit {
+                kind: SemanticLimitKind::Objects,
+                observed: 3,
+                maximum: 2,
+                path: SemanticPath::Package,
+            })
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn primary_type_iteration_emits_a_cross_component_alias_once() -> Result<()> {
+        let bytes = exact_cross_component_alias_package_bytes()?;
+        let package = Package::from_bytes(&bytes)?;
+        let ids = package
+            .state
+            .index
+            .iter_entries_by_type(SHEET_MESSAGE_TYPE)
+            .map(|entry| entry.id())
+            .collect::<Vec<_>>();
+        assert_eq!(ids, [2]);
+        Ok(())
+    }
+
+    #[test]
+    fn unaliased_name_edit_preserves_exact_aliases_and_aliased_edit_fails_atomically()
+    -> std::result::Result<(), Box<dyn std::error::Error>> {
+        let bytes = exact_alias_with_unaliased_sheet_package_bytes()?;
+        let package = Package::from_bytes(&bytes)?;
+        let before_alias = package
+            .state
+            .components
+            .catalog()
+            .get("Index/Alias.iwa")
+            .and_then(|component| component.archive().object(2))
+            .ok_or_else(|| Error::InvalidFormat("alias fixture is missing".to_owned()))?
+            .messages
+            .clone();
+
+        let edited = package
+            .edit_names()
+            .rename_sheet("Unaliased", "Edited")?
+            .commit()?;
+        assert_eq!(edited.package().sheets()[0].name(), "Aliased");
+        assert_eq!(edited.package().sheets()[1].name(), "Edited");
+        let after_alias = edited
+            .package()
+            .state
+            .components
+            .catalog()
+            .get("Index/Alias.iwa")
+            .and_then(|component| component.archive().object(2))
+            .ok_or_else(|| Error::InvalidFormat("rewritten alias is missing".to_owned()))?
+            .messages
+            .clone();
+        assert_eq!(after_alias, before_alias);
+
+        let aliased_edit = package
+            .edit_names()
+            .rename_sheet("Aliased", "Changed")?
+            .commit();
+        assert!(aliased_edit.is_err());
+        assert_eq!(package.sheets()[0].name(), "Aliased");
+        assert_eq!(package.sheets()[1].name(), "Unaliased");
+        Ok(())
+    }
+
+    #[test]
+    fn cross_component_alias_with_divergent_raw_archive_header_is_rejected() -> Result<()> {
+        let bytes = raw_header_alias_package_bytes()?;
+        assert!(Package::from_bytes(&bytes).is_err());
+        Ok(())
+    }
+
+    #[test]
+    fn malformed_legacy_table_candidates_remain_ignorable_false_positives() -> Result<()> {
+        let bytes = package_bytes_from_archive(Archive {
+            objects: vec![
+                object(
+                    1,
+                    DOCUMENT_MESSAGE_TYPE,
+                    tn::DocumentArchive::default().encode_to_vec(),
+                )?,
+                object(2, 6_000, vec![0xff])?,
+            ],
+        })?;
+        let package = Package::from_bytes(&bytes)?;
+        assert!(package.extract_structured_tables()?.is_empty());
+        Ok(())
+    }
+}

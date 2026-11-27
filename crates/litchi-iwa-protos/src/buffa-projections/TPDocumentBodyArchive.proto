@@ -1,0 +1,63 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TSPMessages.proto`: the three scalar fields of `TSP.Reference`;
+// - `TPArchives.proto`: `TP.DocumentArchive.body_storage` (field 4),
+//   `section` (field 5), `settings` (field 7), page-layout scalar fields
+//   30--39 and 42, and selected `TP.SettingsArchive` scalar fields;
+// - `TSWPArchives.proto`: the two fields of
+//   `TSWP.ObjectAttributeTable.ObjectAttribute`, used as a section boundary.
+//
+// `TP.DocumentArchive.super`, field 15, is deliberately absent. The strict
+// adapter checks its required outer framing but leaves its payload opaque.
+// Section-table repetition is routed from caller-owned source bytes, while
+// page layout and selected document settings consist only of optional scalars.
+// This projection therefore contains no collection-valued message field and
+// never owns an input-width collection. Caller-owned IWA bytes remain
+// authoritative.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message PagesDocumentBodyArchive {
+  optional .LitchiIwaProjection.Reference body_storage = 4;
+  optional .LitchiIwaProjection.Reference initial_section = 5;
+  optional .LitchiIwaProjection.Reference settings = 7;
+  optional float page_width = 30;
+  optional float page_height = 31;
+  optional float left_margin = 32;
+  optional float right_margin = 33;
+  optional float top_margin = 34;
+  optional float bottom_margin = 35;
+  optional float header_margin = 36;
+  optional float footer_margin = 37;
+  optional float page_scale = 38;
+  optional bool lays_out_body_vertically = 39;
+  optional uint32 orientation = 42 [default = 0];
+}
+
+// `footnote_kind`, `footnote_format`, and `footnote_numbering` are represented
+// as raw int32 values so values introduced by newer native schemas stay
+// observable through this read-only projection.
+message PagesSettingsArchive {
+  optional bool body = 1 [default = true];
+  optional bool headers = 2 [default = true];
+  optional bool footers = 3 [default = true];
+  optional bool hyphenation = 9 [default = false];
+  optional bool use_ligatures = 10 [default = false];
+  optional int32 footnote_kind = 30;
+  optional int32 footnote_format = 31;
+  optional int32 footnote_numbering = 32;
+  optional int32 footnote_gap = 33;
+  optional bool facing_pages = 34 [default = false];
+}
+
+message PagesSectionBoundaryEntry {
+  required uint32 character_index = 1;
+  optional .LitchiIwaProjection.Reference section = 2;
+}

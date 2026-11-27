@@ -1,0 +1,87 @@
+//! Borrowed low-level views for legacy `PresentationML` comment parts.
+
+use litchi_opc::part::Part as OpcPart;
+
+use super::{AUTHORS_CONTENT_TYPE, Author, COMMENTS_CONTENT_TYPE, Comment, Conformance, Limits};
+use crate::Result;
+use crate::parts::validate_content_type;
+
+/// Borrowed `/ppt/comments/commentN.xml` view.
+pub struct ListPart<'a> {
+    part: &'a dyn OpcPart,
+}
+
+impl<'a> ListPart<'a> {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
+        validate_content_type(part, COMMENTS_CONTENT_TYPE)?;
+        Ok(Self { part })
+    }
+
+    /// The part's comments, read with the comment repairs of
+    /// [`super::parse_slide_comments`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn comments(&self, limits: Limits) -> Result<Vec<Comment>> {
+        super::parse_slide_comments(self.part.blob(), limits)
+    }
+
+    /// Re-serialize the part. A list whose read would need a repair is
+    /// refused ([`super::parse_slide_comments_strict`]).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
+    pub fn to_xml(&self, conformance: Conformance, limits: Limits) -> Result<Vec<u8>> {
+        super::write_slide_comments(
+            &super::parse_slide_comments_strict(self.part.blob(), limits)?,
+            conformance,
+            limits,
+        )
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn part(&self) -> &'a dyn OpcPart {
+        self.part
+    }
+}
+
+/// Borrowed `/ppt/commentAuthors.xml` view.
+pub struct AuthorListPart<'a> {
+    part: &'a dyn OpcPart,
+}
+
+impl<'a> AuthorListPart<'a> {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_part(part: &'a dyn OpcPart) -> Result<Self> {
+        validate_content_type(part, AUTHORS_CONTENT_TYPE)?;
+        Ok(Self { part })
+    }
+
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn authors(&self, limits: Limits) -> Result<Vec<Author>> {
+        super::parse_comment_authors(self.part.blob(), limits)
+    }
+
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
+    pub fn to_xml(&self, conformance: Conformance, limits: Limits) -> Result<Vec<u8>> {
+        super::write_comment_authors(&self.authors(limits)?, conformance, limits)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn part(&self) -> &'a dyn OpcPart {
+        self.part
+    }
+}

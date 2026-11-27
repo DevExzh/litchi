@@ -4,7 +4,7 @@
 
 use litchi::rtf::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("RTF New Features Round-Trip Test");
     println!("{}", "=".repeat(70));
 
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Phase 2: Read RTF document
     println!("\n📖 PHASE 2: Reading RTF document back...\n");
 
-    let doc = RtfDocument::from_bytes(&rtf_content)?;
+    let doc = raw::Tree::from_bytes(&rtf_content, litchi::rtf::read::OpenOptions::default())?;
 
     println!("✅ Document parsed successfully!");
 
@@ -202,7 +202,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 /// Create an RTF document with all new features
-fn create_rtf_with_features() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
+fn create_rtf_with_features() -> std::result::Result<Vec<u8>, Box<dyn std::error::Error>> {
     // Create RTF content as a string for simplicity
     let rtf_content = r#"{\rtf1\ansi\deff0
 {\fonttbl{\f0\fswiss Arial;}}

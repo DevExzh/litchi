@@ -19,16 +19,38 @@ mod difat;
 
 /// Directory tree generation
 mod directory;
+#[cfg(test)]
+pub(crate) use directory::DirectoryBuilder;
 
 /// OLE2 header generation
 mod header;
 
+/// Source-anchored sector layout policy for the core writer.
+mod layout;
+pub use layout::{SectorLayoutFallback, SectorLayoutPolicy, SectorLayoutReport};
+
 /// Core OLE writer implementation
 mod core;
+pub(crate) use core::{atomic_replace, create_sibling_temp_file, parent_directory, sync_parent};
+
+/// The atomic sibling-temporary publication shared by every CFB save.
+mod publish;
+#[cfg(test)]
+pub(crate) use publish::testing;
+pub(crate) use publish::{
+    PublishFailure, PublishSteps, SystemSteps, TemporaryIdentity, publish_staged,
+};
+
+/// Predeclared-layout, forward-only OLE writer.
+mod sequential;
 
 /// Integration tests for OLE writer
 #[cfg(test)]
 mod tests;
 
 // Re-export public types
-pub use core::OleWriter;
+pub use core::{OleWriter, StorageMoveLimits};
+pub use sequential::{
+    SequentialOleWriter, SequentialWriteError, SequentialWriteProgress, SequentialWriteReport,
+    SequentialWriterLimits, SequentialWriterOptions,
+};

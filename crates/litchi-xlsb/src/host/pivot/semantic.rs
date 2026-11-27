@@ -1,0 +1,53 @@
+//! Semantic facades for PivotCache definition and records snapshots.
+//!
+//! The binary readers in [`super::parse`] and [`super::records`] only decode
+//! the record grammar. This layer applies cross-record rules that need the
+//! complete cache definition, then exposes the typed operations to callers.
+
+use crate::package::error::Result;
+
+use super::model::{PivotCacheDefinition, PivotCacheRecords};
+
+/// Parse and semantically validate one `pivotCacheDefinition*.bin` part.
+///
+/// This standalone parser cannot report repairs, so it refuses every defect
+/// an opened workbook repairs and records (see [`crate::leniency`]).
+pub fn parse_pivot_cache_definition(
+    data: &[u8],
+    limits: crate::raw::Limits,
+) -> Result<PivotCacheDefinition> {
+    let definition = super::parse::parse_pivot_cache_definition_binary(
+        crate::package::walker::RecordWalker::new(data, limits),
+    )?;
+    super::validation::validate_definition(&definition)?;
+    Ok(definition)
+}
+
+/// Parse and semantically validate one `pivotCacheDefinition*.bin` part,
+/// recording Excel-compatible repairs into `report`.
+pub(crate) fn parse_pivot_cache_definition_recording(
+    data: &[u8],
+    report: &mut crate::leniency::ToleranceReport,
+    limits: crate::raw::Limits,
+) -> Result<PivotCacheDefinition> {
+    let definition = super::parse::parse_pivot_cache_definition_binary(
+        crate::package::walker::RecordWalker::recording(data, report, limits),
+    )?;
+    super::validation::validate_definition(&definition)?;
+    Ok(definition)
+}
+
+/// Parse and semantically validate one `pivotCacheRecords*.bin` part.
+///
+/// The definition supplies the field order and shared-item/type metadata
+/// needed to turn the two XLSB record encodings into typed source rows.
+pub fn parse_pivot_cache_records(
+    data: &[u8],
+    definition: &PivotCacheDefinition,
+    limits: crate::raw::Limits,
+) -> Result<PivotCacheRecords> {
+    super::validation::validate_records_precondition(definition)?;
+    let records = super::records::parse_pivot_cache_records_binary(data, definition, limits)?;
+    super::validation::validate_records(definition, &records)?;
+    Ok(records)
+}

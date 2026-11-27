@@ -1,0 +1,304 @@
+//! Top-level content projection and structural element operations.
+
+#![deny(clippy::expect_used, clippy::unwrap_used)]
+
+use super::model::{DocumentElement, MutableDocument};
+use crate::elements::table::Table;
+use crate::elements::text::{Heading, Hyperlink, List, Paragraph, Span};
+use litchi_core::{Error, Result};
+
+impl MutableDocument {
+    /// Get all top-level paragraphs in document order.
+    pub(crate) fn paragraphs(&self) -> Vec<&Paragraph> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                DocumentElement::Paragraph(paragraph) => Some(paragraph),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Get all top-level headings in document order.
+    #[cfg(test)]
+    pub(crate) fn headings(&self) -> Vec<&Heading> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                DocumentElement::Heading(heading) => Some(heading),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Get all top-level lists in document order.
+    #[cfg(test)]
+    pub(crate) fn lists(&self) -> Vec<&List> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                DocumentElement::List(list) => Some(list),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Get all top-level tables in document order.
+    #[cfg(test)]
+    pub(crate) fn tables(&self) -> Vec<&Table> {
+        self.elements
+            .iter()
+            .filter_map(|element| match element {
+                DocumentElement::Table(table) => Some(table),
+                _ => None,
+            })
+            .collect()
+    }
+
+    /// Add a new plain paragraph to the end of the document.
+    pub(crate) fn add_paragraph(&mut self, text: &str) -> Result<()> {
+        let mut paragraph = Paragraph::new();
+        paragraph.set_text(text);
+        self.invalidate_content_xml();
+        self.elements.push(DocumentElement::Paragraph(paragraph));
+        Ok(())
+    }
+
+    /// Append a paragraph containing one simple ODF hyperlink.
+    pub(crate) fn add_hyperlink(
+        &mut self,
+        href: impl AsRef<str>,
+        text: impl AsRef<str>,
+    ) -> Result<()> {
+        let hyperlink = Hyperlink::with_href(href, text)?;
+        self.add_hyperlink_element(hyperlink)
+    }
+
+    /// Append a paragraph containing a fully configured ODF hyperlink.
+    pub(crate) fn add_hyperlink_element(&mut self, hyperlink: Hyperlink) -> Result<()> {
+        let mut paragraph = Paragraph::new();
+        paragraph.add_hyperlink(hyperlink)?;
+        self.invalidate_content_xml();
+        self.elements.push(DocumentElement::Paragraph(paragraph));
+        Ok(())
+    }
+
+    /// Add a heading to the end of the document.
+    pub(crate) fn add_heading(&mut self, text: &str, level: u8) -> Result<()> {
+        if !(1..=6).contains(&level) {
+            return Err(Error::InvalidFormat(
+                "Heading level must be between 1 and 6".to_string(),
+            ));
+        }
+        let mut heading = Heading::new(level);
+        heading.set_text(text);
+        self.invalidate_content_xml();
+        self.elements.push(DocumentElement::Heading(heading));
+        Ok(())
+    }
+
+    /// Add an existing list to the end of the document.
+    pub(crate) fn add_list(&mut self, list: List) -> Result<()> {
+        self.invalidate_content_xml();
+        self.elements.push(DocumentElement::List(list));
+        Ok(())
+    }
+
+    /// Insert a plain paragraph at a checked semantic paragraph position.
+    pub(crate) fn insert_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+        text: &str,
+    ) -> Result<()> {
+        self.insert_semantic_paragraph(position.get(), text)
+    }
+
+    /// Remove one paragraph selected by a checked semantic position.
+    pub(crate) fn remove_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+    ) -> Result<Paragraph> {
+        self.remove_semantic_paragraph(position.get())
+    }
+
+    pub(crate) fn remove_semantic_paragraph(&mut self, index: usize) -> Result<Paragraph> {
+        let element_index = nth_element_index(
+            &self.elements,
+            index,
+            "Paragraph",
+            "paragraphs",
+            |element| matches!(element, DocumentElement::Paragraph(_)),
+        )?;
+        self.invalidate_content_xml();
+        match self.elements.remove(element_index) {
+            DocumentElement::Paragraph(paragraph) => Ok(paragraph),
+            _ => unreachable!("paragraph index resolved to a non-paragraph"),
+        }
+    }
+
+    /// Replace one paragraph's content with plain text at a checked position.
+    pub(crate) fn replace_paragraph_at(
+        &mut self,
+        position: litchi_core::Position,
+        text: &str,
+    ) -> Result<()> {
+        self.replace_semantic_paragraph(position.get(), text)
+    }
+
+    pub(crate) fn replace_semantic_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
+        let element_index = nth_element_index(
+            &self.elements,
+            index,
+            "Paragraph",
+            "paragraphs",
+            |element| matches!(element, DocumentElement::Paragraph(_)),
+        )?;
+        self.invalidate_content_xml();
+        match &mut self.elements[element_index] {
+            DocumentElement::Paragraph(paragraph) => {
+                paragraph.set_text(text);
+                Ok(())
+            },
+            _ => unreachable!("paragraph index resolved to a non-paragraph"),
+        }
+    }
+
+    pub(crate) fn insert_semantic_paragraph(&mut self, index: usize, text: &str) -> Result<()> {
+        let paragraph_count = self.paragraphs().len();
+        if index > paragraph_count {
+            return Err(Error::InvalidFormat(format!(
+                "Paragraph position {index} out of bounds (found {paragraph_count} paragraphs)"
+            )));
+        }
+        let element_index = if index == paragraph_count {
+            self.elements
+                .iter()
+                .rposition(|element| matches!(element, DocumentElement::Paragraph(_)))
+                .map_or(self.elements.len(), |position| position + 1)
+        } else {
+            nth_element_index(
+                &self.elements,
+                index,
+                "Paragraph",
+                "paragraphs",
+                |element| matches!(element, DocumentElement::Paragraph(_)),
+            )?
+        };
+        let mut paragraph = Paragraph::new();
+        paragraph.set_text(text);
+        self.invalidate_content_xml();
+        self.elements
+            .insert(element_index, DocumentElement::Paragraph(paragraph));
+        Ok(())
+    }
+
+    pub(crate) fn append_semantic_run(
+        &mut self,
+        paragraph: usize,
+        text: &str,
+        style_name: Option<&str>,
+    ) -> Result<()> {
+        let element_index = nth_element_index(
+            &self.elements,
+            paragraph,
+            "Paragraph",
+            "paragraphs",
+            |element| matches!(element, DocumentElement::Paragraph(_)),
+        )?;
+        let mut span = Span::new();
+        span.set_text(text);
+        if let Some(style_name) = style_name {
+            span.set_style_name(style_name);
+        }
+        self.invalidate_content_xml();
+        match &mut self.elements[element_index] {
+            DocumentElement::Paragraph(paragraph) => {
+                paragraph.add_span(span);
+                Ok(())
+            },
+            _ => unreachable!("paragraph index resolved to a non-paragraph"),
+        }
+    }
+
+    pub(crate) fn append_semantic_hyperlink(
+        &mut self,
+        paragraph: usize,
+        href: &str,
+        text: &str,
+    ) -> Result<()> {
+        let element_index = nth_element_index(
+            &self.elements,
+            paragraph,
+            "Paragraph",
+            "paragraphs",
+            |element| matches!(element, DocumentElement::Paragraph(_)),
+        )?;
+        let hyperlink = Hyperlink::with_href(href, text)?;
+        self.invalidate_content_xml();
+        match &mut self.elements[element_index] {
+            DocumentElement::Paragraph(paragraph) => paragraph.add_hyperlink(hyperlink),
+            _ => unreachable!("paragraph index resolved to a non-paragraph"),
+        }
+    }
+
+    /// Remove all top-level paragraphs while retaining other body elements.
+    pub(crate) fn clear_paragraphs(&mut self) {
+        self.invalidate_content_xml();
+        self.elements
+            .retain(|element| !matches!(element, DocumentElement::Paragraph(_)));
+    }
+
+    /// Add an existing table to the end of the document.
+    pub(crate) fn add_table(&mut self, table: Table) -> Result<()> {
+        self.invalidate_content_xml();
+        self.elements.push(DocumentElement::Table(table));
+        Ok(())
+    }
+
+    /// Remove one top-level table and return its typed value.
+    pub(crate) fn remove_table(&mut self, index: usize) -> Result<Table> {
+        let element_index =
+            nth_element_index(&self.elements, index, "Table", "tables", |element| {
+                matches!(element, DocumentElement::Table(_))
+            })?;
+        self.invalidate_content_xml();
+        match self.elements.remove(element_index) {
+            DocumentElement::Table(table) => Ok(table),
+            _ => unreachable!("table index resolved to a non-table"),
+        }
+    }
+
+    /// Remove all top-level tables while retaining other body elements.
+    pub(crate) fn clear_tables(&mut self) {
+        self.invalidate_content_xml();
+        self.elements
+            .retain(|element| !matches!(element, DocumentElement::Table(_)));
+    }
+
+    /// Remove all projected top-level body content.
+    pub(crate) fn clear_content(&mut self) {
+        self.invalidate_content_xml();
+        self.elements.clear();
+    }
+}
+
+fn nth_element_index(
+    elements: &[DocumentElement],
+    wanted: usize,
+    label: &str,
+    plural: &str,
+    is_kind: impl Fn(&DocumentElement) -> bool,
+) -> Result<usize> {
+    let mut count = 0;
+    for (element_index, element) in elements.iter().enumerate() {
+        if is_kind(element) {
+            if count == wanted {
+                return Ok(element_index);
+            }
+            count += 1;
+        }
+    }
+    Err(Error::InvalidFormat(format!(
+        "{label} index {wanted} out of bounds (found {count} {plural})",
+    )))
+}

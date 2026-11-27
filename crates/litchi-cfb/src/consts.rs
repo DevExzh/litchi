@@ -10,26 +10,52 @@ pub const DIRENTRY_SIZE: usize = 128;
 /// Default sector size for version 3 (512 bytes)
 pub const SECTOR_SIZE_V3: usize = 512;
 
+/// Header offset of the Number of FAT Sectors field (MS-CFB 2.2)
+pub const NUM_FAT_SECTORS_OFFSET: usize = 0x2C;
+
+/// Header offset of the DIFAT array (MS-CFB 2.2)
+pub const HEADER_DIFAT_OFFSET: usize = 0x4C;
+
+/// FAT sector locations the header DIFAT array can hold (MS-CFB 2.2)
+pub const HEADER_DIFAT_ENTRIES: usize = 109;
+
+/// Header offset of the Sector Shift field (MS-CFB 2.2)
+pub const SECTOR_SHIFT_OFFSET: usize = 0x1E;
+
+/// Sector Shift value that selects version 3's 512-byte sectors
+pub const SECTOR_SHIFT_V3: u8 = 9;
+
 /// Default sector size for version 4 (4096 bytes)
 pub const SECTOR_SIZE_V4: usize = 4096;
 
+/// The 4,096-byte sector whose final 256 bytes cover the MS-CFB range-lock
+/// offsets `0x7FFFFF00..=0x7FFFFFFF`.
+///
+/// Sector `n` begins at `(n + 1) * 4096` because the compound-file header
+/// occupies the first sector.  The range-lock sector therefore starts at
+/// `0x7FFFF000` and has sector number `0x7FFFE`.
+pub const RANGE_LOCK_SECTOR_V4: u32 = 0x0007_FFFE;
+
+/// The first byte after the 2-GiB compatibility boundary.
+pub const TWO_GIB_BYTES: u64 = 1_u64 << 31;
+
 // Sector IDs (from AAF specifications)
 /// Maximum regular sector ID
-pub const MAXREGSECT: u32 = 0xFFFFFFFA; // -6
+pub const MAXREGSECT: u32 = 0xFFFF_FFFA; // -6
 /// Denotes a DIFAT sector in a FAT
-pub const DIFSECT: u32 = 0xFFFFFFFC; // -4
+pub const DIFSECT: u32 = 0xFFFF_FFFC; // -4
 /// Denotes a FAT sector in a FAT
-pub const FATSECT: u32 = 0xFFFFFFFD; // -3
+pub const FATSECT: u32 = 0xFFFF_FFFD; // -3
 /// End of a virtual stream chain
-pub const ENDOFCHAIN: u32 = 0xFFFFFFFE; // -2
+pub const ENDOFCHAIN: u32 = 0xFFFF_FFFE; // -2
 /// Unallocated sector
-pub const FREESECT: u32 = 0xFFFFFFFF; // -1
+pub const FREESECT: u32 = 0xFFFF_FFFF; // -1
 
 // Directory Entry IDs (from AAF specifications)
 /// Maximum directory entry ID
-pub const MAXREGSID: u32 = 0xFFFFFFFA; // -6
+pub const MAXREGSID: u32 = 0xFFFF_FFFA; // -6
 /// Unallocated directory entry
-pub const NOSTREAM: u32 = 0xFFFFFFFF; // -1
+pub const NOSTREAM: u32 = 0xFFFF_FFFF; // -1
 
 // Object types in storage (from AAF specifications)
 /// Empty directory entry
@@ -38,15 +64,15 @@ pub const STGTY_EMPTY: u8 = 0;
 pub const STGTY_STORAGE: u8 = 1;
 /// Element is a stream object
 pub const STGTY_STREAM: u8 = 2;
-/// Element is an ILockBytes object
+/// Element is an `ILockBytes` object
 pub const STGTY_LOCKBYTES: u8 = 3;
-/// Element is an IPropertyStorage object
+/// Element is an `IPropertyStorage` object
 pub const STGTY_PROPERTY: u8 = 4;
 /// Element is a root storage
 pub const STGTY_ROOT: u8 = 5;
 
 /// Unknown size for a stream (used when size is not known in advance)
-pub const UNKNOWN_SIZE: u32 = 0x7FFFFFFF;
+pub const UNKNOWN_SIZE: u32 = 0x7FFF_FFFF;
 
 // Property types
 pub const VT_EMPTY: u16 = 0;

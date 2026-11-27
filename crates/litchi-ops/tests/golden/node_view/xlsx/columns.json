@@ -1,0 +1,176 @@
+[
+{
+  "path": "/sheet[1]/col[A]",
+  "type": "column",
+  "preview": "A",
+  "childCount": 6,
+  "format": {
+    "width": 12.5,
+    "customWidth": true
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/A1",
+      "type": "cell",
+      "text": "Region",
+      "preview": "A1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "font.bold": true,
+        "font.color": "dk1",
+        "font.size": "11pt",
+        "font.name": "Calibri"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/A2",
+      "type": "cell",
+      "text": "West",
+      "preview": "A2",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/A3",
+      "type": "cell",
+      "text": "East",
+      "preview": "A3",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/A4",
+      "type": "cell",
+      "text": "North",
+      "preview": "A4",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/A5",
+      "type": "cell",
+      "text": "South",
+      "preview": "A5",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/A7",
+      "type": "cell",
+      "text": "West",
+      "preview": "A7",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]/col[C]",
+  "type": "column",
+  "preview": "C",
+  "childCount": 6,
+  "format": {
+    "width": 9,
+    "hidden": true
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/C1",
+      "type": "cell",
+      "text": "Status",
+      "preview": "C1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "font.bold": true,
+        "font.color": "dk1",
+        "font.size": "11pt",
+        "font.name": "Calibri"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C2",
+      "type": "cell",
+      "text": "open",
+      "preview": "C2",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C3",
+      "type": "cell",
+      "text": "closed",
+      "preview": "C3",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C4",
+      "type": "cell",
+      "text": "open",
+      "preview": "C4",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C5",
+      "type": "cell",
+      "text": "closed",
+      "preview": "C5",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/C6",
+      "type": "cell",
+      "text": "",
+      "preview": "C6",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "formula": "B6*2",
+        "evaluated": false
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[1]/col[Z]",
+  "type": "column",
+  "preview": "Z",
+  "childCount": 0,
+  "format": {},
+  "children": []
+}
+]

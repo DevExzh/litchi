@@ -1,0 +1,922 @@
+//! Packages carrying cataloged OPC non-conformities open by default, and every
+//! repair is recorded in the package's
+//! tolerance report. A conformant control package reports clean through every
+//! ingress path.
+
+use litchi_opc::leniency::{ContentTypeDefect, Defect, RelationshipDefect, ToleranceReport};
+use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, TargetMode};
+use litchi_opc::{SourceCacheLimits, SourceLimits};
+use soapberry_zip::office::StreamingArchiveWriter;
+
+const CONTENT_TYPES: &str = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
+
+const ROOT_RELS: &str = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#;
+
+const DOCUMENT_RELS: &str = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/></Relationships>"#;
+
+const DOCUMENT: &str = r#"<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>"#;
+const STYLES: &str =
+    r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"/>"#;
+
+/// Build a minimal package from the given manifests.
+fn package(content_types: &str, root_rels: &str, document_rels: &str) -> Vec<u8> {
+    let mut writer =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    writer
+        .write_stored("[Content_Types].xml", content_types.as_bytes())
+        .unwrap();
+    writer
+        .write_stored("_rels/.rels", root_rels.as_bytes())
+        .unwrap();
+    writer
+        .write_stored("word/_rels/document.xml.rels", document_rels.as_bytes())
+        .unwrap();
+    writer
+        .write_stored("word/document.xml", DOCUMENT.as_bytes())
+        .unwrap();
+    writer
+        .write_stored("word/styles.xml", STYLES.as_bytes())
+        .unwrap();
+    writer.finish_to_bytes().unwrap()
+}
+
+/// Open `bytes` through every ingress path and return each path's report,
+/// asserting they agree.
+fn reports(bytes: &[u8]) -> ToleranceReport {
+    let eager = OpcPackage::from_bytes(bytes, SourceLimits::default()).expect("eager open");
+    let owned = OpcPackage::from_vec(bytes.to_vec(), SourceLimits::default()).expect("owned open");
+    let source = SourceBackedPackage::from_vec(
+        bytes.to_vec(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .expect("source-backed open");
+    let materialized = source.to_opc_package().expect("materialize");
+
+    let report = eager.tolerance_report().clone();
+    assert_eq!(owned.tolerance_report(), &report, "owned ingress");
+    assert_eq!(source.tolerance_report(), &report, "source-backed ingress");
+    assert_eq!(
+        materialized.tolerance_report(),
+        &report,
+        "materialized source-backed package"
+    );
+    report
+}
+
+/// Defect classes and parts, in discovery order.
+fn classes(report: &ToleranceReport) -> Vec<(Defect, String, Option<String>)> {
+    report
+        .iter()
+        .map(|tolerated| {
+            (
+                tolerated.defect(),
+                tolerated.part().to_owned(),
+                tolerated.item().map(str::to_owned),
+            )
+        })
+        .collect()
+}
+
+#[test]
+fn conformant_package_reports_clean_through_every_ingress() {
+    let report = reports(&package(CONTENT_TYPES, ROOT_RELS, DOCUMENT_RELS));
+    assert!(report.is_clean(), "{:?}", classes(&report));
+    assert_eq!(report.total(), 0);
+    assert_eq!(report.unrecorded(), 0);
+}
+
+#[test]
+fn new_packages_report_clean() {
+    assert!(OpcPackage::new().tolerance_report().is_clean());
+}
+
+/// A repaired package still saves, and the saved package reopens with the
+/// same repairs recorded (an untouched manifest publishes its source bytes).
+fn assert_round_trips(bytes: &[u8]) {
+    let package = OpcPackage::from_bytes(bytes, SourceLimits::default()).expect("open");
+    let mut saved = Vec::new();
+    package
+        .write_to(std::io::Cursor::new(&mut saved))
+        .expect("save");
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).expect("reopen");
+    assert_eq!(reopened.tolerance_report(), package.tolerance_report());
+}
+
+fn relationship_type(package: &OpcPackage, source: &str, id: &str) -> Option<String> {
+    let source = PackURI::new(source).unwrap();
+    package
+        .get_part(&source)
+        .unwrap()
+        .rels()
+        .get(id)
+        .map(|relationship| relationship.reltype().to_owned())
+}
+
+const STYLES_TYPE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+
+/// A duplicated relationship `Id` keeps the first
+/// relationship (LibreOffice's first match) and records the dropped one.
+#[test]
+fn duplicate_relationship_id_keeps_the_first_and_is_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    assert_eq!(
+        classes(&report),
+        vec![(
+            Defect::Relationship(RelationshipDefect::DuplicateId),
+            "/word/document.xml".to_owned(),
+            Some("rId1".to_owned()),
+        )]
+    );
+    assert_eq!(report.defects()[0].value(), Some("https://example.com/"));
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
+}
+
+/// An internal target that cannot be resolved to a part
+/// name (literal space, backslash, absolute URI, root escape) stays visible
+/// as a dangling relationship, is not followed, and is recorded.
+#[test]
+fn unresolvable_internal_targets_stay_dangling_and_are_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media/image 1.png"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="media\image2.png"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="../../../escape.png"/><Relationship Id="rId5" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/image" Target="http://example.com/a.png"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    let unresolvable = Defect::Relationship(RelationshipDefect::UnresolvableTarget);
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.item(), tolerated.value()))
+            .collect::<Vec<_>>(),
+        vec![
+            (unresolvable, Some("rId2"), Some("media/image 1.png")),
+            (unresolvable, Some("rId3"), Some("media\\image2.png")),
+            (unresolvable, Some("rId4"), Some("../../../escape.png")),
+            (unresolvable, Some("rId5"), Some("http://example.com/a.png")),
+        ]
+    );
+    assert!(report.iter().all(|t| t.part() == "/word/document.xml"));
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let document = package
+        .get_part(&PackURI::new("/word/document.xml").unwrap())
+        .unwrap();
+    assert_eq!(
+        document.rels().len(),
+        5,
+        "dangling relationships stay visible"
+    );
+    assert!(
+        document
+            .rels()
+            .get("rId2")
+            .unwrap()
+            .target_partname()
+            .is_err()
+    );
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
+}
+
+/// `TargetMode` is matched case-insensitively (recorded
+/// when non-canonical); any other value reads as `External` (Apache POI) so
+/// it can never resolve to a part, and is recorded.
+#[test]
+fn target_mode_is_case_insensitive_and_unknown_modes_read_as_external() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml" TargetMode="internal"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="EXTERNAL"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/" TargetMode="Remote"/><Relationship Id="rId4" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.net/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.item(), tolerated.value()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Defect::Relationship(RelationshipDefect::NonCanonicalTargetMode),
+                Some("rId1"),
+                Some("internal"),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::NonCanonicalTargetMode),
+                Some("rId2"),
+                Some("EXTERNAL"),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::UnrecognizedTargetMode),
+                Some("rId3"),
+                Some("Remote"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let document = package
+        .get_part(&PackURI::new("/word/document.xml").unwrap())
+        .unwrap();
+    let rels = document.rels();
+    assert_eq!(
+        rels.get("rId1").unwrap().target_mode(),
+        TargetMode::Internal
+    );
+    assert_eq!(
+        rels.get("rId2").unwrap().target_mode(),
+        TargetMode::External
+    );
+    assert_eq!(
+        rels.get("rId3").unwrap().target_mode(),
+        TargetMode::External
+    );
+    assert_eq!(
+        rels.get("rId4").unwrap().target_mode(),
+        TargetMode::External
+    );
+    assert_round_trips(&bytes);
+}
+
+/// A relationship with a missing or empty `Target` or
+/// `Type` is skipped and recorded; its Id stays free for a later
+/// well-formed relationship.
+#[test]
+fn relationships_without_target_or_type_are_skipped_and_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" TargetMode="External"/><Relationship Id="rId3" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="" TargetMode="External"/><Relationship Id="rId4" Target="https://example.com/" TargetMode="External"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.org/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    let hyperlink = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (tolerated.defect(), tolerated.item(), tolerated.value()))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Defect::Relationship(RelationshipDefect::MissingTarget),
+                Some("rId2"),
+                Some(hyperlink),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::MissingTarget),
+                Some("rId3"),
+                Some(hyperlink),
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::MissingType),
+                Some("rId4"),
+                Some("https://example.com/"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let document = package
+        .get_part(&PackURI::new("/word/document.xml").unwrap())
+        .unwrap();
+    assert_eq!(document.rels().len(), 2);
+    assert_eq!(
+        document.rels().get("rId2").unwrap().target_ref(),
+        "https://example.org/"
+    );
+    assert_round_trips(&bytes);
+}
+
+/// Duplicate `Default`/`Override` mappings keep the first
+/// mapping (LibreOffice's first-match lookup) and record the dropped ones.
+#[test]
+fn duplicate_content_type_mappings_keep_the_first_and_are_recorded() {
+    let content_types = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Default Extension="XML" ContentType="text/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/><Override PartName="/word/document.xml" ContentType="application/xml"/></Types>"#;
+    let bytes = package(content_types, ROOT_RELS, DOCUMENT_RELS);
+    let report = reports(&bytes);
+    assert_eq!(
+        report
+            .iter()
+            .map(|tolerated| (
+                tolerated.defect(),
+                tolerated.part(),
+                tolerated.item(),
+                tolerated.value()
+            ))
+            .collect::<Vec<_>>(),
+        vec![
+            (
+                Defect::ContentType(ContentTypeDefect::DuplicateDefault),
+                "/[Content_Types].xml",
+                Some("XML"),
+                Some("text/xml"),
+            ),
+            (
+                Defect::ContentType(ContentTypeDefect::DuplicateOverride),
+                "/[Content_Types].xml",
+                Some("/word/document.xml"),
+                Some("application/xml"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let content_type = |name: &str| {
+        package
+            .get_part(&PackURI::new(name).unwrap())
+            .unwrap()
+            .content_type()
+            .to_owned()
+    };
+    assert_eq!(
+        content_type("/word/document.xml"),
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"
+    );
+    assert_eq!(content_type("/word/styles.xml"), "application/xml");
+    assert_round_trips(&bytes);
+}
+
+/// Every recorded defect as `(class, part, item, value)`.
+fn entries(report: &ToleranceReport) -> Vec<(Defect, &str, Option<&str>, Option<&str>)> {
+    report
+        .iter()
+        .map(|tolerated| {
+            (
+                tolerated.defect(),
+                tolerated.part(),
+                tolerated.item(),
+                tolerated.value(),
+            )
+        })
+        .collect()
+}
+
+const CONTENT_TYPES_PART: &str = "/[Content_Types].xml";
+
+/// Relationships parts declared with another content
+/// type are still read as relationships (identified by name, as LibreOffice
+/// and Apache POI do) and the declaration is recorded per part.
+#[test]
+fn relationships_parts_declared_with_another_type_are_read_and_recorded() {
+    let content_types = CONTENT_TYPES.replace(
+        r#"<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>"#,
+        r#"<Default Extension="rels" ContentType="application/xml"/>"#,
+    );
+    let bytes = package(&content_types, ROOT_RELS, DOCUMENT_RELS);
+    let report = reports(&bytes);
+    let defect = Defect::ContentType(ContentTypeDefect::RelationshipPartType);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                defect,
+                CONTENT_TYPES_PART,
+                Some("/_rels/.rels"),
+                Some("application/xml")
+            ),
+            (
+                defect,
+                CONTENT_TYPES_PART,
+                Some("/word/_rels/document.xml.rels"),
+                Some("application/xml"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
+}
+
+/// Unknown elements, unknown attributes, character
+/// data, and CDATA in either manifest are ignored and recorded.
+#[test]
+fn manifest_shape_deviations_are_ignored_and_recorded() {
+    let content_types = CONTENT_TYPES
+        .replace(
+            r#"<Default Extension="xml" ContentType="application/xml"/>"#,
+            r#"<Default Extension="xml" ContentType="application/xml" Producer="tool"/><x:Hint xmlns:x="urn:vendor"><Default Extension="bin" ContentType="application/x-hidden"/></x:Hint>"#,
+        )
+        .replace("</Types>", "stray</Types>");
+    let document_rels = DOCUMENT_RELS
+        .replace(
+            r#"Target="styles.xml"/>"#,
+            r#"Target="styles.xml" Extra="1"><![CDATA[note]]></Relationship>"#,
+        )
+        .replace(
+            "</Relationships>",
+            r#"<Wrapper><Relationship Id="rId9" Type="urn:hidden" Target="hidden.xml"/></Wrapper></Relationships>"#,
+        );
+    let bytes = package(&content_types, ROOT_RELS, &document_rels);
+    let report = reports(&bytes);
+    let content = |defect| Defect::ContentType(defect);
+    let relationship = |defect| Defect::Relationship(defect);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                content(ContentTypeDefect::UnknownAttribute),
+                CONTENT_TYPES_PART,
+                Some("xml"),
+                Some("Producer"),
+            ),
+            (
+                content(ContentTypeDefect::UnknownElement),
+                CONTENT_TYPES_PART,
+                None,
+                Some("x:Hint"),
+            ),
+            (
+                content(ContentTypeDefect::UnexpectedContent),
+                CONTENT_TYPES_PART,
+                None,
+                Some("#text"),
+            ),
+            (
+                relationship(RelationshipDefect::UnknownAttribute),
+                "/word/document.xml",
+                Some("rId1"),
+                Some("Extra"),
+            ),
+            (
+                relationship(RelationshipDefect::UnexpectedContent),
+                "/word/document.xml",
+                Some("rId1"),
+                Some("#cdata-section"),
+            ),
+            (
+                relationship(RelationshipDefect::UnknownElement),
+                "/word/document.xml",
+                None,
+                Some("Wrapper"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "rId9"),
+        None
+    );
+    assert_round_trips(&bytes);
+}
+
+/// A `ContentType` or `Extension` outside the RFC 2616
+/// grammar is kept verbatim (LibreOffice's opaque strings) and recorded.
+#[test]
+fn content_type_grammar_deviations_are_kept_verbatim_and_recorded() {
+    const MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    let raw = format!("{MAIN}; charset=utf-8");
+    let content_types = CONTENT_TYPES
+        .replace(
+            &format!(r#"ContentType="{MAIN}""#),
+            &format!(r#"ContentType="{raw}""#),
+        )
+        .replace(
+            "</Types>",
+            r#"<Default Extension="my ext" ContentType="text/plain"/></Types>"#,
+        );
+    let bytes = package(&content_types, ROOT_RELS, DOCUMENT_RELS);
+    let report = reports(&bytes);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                Defect::ContentType(ContentTypeDefect::InvalidMediaType),
+                CONTENT_TYPES_PART,
+                Some("/word/document.xml"),
+                Some(raw.as_str()),
+            ),
+            (
+                Defect::ContentType(ContentTypeDefect::InvalidExtension),
+                CONTENT_TYPES_PART,
+                Some("my ext"),
+                Some("text/plain"),
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    assert_eq!(
+        package
+            .get_part(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .content_type(),
+        raw
+    );
+    assert_round_trips(&bytes);
+
+    // Empty content types and control characters stay fatal.
+    for fatal in [
+        CONTENT_TYPES.replace(&format!(r#"ContentType="{MAIN}""#), r#"ContentType="""#),
+        CONTENT_TYPES.replace(
+            &format!(r#"ContentType="{MAIN}""#),
+            r#"ContentType="a/&#1;b""#,
+        ),
+    ] {
+        assert!(
+            OpcPackage::from_bytes(&package_bytes(&fatal), SourceLimits::default()).is_err(),
+            "{fatal}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                package_bytes(&fatal),
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{fatal}"
+        );
+    }
+}
+
+fn package_bytes(content_types: &str) -> Vec<u8> {
+    package(content_types, ROOT_RELS, DOCUMENT_RELS)
+}
+
+/// Structural corruption stays fatal: a malformed relationships manifest,
+/// a relationship without an Id, and an ill-formed content-types manifest
+/// are still rejected.
+#[test]
+fn structural_manifest_corruption_stays_fatal() {
+    let unclosed = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:x" Target="styles.xml">"#;
+    assert!(
+        OpcPackage::from_bytes(
+            &package(CONTENT_TYPES, ROOT_RELS, unclosed),
+            SourceLimits::default()
+        )
+        .is_err()
+    );
+    let no_id = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Type="urn:x" Target="styles.xml"/></Relationships>"#;
+    assert!(
+        OpcPackage::from_bytes(
+            &package(CONTENT_TYPES, ROOT_RELS, no_id),
+            SourceLimits::default()
+        )
+        .is_err()
+    );
+    let ill_formed = r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="xml" ContentType="application/xml"></Types>"#;
+    assert!(
+        OpcPackage::from_bytes(
+            &package(ill_formed, ROOT_RELS, DOCUMENT_RELS),
+            SourceLimits::default()
+        )
+        .is_err()
+    );
+    // A DTD, an unbound prefix, and a wrong document element stay fatal in
+    // both manifests.
+    let doctype_rels = format!("<!DOCTYPE Relationships>{DOCUMENT_RELS}");
+    let unbound_rels = DOCUMENT_RELS.replace("</Relationships>", "<x:Ext/></Relationships>");
+    for rels in [doctype_rels.as_str(), unbound_rels.as_str()] {
+        let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+        assert!(
+            OpcPackage::from_bytes(&bytes, SourceLimits::default()).is_err(),
+            "{rels}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                bytes,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{rels}"
+        );
+    }
+    let doctype_types = format!("<!DOCTYPE Types>{CONTENT_TYPES}");
+    let unbound_types = CONTENT_TYPES.replace("</Types>", "<x:Ext/></Types>");
+    let wrong_root = CONTENT_TYPES
+        .replace("<Types ", "<Kinds ")
+        .replace("</Types>", "</Kinds>");
+    for types in [doctype_types, unbound_types, wrong_root] {
+        let bytes = package(&types, ROOT_RELS, DOCUMENT_RELS);
+        assert!(
+            OpcPackage::from_bytes(&bytes, SourceLimits::default()).is_err(),
+            "{types}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                bytes,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{types}"
+        );
+    }
+}
+
+/// An edited package whose manifest is regenerated carries a source content
+/// type admitted verbatim forward unchanged, while a content type the caller
+/// authors keeps the MIME grammar check.
+#[test]
+fn edited_packages_keep_source_content_types_verbatim_but_check_authored_ones() {
+    const MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    let content_types = CONTENT_TYPES.replace(
+        &format!(r#"ContentType="{MAIN}""#),
+        &format!(r#"ContentType="{MAIN}; charset=utf-8""#),
+    );
+    let bytes = package(&content_types, ROOT_RELS, DOCUMENT_RELS);
+    let add = |package: &mut OpcPackage, content_type: &str| {
+        package
+            .try_add_part(Box::new(litchi_opc::BlobPart::new(
+                PackURI::new("/custom/item.bin").unwrap(),
+                content_type.to_owned(),
+                vec![1, 2, 3],
+            )))
+            .unwrap();
+    };
+
+    let mut edited = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    add(&mut edited, "application/octet-stream");
+    let mut saved = Vec::new();
+    edited
+        .write_to(std::io::Cursor::new(&mut saved))
+        .expect("a source content type admitted verbatim is carried forward");
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
+    assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
+    assert_eq!(
+        reopened
+            .get_part(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .content_type(),
+        format!("{MAIN}; charset=utf-8")
+    );
+
+    let mut authored = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    add(&mut authored, "application/octet-stream; x=1");
+    assert!(
+        authored
+            .write_to(std::io::Cursor::new(&mut Vec::new()))
+            .is_err()
+    );
+}
+
+/// A non-empty relationship `Id` that
+/// is not an XML ID is kept verbatim — LibreOffice and Apache POI treat it as
+/// an opaque string — and recorded on every ingress path.
+#[test]
+fn non_xml_id_relationship_ids_are_kept_verbatim_and_recorded() {
+    let rels = r#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/><Relationship Id="a:b" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" Target="https://example.com/" TargetMode="External"/></Relationships>"#;
+    let bytes = package(CONTENT_TYPES, ROOT_RELS, rels);
+    let report = reports(&bytes);
+    assert_eq!(
+        entries(&report),
+        vec![
+            (
+                Defect::Relationship(RelationshipDefect::NonConformingId),
+                "/word/document.xml",
+                Some("1"),
+                None,
+            ),
+            (
+                Defect::Relationship(RelationshipDefect::NonConformingId),
+                "/word/document.xml",
+                Some("a:b"),
+                None,
+            ),
+        ]
+    );
+
+    let package = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    assert_eq!(
+        relationship_type(&package, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert!(
+        package
+            .get_part(&PackURI::new("/word/document.xml").unwrap())
+            .unwrap()
+            .rels()
+            .get("a:b")
+            .is_some_and(|relationship| relationship.target_mode() == TargetMode::External)
+    );
+    let materialized = SourceBackedPackage::from_vec(
+        bytes.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        None,
+    )
+    .unwrap()
+    .to_opc_package()
+    .unwrap();
+    assert_eq!(
+        relationship_type(&materialized, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert_round_trips(&bytes);
+
+    // An empty Id and one carrying control characters stay fatal.
+    for fatal in [
+        rels.replace(r#"Id="1""#, r#"Id="""#),
+        rels.replace(r#"Id="1""#, r#"Id="1&#1;""#),
+    ] {
+        let bytes = package_with_rels(&fatal);
+        assert!(
+            OpcPackage::from_bytes(&bytes, SourceLimits::default()).is_err(),
+            "{fatal}"
+        );
+        assert!(
+            SourceBackedPackage::from_vec(
+                bytes,
+                SourceLimits::default(),
+                SourceCacheLimits::default(),
+                None
+            )
+            .is_err(),
+            "{fatal}"
+        );
+    }
+}
+
+fn package_with_rels(document_rels: &str) -> Vec<u8> {
+    package(CONTENT_TYPES, ROOT_RELS, document_rels)
+}
+
+/// A source relationship `Id` admitted verbatim is carried forward when its
+/// collection is edited and re-serialized, while an `Id` the caller authors
+/// keeps the XML ID check.
+#[test]
+fn edited_relationships_keep_source_ids_verbatim_but_check_authored_ones() {
+    let rels = DOCUMENT_RELS.replace(r#"Id="rId1""#, r#"Id="1""#);
+    let bytes = package_with_rels(&rels);
+    let document = PackURI::new("/word/document.xml").unwrap();
+
+    let mut edited = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    edited
+        .get_part_mut(&document)
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            "urn:test".to_owned(),
+            "https://example.test/".to_owned(),
+            "rId9".to_owned(),
+            TargetMode::External,
+        )
+        .unwrap();
+    let relationships = edited.get_part(&document).unwrap().rels();
+    relationships
+        .plan_canonical(SourceLimits::default())
+        .expect("a source Id admitted verbatim is carried forward");
+    let mut saved = Vec::new();
+    edited
+        .write_to(std::io::Cursor::new(&mut saved))
+        .expect("save");
+    let reopened = OpcPackage::from_bytes(&saved, SourceLimits::default()).unwrap();
+    assert_eq!(reopened.tolerance_report(), edited.tolerance_report());
+    assert_eq!(
+        relationship_type(&reopened, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+
+    // An authored Id that is not an XML ID is still refused by the canonical
+    // serializer.
+    let mut authored = litchi_opc::Relationships::new("/word/".to_owned());
+    authored
+        .try_add_relationship(
+            "urn:test".to_owned(),
+            "https://example.test/".to_owned(),
+            "2".to_owned(),
+            TargetMode::External,
+        )
+        .unwrap();
+    assert!(authored.plan_canonical(SourceLimits::default()).is_err());
+}
+
+/// A source-backed topology edit re-reads the opened manifest under the same
+/// rules: a relationship can be added beside, replaced at, or removed from a
+/// source `Id` admitted verbatim, while an added `Id` must be an XML ID.
+#[test]
+fn source_backed_topology_edits_accept_admitted_ids_but_check_added_ones() {
+    use litchi_opc::{Relationships, SourceRelationshipTarget, SourceTopologyPlan};
+
+    let document = PackURI::new("/word/document.xml").unwrap();
+    let publish = |bytes: &[u8], plan: SourceTopologyPlan| {
+        let source = SourceBackedPackage::from_vec(
+            bytes.to_vec(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let mut output = Vec::new();
+        source
+            .write_topology_to_stream(&mut output, plan)
+            .expect("publish");
+        OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap()
+    };
+
+    // Appending to and removing from a producer-formatted manifest.
+    let rels = DOCUMENT_RELS
+        .replace(r#"Id="rId1""#, r#"Id="1""#)
+        .replace(r#"Id="rId2""#, r#"Id="2""#);
+    let bytes = package_with_rels(&rels);
+    let mut append = SourceTopologyPlan::new();
+    append
+        .try_add_external_relationship(
+            document.clone(),
+            "rId9",
+            "urn:test",
+            "https://example.test/",
+        )
+        .unwrap();
+    let appended = publish(&bytes, append);
+    assert_eq!(
+        relationship_type(&appended, "/word/document.xml", "1").as_deref(),
+        Some(STYLES_TYPE)
+    );
+    assert!(relationship_type(&appended, "/word/document.xml", "rId9").is_some());
+    let mut remove = SourceTopologyPlan::new();
+    remove
+        .try_remove_relationship(document.clone(), "2")
+        .unwrap();
+    let removed = publish(&bytes, remove);
+    assert!(relationship_type(&removed, "/word/document.xml", "2").is_none());
+    assert!(relationship_type(&removed, "/word/document.xml", "1").is_some());
+
+    // Replacing at an admitted Id in a canonical manifest keeps the Id.
+    let mut canonical = Relationships::new("/word/".to_owned());
+    canonical
+        .try_add_relationship(
+            STYLES_TYPE.to_owned(),
+            "styles.xml".to_owned(),
+            "1".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let bytes = package_with_rels(&canonical.to_xml());
+    let mut replace = SourceTopologyPlan::new();
+    replace
+        .try_replace_relationship(
+            document.clone(),
+            "1",
+            "urn:test",
+            SourceRelationshipTarget::External("https://example.test/".to_owned()),
+        )
+        .unwrap();
+    let replaced = publish(&bytes, replace);
+    assert_eq!(
+        relationship_type(&replaced, "/word/document.xml", "1").as_deref(),
+        Some("urn:test")
+    );
+
+    let mut authored = SourceTopologyPlan::new();
+    assert!(
+        authored
+            .try_add_external_relationship(document, "9", "urn:test", "https://example.test/")
+            .is_err()
+    );
+}
+
+#[test]
+fn prepared_materialization_retains_ingress_repairs_after_edit() {
+    let rels = DOCUMENT_RELS.replace("</Relationships>", r#"<Relationship Id="rId1" Type="http://example.invalid/duplicate" Target="ignored.xml"/></Relationships>"#);
+    for changed in [false, true] {
+        let source = SourceBackedPackage::from_vec(
+            package(CONTENT_TYPES, ROOT_RELS, &rels),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let report = source.tolerance_report().clone();
+        assert!(!report.is_clean());
+        let mut plan = litchi_opc::SourceTopologyPlan::new();
+        if changed {
+            plan.try_replace_part(
+                PackURI::new("/word/document.xml").unwrap(),
+                b"<after/>".to_vec(),
+            )
+            .unwrap();
+        }
+        let candidate = source.prepare_topology(plan).unwrap();
+        let owned = candidate.to_opc_package().unwrap();
+        assert_eq!(owned.tolerance_report(), &report);
+        assert_eq!(
+            owned
+                .get_part(&PackURI::new("/word/document.xml").unwrap())
+                .unwrap()
+                .blob(),
+            if changed {
+                b"<after/>".as_slice()
+            } else {
+                DOCUMENT.as_bytes()
+            }
+        );
+    }
+}

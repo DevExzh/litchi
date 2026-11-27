@@ -1,0 +1,12 @@
+<mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">
+  <mc:Choice Requires="p14">
+    <p:transition xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" spd="slow" p14:dur="1500" advClick="0" advTm="4250">
+      <p14:ripple dir="ld"/>
+    </p:transition>
+  </mc:Choice>
+  <mc:Fallback>
+    <p:transition spd="fast">
+      <p:fade/>
+    </p:transition>
+  </mc:Fallback>
+</mc:AlternateContent>

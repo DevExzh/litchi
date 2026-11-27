@@ -1,0 +1,1972 @@
+[
+  {
+    "function": "COUNT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/count.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=COUNT(2;4;6;\"eight\")",
+    "cached": "3",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "COUNT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/count.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=COUNT([.E1:.E3])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 5,
+        "type": "text",
+        "value": "Comment"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 5,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 5,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "COUNT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/count.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=COUNT([.I13:.I14];[.I15])",
+    "cached": "3",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "COUNTA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/counta.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=COUNTA(2;4;6;\"eight\")",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "COUNTA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/counta.fods",
+    "sheet": "Sheet2",
+    "row": 8,
+    "column": 1,
+    "formula": "of:=COUNTA([.E1:.E3])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 5,
+        "type": "text",
+        "value": "Comment"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 5,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 5,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "COUNTA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/counta.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=COUNTA([.I13:.I14];[.I15])",
+    "cached": "3",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "COUNTBLANK",
+    "source": "sc/qa/unit/data/functions/statistical/fods/countblank.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=COUNTBLANK([.I1:.I6])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "text",
+        "value": "www.libreoffice.org",
+        "nested_markup": [
+          "{urn:oasis:names:tc:opendocument:xmlns:text:1.0}a"
+        ]
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "32"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "text",
+        "value": "123abc"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "89"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "-12"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/average.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=AVERAGE([.G1:.G15])",
+    "cached": "8",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 7,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 7,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 7,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 7,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 7,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 7,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 7,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 7,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 7,
+        "type": "number",
+        "value": "15"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/average.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=AVERAGE([.H1:.H7])",
+    "cached": "4.85714285714286",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 8,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 8,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 8,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 8,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/average.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=AVERAGE({4;5;6;7;5;4;3})",
+    "cached": "4.85714285714286",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "AVERAGE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/average.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=AVERAGE([.G22:.G25])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 7,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 7,
+        "type": "text",
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/average.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=AVERAGE([.G1:.H2])",
+    "cached": "3",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGEA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=AVERAGEA([.G1:.G15])",
+    "cached": "8",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 7,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 7,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 7,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 7,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 7,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 7,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 7,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 7,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 7,
+        "type": "number",
+        "value": "15"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGEA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=AVERAGEA([.H1:.H7])",
+    "cached": "4.85714285714286",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 8,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 8,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 8,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 8,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 8,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGEA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=AVERAGEA({4;5;6;7;5;4;3})",
+    "cached": "4.85714285714286",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "AVERAGEA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=AVERAGEA([.G22:.G25])",
+    "cached": "3",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 7,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 7,
+        "type": "text",
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGEA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=AVERAGEA([.G28:.G32])",
+    "cached": "43.74",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 7,
+        "type": "number",
+        "value": "10.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 7,
+        "type": "number",
+        "value": "7.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 7,
+        "type": "number",
+        "value": "200"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 7,
+        "type": "logical",
+        "value": "true"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 7,
+        "type": "logical",
+        "value": "false"
+      }
+    ]
+  },
+  {
+    "function": "AVERAGEA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=AVERAGEA([.G31:.G32])",
+    "cached": "0.5",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 7,
+        "type": "logical",
+        "value": "true"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 7,
+        "type": "logical",
+        "value": "false"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MIN([.I2];[.I3];[.I4])",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MIN([.I2:.I4])",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=MIN([.I2];[.I3];[.I4];100;101)",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MIN([.H1:.H3])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 8,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=MIN(([.I2]-[.I3]);0)",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=MIN({1;2;3;4})",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=MIN({1;2;3;4};7)",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=MIN([.I2:.I6])",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "function": "MIN",
+    "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+    "sheet": "Sheet2",
+    "row": 16,
+    "column": 1,
+    "formula": "of:=MIN([.I12:.I14])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "text",
+        "value": "b"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "text",
+        "value": "c"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MAX([.I2];[.I3];[.I4])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MAX([.I2:.I4])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=MAX([.I2];[.I3];[.I4];100;101)",
+    "cached": "101",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MAX([.H1:.H3])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 8,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=MAX(([.I2]-[.I3]);0)",
+    "cached": "0.5",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=MAX({1;2;3;4})",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=MAX({1;2;3;4};7)",
+    "cached": "7",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=MAX([.I2:.I6])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "function": "MAX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+    "sheet": "Sheet2",
+    "row": 16,
+    "column": 1,
+    "formula": "of:=MAX([.I12:.I14])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "text",
+        "value": "b"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "text",
+        "value": "c"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MINA([.I2];[.I3];[.I4])",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MINA([.I2:.I4])",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=MINA([.I2];[.I3];[.I4];100;101)",
+    "cached": "1.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MINA([.H1:.H3])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 8,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=MINA(([.I2]-[.I3]);0)",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=MINA({1;2;3;4})",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=MINA({1;2;3;4};7)",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=MINA([.I2:.I6])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "function": "MINA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+    "sheet": "Sheet2",
+    "row": 16,
+    "column": 1,
+    "formula": "of:=MINA([.I12:.I14])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "text",
+        "value": "b"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "text",
+        "value": "c"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=MAXA([.I2];[.I3];[.I4])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=MAXA([.I2:.I4])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=MAXA([.I2];[.I3];[.I4];100;101)",
+    "cached": "101",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=MAXA([.H1:.H3])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 8,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 8,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=MAXA(([.I2]-[.I3]);0)",
+    "cached": "0.5",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 13,
+    "column": 1,
+    "formula": "of:=MAXA({1;2;3;4})",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 14,
+    "column": 1,
+    "formula": "of:=MAXA({1;2;3;4};7)",
+    "cached": "7",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 15,
+    "column": 1,
+    "formula": "of:=MAXA([.I2:.I6])",
+    "cached": "4",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3.5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "1.2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      }
+    ]
+  },
+  {
+    "function": "MAXA",
+    "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+    "sheet": "Sheet2",
+    "row": 16,
+    "column": 1,
+    "formula": "of:=MAXA([.I12:.I15])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "text",
+        "value": "b"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "text",
+        "value": "c"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "-1"
+      }
+    ]
+  }
+]

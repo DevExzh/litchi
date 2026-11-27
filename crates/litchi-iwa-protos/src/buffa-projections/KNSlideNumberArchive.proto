@@ -1,0 +1,25 @@
+// Wire-only projection for the Keynote slide-number visibility path.  The
+// attachment table deliberately remains an opaque bytes field: it contains a
+// repeated native entry list and is routed by the bounded handwritten codec.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message SlideNumberNodeArchive {
+  optional bool is_slide_number_visible = 18 [default = false];
+}
+
+message SlideNumberStorageArchive {
+  optional int32 kind = 1 [default = 3];
+  optional bytes attachment_table = 9;
+  optional bool in_document = 10 [default = false];
+}
+
+message TextualAttachmentArchive {
+  optional string string_equivalent = 1;
+  optional int32 kind = 2;
+}
+
+message SlideNumberAttachmentArchive {
+  required .LitchiIwaProjection.TextualAttachmentArchive super = 1;
+}

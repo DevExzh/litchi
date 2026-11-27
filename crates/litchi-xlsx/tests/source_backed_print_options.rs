@@ -1,0 +1,647 @@
+use std::io;
+use std::io::Write;
+use std::num::{NonZeroU64, NonZeroUsize};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits, ReadAt,
+    Resource, SourceVersion,
+};
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits, TargetMode,
+};
+use litchi_xlsx::SourceBackedWorkbook;
+use litchi_xlsx::print_options::PrintOptions;
+use litchi_xlsx::{Error, Package, SourceLimits};
+
+const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const MAIN: &str = "/xl/workbook.xml";
+const SHEET: &str = "/xl/worksheets/sheet1.xml";
+const SECOND: &str = "/xl/worksheets/sheet2.xml";
+const UNUSED: &str = "/xl/media/unused.bin";
+
+struct VersionedSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+}
+
+impl VersionedSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            revision: AtomicU64::new(0),
+        }
+    }
+
+    fn changed(&self) {
+        self.revision.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl ReadAt for VersionedSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(73, self.revision.load(Ordering::SeqCst)))
+    }
+}
+
+struct FailingSink {
+    accepted: usize,
+    limit: usize,
+}
+
+impl Write for FailingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.limit {
+            return Err(io::Error::other("injected sink failure"));
+        }
+        let written = bytes.len().min(self.limit - self.accepted);
+        self.accepted += written;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn fixture(sheet_xml: String, workbook_suffix: &str, signed: bool) -> Vec<u8> {
+    let workbook = format!(
+        r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/><sheet name="Unused" sheetId="2" r:id="rIdUnused"/></sheets><calcPr calcId="7"/>{workbook_suffix}</workbook>"#
+    );
+    let mut package = OpcPackage::new();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(MAIN).unwrap(),
+            ct::SML_SHEET_MAIN.to_string(),
+            workbook.into_bytes(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(SHEET).unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            sheet_xml.into_bytes(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(SECOND).unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            format!(
+                r#"<worksheet xmlns="{SML}"><sheetData/><extLst><ext uri="urn:unselected">{}</ext></extLst></worksheet>"#,
+                "x".repeat(128 * 1024)
+            )
+            .into_bytes(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(UNUSED).unwrap(),
+            "application/octet-stream".to_string(),
+            (0..128 * 1024).map(|value| (value % 251) as u8).collect(),
+        )))
+        .unwrap();
+    let workbook_part = package.get_part_mut(&PackURI::new(MAIN).unwrap()).unwrap();
+    workbook_part
+        .rels_mut()
+        .try_add_relationship(
+            rt::WORKSHEET.to_string(),
+            "worksheets/sheet1.xml".to_string(),
+            "rIdSheet".to_string(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    workbook_part
+        .rels_mut()
+        .try_add_relationship(
+            rt::WORKSHEET.to_string(),
+            "worksheets/sheet2.xml".to_string(),
+            "rIdUnused".to_string(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+    if signed {
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_string(),
+                b"<origin/>".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn ordinary_fixture(workbook_suffix: &str, signed: bool) -> Vec<u8> {
+    fixture(
+        format!(r#"<worksheet xmlns="{SML}"><sheetData/></worksheet>"#),
+        workbook_suffix,
+        signed,
+    )
+}
+
+fn target_options() -> PrintOptions {
+    let mut value = PrintOptions::new();
+    value
+        .set_horizontal_centered(true)
+        .set_vertical_centered(true)
+        .set_print_headings(true)
+        .set_print_grid_lines(true);
+    value
+}
+
+fn changed_edit(editor: &SourceBackedWorkbook) -> litchi_xlsx::print_options::source::Edit {
+    let mut edit = editor.edit_print_options("Sheet1").unwrap();
+    assert!(edit.set(target_options()));
+    edit
+}
+
+fn changed_commit(editor: &SourceBackedWorkbook) -> litchi_xlsx::print_options::source::Commit {
+    let commit = changed_edit(editor).commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    commit
+}
+
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-print-options-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
+#[test]
+fn managed_payload_retention_publication_and_owning_escape_are_explicit() {
+    let bytes = ordinary_fixture("", false);
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 8).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
+    assert!(editor.cache_diagnostics().budget_managed);
+    assert_eq!(budget.used(Resource::Memory), part_len(&bytes, MAIN));
+    let commit = changed_commit(&editor);
+    assert_eq!(budget.used(Resource::Memory), exact);
+
+    let mut replay = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
+
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    assert_eq!(
+        litchi_xlsx::print_options::Snapshot::load(
+            &OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap(),
+            "Sheet1",
+        )
+        .unwrap()
+        .print_options(),
+        Some(&target_options())
+    );
+    drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_cancellation_is_checked_before_stream_publication() {
+    let bytes = ordinary_fixture("", false);
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let commit = changed_commit(&editor);
+    cancellation_source.cancel();
+    let mut output = Vec::new();
+    assert!(matches!(
+        commit.package().write_to(&mut output),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert!(output.is_empty());
+    drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_one_under_budget_refuses_before_selected_worksheet_load() {
+    let bytes = ordinary_fixture("", false);
+    let exact = part_len(&bytes, MAIN) + part_len(&bytes, SHEET);
+    let (budget, _cancellation_source, context) = managed_context(exact - 1);
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let opened = editor.cache_diagnostics().successful_loads;
+    assert_eq!(budget.used(Resource::Memory), part_len(&bytes, MAIN));
+    assert!(matches!(
+        editor
+            .edit_print_options("Sheet1")
+            .map(|edit| edit.before().clone()),
+        Err(Error::Package(OpcError::Execution(
+            ExecutionError::ResourceLimit(_)
+        )))
+    ));
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<String> {
+    let mut signatures = relationships
+        .iter()
+        .map(|relationship| {
+            format!(
+                "{}\u{1f}{}\u{1f}{}\u{1f}{:?}",
+                relationship.r_id(),
+                relationship.reltype(),
+                relationship.target_ref(),
+                relationship.target_mode()
+            )
+        })
+        .collect::<Vec<_>>();
+    signatures.sort_unstable();
+    signatures
+}
+
+#[test]
+fn changed_edit_reopens_inverts_and_changes_only_the_selected_worksheet() {
+    let source_bytes = ordinary_fixture(r#"<extLst><ext uri="urn:keep"/></extLst>"#, false);
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+            .unwrap();
+    let opened = editor.cache_diagnostics().successful_loads;
+    let commit = changed_commit(&editor);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened + 1);
+
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    assert_eq!(
+        litchi_xlsx::print_options::Snapshot::load(&replay, "Sheet1")
+            .unwrap()
+            .print_options(),
+        Some(&target_options())
+    );
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
+            .unwrap()
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob()
+    );
+
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    let published = commit.patch().after().clone();
+    assert_eq!(published.print_options(), Some(&target_options()));
+
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
+    assert_eq!(source.part_count(), candidate.part_count());
+    assert_eq!(
+        relationship_signatures(source.rels()),
+        relationship_signatures(candidate.rels())
+    );
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
+        let output_part = candidate.get_part(part.partname()).unwrap();
+        assert_eq!(part.content_type(), output_part.content_type());
+        assert_eq!(
+            relationship_signatures(part.rels()),
+            relationship_signatures(output_part.rels())
+        );
+        if part.partname().as_str() == SHEET {
+            assert_ne!(part.blob(), output_part.blob());
+        } else {
+            assert_eq!(part.blob(), output_part.blob());
+        }
+    }
+    let reopened = Package::from_bytes(&output).unwrap();
+    assert_eq!(
+        reopened
+            .workbook()
+            .sheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .print_options()
+            .unwrap(),
+        Some(target_options())
+    );
+}
+
+#[test]
+fn add_replace_remove_noop_and_signed_refusal_are_exact() {
+    let existing = target_options();
+    let existing_xml = format!(
+        r#"<worksheet xmlns="{SML}"><sheetData/><printOptions horizontalCentered="1" verticalCentered="1" headings="1" gridLines="1" gridLinesSet="1"/></worksheet>"#
+    );
+    let bytes = fixture(existing_xml, "", false);
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit_print_options("Sheet1").unwrap();
+    assert!(!edit.set(existing));
+    assert!(edit.remove());
+    let remove = edit.commit().unwrap();
+    assert!(remove.diagnostics().changed());
+    let mut output = Vec::new();
+    remove.package().write_to(&mut output).unwrap();
+    let published = remove.patch().after().clone();
+    assert_eq!(published.print_options(), None);
+    assert!(
+        !OpcPackage::from_bytes(&output, SourceLimits::default())
+            .unwrap()
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob()
+            .windows(b"printOptions".len())
+            .any(|window| window == b"printOptions")
+    );
+
+    let bytes = ordinary_fixture("", false);
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    let mut edit = editor.edit_print_options("Sheet1").unwrap();
+    assert!(edit.set(target_options()));
+    assert!(!edit.set(target_options()));
+    assert!(edit.remove());
+    assert!(!edit.remove());
+    assert!(!edit.commit().unwrap().diagnostics().changed());
+
+    let signed = ordinary_fixture("", true);
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed.clone()))).unwrap();
+    let noop = editor
+        .edit_print_options("Sheet1")
+        .unwrap()
+        .commit()
+        .unwrap();
+    output.clear();
+    noop.package().write_to(&mut output).unwrap();
+    assert_eq!(output, signed);
+
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
+    assert!(matches!(
+        changed_edit(&editor).commit(),
+        Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+}
+
+#[test]
+fn foreign_changed_and_retargeted_sources_are_rejected() {
+    let bytes = ordinary_fixture("", false);
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = changed_commit(&editor);
+    let foreign = ordinary_fixture(r#"<extLst><ext uri="urn:foreign"/></extLst>"#, false);
+    let foreign_editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(foreign))).unwrap();
+    let mut output = Vec::new();
+    assert!(matches!(
+        foreign_editor
+            .apply_print_options(commit.patch())
+            .map(|_| ()),
+        Err(Error::PatchConflict { .. })
+    ));
+    assert!(output.is_empty());
+
+    let source = Arc::new(VersionedSource::new(bytes.clone()));
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let commit = changed_commit(&editor);
+    source.changed();
+    assert!(matches!(
+        commit.package().write_to(&mut output),
+        Err(Error::Package(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
+
+    let mut retargeted = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    let workbook = retargeted
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap();
+    workbook.rels_mut().remove("rIdSheet").unwrap();
+    workbook
+        .rels_mut()
+        .try_add_relationship(
+            rt::WORKSHEET.to_string(),
+            "worksheets/sheet2.xml".to_string(),
+            "rIdSheet".to_string(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    // An owner refuses the retargeted graph at open.
+    assert!(replay_patch(&mut retargeted, commit.patch()).is_err());
+}
+
+#[test]
+fn mce_limits_and_partial_sink_are_checked() {
+    let mce_sheet = format!(
+        concat!(
+            r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future">"#,
+            r#"<mc:AlternateContent><mc:Choice Requires="x"><x:future/></mc:Choice><mc:Fallback>"#,
+            r#"<printOptions horizontalCentered="1"/></mc:Fallback></mc:AlternateContent></worksheet>"#,
+        ),
+        SML = SML,
+    );
+    let mce = fixture(mce_sheet, "", false);
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
+    // This once refused, and the refusal was an artifact of the
+    // markup-compatibility writer rather than a property of the worksheet: the
+    // writer re-declared every in-scope namespace on every element it emitted,
+    // so the `printOptions` it selected out of the `mc:Fallback` carried a
+    // redundant `xmlns="..."`, and `parse_options` reported it as
+    // `unknown printOptions attribute 'xmlns'`. Every worksheet whose
+    // `printOptions` sat inside an `mc:AlternateContent` was unreadable for
+    // that reason. The writer now declares each namespace once, so the
+    // selected element carries no declaration and the Fallback's value is
+    // read. The old shape is still refused, which
+    // `the_old_writers_redundant_declaration_was_refused_by_this_parser` below
+    // pins.
+    let edit = editor
+        .edit_print_options("Sheet1")
+        .expect("the selected fallback is readable");
+    assert_eq!(
+        edit.before()
+            .print_options()
+            .map(PrintOptions::horizontal_centered),
+        Some(true)
+    );
+
+    let limits = SourceLimits::builder()
+        .max_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(VersionedSource::new(ordinary_fixture("", false))),
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        ),
+        Err(Error::Package(OpcError::Limit { .. }))
+    ));
+
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(
+        ordinary_fixture("", false),
+    )))
+    .unwrap();
+    let commit = changed_commit(&editor);
+    let mut sink = FailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+    assert!(matches!(
+        commit.package().write_to(&mut sink),
+        Err(Error::Package(OpcError::IncompleteOutput { .. }))
+    ));
+    assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn chartsheet_selection_is_refused() {
+    const CHARTSHEET_REL: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
+    const CHARTSHEET_CT: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
+
+    let mut package =
+        OpcPackage::from_bytes(&ordinary_fixture("", false), SourceLimits::default()).unwrap();
+    let sheet_uri = PackURI::new(SHEET).unwrap();
+    let sheet = package.get_part_mut(&sheet_uri).unwrap();
+    sheet.set_content_type(CHARTSHEET_CT.to_owned()).unwrap();
+    sheet.set_blob(format!(r#"<chartsheet xmlns="{SML}"/>"#).into_bytes());
+    let workbook = package.get_part_mut(&PackURI::new(MAIN).unwrap()).unwrap();
+    workbook.rels_mut().remove("rIdSheet").unwrap();
+    workbook
+        .rels_mut()
+        .try_add_relationship(
+            CHARTSHEET_REL.to_owned(),
+            "worksheets/sheet1.xml".to_owned(),
+            "rIdSheet".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    let bytes = PackageWriter::to_bytes(&package).unwrap();
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes))).unwrap();
+    assert!(matches!(
+        editor.edit_print_options("Sheet1"),
+        Err(Error::NotWorksheet { .. })
+    ));
+}
+
+/// The markup-compatibility writer's redundant re-declaration was not only
+/// wasteful, it made this parser refuse its own preprocessor's output.
+///
+/// The two byte strings below are the codec's output for the `mc:Fallback`
+/// worksheet in `mce_limits_and_partial_sink_are_checked`, before and after the
+/// rewrite. Only the declarations on the selected `printOptions` differ.
+#[test]
+fn the_old_writers_redundant_declaration_was_refused_by_this_parser() {
+    let old = format!(
+        concat!(
+            r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future">"#,
+            r#"<printOptions xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future" horizontalCentered="1"></printOptions>"#,
+            r#"</worksheet>"#,
+        ),
+        SML = SML,
+    );
+    let error = litchi_xlsx::print_options::parse_print_options(old.as_bytes())
+        .expect_err("a redundant default declaration was reported as an unknown attribute");
+    assert!(
+        error
+            .to_string()
+            .contains("unknown printOptions attribute 'xmlns'"),
+        "unexpected refusal: {error}"
+    );
+
+    let new = format!(
+        concat!(
+            r#"<worksheet xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:future">"#,
+            r#"<printOptions horizontalCentered="1"></printOptions>"#,
+            r#"</worksheet>"#,
+        ),
+        SML = SML,
+    );
+    assert_eq!(
+        litchi_xlsx::print_options::parse_print_options(new.as_bytes())
+            .expect("the rewritten shape is readable")
+            .as_ref()
+            .map(PrintOptions::horizontal_centered),
+        Some(true)
+    );
+}
+
+/// Replay a source-backed patch onto `package` through a source-backed
+/// workbook over its bytes (source-backed patches replay onto
+/// source-backed workbooks).
+fn replay_patch(
+    package: &mut OpcPackage,
+    patch: &litchi_xlsx::print_options::source::Patch,
+) -> litchi_xlsx::Result<()> {
+    let bytes = PackageWriter::to_bytes(package)?;
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let next = workbook
+        .apply_print_options(patch)?
+        .into_package()
+        .to_bytes()?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
+    Ok(())
+}

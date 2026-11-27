@@ -1,0 +1,1 @@
+[{"command":"set","path":"/Sheet1/A1","props":{"value":"Q1","sparkle":"yes"}},{"command":"set","path":"Sheet1!A2","props":{"value":"=SUM(A1:A1)"}}]

@@ -1,0 +1,1782 @@
+//! Exact-source, selector-first Keynote movie/audio-playback transactions.
+//!
+//! This owner deliberately handles the scalar playback edge only. It resolves
+//! a rooted file-backed movie or independently positioned audio control,
+//! delegates the MovieArchive wire projection to the neutral strict codec, and
+//! rewrites the selected media component in a private candidate before
+//! reopening it through the normal Keynote ingress. Movie/audio graph
+//! creation/removal, media replacement, geometry, and metadata allocation are
+//! outside this module.
+
+use std::collections::HashMap;
+use std::fmt;
+use std::mem::size_of;
+use std::sync::Arc;
+use std::time::Duration;
+
+use litchi_core::Position;
+use litchi_iwa_archive::package::{Catalog, Entry, EntryEdit, ExactArtifacts};
+use litchi_iwa_common::{
+    WireLimits, decode_varint_from_bytes, varint::encoded_len, wire::WireView,
+};
+use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use litchi_iwa_protos::movie_playback_codec;
+use thiserror::Error as ThisError;
+
+use super::{Package, PhysicalSource, ReadError, SemanticLimitKind};
+use crate::slide::media::playback::{MediaLoopMode, MediaPlaybackSettings, MediaVolume};
+use crate::{MovieKind, MovieSelector, SlideSelector};
+
+const MOVIE_MESSAGE_TYPE: u32 = 3_007;
+const SLIDE_MESSAGE_TYPE: u32 = 5;
+const SLIDE_OWNED_DRAWABLES_FIELD: u32 = 7;
+const MOVIE_SUPER_FIELD: u32 = 1;
+const DRAWABLE_PARENT_FIELD: u32 = 2;
+
+#[derive(Debug, Clone, Copy)]
+struct PlaybackBudget {
+    max_input: usize,
+    max_output: usize,
+    max_fields: usize,
+    max_work: usize,
+    max_nesting: usize,
+    max_references: usize,
+    max_allocations: usize,
+    max_retained: usize,
+    max_scratch: usize,
+    max_components: usize,
+    input: usize,
+    output: usize,
+    fields: usize,
+    work: usize,
+    nesting: usize,
+    references: usize,
+    allocations: usize,
+    retained: usize,
+    scratch: usize,
+    components: usize,
+}
+
+impl PlaybackBudget {
+    fn for_package(package: &Package) -> Result<Self, Error> {
+        let wire = package.wire_limits().map_err(map_wire_error)?;
+        let physical = package.state.options.archive();
+        let source =
+            usize::try_from(physical.max_input_bytes()).map_err(|_| Error::InvalidSource)?;
+        let aggregate = source.checked_mul(4).ok_or(Error::InvalidSource)?;
+        let semantic = package.semantic_limits();
+        Ok(Self {
+            max_input: aggregate,
+            max_output: aggregate,
+            max_fields: wire.max_fields(),
+            max_work: wire.max_rewrite_work(),
+            max_nesting: wire.max_nesting(),
+            max_references: semantic.max_references(),
+            max_allocations: semantic
+                .max_objects()
+                .checked_add(semantic.max_references())
+                .ok_or(Error::InvalidSource)?,
+            max_retained: aggregate,
+            max_scratch: aggregate,
+            max_components: semantic.max_objects(),
+            input: 0,
+            output: 0,
+            fields: 0,
+            work: 0,
+            nesting: 0,
+            references: 0,
+            allocations: 0,
+            retained: 0,
+            scratch: 0,
+            components: 0,
+        })
+    }
+
+    fn add(
+        current: &mut usize,
+        amount: usize,
+        maximum: usize,
+        kind: LimitKind,
+    ) -> Result<(), Error> {
+        let observed = current.checked_add(amount).ok_or(Error::InvalidSource)?;
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind,
+                observed: observed as u64,
+                maximum: maximum as u64,
+            });
+        }
+        *current = observed;
+        Ok(())
+    }
+
+    fn source(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.input,
+            amount,
+            self.max_input,
+            LimitKind::InputBytes,
+        )
+    }
+
+    fn wire_scan(&mut self, payload: &[u8], nesting: usize) -> Result<(), Error> {
+        self.source(payload.len())?;
+        self.fields(payload.len())?;
+        self.work(payload.len())?;
+        self.nesting(nesting)
+    }
+
+    fn output(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.output,
+            amount,
+            self.max_output,
+            LimitKind::OutputBytes,
+        )
+    }
+
+    fn preflight_output(&self, amount: usize) -> Result<(), Error> {
+        let observed = self
+            .output
+            .checked_add(amount)
+            .ok_or(Error::InvalidSource)?;
+        if observed > self.max_output {
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed: observed as u64,
+                maximum: self.max_output as u64,
+            });
+        }
+        Ok(())
+    }
+
+    fn preflight_work(&self, amount: usize) -> Result<(), Error> {
+        let observed = self.work.checked_add(amount).ok_or(Error::InvalidSource)?;
+        if observed > self.max_work {
+            return Err(Error::Limit {
+                kind: LimitKind::WireWork,
+                observed: observed as u64,
+                maximum: self.max_work as u64,
+            });
+        }
+        Ok(())
+    }
+
+    fn fields(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.fields,
+            amount,
+            self.max_fields,
+            LimitKind::WireFields,
+        )
+    }
+
+    fn work(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(&mut self.work, amount, self.max_work, LimitKind::WireWork)
+    }
+
+    fn nesting(&mut self, amount: usize) -> Result<(), Error> {
+        if amount > self.max_nesting {
+            return Err(Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: amount as u64,
+                maximum: self.max_nesting as u64,
+            });
+        }
+        self.nesting = self.nesting.max(amount);
+        Ok(())
+    }
+
+    fn references(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.references,
+            amount,
+            self.max_references,
+            LimitKind::References,
+        )
+    }
+
+    fn allocations(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.allocations,
+            amount,
+            self.max_allocations,
+            LimitKind::Allocations,
+        )
+    }
+
+    fn retained(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.retained,
+            amount,
+            self.max_retained,
+            LimitKind::Retained,
+        )
+    }
+
+    fn scratch(&mut self, amount: usize) -> Result<(), Error> {
+        Self::add(
+            &mut self.scratch,
+            amount,
+            self.max_scratch,
+            LimitKind::Scratch,
+        )
+    }
+
+    fn component(&mut self) -> Result<(), Error> {
+        Self::add(
+            &mut self.components,
+            1,
+            self.max_components,
+            LimitKind::Components,
+        )
+    }
+
+    fn residual_wire_limits(&self, base: WireLimits) -> Result<WireLimits, Error> {
+        let input = self.max_input.saturating_sub(self.input).max(1);
+        let fields = self.max_fields.saturating_sub(self.fields).max(1);
+        let work = self.max_work.saturating_sub(self.work).max(1);
+        base.with_input_bytes(base.max_input_bytes().min(input))
+            .and_then(|value| value.with_fields(base.max_fields().min(fields)))
+            .and_then(|value| value.with_rewrite_work(base.max_rewrite_work().min(work)))
+            .and_then(|value| value.with_nesting(base.max_nesting().min(self.max_nesting)))
+            .map_err(map_wire_error)
+    }
+
+    fn codec_report(&mut self, report: movie_playback_codec::DecodeReport) -> Result<(), Error> {
+        self.source(report.input_bytes())?;
+        Self::add(
+            &mut self.fields,
+            report.fields(),
+            self.max_fields,
+            LimitKind::WireFields,
+        )?;
+        Self::add(
+            &mut self.work,
+            report.work_bytes(),
+            self.max_work,
+            LimitKind::WireWork,
+        )?;
+        self.scratch(report.scratch_bytes())?;
+        self.retained(report.input_bytes())?;
+        self.nesting(report.max_depth() as usize)?;
+        self.allocations(report.allocations())?;
+        Ok(())
+    }
+
+    fn codec_requirements(
+        &mut self,
+        requirements: movie_playback_codec::RewriteExecutionRequirements,
+    ) -> Result<(), Error> {
+        self.output(requirements.output_bytes)?;
+        Self::add(
+            &mut self.fields,
+            requirements.fields,
+            self.max_fields,
+            LimitKind::WireFields,
+        )?;
+        Self::add(
+            &mut self.work,
+            requirements.work_bytes,
+            self.max_work,
+            LimitKind::WireWork,
+        )?;
+        self.allocations(requirements.allocations)?;
+        self.retained(requirements.retained_bytes)?;
+        self.scratch(requirements.scratch_bytes)?;
+        self.nesting(requirements.max_depth as usize)?;
+        Ok(())
+    }
+
+    fn physical(&mut self, decompressed: usize) -> Result<(), Error> {
+        self.source(decompressed)?;
+        self.work(decompressed)?;
+        self.output(decompressed.checked_mul(2).ok_or(Error::InvalidSource)?)
+    }
+
+    fn reassembly(
+        &mut self,
+        requirements: litchi_iwa_archive::package::ReassemblyExecutionRequirements,
+    ) -> Result<(), Error> {
+        self.output(requirements.output_bytes())?;
+        self.allocations(requirements.allocations())?;
+        self.retained(requirements.retained_bytes())?;
+        self.scratch(requirements.scratch_bytes())?;
+        Ok(())
+    }
+
+    fn candidate_reopen(&mut self, bytes: usize) -> Result<(), Error> {
+        self.source(bytes)?;
+        self.work(bytes)?;
+        Ok(())
+    }
+}
+
+/// Resource categories reported by a movie-playback transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    InputBytes,
+    OutputBytes,
+    WireBytes,
+    Entries,
+    EntryBytes,
+    TotalBytes,
+    Slides,
+    References,
+    WireFields,
+    WireNesting,
+    WireWork,
+    PlaybackBytes,
+    Allocations,
+    Retained,
+    Scratch,
+    Components,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(match self {
+            Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
+            Self::WireBytes => "wire bytes",
+            Self::Entries => "entries",
+            Self::EntryBytes => "entry bytes",
+            Self::TotalBytes => "total bytes",
+            Self::Slides => "slides",
+            Self::References => "references",
+            Self::WireFields => "wire fields",
+            Self::WireNesting => "wire nesting depth",
+            Self::WireWork => "wire work",
+            Self::PlaybackBytes => "movie playback bytes",
+            Self::Allocations => "allocations",
+            Self::Retained => "retained bytes",
+            Self::Scratch => "scratch bytes",
+            Self::Components => "components",
+        })
+    }
+}
+
+/// Content-redacted failure raised by a movie-playback transaction.
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
+    #[error(transparent)]
+    Refused(Refusal),
+    #[error("the Keynote movie-playback source cannot be edited safely")]
+    InvalidSource,
+    #[error("Keynote movie-playback {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        kind: LimitKind,
+        observed: u64,
+        maximum: u64,
+    },
+    #[error("could not allocate {amount} units for the Keynote movie-playback transaction")]
+    Allocation { amount: usize },
+    #[error("the edited Keynote movie playback failed semantic verification")]
+    Verification,
+    #[error("the Keynote movie-playback patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`].
+#[derive(Debug, Clone, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    #[error("this Keynote source does not support physical movie-playback edits")]
+    UnsupportedSource,
+    #[error("the requested Keynote movie-playback graph operation is unsupported")]
+    UnsupportedDependency,
+    #[error("the Keynote movie-playback selector is ambiguous")]
+    AmbiguousSelector,
+    #[error("the Keynote slide selector name cannot be empty")]
+    EmptySlideName,
+    #[error("the Keynote show has no slide matching the requested name")]
+    SlideNameNotFound,
+    #[error("the Keynote show has no slide at position {position:?}")]
+    SlidePositionNotFound { position: Position },
+    #[error("the selected Keynote slide has no movie at position {position:?}")]
+    MoviePositionNotFound { position: Position },
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+            Self::AmbiguousSelector { .. } | Self::EmptySlideName { .. } => {
+                RefusalKind::InvalidValue
+            },
+            Self::SlideNameNotFound { .. }
+            | Self::SlidePositionNotFound { .. }
+            | Self::MoviePositionNotFound { .. } => RefusalKind::NotFound,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
+/// One mutable playback value staged against an immutable package snapshot.
+pub struct Edit<'a> {
+    source: &'a Package,
+    selection: PlaybackSelection,
+    after: MediaPlaybackSettings,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Edit")
+            .field("slide_position", &self.selection.slide_position)
+            .field("movie_position", &self.selection.movie_position)
+            .field("has_before", &self.selection.before.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    fn new<'slide>(
+        source: &'a Package,
+        slide_selector: impl Into<SlideSelector<'slide>>,
+        movie_selector: impl Into<MovieSelector>,
+    ) -> Result<Self, Error> {
+        let selection = select_movie(source, slide_selector.into(), movie_selector.into(), true)?;
+        let after = selection
+            .before
+            .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+        Ok(Self {
+            source,
+            selection,
+            after,
+        })
+    }
+
+    #[must_use]
+    pub const fn slide_position(&self) -> Position {
+        self.selection.slide_position
+    }
+
+    #[must_use]
+    pub const fn movie_position(&self) -> Position {
+        self.selection.movie_position
+    }
+
+    #[must_use]
+    pub const fn before(&self) -> Option<MediaPlaybackSettings> {
+        self.selection.before
+    }
+
+    #[must_use]
+    pub const fn after(&self) -> MediaPlaybackSettings {
+        self.after
+    }
+
+    pub fn set(mut self, settings: MediaPlaybackSettings) -> Result<Self, Error> {
+        settings.validate().map_err(|_| Error::InvalidSource)?;
+        self.after = settings;
+        Ok(self)
+    }
+
+    pub fn commit(self) -> Result<Commit, Error> {
+        commit_edit(self.source, &self.selection, self.after)
+    }
+}
+
+/// Exact-source checked reversible playback patch.
+#[derive(Clone, PartialEq)]
+pub struct Patch {
+    artifacts: ExactArtifacts,
+    selection: PlaybackSelection,
+    before: MediaPlaybackSettings,
+    after: MediaPlaybackSettings,
+    touched_components: usize,
+    deleted_previews: usize,
+}
+
+impl fmt::Debug for Patch {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Patch")
+            .field("slide_position", &self.selection.slide_position)
+            .field("movie_position", &self.selection.movie_position)
+            .field(
+                "changed_poster",
+                &(self.before.poster_time != self.after.poster_time),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Patch {
+    #[must_use]
+    pub const fn slide_position(&self) -> Position {
+        self.selection.slide_position
+    }
+
+    #[must_use]
+    pub const fn movie_position(&self) -> Position {
+        self.selection.movie_position
+    }
+
+    #[must_use]
+    pub const fn before(&self) -> MediaPlaybackSettings {
+        self.before
+    }
+
+    #[must_use]
+    pub const fn after(&self) -> MediaPlaybackSettings {
+        self.after
+    }
+
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.artifacts.source_fingerprint()
+    }
+
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.artifacts.target_fingerprint()
+    }
+
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after && self.artifacts.is_byte_noop()
+    }
+
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            artifacts: self.artifacts.inverse(),
+            selection: self.selection.clone(),
+            before: self.after,
+            after: self.before,
+            touched_components: self.touched_components,
+            deleted_previews: self.deleted_previews,
+        }
+    }
+}
+
+/// Compact playback publication diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    touched_components: usize,
+    deleted_previews: usize,
+    full_reparse_performed: bool,
+}
+
+impl Diagnostics {
+    const fn unchanged() -> Self {
+        Self {
+            changed: false,
+            touched_components: 0,
+            deleted_previews: 0,
+            full_reparse_performed: false,
+        }
+    }
+
+    const fn published(touched_components: usize, deleted_previews: usize) -> Self {
+        Self {
+            changed: true,
+            touched_components,
+            deleted_previews,
+            full_reparse_performed: true,
+        }
+    }
+
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
+    #[must_use]
+    pub const fn touched_components(self) -> usize {
+        self.touched_components
+    }
+
+    #[must_use]
+    pub const fn deleted_previews(self) -> usize {
+        self.deleted_previews
+    }
+
+    #[must_use]
+    pub const fn full_reparse_performed(self) -> bool {
+        self.full_reparse_performed
+    }
+}
+
+/// Fully verified result of one playback transaction.
+#[must_use = "a Keynote movie-playback commit contains the validated package snapshot"]
+#[derive(Debug)]
+pub struct Commit {
+    package: Package,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+impl Commit {
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.package
+    }
+
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    #[must_use]
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+}
+
+#[derive(Clone, PartialEq)]
+struct PlaybackSelection {
+    slide_position: Position,
+    movie_position: Position,
+    slide_identifier: u64,
+    node_identifier: u64,
+    movie_identifier: u64,
+    message_index: usize,
+    slide_component_name: Arc<str>,
+    before: Option<MediaPlaybackSettings>,
+}
+
+impl fmt::Debug for PlaybackSelection {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("PlaybackSelection")
+            .field("slide_position", &self.slide_position)
+            .field("movie_position", &self.movie_position)
+            .field("has_before", &self.before.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Read playback settings for one existing file-backed movie or audio
+    /// control.
+    pub fn slide_movie_playback_settings<'slide>(
+        &self,
+        slide_selector: impl Into<SlideSelector<'slide>>,
+        movie_selector: impl Into<MovieSelector>,
+    ) -> Result<Option<MediaPlaybackSettings>, Error> {
+        let mut budget = PlaybackBudget::for_package(self)?;
+        Ok(select_movie_with_budget(
+            self,
+            slide_selector.into(),
+            movie_selector.into(),
+            false,
+            &mut budget,
+        )?
+        .before)
+    }
+
+    /// Begin an exact immutable edit of an existing file-backed movie or audio
+    /// control's playback.
+    pub fn edit_slide_movie_playback_settings<'slide>(
+        &self,
+        slide_selector: impl Into<SlideSelector<'slide>>,
+        movie_selector: impl Into<MovieSelector>,
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, slide_selector, movie_selector)
+    }
+
+    /// Apply an exact-source checked playback patch.
+    pub fn apply_slide_movie_playback_settings(&self, patch: &Patch) -> Result<Commit, Error> {
+        let catalog = physical_catalog(self)?;
+        let source = catalog.shared_source();
+        if !patch.artifacts.authorizes_source(&source) {
+            return Err(Error::PatchConflict);
+        }
+        let mut budget = PlaybackBudget::for_package(self)?;
+        let current = select_movie_with_budget(
+            self,
+            SlideSelector::position(patch.selection.slide_position),
+            MovieSelector::position(patch.selection.movie_position),
+            true,
+            &mut budget,
+        )?;
+        if !same_selection(&current, &patch.selection) || current.before != Some(patch.before) {
+            return Err(Error::PatchConflict);
+        }
+        if patch.is_noop() {
+            self.validate().map_err(map_read_error)?;
+            return Ok(Commit {
+                package: self.snapshot(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::unchanged(),
+            });
+        }
+        if !catalog.source_is_exact() {
+            return Err(Error::PatchConflict);
+        }
+        reopen_target_patch(self, patch, &mut budget)
+    }
+}
+
+#[cfg(test)]
+fn decode_movie_playback_payload(
+    source: &[u8],
+    wire_limits: WireLimits,
+) -> Result<MediaPlaybackSettings, Error> {
+    let recursion_limit =
+        u32::try_from(wire_limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
+    let options = movie_playback_codec::DecodeOptions::new(
+        wire_limits.max_input_bytes().min(source.len().max(1)),
+        wire_limits.max_fields(),
+        wire_limits.max_rewrite_work(),
+        recursion_limit,
+    )
+    .with_max_output_bytes(wire_limits.max_output_bytes());
+    let (snapshot, _report) =
+        movie_playback_codec::decode_movie_playback_with_report(source, options)
+            .map_err(map_codec_error)?;
+    settings_from_snapshot(snapshot)
+}
+
+fn commit_edit(
+    source: &Package,
+    selection: &PlaybackSelection,
+    after: MediaPlaybackSettings,
+) -> Result<Commit, Error> {
+    let catalog = physical_catalog(source)?;
+    let source_bytes = catalog.shared_source();
+    let mut budget = PlaybackBudget::for_package(source)?;
+    budget.source(source.source_bytes().len())?;
+    let current = select_movie_with_budget(
+        source,
+        SlideSelector::position(selection.slide_position),
+        MovieSelector::position(selection.movie_position),
+        true,
+        &mut budget,
+    )?;
+    let before = selection
+        .before
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+    if !same_selection(&current, selection) || current.before != Some(before) {
+        return Err(Error::InvalidSource);
+    }
+    if before == after {
+        return Ok(Commit {
+            package: source.snapshot(),
+            patch: Patch {
+                artifacts: ExactArtifacts::new(Arc::clone(&source_bytes), source_bytes),
+                selection: selection.clone(),
+                before,
+                after,
+                touched_components: 0,
+                deleted_previews: 0,
+            },
+            diagnostics: Diagnostics::unchanged(),
+        });
+    }
+    if !catalog.source_is_exact() {
+        return Err(Error::Refused(Refusal::UnsupportedSource));
+    }
+    let (candidate, deleted_previews) = rewrite_movie(source, selection, after, &mut budget)?;
+    candidate.validate().map_err(map_read_error)?;
+    let target = physical_catalog(&candidate)?.shared_source();
+    let target_selection = select_movie(
+        &candidate,
+        SlideSelector::position(selection.slide_position),
+        MovieSelector::position(selection.movie_position),
+        true,
+    )?;
+    if !same_selection(&target_selection, selection) || target_selection.before != Some(after) {
+        return Err(Error::Verification);
+    }
+    verify_locality(source, &candidate, selection, &mut budget)?;
+    Ok(Commit {
+        package: candidate,
+        patch: Patch {
+            artifacts: ExactArtifacts::new(source_bytes, Arc::clone(&target)),
+            selection: selection.clone(),
+            before,
+            after,
+            touched_components: 1,
+            deleted_previews,
+        },
+        diagnostics: Diagnostics::published(1, deleted_previews),
+    })
+}
+
+fn reopen_target_patch(
+    source: &Package,
+    patch: &Patch,
+    budget: &mut PlaybackBudget,
+) -> Result<Commit, Error> {
+    budget.candidate_reopen(patch.artifacts.target().len())?;
+    let candidate =
+        Package::from_source_with_options(patch.artifacts.target(), source.state.options)
+            .map_err(map_read_error)?;
+    candidate.validate().map_err(map_read_error)?;
+    let selected = select_movie_with_budget(
+        &candidate,
+        SlideSelector::position(patch.selection.slide_position),
+        MovieSelector::position(patch.selection.movie_position),
+        true,
+        budget,
+    )?;
+    if !same_selection(&selected, &patch.selection) || selected.before != Some(patch.after) {
+        return Err(Error::Verification);
+    }
+    verify_locality(source, &candidate, &patch.selection, budget)?;
+    Ok(Commit {
+        package: candidate,
+        patch: patch.clone(),
+        diagnostics: Diagnostics::published(patch.touched_components, patch.deleted_previews),
+    })
+}
+
+fn select_movie(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    mutation_guards: bool,
+) -> Result<PlaybackSelection, Error> {
+    let mut budget = PlaybackBudget::for_package(package)?;
+    select_movie_with_budget(
+        package,
+        slide_selector,
+        movie_selector,
+        mutation_guards,
+        &mut budget,
+    )
+}
+
+fn select_movie_with_budget(
+    package: &Package,
+    slide_selector: SlideSelector<'_>,
+    movie_selector: MovieSelector,
+    _mutation_guards: bool,
+    budget: &mut PlaybackBudget,
+) -> Result<PlaybackSelection, Error> {
+    let slide_position = resolve_slide_position(package, slide_selector)?;
+    let record = package
+        .slide_record_at(slide_position.get())
+        .map_err(map_read_error)?
+        .ok_or(Error::Refused(Refusal::SlidePositionNotFound {
+            position: slide_position,
+        }))?;
+    let (slide_component_name, slide) = package
+        .object_with_component(record.slide_identifier)
+        .ok_or(Error::InvalidSource)?;
+    if slide.messages.len() != slide.archive_info.message_infos.len() {
+        return Err(Error::InvalidSource);
+    }
+    let slide_message = unique_message(slide, SLIDE_MESSAGE_TYPE)?;
+    let base_limits = package.wire_limits().map_err(map_wire_error)?;
+    let limits = budget.residual_wire_limits(base_limits)?;
+    let movies = repeated_references(slide_message.1, SLIDE_OWNED_DRAWABLES_FIELD, limits)?;
+    budget.wire_scan(slide_message.1, 1)?;
+    budget.references(movies.len())?;
+    let mut movie_entries = Vec::new();
+    movie_entries
+        .try_reserve_exact(movies.len())
+        .map_err(|_| Error::Allocation {
+            amount: movies.len(),
+        })?;
+    for identifier in movies {
+        let (component, movie) = package
+            .object_with_component(identifier)
+            .ok_or(Error::InvalidSource)?;
+        // A slide may own shapes, placeholders, or other drawable records
+        // beside movies. Only a type-3007 payload participates in the movie
+        // source order; unrelated drawable records are ignored here.
+        if movie
+            .messages
+            .iter()
+            .all(|message| message.type_ != MOVIE_MESSAGE_TYPE)
+        {
+            continue;
+        }
+        if component != slide_component_name
+            || movie.messages.len() != movie.archive_info.message_infos.len()
+        {
+            return Err(Error::InvalidSource);
+        }
+        let (message_index, payload) = unique_message(movie, MOVIE_MESSAGE_TYPE)?;
+        let path = super::SemanticPath::SlideDrawable {
+            slide: slide_position.get(),
+            index: movie_entries.len(),
+        };
+        let semantic_limits =
+            budget.residual_wire_limits(package.semantic_wire_limits().map_err(map_read_error)?)?;
+        let preflight =
+            super::preflight_movie(payload, semantic_limits, path).map_err(map_read_error)?;
+        let (info, _) = super::decode_movie_info(
+            payload,
+            budget.residual_wire_limits(package.semantic_wire_limits().map_err(map_read_error)?)?,
+            path,
+        )
+        .map_err(map_read_error)?;
+        budget.wire_scan(payload, 1)?;
+        budget.references(preflight.data_references)?;
+        let parent = movie_parent(payload, budget.residual_wire_limits(base_limits)?)?;
+        budget.wire_scan(payload, 2)?;
+        if parent != record.slide_identifier {
+            return Err(Error::InvalidSource);
+        }
+        movie_entries.push((identifier, message_index, info.kind(), info.playback()));
+    }
+    let movie_position = movie_selector.as_position();
+    let (movie_identifier, message_index, movie_kind, _) = *movie_entries
+        .get(movie_position.get())
+        .ok_or(Error::Refused(Refusal::MoviePositionNotFound {
+            position: movie_position,
+        }))?;
+    if !matches!(movie_kind, MovieKind::File | MovieKind::Audio) {
+        return Err(Error::InvalidSource);
+    }
+    let movie = package
+        .object(movie_identifier)
+        .ok_or(Error::InvalidSource)?;
+    let payload = movie
+        .messages
+        .get(message_index)
+        .ok_or(Error::InvalidSource)?
+        .data
+        .as_slice();
+    if movie_data_field_count(payload, base_limits)? != 1 {
+        return Err(Error::InvalidSource);
+    }
+    ensure_unique_movie_identity(package, slide_component_name, movie_identifier)?;
+    ensure_unique_movie_owner(
+        package,
+        record.slide_identifier,
+        movie_identifier,
+        base_limits,
+        budget,
+    )?;
+    let options = codec_options(package, payload, budget)?;
+    let (snapshot, report) =
+        movie_playback_codec::decode_movie_playback_with_report(payload, options)
+            .map_err(map_codec_error)?;
+    budget.codec_report(report)?;
+    let before = settings_from_snapshot(snapshot)?;
+    Ok(PlaybackSelection {
+        slide_position,
+        movie_position,
+        slide_identifier: record.slide_identifier,
+        node_identifier: record.node_identifier,
+        movie_identifier,
+        message_index,
+        slide_component_name: Arc::from(slide_component_name),
+        before: Some(before),
+    })
+}
+
+fn ensure_unique_movie_identity(
+    package: &Package,
+    selected_component: &str,
+    movie_identifier: u64,
+) -> Result<(), Error> {
+    let mut matches = 0usize;
+    let mut selected_matches = 0usize;
+    for component in package.state.source.components().iter() {
+        for object in &component.archive().objects {
+            if object.archive_info.identifier == Some(movie_identifier) {
+                matches = matches.checked_add(1).ok_or(Error::InvalidSource)?;
+                if component.name() == selected_component {
+                    selected_matches = selected_matches
+                        .checked_add(1)
+                        .ok_or(Error::InvalidSource)?;
+                }
+            }
+        }
+    }
+    if matches != 1 || selected_matches != 1 {
+        // Cross-component movie graphs and physical duplicate identifiers are
+        // intentionally unsupported by this scalar owner.
+        return Err(Error::Refused(Refusal::UnsupportedDependency));
+    }
+    Ok(())
+}
+
+fn rewrite_movie(
+    source: &Package,
+    selection: &PlaybackSelection,
+    after: MediaPlaybackSettings,
+    budget: &mut PlaybackBudget,
+) -> Result<(Package, usize), Error> {
+    let catalog = physical_catalog(source)?;
+    let entry = catalog
+        .package()
+        .iter()
+        .find(|entry| entry.name() == selection.slide_component_name.as_ref())
+        .ok_or(Error::InvalidSource)?;
+    if entry.is_opaque() {
+        return Err(Error::InvalidSource);
+    }
+    let physical_limits = source.state.options.archive();
+    let archive_limits = physical_limits
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
+    budget.source(entry.data().len())?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits).map_err(map_core_error)?;
+    budget.physical(stream.as_bytes().len())?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let object = archive
+        .object(selection.movie_identifier)
+        .ok_or(Error::InvalidSource)?;
+    let original = object
+        .messages
+        .get(selection.message_index)
+        .ok_or(Error::InvalidSource)?
+        .data
+        .as_slice();
+    let before = selection
+        .before
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency))?;
+    if before == after {
+        return Ok((source.snapshot(), 0));
+    }
+
+    // Size the archive and its worst-case Snappy member before the codec is
+    // allowed to execute. The prepared codec still performs its own exact
+    // requirements replay; this outer bound covers archive serialization,
+    // compression, and the package member replacement without claiming one
+    // physical allocation.
+    let encoded_bound = archive
+        .encoded_len(archive_limits)
+        .map_err(map_core_error)?;
+    let compressed_bound = SnappyStream::maximum_compressed_len(encoded_bound, snappy_limits)
+        .map_err(map_core_error)?;
+    let package_bound = source
+        .source_bytes()
+        .len()
+        .checked_sub(entry.data().len())
+        .and_then(|value| value.checked_add(compressed_bound))
+        .ok_or(Error::InvalidSource)?;
+    budget.preflight_output(
+        encoded_bound
+            .checked_add(compressed_bound)
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    budget.preflight_output(package_bound)?;
+    budget.preflight_work(
+        encoded_bound
+            .checked_add(compressed_bound)
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let options = codec_options(source, original, budget)?;
+    let write = movie_playback_write(after)?;
+    let prepared = movie_playback_codec::prepare_movie_playback_rewrite(original, write, options)
+        .map_err(map_codec_error)?;
+    budget.codec_report(prepared.prepare_report())?;
+    let requirements = prepared.execution_requirements();
+    budget.codec_requirements(requirements)?;
+    let rewritten = prepared
+        .execute(requirements.exact_limits())
+        .map_err(map_codec_error)?;
+    archive
+        .object_mut(selection.movie_identifier)
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
+            selection.message_index,
+            RawMessage {
+                type_: MOVIE_MESSAGE_TYPE,
+                data: rewritten.into_bytes(),
+            },
+            archive_limits,
+        )
+        .map_err(map_core_error)?;
+    let bytes = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    budget.physical(bytes.len())?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits).map_err(map_core_error)?;
+    let edit = EntryEdit::new(
+        selection.slide_component_name.as_ref(),
+        compressed.as_slice(),
+    );
+    // Playback scalars do not change slide geometry or text rendering.  Keep
+    // the existing preview members byte-for-byte; only the selected IWA
+    // component is part of this owner’s locality contract.
+    let edits = [edit];
+    let prepared_reassembly = catalog
+        .prepare_reassembly_with_deletions(&edits, &[], physical_limits)
+        .map_err(map_archive_error)?;
+    let reassembly_requirements = prepared_reassembly.execution_requirements();
+    budget.reassembly(reassembly_requirements)?;
+    budget.candidate_reopen(reassembly_requirements.output_bytes())?;
+    let output = prepared_reassembly
+        .execute(reassembly_requirements.exact_limits())
+        .map_err(map_archive_error)?;
+    let candidate = Package::from_source_with_options(output.into(), source.state.options)
+        .map_err(map_read_error)?;
+    Ok((candidate, 0))
+}
+
+fn resolve_slide_position(
+    package: &Package,
+    selector: SlideSelector<'_>,
+) -> Result<Position, Error> {
+    match selector {
+        SlideSelector::Position(position) => Ok(position),
+        SlideSelector::Name(name) => {
+            if name.is_empty() {
+                return Err(Error::Refused(Refusal::EmptySlideName));
+            }
+            package
+                .show()
+                .map_err(map_read_error)?
+                .select_slide(selector)
+                .map_err(map_slide_selector_error)?
+                .map(|slide| Position::new(slide.index()))
+                .ok_or(Error::Refused(Refusal::SlideNameNotFound))
+        },
+    }
+}
+
+fn verify_locality(
+    source: &Package,
+    candidate: &Package,
+    selection: &PlaybackSelection,
+    budget: &mut PlaybackBudget,
+) -> Result<(), Error> {
+    let source_catalog = physical_catalog(source)?;
+    let candidate_catalog = physical_catalog(candidate)?;
+    if source_catalog.package().len() != candidate_catalog.package().len() {
+        return Err(Error::Verification);
+    }
+    let source_entries = entry_index(source_catalog.package(), budget)?;
+    let candidate_entries = entry_index(candidate_catalog.package(), budget)?;
+    for source_entry in source_catalog.package().iter() {
+        let candidate_entry = candidate_entries
+            .get(source_entry.name())
+            .copied()
+            .ok_or(Error::Verification)?;
+        if source_entry.name() != selection.slide_component_name.as_ref()
+            && source_entry.data() != candidate_entry.data()
+        {
+            return Err(Error::Verification);
+        }
+    }
+    for candidate_entry in candidate_catalog.package().iter() {
+        if !source_entries.contains_key(candidate_entry.name()) {
+            return Err(Error::Verification);
+        }
+    }
+    budget.component()?;
+    let source_archive = component_archive(source, selection.slide_component_name.as_ref())?;
+    let candidate_archive = component_archive(candidate, selection.slide_component_name.as_ref())?;
+    if source_archive.objects.len() != candidate_archive.objects.len() {
+        return Err(Error::Verification);
+    }
+    for source_object in &source_archive.objects {
+        let identifier = source_object
+            .archive_info
+            .identifier
+            .ok_or(Error::Verification)?;
+        let candidate_object = candidate_archive
+            .object(identifier)
+            .ok_or(Error::Verification)?;
+        if identifier == selection.movie_identifier {
+            let source_message = source_object
+                .messages
+                .get(selection.message_index)
+                .ok_or(Error::Verification)?;
+            let candidate_message = candidate_object
+                .messages
+                .get(selection.message_index)
+                .ok_or(Error::Verification)?;
+            if source_message.type_ != candidate_message.type_ {
+                return Err(Error::Verification);
+            }
+            let mut expected = source_object.clone();
+            expected
+                .replace_message_preserving_header(
+                    selection.message_index,
+                    candidate_message.clone(),
+                    source
+                        .state
+                        .options
+                        .archive()
+                        .effective_archive_limits()
+                        .map_err(map_archive_error)?,
+                )
+                .map_err(map_core_error)?;
+            // The physical provenance lengths describe the selected
+            // candidate framing, not the immutable source framing. All raw
+            // header/message metadata remains compared by
+            // `same_content_ignoring_offsets` below.
+            expected.header_length = candidate_object.header_length;
+            expected.data_length = candidate_object.data_length;
+            if !expected.same_content_ignoring_offsets(candidate_object) {
+                return Err(Error::Verification);
+            }
+        } else if !source_object.same_content_ignoring_offsets(candidate_object) {
+            return Err(Error::Verification);
+        }
+        budget.work(source_object.messages.len())?;
+    }
+    Ok(())
+}
+
+/// Build a bounded name index for physical members before any locality pass.
+///
+/// ZIP member names are expected to be unique.  Rejecting duplicates while
+/// constructing the index keeps the verification lookup linear and avoids
+/// silently selecting the first of two physical records with the same name.
+fn entry_index<'a>(
+    catalog: &'a Catalog,
+    budget: &mut PlaybackBudget,
+) -> Result<HashMap<&'a str, &'a Entry>, Error> {
+    let count = catalog.iter().count();
+    budget.allocations(usize::from(count != 0))?;
+    budget.retained(
+        count
+            .checked_mul(size_of::<(&str, &Entry)>())
+            .ok_or(Error::InvalidSource)?,
+    )?;
+    let mut index = HashMap::new();
+    index
+        .try_reserve(count)
+        .map_err(|_| Error::Allocation { amount: count })?;
+    for entry in catalog.iter() {
+        budget.work(
+            entry
+                .name()
+                .len()
+                .checked_add(1)
+                .ok_or(Error::InvalidSource)?,
+        )?;
+        if index.insert(entry.name(), entry).is_some() {
+            return Err(Error::Verification);
+        }
+    }
+    Ok(index)
+}
+
+fn component_archive(package: &Package, name: &str) -> Result<Archive, Error> {
+    let catalog = physical_catalog(package)?;
+    let entry = catalog
+        .package()
+        .iter()
+        .find(|entry| entry.name() == name)
+        .ok_or(Error::InvalidSource)?;
+    let snappy = package
+        .state
+        .options
+        .archive()
+        .snappy_limits()
+        .map_err(map_archive_error)?;
+    let archive_limits = package
+        .state
+        .options
+        .archive()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let stream = SnappyStream::decompress(entry.data(), snappy).map_err(map_core_error)?;
+    Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)
+}
+
+fn unique_message(
+    object: &litchi_iwa_core::ArchiveObject,
+    message_type: u32,
+) -> Result<(usize, &[u8]), Error> {
+    let mut selected = None;
+    for (index, message) in object.messages.iter().enumerate() {
+        let info = object
+            .archive_info
+            .message_infos
+            .get(index)
+            .ok_or(Error::InvalidSource)?;
+        if message.type_ != info.type_
+            || usize::try_from(info.length).ok() != Some(message.data.len())
+        {
+            return Err(Error::InvalidSource);
+        }
+        if message.type_ == message_type
+            && selected.replace((index, message.data.as_slice())).is_some()
+        {
+            return Err(Error::InvalidSource);
+        }
+    }
+    selected.ok_or(Error::InvalidSource)
+}
+
+fn repeated_references(
+    payload: &[u8],
+    field_number: u32,
+    limits: WireLimits,
+) -> Result<Vec<u64>, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(fields.len())
+        .map_err(|_| Error::Allocation {
+            amount: fields.len(),
+        })?;
+    for field in fields
+        .fields()
+        .filter(|field| field.number() == field_number)
+    {
+        if field.wire_type() != 2 {
+            return Err(Error::InvalidSource);
+        }
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        values.push(strict_reference_payload(
+            field.payload(),
+            limits,
+            "Keynote movie playback reference",
+        )?);
+    }
+    Ok(values)
+}
+
+fn movie_parent(payload: &[u8], limits: WireLimits) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let super_field = fields
+        .fields()
+        .filter(|field| field.number() == MOVIE_SUPER_FIELD)
+        .collect::<Vec<_>>();
+    if super_field.len() != 1 || super_field[0].wire_type() != 2 {
+        return Err(Error::InvalidSource);
+    }
+    let nested = WireView::parse(super_field[0].payload(), limits).map_err(map_wire_error)?;
+    let parent = nested
+        .fields()
+        .filter(|field| field.number() == DRAWABLE_PARENT_FIELD)
+        .collect::<Vec<_>>();
+    if parent.len() != 1 || parent[0].wire_type() != 2 {
+        return Err(Error::InvalidSource);
+    }
+    strict_reference_payload(parent[0].payload(), limits, "Keynote movie parent")
+}
+
+fn strict_reference_payload(
+    payload: &[u8],
+    limits: WireLimits,
+    _context: &'static str,
+) -> Result<u64, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let mut identifier = None;
+    for field in fields.fields() {
+        field.validate_canonical_key().map_err(map_wire_error)?;
+        match field.number() {
+            1 => {
+                if field.wire_type() != 0 || identifier.is_some() {
+                    return Err(Error::InvalidSource);
+                }
+                let (value, width) =
+                    decode_varint_from_bytes(field.payload()).map_err(|_| Error::InvalidSource)?;
+                if width != encoded_len(value) || value == 0 {
+                    return Err(Error::InvalidSource);
+                }
+                identifier = Some(value);
+            },
+            // The legacy Reference type and deprecated external marker are
+            // not authoritative for this strict scalar edge. Reject their
+            // presence, including explicit defaults, instead of silently
+            // accepting an external/typed route.
+            2 | 3 => return Err(Error::InvalidSource),
+            _ => {},
+        }
+    }
+    identifier.ok_or(Error::InvalidSource)
+}
+
+fn movie_data_field_count(payload: &[u8], limits: WireLimits) -> Result<usize, Error> {
+    let fields = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let mut count = 0usize;
+    for field in fields.fields().filter(|field| field.number() == 14) {
+        if field.wire_type() != 2 {
+            return Err(Error::InvalidSource);
+        }
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        super::validate_movie_data_reference(field.payload(), limits).map_err(map_wire_error)?;
+        count = count.checked_add(1).ok_or(Error::InvalidSource)?;
+    }
+    Ok(count)
+}
+
+fn ensure_unique_movie_owner(
+    package: &Package,
+    slide_identifier: u64,
+    movie_identifier: u64,
+    limits: WireLimits,
+    budget: &mut PlaybackBudget,
+) -> Result<(), Error> {
+    let mut occurrences = 0usize;
+    let mut selected_occurrences = 0usize;
+    for component in package.state.source.components().iter() {
+        budget.component()?;
+        for object in &component.archive().objects {
+            for message in &object.messages {
+                if message.type_ != SLIDE_MESSAGE_TYPE {
+                    continue;
+                }
+                let owner_identifier = object.archive_info.identifier;
+                let ids = repeated_references(&message.data, SLIDE_OWNED_DRAWABLES_FIELD, limits)?;
+                budget.wire_scan(&message.data, 1)?;
+                budget.references(ids.len())?;
+                for id in ids {
+                    if id == movie_identifier {
+                        occurrences = occurrences.checked_add(1).ok_or(Error::InvalidSource)?;
+                        if owner_identifier == Some(slide_identifier) {
+                            selected_occurrences = selected_occurrences
+                                .checked_add(1)
+                                .ok_or(Error::InvalidSource)?;
+                        }
+                    }
+                }
+            }
+        }
+    }
+    if occurrences != 1 || selected_occurrences != 1 {
+        return Err(Error::InvalidSource);
+    }
+    Ok(())
+}
+
+fn same_selection(left: &PlaybackSelection, right: &PlaybackSelection) -> bool {
+    left.slide_position == right.slide_position
+        && left.movie_position == right.movie_position
+        && left.slide_identifier == right.slide_identifier
+        && left.node_identifier == right.node_identifier
+        && left.movie_identifier == right.movie_identifier
+        && left.message_index == right.message_index
+        && left.slide_component_name == right.slide_component_name
+}
+
+fn codec_options(
+    package: &Package,
+    payload: &[u8],
+    budget: &PlaybackBudget,
+) -> Result<movie_playback_codec::DecodeOptions, Error> {
+    let limits =
+        budget.residual_wire_limits(package.semantic_wire_limits().map_err(map_read_error)?)?;
+    let recursion = u32::try_from(limits.max_nesting()).map_err(|_| Error::InvalidSource)?;
+    let output = budget
+        .max_output
+        .saturating_sub(budget.output)
+        .max(payload.len().max(1));
+    Ok(movie_playback_codec::DecodeOptions::new(
+        limits.max_input_bytes().min(payload.len().max(1)),
+        limits.max_fields(),
+        limits.max_rewrite_work(),
+        recursion,
+    )
+    .with_max_output_bytes(output))
+}
+
+fn movie_playback_write(
+    settings: MediaPlaybackSettings,
+) -> Result<movie_playback_codec::MoviePlaybackWrite, Error> {
+    let canonical = settings.canonicalize().map_err(|_| Error::InvalidSource)?;
+    Ok(movie_playback_codec::MoviePlaybackWrite::from_values(
+        canonical.start_time.map(duration_seconds).transpose()?,
+        duration_seconds(canonical.end_time)?,
+        canonical.poster_time.map(duration_seconds).transpose()?,
+        canonical.loop_mode.map(MediaLoopMode::as_raw),
+        canonical.volume.map(MediaVolume::as_f32),
+    ))
+}
+
+fn duration_seconds(value: Duration) -> Result<f32, Error> {
+    let seconds = value.as_secs_f64();
+    if !seconds.is_finite() || seconds > f64::from(f32::MAX) {
+        return Err(Error::InvalidSource);
+    }
+    Ok(seconds as f32)
+}
+
+fn settings_from_snapshot(
+    snapshot: movie_playback_codec::MoviePlaybackSnapshot,
+) -> Result<MediaPlaybackSettings, Error> {
+    let duration = |value: f32| {
+        if !value.is_finite() || value < 0.0 {
+            return Err(Error::InvalidSource);
+        }
+        Duration::try_from_secs_f32(value).map_err(|_| Error::InvalidSource)
+    };
+    MediaPlaybackSettings::new(duration(snapshot.end_time)?)
+        .with_start_time(snapshot.start_time.map(duration).transpose()?)
+        .with_poster_time(snapshot.poster_time.map(duration).transpose()?)
+        .with_loop_mode(snapshot.loop_mode.map(MediaLoopMode::from_raw))
+        .with_volume(
+            snapshot
+                .volume
+                .map(MediaVolume::new)
+                .transpose()
+                .map_err(|_| Error::InvalidSource)?,
+        )
+        .canonicalize()
+        .map_err(|_| Error::InvalidSource)
+}
+
+fn physical_catalog(package: &Package) -> Result<&litchi_iwa_archive::SourceCatalog, Error> {
+    match &package.state.source {
+        PhysicalSource::Package(source) => Ok(source),
+        PhysicalSource::Semantic(_) => Err(Error::Refused(Refusal::UnsupportedSource)),
+    }
+}
+
+fn map_slide_selector_error(error: crate::SlideSelectorError) -> Error {
+    match error {
+        crate::SlideSelectorError::DuplicateSlideName { .. } => {
+            Error::Refused(Refusal::AmbiguousSelector)
+        },
+        crate::SlideSelectorError::EmptySlideName => Error::Refused(Refusal::EmptySlideName),
+    }
+}
+
+fn map_read_error(error: ReadError) -> Error {
+    match error {
+        ReadError::SemanticLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Error::Limit {
+            kind: match kind {
+                SemanticLimitKind::Slides => LimitKind::Slides,
+                SemanticLimitKind::References => LimitKind::References,
+                SemanticLimitKind::Objects => LimitKind::Entries,
+                _ => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        ReadError::PayloadLimit {
+            kind,
+            observed,
+            maximum,
+            ..
+        } => Error::Limit {
+            kind: match kind {
+                super::PayloadLimitKind::Bytes => LimitKind::WireBytes,
+                super::PayloadLimitKind::Fields => LimitKind::WireFields,
+                super::PayloadLimitKind::Nesting => LimitKind::WireNesting,
+                super::PayloadLimitKind::Work => LimitKind::WireWork,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        ReadError::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_codec_error(error: movie_playback_codec::DecodeError) -> Error {
+    if let Some(limit) = error.limit_kind() {
+        let (observed, maximum) = error.limit_values().unwrap_or((0, 0));
+        let kind = match limit {
+            movie_playback_codec::DecodeLimit::InputBytes => LimitKind::WireBytes,
+            movie_playback_codec::DecodeLimit::OutputBytes => LimitKind::OutputBytes,
+            movie_playback_codec::DecodeLimit::Fields => LimitKind::WireFields,
+            movie_playback_codec::DecodeLimit::Work => LimitKind::WireWork,
+            movie_playback_codec::DecodeLimit::Nesting => LimitKind::WireNesting,
+            movie_playback_codec::DecodeLimit::Allocations
+            | movie_playback_codec::DecodeLimit::Scratch => LimitKind::WireWork,
+            movie_playback_codec::DecodeLimit::Retained => LimitKind::OutputBytes,
+            _ => LimitKind::WireWork,
+        };
+        return Error::Limit {
+            kind,
+            observed: observed as u64,
+            maximum: maximum as u64,
+        };
+    }
+    Error::InvalidSource
+}
+
+fn map_wire_error(_error: litchi_iwa_common::Error) -> Error {
+    Error::InvalidSource
+}
+fn map_archive_error(error: litchi_iwa_archive::Error) -> Error {
+    match error {
+        litchi_iwa_archive::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::EntryBytes
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes => LimitKind::TotalBytes,
+                litchi_iwa_archive::LimitKind::IwaStreamBytes
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::PlaybackBytes,
+                litchi_iwa_archive::LimitKind::MemberNameBytes
+                | litchi_iwa_archive::LimitKind::MetadataBytes => LimitKind::WireBytes,
+            },
+            observed,
+            maximum,
+        },
+        litchi_iwa_archive::Error::Iwa(error) => map_core_error(error),
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+fn map_core_error(error: litchi_iwa_core::Error) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::Objects
+                | litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::HeaderFields
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::PlaybackBytes,
+                litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+            },
+            observed: observed as u64,
+            maximum: maximum as u64,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::time::Duration;
+
+    use litchi_iwa_protos::tsd;
+    use prost::Message as _;
+
+    use super::*;
+
+    #[allow(
+        deprecated,
+        reason = "the fixture authors the deprecated integer loop field"
+    )]
+    fn payload() -> Vec<u8> {
+        tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            start_time: Some(0.25),
+            end_time: Some(1.5),
+            poster_time: Some(0.5),
+            loop_option_as_integer: Some(u32::from_le_bytes((-1_i32).to_le_bytes())),
+            volume: Some(0.75),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    fn payload_without_end() -> Vec<u8> {
+        tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            ..Default::default()
+        }
+        .encode_to_vec()
+    }
+
+    #[test]
+    fn borrowed_payload_reader_preserves_optional_and_unknown_values() {
+        let settings = decode_movie_playback_payload(&payload(), WireLimits::default()).unwrap();
+        assert_eq!(settings.start_time, Some(Duration::from_secs_f32(0.25)));
+        assert_eq!(settings.end_time, Duration::from_secs_f32(1.5));
+        assert_eq!(settings.poster_time, Some(Duration::from_secs_f32(0.5)));
+        assert_eq!(settings.loop_mode, Some(MediaLoopMode::Unknown(-1)));
+        assert_eq!(settings.volume.map(MediaVolume::as_f32), Some(0.75));
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_missing_end_time() {
+        assert!(
+            decode_movie_playback_payload(&payload_without_end(), WireLimits::default()).is_err()
+        );
+    }
+
+    #[test]
+    #[allow(
+        deprecated,
+        reason = "the fixture authors the deprecated integer loop field"
+    )]
+    fn borrowed_payload_reader_rejects_conflicting_loop_fields() {
+        let source = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            loop_option_as_integer: Some(1),
+            loop_option: Some(2),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(decode_movie_playback_payload(&source, WireLimits::default()).is_err());
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_noncanonical_known_varints() {
+        let mut source = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        source.extend_from_slice(&[0xc0, 0x01, 0x80, 0x00]);
+        assert!(decode_movie_playback_payload(&source, WireLimits::default()).is_err());
+    }
+
+    #[test]
+    fn borrowed_payload_reader_rejects_invalid_scalar_values() {
+        let negative_end = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(-1.0),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(decode_movie_playback_payload(&negative_end, WireLimits::default()).is_err());
+
+        let invalid_volume = tsd::MovieArchive {
+            super_: tsd::DrawableArchive::default(),
+            end_time: Some(1.0),
+            volume: Some(1.1),
+            ..Default::default()
+        }
+        .encode_to_vec();
+        assert!(decode_movie_playback_payload(&invalid_volume, WireLimits::default()).is_err());
+    }
+
+    #[test]
+    fn borrowed_payload_reader_honors_lower_field_budget() {
+        let limits = WireLimits::default().with_fields(1).unwrap();
+        let error = decode_movie_playback_payload(&payload(), limits).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: LimitKind::WireFields,
+                ..
+            }
+        ));
+    }
+}

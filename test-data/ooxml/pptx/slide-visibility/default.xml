@@ -1,0 +1,5 @@
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld name="Visible by default">
+    <p:spTree/>
+  </p:cSld>
+</p:sld>

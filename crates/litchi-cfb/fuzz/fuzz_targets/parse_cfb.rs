@@ -2,14 +2,26 @@
 
 use libfuzzer_sys::fuzz_target;
 
+// Keep directory/FAT bookkeeping and stream materialization bounded during
+// sanitizer campaigns. Oversized inputs are skipped rather than truncated so
+// every parser call receives one unchanged source slice.
+const MAX_INPUT_BYTES: usize = 4 * 1024 * 1024;
+
 // Drives raw bytes through litchi-cfb's CFB/OLE2 parser.
 // Errors are expected on malformed input; we want to ensure
 // the parser does not panic, OOM, or hit UB on arbitrary bytes.
 fuzz_target!(|data: &[u8]| {
+    if data.len() > MAX_INPUT_BYTES {
+        return;
+    }
+
     // Cheap sniff helper; exercises the public is_ole_file path.
     let _ = litchi_cfb::is_ole_file(data);
 
-    if let Ok(mut ole) = litchi_cfb::OleFile::open(std::io::Cursor::new(data)) {
+    if let Ok(mut ole) = litchi_cfb::OleFile::open(
+        std::io::Cursor::new(data),
+        litchi_cfb::OleFileLimits::default(),
+    ) {
         // Walk the directory tree to give the fuzzer extra reach.
         let streams = ole.list_streams();
         let _ = ole.list_directory_entries(&[]);

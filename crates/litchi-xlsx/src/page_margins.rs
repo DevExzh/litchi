@@ -1,0 +1,701 @@
+//! Immutable worksheet page-margin metadata.
+
+mod patch;
+mod snapshot;
+pub mod source;
+
+pub(crate) use patch::Patch;
+pub use snapshot::Snapshot;
+
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
+
+use crate::error::{Error, Result};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
+const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 128;
+const MAX_EVENTS: usize = 1_000_000;
+const MAX_OFFICE_MARGIN_INCHES: f64 = 49.0;
+
+/// A validated physical page margin stored by `SpreadsheetML` in inches.
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
+pub struct PageMargin(f64);
+
+impl PageMargin {
+    /// Construct a margin from inches.
+    pub fn from_inches(value: f64) -> Result<Self> {
+        validate_margin(value, "page")
+    }
+
+    /// Construct a margin from typographic points.
+    pub fn from_points(value: f64) -> Result<Self> {
+        Self::from_inches(value / 72.0)
+    }
+
+    /// Construct a margin from millimeters.
+    pub fn from_millimeters(value: f64) -> Result<Self> {
+        Self::from_inches(value / 25.4)
+    }
+
+    /// Margin in the native `SpreadsheetML` unit, inches.
+    #[must_use]
+    pub fn inches(self) -> f64 {
+        self.0
+    }
+
+    /// Margin converted to typographic points.
+    #[must_use]
+    pub fn points(self) -> f64 {
+        self.0 * 72.0
+    }
+
+    /// Margin converted to millimeters.
+    #[must_use]
+    pub fn millimeters(self) -> f64 {
+        self.0 * 25.4
+    }
+}
+
+impl Eq for PageMargin {}
+
+/// The six required margins from one worksheet `pageMargins` element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Margins {
+    left: PageMargin,
+    right: PageMargin,
+    top: PageMargin,
+    bottom: PageMargin,
+    header: PageMargin,
+    footer: PageMargin,
+}
+
+impl Margins {
+    /// Construct a complete six-value worksheet margin set.
+    #[must_use]
+    pub const fn new(
+        left: PageMargin,
+        right: PageMargin,
+        top: PageMargin,
+        bottom: PageMargin,
+        header: PageMargin,
+        footer: PageMargin,
+    ) -> Self {
+        Self {
+            left,
+            right,
+            top,
+            bottom,
+            header,
+            footer,
+        }
+    }
+
+    #[must_use]
+    pub fn left(&self) -> PageMargin {
+        self.left
+    }
+    #[must_use]
+    pub fn right(&self) -> PageMargin {
+        self.right
+    }
+    #[must_use]
+    pub fn top(&self) -> PageMargin {
+        self.top
+    }
+    #[must_use]
+    pub fn bottom(&self) -> PageMargin {
+        self.bottom
+    }
+    #[must_use]
+    pub fn header(&self) -> PageMargin {
+        self.header
+    }
+    #[must_use]
+    pub fn footer(&self) -> PageMargin {
+        self.footer
+    }
+}
+
+/// Serialize one complete core worksheet `pageMargins` element.
+#[must_use]
+pub fn write_page_margins(value: &Margins) -> Vec<u8> {
+    format!("<pageMargins{}/>", margin_attributes(value)).into_bytes()
+}
+
+/// Replace, insert, or remove direct worksheet page margins.
+pub fn replace_page_margins(xml: &[u8], value: Option<&Margins>) -> Result<Vec<u8>> {
+    let _ = parse_page_margins(xml)?;
+    let attributes = value.map(margin_attributes);
+    let output = crate::raw::worksheet_property::replace_direct_empty(
+        xml,
+        "pageMargins",
+        attributes.as_deref(),
+        &[
+            b"pageSetup",
+            b"headerFooter",
+            b"rowBreaks",
+            b"colBreaks",
+            b"customProperties",
+            b"cellWatches",
+            b"ignoredErrors",
+            b"smartTags",
+            b"drawing",
+            b"legacyDrawing",
+            b"legacyDrawingHF",
+            b"picture",
+            b"oleObjects",
+            b"controls",
+            b"webPublishItems",
+            b"tableParts",
+            b"extLst",
+        ],
+        "page-margin worksheet output",
+    )?;
+    if parse_page_margins(&output)?.as_ref() != value {
+        return Err(invalid("worksheet page-margin write verification failed"));
+    }
+    Ok(output)
+}
+
+fn margin_attributes(value: &Margins) -> String {
+    format!(
+        " left=\"{}\" right=\"{}\" top=\"{}\" bottom=\"{}\" header=\"{}\" footer=\"{}\"",
+        value.left.0, value.right.0, value.top.0, value.bottom.0, value.header.0, value.footer.0,
+    )
+}
+
+/// Parse a worksheet's optional core `pageMargins` element.
+pub fn parse_page_margins(xml: &[u8]) -> Result<Option<Margins>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML is too large"));
+    }
+    let limits = Limits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..Limits::default()
+    };
+    let validated = process_markup_compatibility(xml, &Capabilities::default(), &limits)?;
+    if validated.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML is too large"));
+    }
+    let selected = if validated.report.alternate_content_count == 0 {
+        xml
+    } else {
+        validated.xml.as_ref()
+    };
+    parse_selected(selected)
+}
+
+/// Where the `pageMargins` reader is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
+fn parse_selected(xml: &[u8]) -> Result<Option<Margins>> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut phase = RootPhase::Prolog;
+    let mut result = None;
+    let mut open: Option<(usize, Margins)> = None;
+    let mut events = 0usize;
+    reader.config_mut().check_end_names = true;
+
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
+        let decoder = reader.decoder();
+        let event = reader.read_event().map_err(xml_error)?.into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                if phase == RootPhase::Closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if depth == 0 && matches!(phase, RootPhase::Open | RootPhase::Closed) {
+                    return Err(invalid("worksheet XML contains multiple roots"));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
+                if depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
+                if depth == 1 {
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed)
+                        || !spreadsheet(&namespace)
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
+                        return Err(invalid("page-margin parser requires a worksheet root"));
+                    }
+                    phase = RootPhase::Open;
+                } else if depth == 2
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"pageMargins"
+                {
+                    if result.is_some() || open.is_some() {
+                        return Err(invalid("duplicate worksheet pageMargins element"));
+                    }
+                    open = Some((depth, parse_margins(&element, decoder)?));
+                } else if open.is_some() {
+                    return Err(invalid("pageMargins must not contain child elements"));
+                }
+            },
+            Event::Empty(element) => {
+                if phase == RootPhase::Closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if depth == 0 {
+                    return Err(if matches!(phase, RootPhase::Open | RootPhase::Closed) {
+                        invalid("worksheet XML contains multiple roots")
+                    } else {
+                        invalid("worksheet root cannot be empty")
+                    });
+                }
+                if depth == 1
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"pageMargins"
+                {
+                    if result.is_some() || open.is_some() {
+                        return Err(invalid("duplicate worksheet pageMargins element"));
+                    }
+                    result = Some(parse_margins(&element, decoder)?);
+                } else if open.is_some() {
+                    return Err(invalid("pageMargins must not contain child elements"));
+                }
+            },
+            Event::Text(text) => {
+                if phase != RootPhase::Open && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
+                if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("pageMargins must not contain text"));
+                }
+                if depth == 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet cannot contain direct text"));
+                }
+            },
+            Event::CData(_) if open.is_some() => {
+                return Err(invalid("pageMargins must not contain CDATA"));
+            },
+            Event::CData(_) if depth == 1 => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
+            },
+            Event::CData(_) if phase != RootPhase::Open => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
+            },
+            Event::End(element) => {
+                if open
+                    .as_ref()
+                    .is_some_and(|(element_depth, _)| *element_depth == depth)
+                {
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"pageMargins" {
+                        return Err(invalid("invalid pageMargins closing element"));
+                    }
+                    let (_, margins) = open
+                        .take()
+                        .ok_or_else(|| invalid("invalid pageMargins closing state"))?;
+                    result = Some(margins);
+                }
+                if depth == 1 {
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                        return Err(invalid("invalid worksheet closing element"));
+                    }
+                    phase = RootPhase::Closed;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unexpected XML end element"))?;
+            },
+            Event::GeneralRef(reference) => {
+                if phase != RootPhase::Open {
+                    return Err(invalid("worksheet XML entity is outside root"));
+                }
+                if reference.resolve_char_ref().map_err(xml_error)?.is_none()
+                    && !matches!(
+                        reference.decode().map_err(xml_error)?.as_ref(),
+                        "amp" | "lt" | "gt" | "apos" | "quot"
+                    )
+                {
+                    return Err(invalid("custom XML entities are rejected"));
+                }
+                if open.is_some() || depth == 1 {
+                    return Err(invalid("pageMargins must not contain entity text"));
+                }
+            },
+            Event::Decl(_) => {
+                if phase != RootPhase::Prolog {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                phase = RootPhase::Declared;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            },
+            Event::Comment(_) | Event::CData(_) => {},
+            Event::Eof => break,
+        }
+    }
+    match phase {
+        RootPhase::Closed if depth == 0 && open.is_none() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete worksheet page-margin XML"));
+        },
+    }
+    Ok(result)
+}
+
+fn parse_margins(element: &BytesStart<'_>, decoder: Decoder) -> Result<Margins> {
+    let mut values = [None; 6];
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.as_ref().contains(&b':') || attribute.key.as_ref() == b"xmlns" {
+            continue;
+        }
+        let slot = match attribute.key.local_name().as_ref() {
+            b"left" => 0,
+            b"right" => 1,
+            b"top" => 2,
+            b"bottom" => 3,
+            b"header" => 4,
+            b"footer" => 5,
+            name => {
+                return Err(invalid(format!(
+                    "unknown pageMargins attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            },
+        };
+        if values[slot].is_some() {
+            return Err(invalid("duplicate pageMargins attribute"));
+        }
+        let raw = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?;
+        values[slot] = Some(parse_margin(&raw, attribute.key.local_name().as_ref())?);
+    }
+    let [left, right, top, bottom, header, footer] = values;
+    Ok(Margins {
+        left: left.ok_or_else(|| missing("left"))?,
+        right: right.ok_or_else(|| missing("right"))?,
+        top: top.ok_or_else(|| missing("top"))?,
+        bottom: bottom.ok_or_else(|| missing("bottom"))?,
+        header: header.ok_or_else(|| missing("header"))?,
+        footer: footer.ok_or_else(|| missing("footer"))?,
+    })
+}
+
+fn parse_margin(raw: &str, name: &[u8]) -> Result<PageMargin> {
+    let value = raw.parse::<f64>().map_err(|_source| {
+        invalid(format!(
+            "invalid {} page margin",
+            String::from_utf8_lossy(name)
+        ))
+    })?;
+    validate_margin(value, &String::from_utf8_lossy(name))
+}
+
+fn validate_margin(value: f64, name: &str) -> Result<PageMargin> {
+    if !value.is_finite() || !(0.0..MAX_OFFICE_MARGIN_INCHES).contains(&value) {
+        return Err(invalid(format!(
+            "{name} page margin is outside Office's [0, 49) range"
+        )));
+    }
+    Ok(PageMargin(if value == 0.0 { 0.0 } else { value }))
+}
+
+fn missing(name: &str) -> Error {
+    invalid(format!(
+        "pageMargins is missing required '{name}' attribute"
+    ))
+}
+fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
+    exact(namespace, CORE) || exact(namespace, STRICT)
+}
+fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected)
+}
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "invalid worksheet page-margin XML: {error}"
+    )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::{OpcPackage, PackURI};
+
+    const START: &str =
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+    const CORE_NAMESPACE: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    fn parse(body: &str) -> Result<Option<Margins>> {
+        parse_page_margins(format!("{START}{body}</worksheet>").as_bytes())
+    }
+
+    fn parse_fixture(path: &str) -> Margins {
+        let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
+        let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        parse_page_margins(package.get_part(&uri).unwrap().blob())
+            .unwrap()
+            .unwrap()
+    }
+
+    #[test]
+    fn parses_required_values_and_converts_units() {
+        let margins = parse(
+            r#"<pageMargins left="0.7" right="0" top="1" bottom="2" header="0.5" footer="0.25"/>"#,
+        )
+        .unwrap()
+        .unwrap();
+        assert_eq!(margins.left().inches(), 0.7);
+        assert_eq!(margins.right().inches(), 0.0);
+        assert_eq!(margins.top().points(), 72.0);
+        assert_eq!(margins.bottom().millimeters(), 50.8);
+    }
+
+    #[test]
+    fn authors_inserts_and_removes_byte_minimal_margins() {
+        let margins = Margins::new(
+            PageMargin::from_inches(0.7).unwrap(),
+            PageMargin::from_inches(0.8).unwrap(),
+            PageMargin::from_points(72.0).unwrap(),
+            PageMargin::from_millimeters(25.4).unwrap(),
+            PageMargin::from_inches(0.3).unwrap(),
+            PageMargin::from_inches(0.4).unwrap(),
+        );
+        assert_eq!(
+            write_page_margins(&margins),
+            br#"<pageMargins left="0.7" right="0.8" top="1" bottom="1" header="0.3" footer="0.4"/>"#
+        );
+
+        let source = format!(
+            r#"{START}<sheetData/><printOptions gridLines="1"/><pageSetup orientation="portrait"/></worksheet>"#
+        );
+        let replaced = replace_page_margins(source.as_bytes(), Some(&margins)).unwrap();
+        assert_eq!(parse_page_margins(&replaced).unwrap(), Some(margins));
+        let replaced = std::str::from_utf8(&replaced).unwrap();
+        assert!(replaced.contains(std::str::from_utf8(&write_page_margins(&margins)).unwrap()));
+        assert!(replaced.find("<printOptions").unwrap() < replaced.find("<pageMargins").unwrap());
+        assert!(replaced.find("<pageMargins").unwrap() < replaced.find("<pageSetup").unwrap());
+
+        let removed = replace_page_margins(replaced.as_bytes(), None).unwrap();
+        assert_eq!(parse_page_margins(&removed).unwrap(), None);
+        assert!(
+            !std::str::from_utf8(&removed)
+                .unwrap()
+                .contains("pageMargins")
+        );
+    }
+
+    #[test]
+    fn accepts_strict_namespace_and_absence() {
+        let xml = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><pageMargins left="1" right="2" top="3" bottom="4" header="5" footer="6"/></worksheet>"#;
+        assert_eq!(
+            parse_page_margins(xml).unwrap().unwrap().footer().inches(),
+            6.0
+        );
+        assert!(parse("").unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_missing_nonfinite_out_of_range_and_content() {
+        assert!(
+            parse(r#"<pageMargins left="1" right="2" top="3" bottom="4" header="5"/>"#).is_err()
+        );
+        assert!(
+            parse(
+                r#"<pageMargins left="NaN" right="2" top="3" bottom="4" header="5" footer="6"/>"#
+            )
+            .is_err()
+        );
+        assert!(
+            parse(r#"<pageMargins left="49" right="2" top="3" bottom="4" header="5" footer="6"/>"#)
+                .is_err()
+        );
+        assert!(parse(r#"<pageMargins left="1" right="2" top="3" bottom="4" header="5" footer="6"><x/></pageMargins>"#).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_document_boundaries_and_excessive_depth() {
+        for xml in [
+            format!(
+                r#"<worksheet xmlns="{CORE_NAMESPACE}"/><worksheet xmlns="{CORE_NAMESPACE}"/>"#
+            ),
+            format!(r#"text{}"#, START),
+            format!(r#"{}text</worksheet>"#, START),
+            format!(r#"{}</worksheet>tail"#, START),
+            format!(r#"{}<![CDATA[data]]></worksheet>"#, START),
+        ] {
+            assert!(
+                parse_page_margins(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = START.to_owned();
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_page_margins(xml.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn loads_poi_custom_margin_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/poi/test-data/spreadsheet/headerFooterTest.xlsx"
+        );
+        let margins = parse_fixture(path);
+        assert!((margins.left().inches() - 0.75).abs() < 1e-12);
+        assert_eq!(margins.top().inches(), 1.0);
+        assert_eq!(margins.header().inches(), 0.5);
+    }
+
+    #[test]
+    fn loads_libreoffice_metric_margin_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf134459_HeaderFooterColor.xlsx"
+        );
+        let margins = parse_fixture(path);
+        assert!((margins.left().millimeters() - 20.0).abs() < 1e-10);
+        assert!((margins.top().millimeters() - 27.0).abs() < 1e-10);
+    }
+
+    /// Freezes how the `pageMargins` reader treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn page_margins_envelope_matrix() {
+        const NAME: &str = "worksheet";
+        const OPEN: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</worksheet>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"incomplete worksheet page-margin XML\")",
+            "Invalid(\"incomplete worksheet page-margin XML\")",
+            "Invalid(\"incomplete worksheet page-margin XML\")",
+            "Invalid(\"worksheet root cannot be empty\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"DTD and processing instructions are rejected\")",
+            "Invalid(\"worksheet XML text is outside root\")",
+            "Invalid(\"worksheet XML contains content after root\")",
+            "Invalid(\"worksheet XML contains content after root\")",
+            "Invalid(\"worksheet XML contains content after root\")",
+            "Invalid(\"invalid worksheet XML declaration position\")",
+            "Invalid(\"invalid worksheet XML declaration position\")",
+            "Ok",
+            "Invalid(\"worksheet XML text is outside root\")",
+            "Invalid(\"incomplete worksheet page-margin XML\")",
+            "Xml(Malformed(\"invalid worksheet page-margin XML: ill-formed document: close tag `</worksheet>` does not match any open tag\"))",
+            "Invalid(\"DTD and processing instructions are rejected\")",
+            "Invalid(\"worksheet XML CDATA is outside root\")",
+            "Invalid(\"worksheet XML CDATA is outside root\")",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match parse_selected(input.as_bytes()) {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
+}

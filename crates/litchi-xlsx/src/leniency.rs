@@ -1,0 +1,965 @@
+//! Repair reporting for non-structural defects in `SpreadsheetML` workbooks.
+//!
+//! Two kinds of repair can happen while a workbook is read, and both are
+//! *recorded*, so a caller can enumerate exactly what changed through
+//! [`ToleranceReport`]. Nothing is swallowed silently, and nothing outside
+//! the closed enumerations changes: ZIP and XML well-formedness, OPC package
+//! grammar, worksheet framing, bounded resource limits, and encryption remain
+//! hard errors under every variant.
+//!
+//! **Excel-compatible repairs** are applied under every [`Leniency`] variant,
+//! including the default [`Leniency::Strict`]. They cover markup ECMA-376
+//! constrains but real producers emit anyway — markup Excel and LibreOffice
+//! read past (or silently repair) without failing the workbook, so rejecting
+//! it would cost the caller a whole sheet over a stale reference that cannot
+//! change what the conforming remainder of the file means. Each substitutes
+//! the value documented on the corresponding defect variant.
+//!
+//! **Opt-in repairs** trade strict conformance for reach and stay gated by
+//! [`Leniency`] variants, passed to the `*_with_leniency` open functions of
+//! [`crate::Workbook`] and [`crate::SourceBackedWorkbook`]. The one
+//! judgment-call class — sheet-name authoring rules enforced
+//! at load time — is gated by
+//! [`Leniency::TolerateSheetNameRules`].
+//!
+//! The defect enumerations are closed. A variant whose recording
+//! site has not landed yet is documented as a *roadmap contract*: it fixes
+//! the repair it will apply, and no read produces it today.
+//!
+//! # Where recording sites plug in
+//!
+//! This crate opens lazily: [`crate::Workbook`] and
+//! [`crate::SourceBackedWorkbook`] validate the OPC graph and parse the
+//! workbook catalog when opened, while worksheet, shared-string, and style
+//! payloads are parsed on first use behind `&self` handles and published
+//! through write-once caches. The report is therefore assembled at three
+//! levels, with explicit `&mut ToleranceReport` threading inside each parse
+//! and no interior mutability:
+//!
+//! * **Open time (workbook level).** Each workbook handle owns a report built
+//!   while it was opened. It starts with the OPC packaging repairs of the
+//!   package the workbook was opened from (`OpcPackage::tolerance_report` /
+//!   `SourceBackedPackage::tolerance_report`), folded in as
+//!   [`Defect::Package`] entries at [`Location::Part`] together with the
+//!   packaging report's unrecorded count, so every open path — owned,
+//!   source-backed, `Package::workbook`, decrypted — lists the manifest
+//!   repairs its package made. Catalog repairs (`activeTab` /
+//!   `localSheetId`, sheet names) thread `&mut ToleranceReport` into the
+//!   catalog parse and record [`CatalogDefect`]s located at
+//!   [`Location::Workbook`] or [`Location::DefinedName`].
+//! * **Per worksheet.** A worksheet's parsed cell store carries its own
+//!   report, filled while that store was built: the streaming worksheet
+//!   parser threads `&mut ToleranceReport` through cell materialization
+//!   (recording [`CellDefect`]s at [`Location::Cell`] and
+//!   [`WorksheetDefect`]s), and the style cross-reference pass that runs
+//!   before the store is published takes the store mutably and records at the cell, row, or
+//!   column it repaired. Because the report
+//!   lives *in* the store, every path that builds one — owned workbook,
+//!   source-backed workbook, edit and readback planning — carries the repairs
+//!   it made, and a cached store reports the same repairs on every access.
+//!   `Worksheet::tolerance_report` / `SourceWorksheet::tolerance_report`
+//!   force that sheet's parse and return its report; per-sheet locations
+//!   leave [`ToleratedDefect::sheet`] unset.
+//! * **Workbook aggregate.** `Workbook::tolerance_report` /
+//!   `SourceBackedWorkbook::tolerance_report` merge the open-time report with
+//!   the report of every worksheet parsed *so far*, in sheet order, stamping
+//!   each entry with its sheet position in [`ToleratedDefect::sheet`]. Sheets
+//!   that were never read have not been parsed, so they cannot have been
+//!   repaired; reading every sheet first yields the complete report.
+//!   Shared-string repairs are recorded when the table is parsed
+//!   and join the aggregate the same way, at [`Location::SharedStringTable`]
+//!   or [`Location::SharedStringItem`].
+//!
+//! The source-backed facade also answers cold cell reads through a bounded
+//! selected-range scanner that never builds a store. That scanner does not
+//! repair anything: whenever a dependency it needs is irregular — a
+//! shared-string index the table does not hold, a style index past the
+//! catalog, or a lexical the store parse would repair — it falls back to
+//! the authoritative store parse, which repairs and records. Selected reads therefore never observe a defect the report
+//! does not list.
+//!
+//! # Carrier status
+//!
+//! The plumbing is in place: both workbook handles carry an open-time
+//! report, every worksheet store carries the report of the parse that built
+//! it, and the aggregates above expose them. Live recording sites:
+//!
+//! * OPC packaging repairs — folded from the package's own report
+//!   at open as [`Defect::Package`]. Shared metadata repairs (core and
+//!   custom document properties) are not read by the
+//!   workbook facades; a caller that reads them with
+//!   `litchi_ooxml_common::properties::read_with_report` folds that report
+//!   in with [`ToleranceReport::append_properties`] as
+//!   [`Defect::Properties`]. Custom properties read through
+//!   `Package::custom_props` carry their own report on the returned value.
+//! * row and column geometry — the worksheet event parser (`raw/worksheet/codec.rs`,
+//!   with `sheetFormatPr` in `raw/worksheet/validation.rs`) records
+//!   [`WorksheetDefect::RowHeightOutOfRange`],
+//!   [`WorksheetDefect::ColumnWidthOutOfRange`], and
+//!   [`WorksheetDefect::SheetFormatDefaultOutOfRange`] at the row, column
+//!   range, or worksheet. The standalone `raw::parse_worksheet_defaults`
+//!   reader has no report and keeps its errors.
+//! * style indexes — `Store::repair_style_indexes`, run by both read facades
+//!   before a worksheet store is published, records
+//!   [`CellDefect::StyleIndexOutOfRange`] at the cell, row, or column.
+//! * cell values and shared-string references — cell materialization
+//!   (`raw/worksheet/semantic.rs`) records [`CellDefect::MalformedNumber`],
+//!   [`CellDefect::MalformedBoolean`], [`CellDefect::MalformedDate`],
+//!   [`CellDefect::SharedStringIndexOutOfRange`], and
+//!   [`CellDefect::MissingSharedStringTable`] at the cell.
+//! * the shared-string table — the shared-string table parse
+//!   (`raw/strings.rs`) records [`SharedStringsDefect::CountHint`],
+//!   [`SharedStringsDefect::RunStructure`], and
+//!   [`SharedStringsDefect::UnpairedEscape`]; each workbook handle keeps the
+//!   table's report beside its write-once cache and the aggregate lists it
+//!   after the open-time entries, with no sheet. The bounded selected
+//!   dependency scan reports such a table as irregular and the read falls
+//!   back to the repairing parse.
+//! * shared formulas — shared-formula resolution (`raw/worksheet/semantic.rs`)
+//!   records [`CellDefect::BrokenSharedFormulaGroup`] at each repaired cell.
+//! * the workbook catalog — the open-time catalog parse (`raw/catalog.rs`)
+//!   records [`CatalogDefect::ActiveTabOutOfRange`] and
+//!   [`CatalogDefect::LocalSheetIdOutOfRange`]; under the opt-in
+//!   [`Leniency::TolerateSheetNameRules`] it also records
+//!   [`CatalogDefect::SheetNameRules`]. The standalone `raw::parse_catalog`
+//!   and the feature snapshots that re-read the catalog for editing keep the
+//!   historical errors.
+//! * formulas and worksheet sequencing — the worksheet event parser records
+//!   [`CellDefect::FormulaLeadingEquals`] and [`CellDefect::EmptyFormula`]
+//!   at the cell, and [`WorksheetDefect::MisplacedElement`],
+//!   [`WorksheetDefect::CountMismatch`], and
+//!   [`WorksheetDefect::RowOutOfOrder`].
+//! * the theme color scheme — `style::theme::Theme::parse` records [`ThemeDefect`]s
+//!   in the parsed theme's own report; no workbook handle parses the theme.
+//!
+//! Whenever the selected-range scanner meets a cell or worksheet one of the
+//! worksheet sites would repair, it defers to the materializing parse.
+//!
+//! Write paths stay strict where they re-read source parts: the value-only
+//! cell editor parses worksheets with repairs refused and keeps its
+//! historical errors, commit-time readback verification still refuses stale
+//! style indexes, and the catalog re-reads of the edit planners and the
+//! source-backed shared-string re-reads refuse repairs.
+//! [`SharedStringsDefect::RunProperty`] is the one remaining roadmap
+//! contract.
+//!
+//! This mirrors the contract `crates/litchi-doc/src/leniency.rs` establishes
+//! for legacy Word documents and `crates/litchi-xls/src/leniency.rs` for
+//! legacy workbooks, so the readers behave the same way.
+
+use litchi_sheet::{Cell as Address, Column as ColumnIndex, Row as RowIndex};
+
+/// Upper bound on individually recorded defects.
+///
+/// A hostile or merely enormous workbook must not be able to make the report
+/// grow without limit. Defects beyond this bound are counted, not stored; see
+/// [`ToleranceReport::unrecorded`].
+const MAX_RECORDED_DEFECTS: usize = 1024;
+
+/// How the reader treats non-structural workbook defects.
+///
+/// Structural defects — malformed ZIP or XML framing, a broken OPC package
+/// grammar, unsupported/absent decryption material, or an exceeded resource
+/// limit — are hard errors under every variant. The Excel-compatible repairs
+/// listed by [`Defect`] are applied and recorded under every variant,
+/// including [`Leniency::Strict`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
+#[non_exhaustive]
+pub enum Leniency {
+    /// Reject every defect whose repair requires opting in.
+    ///
+    /// This is the default: the Excel-compatible repairs are applied and
+    /// recorded here too.
+    #[default]
+    Strict,
+    /// [`Leniency::Strict`], plus admit sheet names that break Excel's
+    /// authoring rules — over 31 characters, a reserved
+    /// character (`* ? / \ : [ ]`), or a leading/trailing apostrophe.
+    ///
+    /// ECMA-376 §18.2.18 types `sheet/@name` as `ST_Xstring` with no such
+    /// constraint; the rules are Excel *application* limits, Apache POI
+    /// accepts any name, and Excel and LibreOffice repair by renaming on
+    /// import. Renaming is a judgment call, so this reader instead keeps the
+    /// name verbatim (sheets are keyed by position) and records
+    /// [`CatalogDefect::SheetNameRules`] at [`Location::Sheet`]. An empty
+    /// name, and a name colliding with another, stay hard errors; renaming
+    /// or creating a sheet still enforces the rules.
+    TolerateSheetNameRules,
+}
+
+/// A per-cell defect repaired the way Excel repairs it.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of the
+/// cell-level repairs a read applies.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CellDefect {
+    /// A cell's `s` attribute (or a row's / column's style) names an index at
+    /// or beyond the workbook's `cellXfs` count.
+    ///
+    /// ECMA-376 §18.3.1.4 requires the index to reference `cellXfs` but gives
+    /// no basis for rejecting the sheet over a stale one; Excel substitutes
+    /// the default format and LibreOffice clamps. The reader drops the stale
+    /// index, so the cell, row, or column reads with the mandatory default
+    /// format (`cellXfs` entry 0). `MAX_CELL_STYLE` remains an allocation
+    /// guard and is still a hard error.
+    StyleIndexOutOfRange,
+    /// A `t="s"` cell names a shared-string index at or beyond the table's
+    /// length.
+    ///
+    /// Excel repairs the cell; LibreOffice resolves the lookup to empty. The
+    /// reader substitutes an empty string, matching the LibreOffice result.
+    /// An index that is not an unsigned integer at all stays a hard error.
+    SharedStringIndexOutOfRange,
+    /// A `t="s"` cell appears in a workbook that has no shared-string part.
+    ///
+    /// The reader substitutes an empty string for each such cell, exactly as
+    /// for an out-of-range index into an empty table.
+    MissingSharedStringTable,
+    /// A number `<v>` does not parse as a finite `xsd:double` — `1,234.56`,
+    /// `1E+999`, `NaN`.
+    ///
+    /// LibreOffice converts lossily and Apache POI keeps the raw string; the
+    /// reader keeps the raw string without inventing a number: the cell is
+    /// demoted to `Cell::Unknown` with kind `n` and the lexical as its value.
+    /// On a formula cell the malformed cached value is dropped and the
+    /// formula kept (Excel recalculates it).
+    MalformedNumber,
+    /// A boolean `<v>` is outside `{0, 1, true, false}`.
+    ///
+    /// Read as LibreOffice reads it — `true`/`false` in any ASCII case, and
+    /// any finite number as non-zero-is-true. A lexical neither form covers
+    /// (for example `yes`) is demoted to `Cell::Unknown` with kind `b`
+    /// instead of being guessed; a formula's cached value is then dropped.
+    MalformedBoolean,
+    /// A `t="d"` value is outside the accepted ISO 8601 layouts. The value is demoted to its text.
+    MalformedDate,
+    /// A shared-formula group is structurally inconsistent — a would-be
+    /// master without `ref` or expression, not first in its `ref`, or a
+    /// second master for one `si`; a member without a master or outside the
+    /// master's range.
+    ///
+    /// LibreOffice falls back to plain cells for an unusable shared
+    /// reference. A would-be master keeps its own expression verbatim as an
+    /// ordinary formula (or, without one, reads as its cached value); the
+    /// first master of an `si` wins. An orphaned member is never translated
+    /// from a master that does not cover it: it loses the formula and reads
+    /// as a plain cell holding its cached value. The location is the
+    /// repaired cell. A `ref` that is not a range lexical stays fatal.
+    BrokenSharedFormulaGroup,
+    /// An `<f>` starts with `=`. Naive generators write
+    /// `<f>=SUM(A1:A2)</f>`; LibreOffice's compiler accepts the `=` and Excel
+    /// repairs. One leading `=` (after any leading whitespace) is stripped; a
+    /// second one stays a hard error.
+    FormulaLeadingEquals,
+    /// A scalar or array `<f>` is empty. LibreOffice
+    /// skips an empty formula; the cell reads without one, keeping its
+    /// cached value.
+    EmptyFormula,
+}
+
+impl CellDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::StyleIndexOutOfRange => {
+                "dropped the stale style index; the default cell format (cellXfs 0) applies"
+            },
+            Self::SharedStringIndexOutOfRange => {
+                "substituted an empty string for the out-of-range shared-string reference"
+            },
+            Self::MissingSharedStringTable => {
+                "substituted an empty string; the workbook has no shared-string table"
+            },
+            Self::MalformedNumber => {
+                "demoted the unparseable number to an unknown cell, or dropped the cached formula value"
+            },
+            Self::MalformedBoolean => {
+                "read the nonstandard boolean lexical leniently, or demoted it to an unknown cell"
+            },
+            Self::MalformedDate => "demoted the unparseable date to text",
+            Self::BrokenSharedFormulaGroup => {
+                "kept the would-be master's own formula, or kept the orphaned member's cached value without a formula"
+            },
+            Self::FormulaLeadingEquals => "stripped the leading '=' from the formula",
+            Self::EmptyFormula => "dropped the empty formula",
+        }
+    }
+}
+
+/// A worksheet-level structural-advisory defect repaired the way Excel
+/// repairs it.
+///
+/// Every variant is live: the geometry variants and the
+/// sequencing and advisory-count variants.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum WorksheetDefect {
+    /// A row `ht` lies outside 0..=409 points. ECMA-376 types
+    /// `ht` as a plain `xsd:double`; 409 is Excel's authoring ceiling and
+    /// LibreOffice writes taller rows. A height past 409 (including `+inf`)
+    /// clamps to 409; a negative or `NaN` height is dropped, so the row
+    /// takes the sheet default, as LibreOffice reads a negative `ht`. The
+    /// location is the row.
+    RowHeightOutOfRange,
+    /// A column `width` lies outside 0..=255 characters. A
+    /// width past 255 clamps to 255; a negative or `NaN` width is dropped,
+    /// so the columns take the sheet default. The location is the column
+    /// range of the `col` record.
+    ColumnWidthOutOfRange,
+    /// A `sheetFormatPr` default is negative, non-finite, or out of range:
+    /// `defaultColWidth` and `baseColWidth` are dropped, so
+    /// the application default applies; a required `defaultRowHeight` is
+    /// replaced with Excel's 15-point default. A missing or unparseable
+    /// attribute stays a hard error.
+    SheetFormatDefaultOutOfRange,
+    /// `dimension`, `sheetFormatPr`, `cols`, or `mergeCells` appears out of
+    /// schema order, or `dimension` is repeated, lacks `ref`, or has an
+    /// unparseable `ref`. ECMA-376 §18.3.1.35 makes
+    /// `dimension` informational and Excel and LibreOffice recompute it. The
+    /// element is accepted position-independently; the first `dimension`
+    /// wins and an unusable one is ignored. A repeated `sheetData`, `cols`,
+    /// `sheetFormatPr`, or `mergeCells` stays fatal. Located at
+    /// [`Location::Worksheet`].
+    MisplacedElement,
+    /// `mergeCells/@count` disagrees with its records, or `cols` /
+    /// `mergeCells` is empty. The counts are informational
+    /// (§18.3.1.55); the records are authoritative, as for the
+    /// shared-string hints. Located at [`Location::Worksheet`].
+    CountMismatch,
+    /// A row appears after a higher-numbered row, or a row index repeats.
+    /// Rows are sorted; a repeated row merges last-wins —
+    /// its later properties and cells replace earlier ones at the same
+    /// index — as Apache POI's sorted row map does. A cell repeated within
+    /// one row stays fatal. Located at the row.
+    RowOutOfOrder,
+}
+
+impl WorksheetDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::RowHeightOutOfRange => {
+                "clamped the row height to 409 points, or dropped a negative height"
+            },
+            Self::ColumnWidthOutOfRange => {
+                "clamped the column width to 255 characters, or dropped a negative width"
+            },
+            Self::SheetFormatDefaultOutOfRange => {
+                "dropped the out-of-range sheet format default; the application default applies"
+            },
+            Self::MisplacedElement => "accepted the out-of-order worksheet element",
+            Self::CountMismatch => "ignored the advisory count; the records are authoritative",
+            Self::RowOutOfOrder => "sorted the out-of-order rows",
+        }
+    }
+}
+
+/// A workbook-catalog (`xl/workbook.xml`) defect.
+///
+/// Every variant is live and recorded when a workbook handle is opened;
+/// [`CatalogDefect::SheetNameRules`] only under its opt-in [`Leniency`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum CatalogDefect {
+    /// `workbookView/@activeTab` names a sheet past the catalog. ECMA-376 types
+    /// it as an unconstrained `unsignedInt` and it goes
+    /// stale when other tools delete sheets. The active tab falls back to
+    /// the first sheet — LibreOffice's reading, and the value an absent
+    /// `activeTab` means. Located at [`Location::Workbook`].
+    ActiveTabOutOfRange,
+    /// A `definedName/@localSheetId` names a sheet past the catalog. A scope
+    /// naming no sheet cannot be resolved; the name is dropped,
+    /// as LibreOffice drops it, rather than promoted to a workbook-global
+    /// name that could shadow another. Located at [`Location::DefinedName`],
+    /// the name's zero-based position among the catalog's defined names.
+    LocalSheetIdOutOfRange,
+    /// A sheet name violates Excel's authoring rules — over 31 characters,
+    /// a reserved character, or a leading/trailing apostrophe.
+    /// The name is retained verbatim. This is the one judgment-call repair in
+    /// this crate: it applies only under the opt-in
+    /// [`Leniency::TolerateSheetNameRules`]; under [`Leniency::Strict`] the
+    /// name fails the open. Located at [`Location::Sheet`].
+    SheetNameRules,
+}
+
+impl CatalogDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::ActiveTabOutOfRange => "reset the out-of-range active tab to the first sheet",
+            Self::LocalSheetIdOutOfRange => {
+                "dropped the defined name scoped to a sheet the workbook does not have"
+            },
+            Self::SheetNameRules => "retained the non-conforming sheet name verbatim",
+        }
+    }
+}
+
+/// A shared-string table (`xl/sharedStrings.xml`) defect.
+///
+/// Recorded by the workbook handles' shared-string parse (`raw/strings.rs`):
+/// [`SharedStringsDefect::CountHint`] at
+/// [`Location::SharedStringTable`], and [`SharedStringsDefect::RunStructure`]
+/// and [`SharedStringsDefect::UnpairedEscape`] at
+/// [`Location::SharedStringItem`]. That parser reads item text only, so a
+/// malformed run property cannot fail it; [`SharedStringsDefect::RunProperty`]
+/// is a *roadmap contract* for the standalone `raw::shared_strings::Table`
+/// reader, which keeps its errors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum SharedStringsDefect {
+    /// `sst/@count` or `sst/@uniqueCount` is unparseable, negative, or past
+    /// 2³¹−1. ECMA-376 §18.4.9 makes both optional and
+    /// informational; Excel and LibreOffice ignore them. The hint is treated
+    /// as absent — the items are authoritative — as the crate's tolerant
+    /// twin parser already does. One entry per malformed hint, at
+    /// [`Location::SharedStringTable`].
+    CountHint,
+    /// An item mixes simple and rich text, or repeats a `<t>` in the item
+    /// or in one run. LibreOffice appends every text portion;
+    /// the reader keeps every text element's characters in document order,
+    /// so no text is lost.
+    RunStructure,
+    /// A run property is duplicated, unknown, or malformed.
+    /// The property is dropped; an unknown underline reads as single.
+    RunProperty,
+    /// An `_xHHHH_` escape encodes an unpaired surrogate.
+    /// The escape decodes to U+FFFD, as reference decoders do; one entry
+    /// per affected item.
+    UnpairedEscape,
+}
+
+impl SharedStringsDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::CountHint => "ignored the malformed shared-string count hint",
+            Self::RunStructure => "kept every text portion of the malformed item in document order",
+            Self::RunProperty => "dropped the malformed run property",
+            Self::UnpairedEscape => "decoded the unpaired surrogate escape as U+FFFD",
+        }
+    }
+}
+
+/// A theme color-scheme (`a:clrScheme`) defect.
+///
+/// Recorded by `style::theme::Theme::parse` into the
+/// parsed theme's own report (`Theme::tolerance_report`), at
+/// [`Location::ColorSchemeSlot`]. The theme parser is not on the
+/// workbook-open path. LibreOffice dispatches color-scheme children by name,
+/// order-independently, and leaves defaults for missing slots.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum ThemeDefect {
+    /// A color-scheme slot appears after a later schema slot, or repeats.
+    /// Slots are matched by name; a repeated slot's first occurrence wins.
+    MisorderedSlot,
+    /// A color-scheme slot is missing, or carries a color form this reader
+    /// does not model (for example `a:prstClr`). The slot takes the Office
+    /// theme's value.
+    MissingSlot,
+    /// `a:sysClr` lacks `lastClr`, which CT_SystemColor makes optional. The
+    /// color resolves by name (`window` is white), else black.
+    MissingLastColor,
+    /// `a:srgbClr/@val` is missing or not six hex digits, or `a:sysClr`
+    /// lacks `val`: the slot takes the Office theme's value. A malformed
+    /// `a:sysClr/@lastClr` resolves by name instead.
+    MalformedColor,
+}
+
+impl ThemeDefect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::MisorderedSlot => "matched the color-scheme slot by name",
+            Self::MissingSlot => "defaulted the missing color-scheme slot",
+            Self::MissingLastColor => "resolved the system color by name",
+            Self::MalformedColor => "defaulted the slot with a malformed color",
+        }
+    }
+}
+
+/// One class of defect repaired while a workbook was read.
+///
+/// This enumeration is closed by design: it is the exhaustive contract of what
+/// a read may change about a workbook.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Defect {
+    /// A per-cell (or per-row/column style) defect.
+    Cell(CellDefect),
+    /// A worksheet structural-advisory defect.
+    Worksheet(WorksheetDefect),
+    /// A workbook-catalog defect.
+    Catalog(CatalogDefect),
+    /// A shared-string table defect.
+    SharedStrings(SharedStringsDefect),
+    /// A theme color-scheme defect.
+    Theme(ThemeDefect),
+    /// An OPC packaging defect (relationship or content-types manifest)
+    /// repaired while the workbook's package was read; see
+    /// `litchi_opc::leniency`. Located at [`Location::Part`].
+    Package(litchi_opc::leniency::Defect),
+    /// A shared OOXML metadata defect (core or custom document properties)
+    /// repaired while the package metadata was read; see
+    /// `litchi_ooxml_common::leniency`. Located at [`Location::Part`].
+    Properties(litchi_ooxml_common::leniency::Defect),
+}
+
+impl Defect {
+    /// A short, stable description of what the repair did.
+    #[must_use]
+    pub const fn repair(self) -> &'static str {
+        match self {
+            Self::Cell(defect) => defect.repair(),
+            Self::Worksheet(defect) => defect.repair(),
+            Self::Catalog(defect) => defect.repair(),
+            Self::SharedStrings(defect) => defect.repair(),
+            Self::Theme(defect) => defect.repair(),
+            Self::Package(defect) => defect.repair(),
+            Self::Properties(defect) => defect.repair(),
+        }
+    }
+}
+
+impl From<litchi_opc::leniency::Defect> for Defect {
+    fn from(defect: litchi_opc::leniency::Defect) -> Self {
+        Self::Package(defect)
+    }
+}
+
+impl From<litchi_ooxml_common::leniency::Defect> for Defect {
+    fn from(defect: litchi_ooxml_common::leniency::Defect) -> Self {
+        Self::Properties(defect)
+    }
+}
+
+impl From<CellDefect> for Defect {
+    fn from(defect: CellDefect) -> Self {
+        Self::Cell(defect)
+    }
+}
+
+impl From<WorksheetDefect> for Defect {
+    fn from(defect: WorksheetDefect) -> Self {
+        Self::Worksheet(defect)
+    }
+}
+
+impl From<CatalogDefect> for Defect {
+    fn from(defect: CatalogDefect) -> Self {
+        Self::Catalog(defect)
+    }
+}
+
+impl From<SharedStringsDefect> for Defect {
+    fn from(defect: SharedStringsDefect) -> Self {
+        Self::SharedStrings(defect)
+    }
+}
+
+impl From<ThemeDefect> for Defect {
+    fn from(defect: ThemeDefect) -> Self {
+        Self::Theme(defect)
+    }
+}
+
+/// Where in its part a repaired defect was found.
+///
+/// Worksheet locations are relative to the worksheet named by
+/// [`ToleratedDefect::sheet`]; coordinates are zero-based.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Location {
+    /// The workbook catalog part as a whole (for example `workbookView`).
+    Workbook,
+    /// The zero-based position of a `definedName` in the catalog.
+    DefinedName(u32),
+    /// The zero-based position of a `sheet` entry in the catalog.
+    Sheet(u32),
+    /// The shared-string table as a whole (for example its count hints).
+    SharedStringTable,
+    /// The zero-based index of one shared-string item (`si`).
+    SharedStringItem(u32),
+    /// The worksheet part as a whole (for example its `dimension`).
+    Worksheet,
+    /// One worksheet cell.
+    Cell(Address),
+    /// One worksheet row's properties.
+    Row(RowIndex),
+    /// One worksheet column-range record (`col/@min..=@max`).
+    Columns {
+        /// The first column the record covers.
+        first: ColumnIndex,
+        /// The last column the record covers.
+        last: ColumnIndex,
+    },
+    /// The zero-based slot of a theme color-scheme entry.
+    ColorSchemeSlot(u8),
+    /// A package part, for defects folded in from the OPC packaging report
+    /// ([`Defect::Package`]) or the shared metadata report
+    /// ([`Defect::Properties`]). The strings are those the lower layer
+    /// recorded, bounded by the read limits that admitted them.
+    Part {
+        /// The part name the defect belongs to (for example `/` for package
+        /// relationships, or `/[Content_Types].xml`).
+        part: Box<str>,
+        /// The item within the part — a relationship `Id`, a content-type
+        /// key, or a property name — when one is known.
+        item: Option<Box<str>>,
+        /// The raw value the repair replaced or discarded, when one exists.
+        value: Option<Box<str>>,
+    },
+}
+
+/// One repaired defect, with enough context to locate it in the workbook.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct ToleratedDefect {
+    /// Which defect class was repaired.
+    pub defect: Defect,
+    /// The zero-based workbook position of the worksheet the defect was
+    /// found in, when it was found in a worksheet and reported through a
+    /// workbook-level aggregate; `None` for workbook-scoped parts and in a
+    /// single worksheet's own report.
+    pub sheet: Option<u32>,
+    /// Where in its part the defect was found.
+    pub location: Location,
+}
+
+/// Everything a read repaired, in the order the defects were found.
+///
+/// An empty report means every parse so far conformed and no substitution
+/// was made. See the [module documentation](self) for how per-worksheet
+/// reports aggregate into a workbook report.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ToleranceReport {
+    defects: Vec<ToleratedDefect>,
+    unrecorded: u32,
+}
+
+/// The report of a parse that cannot repair anything, such as a chart sheet's
+/// absent cell store.
+pub(crate) static CLEAN: ToleranceReport = ToleranceReport {
+    defects: Vec::new(),
+    unrecorded: 0,
+};
+
+impl ToleranceReport {
+    /// Whether the parse completed without any repair.
+    #[inline]
+    #[must_use]
+    pub fn is_clean(&self) -> bool {
+        self.defects.is_empty() && self.unrecorded == 0
+    }
+
+    /// The individually recorded defects, in discovery order.
+    #[inline]
+    #[must_use]
+    pub fn defects(&self) -> &[ToleratedDefect] {
+        &self.defects
+    }
+
+    /// Iterate the individually recorded defects, in discovery order.
+    #[inline]
+    pub fn iter(&self) -> std::slice::Iter<'_, ToleratedDefect> {
+        self.defects.iter()
+    }
+
+    /// Defects that were repaired but not stored, once the bound was reached.
+    #[inline]
+    #[must_use]
+    pub fn unrecorded(&self) -> u32 {
+        self.unrecorded
+    }
+
+    /// Total repairs performed, recorded or not.
+    #[inline]
+    #[must_use]
+    pub fn total(&self) -> u64 {
+        self.defects.len() as u64 + u64::from(self.unrecorded)
+    }
+
+    /// Record one repair, saturating at [`MAX_RECORDED_DEFECTS`] stored entries.
+    pub(crate) fn record(&mut self, defect: impl Into<Defect>, location: Location) {
+        self.push(ToleratedDefect {
+            defect: defect.into(),
+            sheet: None,
+            location,
+        });
+    }
+
+    fn push(&mut self, tolerated: ToleratedDefect) {
+        if self.defects.len() < MAX_RECORDED_DEFECTS {
+            self.defects.push(tolerated);
+        } else {
+            self.unrecorded = self.unrecorded.saturating_add(1);
+        }
+    }
+
+    /// Merge another parse's report into this one, keeping discovery order.
+    ///
+    /// The stored-entry bound applies to the merged report as a whole; entries
+    /// that no longer fit join the unrecorded count.
+    pub(crate) fn append(&mut self, other: &Self) {
+        for tolerated in other.iter() {
+            self.push(tolerated.clone());
+        }
+        self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+
+    /// Fold an OPC packaging report into this one.
+    ///
+    /// Every packaging repair becomes a [`Defect::Package`] entry located at
+    /// [`Location::Part`], and the packaging report's unrecorded count is
+    /// carried over, so the merged total stays exact.
+    pub(crate) fn append_package(&mut self, package: &litchi_opc::leniency::ToleranceReport) {
+        for tolerated in package {
+            self.push(ToleratedDefect {
+                defect: Defect::Package(tolerated.defect()),
+                sheet: None,
+                location: part_location(tolerated.part(), tolerated.item(), tolerated.value()),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(package.unrecorded());
+    }
+
+    /// Fold a shared metadata (core/custom document properties) report into
+    /// this one.
+    ///
+    /// Every metadata repair becomes a [`Defect::Properties`] entry located at
+    /// [`Location::Part`], and the metadata report's unrecorded count is
+    /// carried over. Callers that read package metadata alongside a workbook
+    /// (for example through `litchi_ooxml_common::properties::read_with_report`)
+    /// use this to keep one report for the whole document.
+    pub fn append_properties(
+        &mut self,
+        properties: &litchi_ooxml_common::leniency::ToleranceReport,
+    ) {
+        for tolerated in properties {
+            self.push(ToleratedDefect {
+                defect: Defect::Properties(tolerated.defect()),
+                sheet: None,
+                location: part_location(tolerated.part(), tolerated.item(), tolerated.value()),
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(properties.unrecorded());
+    }
+
+    /// Merge one worksheet's report, stamping each entry with the worksheet's
+    /// workbook position.
+    pub(crate) fn append_sheet(&mut self, other: &Self, position: usize) {
+        let sheet = u32::try_from(position).ok();
+        for tolerated in other.iter() {
+            self.push(ToleratedDefect {
+                sheet,
+                ..tolerated.clone()
+            });
+        }
+        self.unrecorded = self.unrecorded.saturating_add(other.unrecorded);
+    }
+}
+
+fn part_location(part: &str, item: Option<&str>, value: Option<&str>) -> Location {
+    Location::Part {
+        part: part.into(),
+        item: item.map(Into::into),
+        value: value.map(Into::into),
+    }
+}
+
+impl<'a> IntoIterator for &'a ToleranceReport {
+    type Item = &'a ToleratedDefect;
+    type IntoIter = std::slice::Iter<'a, ToleratedDefect>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn cell(row: u32, column: u32) -> Location {
+        Location::Cell(Address::at(row, column).unwrap())
+    }
+
+    #[test]
+    fn strict_is_the_default() {
+        assert_eq!(Leniency::default(), Leniency::Strict);
+        assert_ne!(Leniency::default(), Leniency::TolerateSheetNameRules);
+    }
+
+    #[test]
+    fn a_fresh_report_is_clean() {
+        let report = ToleranceReport::default();
+        assert!(report.is_clean());
+        assert_eq!(report.total(), 0);
+        assert!(report.defects().is_empty());
+        assert_eq!(report.iter().count(), 0);
+    }
+
+    #[test]
+    fn recorded_defects_are_returned_in_discovery_order() {
+        let mut report = ToleranceReport::default();
+        report.record(CellDefect::StyleIndexOutOfRange, cell(0, 0));
+        report.record(CellDefect::SharedStringIndexOutOfRange, cell(4, 2));
+        report.record(CatalogDefect::ActiveTabOutOfRange, Location::Workbook);
+
+        assert!(!report.is_clean());
+        assert_eq!(report.total(), 3);
+        assert_eq!(
+            (&report)
+                .into_iter()
+                .map(|d| (d.defect, d.sheet, d.location.clone()))
+                .collect::<Vec<_>>(),
+            vec![
+                (
+                    Defect::Cell(CellDefect::StyleIndexOutOfRange),
+                    None,
+                    cell(0, 0)
+                ),
+                (
+                    Defect::Cell(CellDefect::SharedStringIndexOutOfRange),
+                    None,
+                    cell(4, 2)
+                ),
+                (
+                    Defect::Catalog(CatalogDefect::ActiveTabOutOfRange),
+                    None,
+                    Location::Workbook
+                ),
+            ]
+        );
+    }
+
+    /// A hostile part must not be able to grow the report without limit.
+    #[test]
+    fn defects_past_the_bound_are_counted_not_stored() {
+        let mut report = ToleranceReport::default();
+        for _ in 0..(MAX_RECORDED_DEFECTS + 5) {
+            report.record(CellDefect::StyleIndexOutOfRange, Location::Worksheet);
+        }
+        for _ in 0..3 {
+            report.record(CellDefect::StyleIndexOutOfRange, Location::Worksheet);
+        }
+
+        assert_eq!(report.defects().len(), MAX_RECORDED_DEFECTS);
+        assert_eq!(report.unrecorded(), 8);
+        assert_eq!(report.total(), MAX_RECORDED_DEFECTS as u64 + 8);
+    }
+
+    #[test]
+    fn appended_reports_merge_within_the_bound() {
+        let mut base = ToleranceReport::default();
+        base.record(CatalogDefect::ActiveTabOutOfRange, Location::Workbook);
+
+        let mut parsed = ToleranceReport::default();
+        for _ in 0..MAX_RECORDED_DEFECTS {
+            parsed.record(CellDefect::StyleIndexOutOfRange, cell(1, 1));
+        }
+        assert_eq!(parsed.unrecorded(), 0);
+
+        base.append(&parsed);
+        assert_eq!(base.defects().len(), MAX_RECORDED_DEFECTS);
+        assert_eq!(base.unrecorded(), 1);
+        assert_eq!(base.total(), MAX_RECORDED_DEFECTS as u64 + 1);
+        assert_eq!(
+            base.defects()[0],
+            ToleratedDefect {
+                defect: Defect::Catalog(CatalogDefect::ActiveTabOutOfRange),
+                sheet: None,
+                location: Location::Workbook,
+            }
+        );
+
+        let mut clean = ToleranceReport::default();
+        clean.append(&ToleranceReport::default());
+        clean.append_sheet(&ToleranceReport::default(), 3);
+        assert!(clean.is_clean());
+    }
+
+    #[test]
+    fn sheet_reports_are_stamped_with_their_position() {
+        let mut sheet = ToleranceReport::default();
+        sheet.record(CellDefect::MissingSharedStringTable, cell(2, 3));
+        sheet.unrecorded = 2;
+
+        let mut workbook = ToleranceReport::default();
+        workbook.append_sheet(&sheet, 1);
+        assert_eq!(workbook.defects()[0].sheet, Some(1));
+        assert_eq!(workbook.defects()[0].location, cell(2, 3));
+        assert_eq!(workbook.unrecorded(), 2);
+        assert_eq!(workbook.total(), 3);
+    }
+
+    #[test]
+    fn every_defect_class_describes_its_repair() {
+        let defects = [
+            Defect::from(CellDefect::StyleIndexOutOfRange),
+            Defect::from(CellDefect::SharedStringIndexOutOfRange),
+            Defect::from(CellDefect::MissingSharedStringTable),
+            Defect::from(CellDefect::MalformedNumber),
+            Defect::from(CellDefect::MalformedBoolean),
+            Defect::from(CellDefect::MalformedDate),
+            Defect::from(CellDefect::BrokenSharedFormulaGroup),
+            Defect::from(CellDefect::FormulaLeadingEquals),
+            Defect::from(CellDefect::EmptyFormula),
+            Defect::from(WorksheetDefect::RowHeightOutOfRange),
+            Defect::from(WorksheetDefect::ColumnWidthOutOfRange),
+            Defect::from(WorksheetDefect::SheetFormatDefaultOutOfRange),
+            Defect::from(WorksheetDefect::MisplacedElement),
+            Defect::from(WorksheetDefect::CountMismatch),
+            Defect::from(WorksheetDefect::RowOutOfOrder),
+            Defect::from(CatalogDefect::ActiveTabOutOfRange),
+            Defect::from(CatalogDefect::LocalSheetIdOutOfRange),
+            Defect::from(CatalogDefect::SheetNameRules),
+            Defect::from(SharedStringsDefect::CountHint),
+            Defect::from(SharedStringsDefect::RunStructure),
+            Defect::from(SharedStringsDefect::RunProperty),
+            Defect::from(SharedStringsDefect::UnpairedEscape),
+            Defect::from(ThemeDefect::MisorderedSlot),
+            Defect::from(ThemeDefect::MissingSlot),
+            Defect::from(ThemeDefect::MissingLastColor),
+            Defect::from(ThemeDefect::MalformedColor),
+        ];
+        for defect in defects {
+            assert!(!defect.repair().is_empty());
+        }
+    }
+
+    /// The carrier is wired through every open path: a conformant workbook
+    /// whose sheets have all been parsed reports clean, per sheet and in the
+    /// workbook aggregate.
+    #[test]
+    fn conformant_fixture_opens_with_a_clean_report() {
+        let fixture = include_bytes!("../../../test-data/ooxml/xlsx/DateFormatTests.xlsx");
+
+        let workbook = crate::Package::from_bytes(fixture).unwrap();
+        assert!(workbook.tolerance_report().is_clean());
+        for sheet in workbook.sheets() {
+            assert!(sheet.tolerance_report().unwrap().is_clean());
+        }
+        let report = workbook.tolerance_report();
+        assert!(report.is_clean());
+        assert_eq!(report.total(), 0);
+        assert_eq!(report.unrecorded(), 0);
+
+        let package = crate::Package::from_bytes(fixture).unwrap();
+        assert!(package.workbook().tolerance_report().is_clean());
+
+        let source =
+            crate::SourceBackedWorkbook::from_reader(std::io::Cursor::new(fixture.as_slice()))
+                .unwrap();
+        for sheet in source.sheets().unwrap() {
+            assert!(sheet.tolerance_report().unwrap().is_clean());
+        }
+        assert!(source.tolerance_report().is_clean());
+    }
+}

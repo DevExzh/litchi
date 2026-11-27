@@ -1,0 +1,4472 @@
+//! Typed `MS-OFFCRYPTO` `DataSpaces` and IRM metadata.
+//!
+//! This module validates the structural graph only. `XrML` licenses and
+//! protected content remain inert and are never activated, fetched, or
+//! decrypted.
+//!
+//! ```no_run
+//! use litchi_crypto::spaces::inspect_bytes;
+//! use litchi_crypto::spaces::Limits;
+//!
+//! let bytes = std::fs::read("protected.docx")?;
+//! if let Some(graph) = inspect_bytes(&bytes, &Limits::default())? {
+//!     println!("IRM profile: {:?}", graph.irm);
+//! }
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
+use std::fmt;
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::sync::Arc;
+
+use litchi_cfb::consts::{STGTY_STORAGE, STGTY_STREAM};
+use litchi_cfb::{OleError, OleFile, OleWriter};
+
+use super::integrity::{
+    self, DOCUMENT_SUMMARY_HASH_STREAM, DOCUMENT_SUMMARY_STREAM, Info, SUMMARY_HASH_STREAM,
+    SUMMARY_STREAM,
+};
+use super::labels::{self, List};
+use litchi_ole_common::custom_xml::{Promotion, Store, inspect as inspect_custom_xml};
+use litchi_ole_common::dataspaces::{
+    MAX_STREAM_BYTES as DATASPACES_MAX_STREAM_BYTES, read_stream_with_limit as read_bounded_stream,
+};
+
+const HEADER_LENGTH: u32 = 8;
+const TRANSFORM_TYPE: u32 = 1;
+const EXTENSIBILITY_HEADER_LENGTH: u32 = 4;
+const MAX_STREAM_BYTES: usize = DATASPACES_MAX_STREAM_BYTES;
+const MAX_ENTRIES: usize = 65_536;
+const MAX_COMPONENTS: usize = MAX_ENTRIES * 8;
+const MAX_STRING_BYTES: usize = 1_048_576;
+const MAX_XML_DEPTH: usize = 256;
+const MAX_TOTAL_BYTES: usize = 512 * 1024 * 1024;
+const MAX_OUTPUT_BYTES: usize = 512 * 1024 * 1024;
+// Office 2007's StrongEncryptionTransform writes the first 0x6c bytes of
+// this fixed transform header as TransformLength. The canonical value is
+// 0x58, immediately before TransformName; keep this exact legacy shape local
+// to the OOXML compatibility reader.
+const LEGACY_MSO2007_TRANSFORM_LENGTH: usize = 0x6c;
+
+pub const STORAGE: &str = "\u{0006}DataSpaces";
+pub const PRIMARY: &str = "\u{0006}Primary";
+pub const FEATURE: &str = "Microsoft.Container.DataSpaces";
+pub const DRM_ID: &str = "{C73DFACD-061F-43B0-8B64-0C620D2A8B50}";
+pub const DRM_NAME: &str = "Microsoft.Metadata.DRMTransform";
+pub const LZX_ID: &str = "{86DE7F2B-DDCE-486d-B016-405BBE82B8BC}";
+pub const LZX_NAME: &str = "Microsoft.Metadata.CompressionTransform";
+pub const ENCRYPTION_ID: &str = "{FF9A3F03-56EF-4613-BDD5-5A41C1D07246}";
+pub const ENCRYPTION_NAME: &str = "Microsoft.Container.EncryptionTransform";
+
+/// Resource policy for one raw DataSpaces parse, inspection, or serialization.
+///
+/// The limits are required on every raw entry point.  The defaults preserve
+/// the historical parser ceilings while adding an aggregate bound for a
+/// package containing many individually small streams.  Callers handling a
+/// larger package must opt in explicitly through their package profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    /// Maximum bytes in one DataSpaces stream or inert XML payload.
+    pub max_stream_bytes: usize,
+    /// Maximum aggregate bytes captured from all DataSpaces streams.
+    pub max_total_bytes: usize,
+    /// Maximum map, definition, transform, or license entries.
+    pub max_entries: usize,
+    /// Maximum OLE directory components inspected for graph references.
+    pub max_components: usize,
+    /// Maximum bytes in one encoded string field.
+    pub max_string_bytes: usize,
+    /// Maximum nested XML or OLE directory depth.
+    pub max_xml_depth: usize,
+    /// Maximum inert XML parser events.
+    pub max_xml_nodes: usize,
+    /// Maximum bytes emitted by one raw writer.
+    pub max_output_bytes: usize,
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_stream_bytes: MAX_STREAM_BYTES,
+            max_total_bytes: MAX_TOTAL_BYTES,
+            max_entries: MAX_ENTRIES,
+            max_components: MAX_COMPONENTS,
+            max_string_bytes: MAX_STRING_BYTES,
+            max_xml_depth: MAX_XML_DEPTH,
+            max_xml_nodes: MAX_ENTRIES,
+            max_output_bytes: MAX_OUTPUT_BYTES,
+        }
+    }
+}
+
+impl Limits {
+    fn validate(self) -> Result<Self, Error> {
+        if self.max_stream_bytes == 0 || self.max_stream_bytes > MAX_STREAM_BYTES {
+            return Err(invalid_limit(
+                LimitKind::StreamBytes,
+                self.max_stream_bytes,
+                MAX_STREAM_BYTES,
+            ));
+        }
+        if self.max_total_bytes == 0 || self.max_total_bytes > MAX_TOTAL_BYTES {
+            return Err(invalid_limit(
+                LimitKind::TotalBytes,
+                self.max_total_bytes,
+                MAX_TOTAL_BYTES,
+            ));
+        }
+        if self.max_entries == 0 || self.max_entries > MAX_ENTRIES {
+            return Err(invalid_limit(
+                LimitKind::Entries,
+                self.max_entries,
+                MAX_ENTRIES,
+            ));
+        }
+        if self.max_components == 0 || self.max_components > MAX_COMPONENTS {
+            return Err(invalid_limit(
+                LimitKind::Components,
+                self.max_components,
+                MAX_COMPONENTS,
+            ));
+        }
+        if self.max_string_bytes == 0 || self.max_string_bytes > MAX_STRING_BYTES {
+            return Err(invalid_limit(
+                LimitKind::StringBytes,
+                self.max_string_bytes,
+                MAX_STRING_BYTES,
+            ));
+        }
+        if self.max_xml_depth == 0 || self.max_xml_depth > MAX_XML_DEPTH {
+            return Err(invalid_limit(
+                LimitKind::XmlDepth,
+                self.max_xml_depth,
+                MAX_XML_DEPTH,
+            ));
+        }
+        if self.max_xml_nodes == 0 || self.max_xml_nodes > MAX_ENTRIES {
+            return Err(invalid_limit(
+                LimitKind::XmlNodes,
+                self.max_xml_nodes,
+                MAX_ENTRIES,
+            ));
+        }
+        if self.max_output_bytes == 0 || self.max_output_bytes > MAX_OUTPUT_BYTES {
+            return Err(invalid_limit(
+                LimitKind::OutputBytes,
+                self.max_output_bytes,
+                MAX_OUTPUT_BYTES,
+            ));
+        }
+        Ok(self)
+    }
+
+    fn entries(self, actual: usize) -> Result<(), Error> {
+        if actual > self.max_entries {
+            return Err(limit_exceeded(LimitKind::Entries, actual, self.max_entries));
+        }
+        Ok(())
+    }
+}
+
+/// Resource dimensions governed by a DataSpaces profile.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LimitKind {
+    /// Bytes in one DataSpaces stream or inert XML payload.
+    StreamBytes,
+    /// Aggregate bytes captured from DataSpaces streams.
+    TotalBytes,
+    /// Map, definition, transform, or license entries.
+    Entries,
+    /// OLE directory components inspected for graph references.
+    Components,
+    /// Bytes in one encoded string field.
+    StringBytes,
+    /// Nested XML or OLE directory depth.
+    XmlDepth,
+    /// Inert XML parser events.
+    XmlNodes,
+    /// Bytes emitted by a raw writer or patch publication.
+    OutputBytes,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::StreamBytes => "stream bytes",
+            Self::TotalBytes => "aggregate bytes",
+            Self::Entries => "entries",
+            Self::Components => "components",
+            Self::StringBytes => "string bytes",
+            Self::XmlDepth => "XML depth",
+            Self::XmlNodes => "XML nodes",
+            Self::OutputBytes => "output bytes",
+        };
+        formatter.write_str(name)
+    }
+}
+
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// The recipient does not match the patch's recorded base snapshot.
+    PatchConflict,
+    /// A caller supplied a profile outside the supported hard ceiling.
+    InvalidLimit {
+        /// Profile dimension whose value was rejected.
+        kind: LimitKind,
+        /// Supplied value.
+        value: usize,
+        /// Largest supported value.
+        maximum: usize,
+    },
+    /// A configured profile was exceeded during parsing or publication.
+    LimitExceeded {
+        /// Resource dimension that crossed its configured ceiling.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
+    /// A bounded collection or output buffer could not reserve memory.
+    Allocation {
+        /// Collection or output resource whose allocation failed.
+        resource: &'static str,
+    },
+    Invalid(String),
+    Ole(OleError),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::PatchConflict => {
+                formatter.write_str("DataSpaces patch base does not match recipient")
+            },
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                formatter,
+                "invalid DataSpaces {kind} limit {value}; maximum is {maximum}"
+            ),
+            Self::LimitExceeded {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "DataSpaces {kind} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::Allocation { resource } => {
+                write!(formatter, "DataSpaces allocation failed for {resource}")
+            },
+            Self::Invalid(message) => write!(formatter, "invalid DataSpaces structure: {message}"),
+            Self::Ole(error) => write!(formatter, "OLE DataSpaces error: {error}"),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::PatchConflict
+            | Self::InvalidLimit { .. }
+            | Self::LimitExceeded { .. }
+            | Self::Allocation { .. }
+            | Self::Invalid(_) => None,
+            Self::Ole(error) => Some(error),
+        }
+    }
+}
+
+impl From<OleError> for Error {
+    fn from(error: OleError) -> Self {
+        Self::Ole(error)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Version {
+    pub major: u16,
+    pub minor: u16,
+}
+
+impl Version {
+    pub const V1_0: Self = Self { major: 1, minor: 0 };
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct VersionInfo {
+    pub feature_identifier: String,
+    pub reader: Version,
+    pub updater: Version,
+    pub writer: Version,
+}
+
+impl Default for VersionInfo {
+    fn default() -> Self {
+        Self {
+            feature_identifier: FEATURE.to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReferenceKind {
+    Stream,
+    Storage,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Reference {
+    pub kind: ReferenceKind,
+    pub component: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct MapEntry {
+    pub references: Vec<Reference>,
+    pub data_space_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Map {
+    pub entries: Vec<MapEntry>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Definition {
+    pub transforms: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Header {
+    pub transform_id: String,
+    pub transform_name: String,
+    pub reader: Version,
+    pub updater: Version,
+    pub writer: Version,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IrmTransform {
+    pub header: Header,
+    /// Signed issuance license XML retained verbatim and never interpreted.
+    pub publishing_license: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct EncryptionTransform {
+    pub header: Header,
+    /// Null when `EncryptionInfo` is authoritative, as with Agile encryption.
+    pub encryption_name: Option<String>,
+    pub encryption_block_size: u32,
+    pub cipher_mode: u32,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct License {
+    pub stream_name: String,
+    /// Base64-encoded Unicode `LicenseID` retained verbatim.
+    pub encoded_license_id: String,
+    /// Certificate-chain XML retained verbatim and never interpreted.
+    pub certificate_chain: Option<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct NamedDefinition {
+    pub name: String,
+    pub definition: Definition,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Transform {
+    pub name: String,
+    pub header: Header,
+    pub irm: Option<IrmTransform>,
+    pub encryption: Option<EncryptionTransform>,
+    pub end_user_licenses: Vec<License>,
+    /// Non-IRM bytes following the transform header.
+    pub opaque_tail: Vec<u8>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DocumentKind {
+    Ooxml,
+    LegacyBinary,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Irm {
+    pub document_kind: DocumentKind,
+    pub protected_stream: String,
+    pub viewer_content_stream: Option<String>,
+    pub transform_name: String,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Graph {
+    pub version: VersionInfo,
+    pub map: Map,
+    pub definitions: Vec<NamedDefinition>,
+    pub transforms: Vec<Transform>,
+    pub irm: Option<Irm>,
+    /// Exact sensitivity-label XML bytes, retained inert when present.
+    pub label_info: Option<Vec<u8>>,
+    /// Validated typed view of `label_info`.
+    pub labels: Option<List>,
+    /// Integrity metadata for the public `SummaryInformation` property stream.
+    pub summary_information_integrity: Option<Integrity>,
+    /// Integrity metadata for the public `DocumentSummaryInformation` property stream.
+    pub document_summary_information_integrity: Option<Integrity>,
+    /// Public legacy Custom XML mirror and its IRM promotion semantics.
+    pub custom_xml_data_store: Option<Store>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Integrity {
+    pub info: Info,
+    /// `None` means a future info-stream version that readers must ignore.
+    pub valid: Option<bool>,
+}
+
+/// A deterministic identity for the `DataSpaces` streams captured by a snapshot.
+///
+/// This is intentionally scoped to the `DataSpaces` graph rather than to the
+/// physical CFB allocation. Package patches therefore remain applicable when
+/// unrelated streams are rewritten, while exact `DataSpaces` source bytes are
+/// still required before a patch can be applied.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Revision(u64);
+
+impl Revision {
+    /// Returns the compact source fingerprint.
+    #[must_use]
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Component {
+    path: Vec<String>,
+    kind: ReferenceKind,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct SourceStream {
+    path: Vec<String>,
+    bytes: Arc<[u8]>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Source {
+    streams: Vec<SourceStream>,
+    components: Vec<Component>,
+    revision: Revision,
+}
+
+/// An immutable, source-preserving `DataSpaces` graph snapshot.
+///
+/// The snapshot owns the exact bytes of every `DataSpaces` stream that it
+/// exposes. An unchanged transaction therefore replays producer bytes exactly
+/// and never canonicalizes IRM, license, encryption, label, or opaque payloads.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Snapshot {
+    graph: Graph,
+    source: Arc<Source>,
+    limits: Limits,
+}
+
+impl Snapshot {
+    /// Parses and captures a validated `DataSpaces` graph from an OLE package.
+    ///
+    /// `None` means the package has no `\x06DataSpaces` storage.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the OLE container or a `DataSpaces` stream cannot be read or validated.
+    pub fn from_ole<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        limits: &Limits,
+    ) -> Result<Option<Self>, Error> {
+        let limits = limits.validate()?;
+        let Some(graph) = inspect(ole, &limits)? else {
+            return Ok(None);
+        };
+        let source = Source::capture(ole, &graph, &limits)?;
+        Ok(Some(Self {
+            graph,
+            source: Arc::new(source),
+            limits,
+        }))
+    }
+
+    /// Borrows the validated semantic graph.
+    #[must_use]
+    pub const fn graph(&self) -> &Graph {
+        &self.graph
+    }
+
+    /// Returns the exact `DataSpaces` source revision.
+    #[must_use]
+    pub fn revision(&self) -> Revision {
+        self.source.revision
+    }
+
+    /// Returns the exact `DataSpaces` source fingerprint.
+    #[must_use]
+    pub fn fingerprint(&self) -> u64 {
+        self.revision().value()
+    }
+
+    /// Starts an isolated typed edit.
+    #[must_use]
+    pub fn edit(&self) -> Edit {
+        Edit {
+            source: self.clone(),
+            candidate: self.graph.clone(),
+        }
+    }
+
+    fn patch_to(&self, after: &Snapshot) -> Result<Patch, Error> {
+        if self.source.components != after.source.components
+            || self
+                .source
+                .streams
+                .iter()
+                .map(|stream| &stream.path)
+                .ne(after.source.streams.iter().map(|stream| &stream.path))
+        {
+            return Err(invalid(
+                "DataSpaces edit changed the package graph or stream paths",
+            ));
+        }
+        let changes = self
+            .source
+            .streams
+            .iter()
+            .zip(&after.source.streams)
+            .filter(|(before, changed)| before.bytes != changed.bytes)
+            .map(|(before, changed)| StreamChange {
+                path: before.path.clone(),
+                before: Arc::clone(&before.bytes),
+                after: Arc::clone(&changed.bytes),
+            })
+            .collect();
+        Ok(Patch {
+            base: self.revision(),
+            target: after.revision(),
+            before: Arc::clone(&self.source),
+            after: Arc::clone(&after.source),
+            before_graph: self.graph.clone(),
+            after_graph: after.graph.clone(),
+            changes,
+            limits: self.limits,
+        })
+    }
+}
+
+/// A failure-atomic typed `DataSpaces` edit.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    source: Snapshot,
+    candidate: Graph,
+}
+
+impl Edit {
+    /// Borrows the source snapshot used by this transaction.
+    #[must_use]
+    pub const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Borrows the working semantic graph.
+    #[must_use]
+    pub const fn graph(&self) -> &Graph {
+        &self.candidate
+    }
+
+    /// Replaces the checked `DataSpaceVersionInfo` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `value` fails `DataSpaceVersionInfo` validation.
+    pub fn set_version_info(&mut self, value: VersionInfo) -> Result<&mut Self, Error> {
+        validate_version_info(&value)?;
+        self.candidate.version = value;
+        Ok(self)
+    }
+
+    /// Replaces and checks the `DataSpaceMap` value.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `value` fails `DataSpaceMap` validation.
+    pub fn set_map(&mut self, value: Map) -> Result<&mut Self, Error> {
+        validate_map(&value)?;
+        self.candidate.map = value;
+        Ok(self)
+    }
+
+    /// Replaces an existing named `DataSpaceDefinition`.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `name` or `value` is invalid, or no definition named `name` exists.
+    pub fn set_definition(&mut self, name: &str, value: Definition) -> Result<&mut Self, Error> {
+        validate_name(name, "data space name")?;
+        validate_definition(&value)?;
+        let definition = self
+            .candidate
+            .definitions
+            .iter_mut()
+            .find(|definition| definition.name == name)
+            .ok_or_else(|| invalid(format!("unknown data space definition '{name}'")))?;
+        definition.definition = value;
+        Ok(self)
+    }
+
+    /// Replaces the non-payload header of an existing transform.
+    ///
+    /// The identity of a known IRM or encryption transform is immutable here;
+    /// changing it would reinterpret its inert payload. Version fields are
+    /// still validated by the transform-specific `MS-OFFCRYPTO` rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when `name` or `value` is invalid, the transform is unknown, or the edit would change a known transform's identity.
+    pub fn set_transform_header(&mut self, name: &str, value: Header) -> Result<&mut Self, Error> {
+        validate_name(name, "transform name")?;
+        validate_transform_header(&value)?;
+        let transform = self
+            .candidate
+            .transforms
+            .iter_mut()
+            .find(|transform| transform.name == name)
+            .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
+        let mut candidate = transform.clone();
+        if (candidate.irm.is_some() || candidate.encryption.is_some())
+            && (candidate.header.transform_id != value.transform_id
+                || candidate.header.transform_name != value.transform_name)
+        {
+            return Err(invalid(
+                "known transform identity cannot be changed while its payload is inert",
+            ));
+        }
+        if let Some(irm) = candidate.irm.as_mut() {
+            irm.header = value.clone();
+        }
+        if let Some(encryption) = candidate.encryption.as_mut() {
+            encryption.header = value.clone();
+        }
+        candidate.header = value;
+        validate_transform_model(&candidate, &self.source.limits)?;
+        *transform = candidate;
+        Ok(self)
+    }
+
+    /// Replaces checked algorithm metadata for a known encryption transform.
+    ///
+    /// This never touches `EncryptedPackage`, `EncryptionInfo`, or any other
+    /// encrypted payload. The transform metadata remains advisory when the
+    /// authoritative encryption information says otherwise.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the transform is unknown or is not an encryption transform, or the resulting metadata is invalid.
+    pub fn set_encryption_info(
+        &mut self,
+        name: &str,
+        encryption_name: Option<String>,
+        encryption_block_size: u32,
+        cipher_mode: u32,
+    ) -> Result<&mut Self, Error> {
+        let transform = self
+            .candidate
+            .transforms
+            .iter_mut()
+            .find(|transform| transform.name == name)
+            .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
+        let mut candidate = transform.clone();
+        let encryption = candidate
+            .encryption
+            .as_mut()
+            .ok_or_else(|| invalid(format!("transform '{name}' is not an encryption transform")))?;
+        encryption.encryption_name = encryption_name;
+        encryption.encryption_block_size = encryption_block_size;
+        encryption.cipher_mode = cipher_mode;
+        validate_transform_model(&candidate, &self.source.limits)?;
+        *transform = candidate;
+        Ok(self)
+    }
+
+    /// Replaces the opaque tail of an unknown transform header.
+    ///
+    /// Known IRM and encryption payloads cannot be edited by this owner.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::LimitExceeded`] when `value` exceeds the selected
+    /// stream limit, or [`Error::Invalid`] when the transform is unknown or
+    /// its payload is inert.
+    pub fn set_transform_opaque_tail(
+        &mut self,
+        name: &str,
+        value: Vec<u8>,
+    ) -> Result<&mut Self, Error> {
+        if value.len() > self.source.limits.max_stream_bytes {
+            return Err(limit_exceeded(
+                LimitKind::StreamBytes,
+                value.len(),
+                self.source.limits.max_stream_bytes,
+            ));
+        }
+        let transform = self
+            .candidate
+            .transforms
+            .iter_mut()
+            .find(|transform| transform.name == name)
+            .ok_or_else(|| invalid(format!("unknown transform '{name}'")))?;
+        if transform.irm.is_some() || transform.encryption.is_some() {
+            return Err(invalid(
+                "known transform payloads are inert and cannot be replaced",
+            ));
+        }
+        transform.opaque_tail = value;
+        Ok(self)
+    }
+
+    /// Whether a semantic field differs from the source graph.
+    #[must_use]
+    fn has_changes(&self) -> bool {
+        self.candidate != self.source.graph
+    }
+
+    /// Validates and publishes the candidate with a reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Invalid`] when the candidate graph fails validation.
+    pub fn commit(self) -> Result<Commit, Error> {
+        let snapshot = self.materialize()?;
+        let patch = self.source.patch_to(&snapshot)?;
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit::new(snapshot, patch, diagnostics))
+    }
+
+    fn materialize(&self) -> Result<Snapshot, Error> {
+        if !self.has_changes() {
+            return Ok(self.source.clone());
+        }
+        let mut graph = self.candidate.clone();
+        validate_graph_model(
+            &graph.map,
+            &graph.definitions,
+            &graph.transforms,
+            &self.source.limits,
+        )?;
+        validate_component_references(
+            &graph.map,
+            &self.source.source.components,
+            &self.source.limits,
+        )?;
+        graph.irm = classify_irm(&graph.map, &graph.definitions, &graph.transforms)?;
+        validate_derived_graph(&graph, &self.source.limits)?;
+        let streams = encode_graph_streams(&graph, &self.source.source, &self.source.limits)?;
+        let source = Source::new(
+            streams,
+            self.source.source.components.clone(),
+            &self.source.limits,
+        )?;
+        Ok(Snapshot {
+            graph,
+            source: Arc::new(source),
+            limits: self.source.limits,
+        })
+    }
+}
+
+/// A published edit: the new snapshot, its reversible patch and
+/// diagnostics.
+pub type Commit = litchi_core::edit::Commit<Snapshot, Patch>;
+
+/// Content-free diagnostics of one commit.
+pub use litchi_core::edit::Diagnostics;
+
+/// One source-checked replacement of a `DataSpaces` stream.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StreamChange {
+    path: Vec<String>,
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+}
+
+impl StreamChange {
+    /// Borrows the changed stream path.
+    #[must_use]
+    pub fn path(&self) -> &[String] {
+        &self.path
+    }
+
+    /// Borrows the exact source bytes required by this replacement.
+    #[must_use]
+    pub fn before(&self) -> &[u8] {
+        &self.before
+    }
+
+    /// Borrows the exact bytes produced by this replacement.
+    #[must_use]
+    pub fn after(&self) -> &[u8] {
+        &self.after
+    }
+}
+
+/// A reversible, source-checked `DataSpaces` graph patch.
+#[derive(Debug, Clone)]
+pub struct Patch {
+    base: Revision,
+    target: Revision,
+    before: Arc<Source>,
+    after: Arc<Source>,
+    before_graph: Graph,
+    after_graph: Graph,
+    changes: Vec<StreamChange>,
+    limits: Limits,
+}
+
+impl Patch {
+    /// Returns the expected source revision.
+    #[must_use]
+    pub const fn base(&self) -> Revision {
+        self.base
+    }
+
+    /// Returns the revision produced by this patch.
+    #[must_use]
+    pub const fn target(&self) -> Revision {
+        self.target
+    }
+
+    /// Returns the source fingerprint required by this patch.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.base.value()
+    }
+
+    /// Returns the resulting source fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.target.value()
+    }
+
+    /// Borrows the semantic graph required before the patch.
+    #[must_use]
+    pub const fn before(&self) -> &Graph {
+        &self.before_graph
+    }
+
+    /// Borrows the semantic graph produced by the patch.
+    #[must_use]
+    pub const fn after(&self) -> &Graph {
+        &self.after_graph
+    }
+
+    /// Borrows the changed `DataSpaces` stream replacements.
+    #[must_use]
+    pub fn changes(&self) -> &[StreamChange] {
+        &self.changes
+    }
+
+    /// Whether this patch is an exact `DataSpaces` no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Applies the patch only to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when `source` is not this patch's base snapshot.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot, Error> {
+        if source.limits != self.limits
+            || source.revision() != self.base
+            || source.source.as_ref() != self.before.as_ref()
+        {
+            return Err(Error::PatchConflict);
+        }
+        Ok(Snapshot {
+            graph: self.after_graph.clone(),
+            source: Arc::clone(&self.after),
+            limits: self.limits,
+        })
+    }
+
+    /// Returns the exact inverse replacement.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        let changes = self
+            .changes
+            .iter()
+            .map(|change| StreamChange {
+                path: change.path.clone(),
+                before: Arc::clone(&change.after),
+                after: Arc::clone(&change.before),
+            })
+            .collect();
+        Self {
+            base: self.target,
+            target: self.base,
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+            before_graph: self.after_graph.clone(),
+            after_graph: self.before_graph.clone(),
+            changes,
+            limits: self.limits,
+        }
+    }
+
+    /// Rebuilds an OLE package after validating the exact `DataSpaces` source.
+    ///
+    /// All current streams and storages are copied into a fresh CFB writer;
+    /// only the streams listed by [`Self::changes`] are replaced. IRM/license,
+    /// encryption, and unrelated payloads are copied as inert bytes. The
+    /// physical CFB allocation is intentionally rebuilt, while logical
+    /// storage names, stream contents, and storage CLSIDs are retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error`] when the package has no `DataSpaces` graph, its source does not match this patch's base, or the output cannot be written.
+    pub fn write_to<R: Read + Seek, W: Write + Seek>(
+        &self,
+        ole: &mut OleFile<R>,
+        output: &mut W,
+    ) -> Result<(), Error> {
+        let current = Snapshot::from_ole(ole, &self.limits)?
+            .ok_or_else(|| invalid("package has no DataSpaces graph"))?;
+        self.apply(&current)?;
+        rebuild_ole(ole, &self.changes, output, &self.limits)
+    }
+}
+
+impl Source {
+    fn capture<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        graph: &Graph,
+        limits: &Limits,
+    ) -> Result<Self, Error> {
+        let components = collect_components(ole, limits)?;
+        let known_paths = graph_stream_paths(graph)?;
+        let mut paths = Vec::new();
+        for component in &components {
+            if component.kind == ReferenceKind::Stream
+                && component.path.first().is_some_and(|name| name == STORAGE)
+            {
+                push_bounded(
+                    &mut paths,
+                    component.path.clone(),
+                    LimitKind::Entries,
+                    limits.max_entries,
+                    "DataSpaces source paths",
+                )?;
+            }
+        }
+        paths.sort();
+        for path in &known_paths {
+            let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+            if !ole.exists(&references) {
+                return Err(invalid(format!(
+                    "DataSpaces source stream '{}' is missing",
+                    path.join("/")
+                )));
+            }
+        }
+        let mut total_bytes = 0usize;
+        for path in &paths {
+            let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let declared = usize::try_from(ole.stream_len(&references)?).unwrap_or(usize::MAX);
+            if declared > limits.max_stream_bytes {
+                return Err(limit_exceeded(
+                    LimitKind::StreamBytes,
+                    declared,
+                    limits.max_stream_bytes,
+                ));
+            }
+            total_bytes = total_bytes.checked_add(declared).ok_or_else(|| {
+                limit_exceeded(LimitKind::TotalBytes, usize::MAX, limits.max_total_bytes)
+            })?;
+            if total_bytes > limits.max_total_bytes {
+                return Err(limit_exceeded(
+                    LimitKind::TotalBytes,
+                    total_bytes,
+                    limits.max_total_bytes,
+                ));
+            }
+        }
+        let mut streams = Vec::new();
+        streams
+            .try_reserve_exact(paths.len())
+            .map_err(|_error| Error::Allocation {
+                resource: "DataSpaces source streams",
+            })?;
+        for path in paths {
+            let references = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let bytes = read_stream(ole, &references, limits)?;
+            streams.push(SourceStream {
+                path,
+                bytes: Arc::from(bytes.into_boxed_slice()),
+            });
+        }
+        Self::new(streams, components, limits)
+    }
+
+    fn new(
+        streams: Vec<SourceStream>,
+        components: Vec<Component>,
+        limits: &Limits,
+    ) -> Result<Self, Error> {
+        if streams.is_empty() {
+            return Err(invalid("DataSpaces source contains no streams"));
+        }
+        limits.entries(streams.len())?;
+        if streams.len() > limits.max_entries {
+            return Err(limit_exceeded(
+                LimitKind::Entries,
+                streams.len(),
+                limits.max_entries,
+            ));
+        }
+        if components.len() > limits.max_components {
+            return Err(limit_exceeded(
+                LimitKind::Components,
+                components.len(),
+                limits.max_components,
+            ));
+        }
+        let mut stream_paths = std::collections::HashSet::with_capacity(streams.len());
+        let mut total_bytes = 0usize;
+        for stream in &streams {
+            if stream.path.is_empty() || !stream_paths.insert(stream.path.clone()) {
+                return Err(invalid("duplicate DataSpaces source stream path"));
+            }
+            if stream.bytes.len() > limits.max_stream_bytes {
+                return Err(limit_exceeded(
+                    LimitKind::StreamBytes,
+                    stream.bytes.len(),
+                    limits.max_stream_bytes,
+                ));
+            }
+            total_bytes = total_bytes.checked_add(stream.bytes.len()).ok_or_else(|| {
+                limit_exceeded(LimitKind::TotalBytes, usize::MAX, limits.max_total_bytes)
+            })?;
+        }
+        if total_bytes > limits.max_total_bytes {
+            return Err(limit_exceeded(
+                LimitKind::TotalBytes,
+                total_bytes,
+                limits.max_total_bytes,
+            ));
+        }
+        let mut component_paths = std::collections::HashSet::with_capacity(components.len());
+        for component in &components {
+            if component.path.is_empty() || !component_paths.insert(component.path.clone()) {
+                return Err(invalid("duplicate OLE directory component path"));
+            }
+        }
+        Ok(Self {
+            revision: Revision::of_streams(&streams),
+            streams,
+            components,
+        })
+    }
+}
+
+impl Revision {
+    fn of_streams(streams: &[SourceStream]) -> Self {
+        let mut value = 0xcbf2_9ce4_8422_2325u64;
+        for stream in streams {
+            for component in &stream.path {
+                for byte in component.as_bytes() {
+                    value ^= u64::from(*byte);
+                    value = value.wrapping_mul(0x0000_0100_0000_01b3);
+                }
+                value ^= 0xff;
+                value = value.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            value ^= 0xfe;
+            value = value.wrapping_mul(0x0000_0100_0000_01b3);
+            for byte in stream.bytes.iter() {
+                value ^= u64::from(*byte);
+                value = value.wrapping_mul(0x0000_0100_0000_01b3);
+            }
+            value ^= 0xfd;
+            value = value.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Self(value)
+    }
+}
+
+impl Graph {
+    fn end_user_license_count(&self) -> usize {
+        self.transforms
+            .iter()
+            .map(|transform| transform.end_user_licenses.len())
+            .sum()
+    }
+}
+
+#[derive(Debug)]
+struct StorageCopy {
+    path: Vec<String>,
+    clsid: Option<[u8; 16]>,
+}
+
+#[derive(Debug)]
+struct StreamCopy {
+    path: Vec<String>,
+}
+
+struct SliceReader<'a> {
+    data: &'a [u8],
+    offset: usize,
+    limits: Limits,
+}
+
+impl<'a> SliceReader<'a> {
+    fn new(data: &'a [u8], limits: &Limits) -> Result<Self, Error> {
+        if data.len() > limits.max_stream_bytes {
+            return Err(limit_exceeded(
+                LimitKind::StreamBytes,
+                data.len(),
+                limits.max_stream_bytes,
+            ));
+        }
+        Ok(Self {
+            data,
+            offset: 0,
+            limits: *limits,
+        })
+    }
+
+    fn at(data: &'a [u8], offset: usize, limits: &Limits) -> Result<Self, Error> {
+        let mut reader = Self::new(data, limits)?;
+        if offset > data.len() {
+            return Err(invalid("parser offset exceeds stream"));
+        }
+        reader.offset = offset;
+        Ok(reader)
+    }
+
+    fn position(&self) -> usize {
+        self.offset
+    }
+
+    fn take(&mut self, count: usize) -> Result<&'a [u8], Error> {
+        let end = self
+            .offset
+            .checked_add(count)
+            .ok_or_else(|| invalid("stream offset overflow"))?;
+        let bytes = self
+            .data
+            .get(self.offset..end)
+            .ok_or_else(|| invalid("truncated DataSpaces stream"))?;
+        self.offset = end;
+        Ok(bytes)
+    }
+
+    fn u16(&mut self) -> Result<u16, Error> {
+        let bytes = self
+            .take(2)?
+            .try_into()
+            .map_err(|_err| invalid("invalid two-byte DataSpaces field"))?;
+        Ok(u16::from_le_bytes(bytes))
+    }
+
+    fn u32(&mut self) -> Result<u32, Error> {
+        let bytes = self
+            .take(4)?
+            .try_into()
+            .map_err(|_err| invalid("invalid four-byte DataSpaces field"))?;
+        Ok(u32::from_le_bytes(bytes))
+    }
+
+    fn version(&mut self) -> Result<Version, Error> {
+        Ok(Version {
+            major: self.u16()?,
+            minor: self.u16()?,
+        })
+    }
+
+    fn unicode_lpp4(&mut self) -> Result<String, Error> {
+        let byte_len = usize::try_from(self.u32()?)
+            .map_err(|_err| invalid("UNICODE-LP-P4 length overflows usize"))?;
+        if byte_len == 0 || byte_len % 2 != 0 {
+            return Err(invalid("invalid UNICODE-LP-P4 length"));
+        }
+        if byte_len > self.limits.max_string_bytes {
+            return Err(limit_exceeded(
+                LimitKind::StringBytes,
+                byte_len,
+                self.limits.max_string_bytes,
+            ));
+        }
+        let bytes = self.take(byte_len)?;
+        let mut units = Vec::with_capacity(byte_len / 2);
+        for pair in bytes.as_chunks::<2>().0.iter() {
+            units.push(u16::from_le_bytes([pair[0], pair[1]]));
+        }
+        let value =
+            String::from_utf16(&units).map_err(|_err| invalid("invalid UNICODE-LP-P4 UTF-16"))?;
+        if value.contains('\0') {
+            return Err(invalid("UNICODE-LP-P4 string contains NUL"));
+        }
+        let padding = (4 - (byte_len % 4)) % 4;
+        if self.take(padding)?.iter().any(|byte| *byte != 0) {
+            return Err(invalid("UNICODE-LP-P4 padding is nonzero"));
+        }
+        Ok(value)
+    }
+
+    fn utf8_lpp4(&mut self) -> Result<Option<String>, Error> {
+        let byte_len = usize::try_from(self.u32()?)
+            .map_err(|_err| invalid("UTF-8-LP-P4 length overflows usize"))?;
+        if byte_len == 0 {
+            return Ok(None);
+        }
+        if byte_len > self.limits.max_string_bytes {
+            return Err(limit_exceeded(
+                LimitKind::StringBytes,
+                byte_len,
+                self.limits.max_string_bytes,
+            ));
+        }
+        let bytes = self.take(byte_len)?;
+        let value =
+            std::str::from_utf8(bytes).map_err(|_err| invalid("invalid UTF-8-LP-P4 UTF-8"))?;
+        if value.contains('\0') {
+            return Err(invalid("UTF-8-LP-P4 string contains NUL"));
+        }
+        let padding = (4 - (byte_len % 4)) % 4;
+        if self.take(padding)?.iter().any(|byte| *byte != 0) {
+            return Err(invalid("UTF-8-LP-P4 padding is nonzero"));
+        }
+        Ok(Some(value.to_string()))
+    }
+
+    fn finish(self) -> Result<(), Error> {
+        if self.offset == self.data.len() {
+            Ok(())
+        } else {
+            Err(invalid("trailing bytes in DataSpaces stream"))
+        }
+    }
+}
+
+/// Runs one checked `DataSpaces` edit and publishes it atomically.
+///
+/// # Errors
+///
+/// Returns [`Error`] when `edit` fails or the edited graph cannot be validated and published.
+pub fn update<F>(snapshot: &Snapshot, edit: F) -> Result<Commit, Error>
+where
+    F: FnOnce(&mut Edit) -> Result<(), Error>,
+{
+    let mut transaction = snapshot.edit();
+    edit(&mut transaction)?;
+    transaction.commit()
+}
+
+fn graph_stream_paths(graph: &Graph) -> Result<Vec<Vec<String>>, Error> {
+    let mut paths = Vec::with_capacity(
+        2 + graph.definitions.len() + graph.transforms.len() + graph.end_user_license_count(),
+    );
+    paths.push(vec![STORAGE.to_string(), "Version".to_string()]);
+    paths.push(vec![STORAGE.to_string(), "DataSpaceMap".to_string()]);
+    for definition in &graph.definitions {
+        validate_name(&definition.name, "data space name")?;
+        paths.push(vec![
+            STORAGE.to_string(),
+            "DataSpaceInfo".to_string(),
+            definition.name.clone(),
+        ]);
+    }
+    for transform in &graph.transforms {
+        validate_name(&transform.name, "transform name")?;
+        paths.push(vec![
+            STORAGE.to_string(),
+            "TransformInfo".to_string(),
+            transform.name.clone(),
+            PRIMARY.to_string(),
+        ]);
+        for license in &transform.end_user_licenses {
+            validate_eul_stream_name(&license.stream_name)?;
+            paths.push(vec![
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                transform.name.clone(),
+                license.stream_name.clone(),
+            ]);
+        }
+    }
+    if graph.label_info.is_some() {
+        paths.push(vec![
+            STORAGE.to_string(),
+            "TransformInfo".to_string(),
+            "LabelInfo".to_string(),
+        ]);
+    }
+    Ok(paths)
+}
+
+fn collect_components<R: Read + Seek>(
+    ole: &OleFile<R>,
+    limits: &Limits,
+) -> Result<Vec<Component>, Error> {
+    let mut components = Vec::new();
+    let mut path = Vec::new();
+    collect_directory_components(ole, &mut path, &mut components, 0, limits)?;
+    Ok(components)
+}
+
+fn collect_directory_components<R: Read + Seek>(
+    ole: &OleFile<R>,
+    path: &mut Vec<String>,
+    components: &mut Vec<Component>,
+    depth: usize,
+    limits: &Limits,
+) -> Result<(), Error> {
+    if depth > limits.max_xml_depth {
+        return Err(limit_exceeded(
+            LimitKind::XmlDepth,
+            depth,
+            limits.max_xml_depth,
+        ));
+    }
+    let reference_names = path.clone();
+    let references = reference_names
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    ole.visit_directory_entry_refs(&references, limits.max_components, |entry| {
+        let name = entry.name.clone();
+        let kind = entry.entry_type;
+        if name.is_empty() {
+            return Err(invalid("OLE directory entry has an empty name"));
+        }
+        path.push(name);
+        match kind {
+            STGTY_STORAGE => {
+                push_bounded(
+                    components,
+                    Component {
+                        path: path.clone(),
+                        kind: ReferenceKind::Storage,
+                    },
+                    LimitKind::Components,
+                    limits.max_components,
+                    "DataSpaces components",
+                )?;
+                collect_directory_components(ole, path, components, depth + 1, limits)?;
+            },
+            STGTY_STREAM => {
+                push_bounded(
+                    components,
+                    Component {
+                        path: path.clone(),
+                        kind: ReferenceKind::Stream,
+                    },
+                    LimitKind::Components,
+                    limits.max_components,
+                    "DataSpaces components",
+                )?;
+            },
+            _ => {
+                return Err(invalid(format!(
+                    "unsupported OLE directory entry type {kind} at '{}'",
+                    path.join("/")
+                )));
+            },
+        }
+        path.pop();
+        Ok(())
+    })
+    .map_err(|error| {
+        map_directory_visit_error(error, LimitKind::Components, limits.max_components)
+    })?;
+    Ok(())
+}
+
+fn validate_graph_model(
+    map: &Map,
+    definitions: &[NamedDefinition],
+    transforms: &[Transform],
+    _limits: &Limits,
+) -> Result<(), Error> {
+    validate_map(map)?;
+    if definitions.len() != map.entries.len() {
+        return Err(invalid(
+            "DataSpaceInfo streams do not correspond one-to-one with map entries",
+        ));
+    }
+    let mut definition_names = std::collections::HashSet::with_capacity(definitions.len());
+    for definition in definitions {
+        validate_name(&definition.name, "data space name")?;
+        if !definition_names.insert(definition.name.as_str()) {
+            return Err(invalid("duplicate data space definition name"));
+        }
+        validate_definition(&definition.definition)?;
+        if !map
+            .entries
+            .iter()
+            .any(|entry| entry.data_space_name == definition.name)
+        {
+            return Err(invalid(format!(
+                "data space definition '{}' is not present in the map",
+                definition.name
+            )));
+        }
+    }
+
+    let mut transform_names = std::collections::HashSet::with_capacity(transforms.len());
+    for transform in transforms {
+        validate_name(&transform.name, "transform name")?;
+        if !transform_names.insert(transform.name.as_str()) {
+            return Err(invalid("duplicate transform name"));
+        }
+        validate_transform_model(transform, _limits)?;
+    }
+    for definition in definitions {
+        for transform_name in &definition.definition.transforms {
+            if !transform_names.contains(transform_name.as_str()) {
+                return Err(invalid(format!(
+                    "data space '{}' references missing transform '{}'",
+                    definition.name, transform_name
+                )));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_transform_model(transform: &Transform, limits: &Limits) -> Result<(), Error> {
+    validate_transform_header(&transform.header)?;
+    if transform.opaque_tail.len() > limits.max_stream_bytes {
+        return Err(limit_exceeded(
+            LimitKind::StreamBytes,
+            transform.opaque_tail.len(),
+            limits.max_stream_bytes,
+        ));
+    }
+    match (&transform.irm, &transform.encryption) {
+        (Some(_), Some(_)) => {
+            return Err(invalid(
+                "a transform cannot contain both IRM and encryption metadata",
+            ));
+        },
+        (Some(irm), None) => {
+            if irm.header != transform.header || !transform.opaque_tail.is_empty() {
+                return Err(invalid("IRM transform metadata is inconsistent"));
+            }
+            validate_drm_header(&irm.header)?;
+            let license = irm
+                .publishing_license
+                .as_deref()
+                .filter(|license| !license.is_empty())
+                .ok_or_else(|| invalid("IRM publishing license cannot be null or empty"))?;
+            validate_inert_xml(license, "IRM publishing license", limits)?;
+        },
+        (None, Some(encryption)) => {
+            if encryption.header != transform.header || !transform.opaque_tail.is_empty() {
+                return Err(invalid("encryption transform metadata is inconsistent"));
+            }
+            validate_encryption_transform(encryption)?;
+        },
+        (None, None) => {},
+    }
+    for license in &transform.end_user_licenses {
+        validate_eul_stream_name(&license.stream_name)?;
+        if license.encoded_license_id.is_empty() {
+            return Err(invalid("EndUserLicenseHeader.ID_String cannot be empty"));
+        }
+        let chain = license
+            .certificate_chain
+            .as_deref()
+            .filter(|chain| !chain.is_empty())
+            .ok_or_else(|| invalid("end-user license certificate chain cannot be null or empty"))?;
+        validate_inert_xml(chain, "end-user license certificate chain", limits)?;
+    }
+    if transform.irm.is_some() && transform.end_user_licenses.is_empty() {
+        return Err(invalid(format!(
+            "IRM transform '{}' has no end-user license stream",
+            transform.name
+        )));
+    }
+    Ok(())
+}
+
+fn validate_component_references(
+    map: &Map,
+    components: &[Component],
+    _limits: &Limits,
+) -> Result<(), Error> {
+    let mut protected_paths = std::collections::HashSet::with_capacity(map.entries.len());
+    for entry in &map.entries {
+        let mut path = Vec::with_capacity(entry.references.len());
+        for reference in &entry.references {
+            path.push(reference.component.clone());
+            let component = components
+                .iter()
+                .find(|component| same_path(&component.path, &path))
+                .ok_or_else(|| {
+                    invalid(format!(
+                        "map references missing component '{}'",
+                        path.join("/")
+                    ))
+                })?;
+            if component.kind != reference.kind {
+                return Err(invalid(format!(
+                    "map component '{}' has the wrong reference kind",
+                    path.join("/")
+                )));
+            }
+        }
+        let protected_path = path
+            .iter()
+            .map(|component| component.to_ascii_lowercase())
+            .collect::<Vec<_>>();
+        if !protected_paths.insert(protected_path) {
+            return Err(invalid(
+                "a protected content component is mapped by more than one data space",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn same_path(left: &[String], right: &[String]) -> bool {
+    left.len() == right.len()
+        && left
+            .iter()
+            .zip(right)
+            .all(|(lhs, rhs)| lhs.eq_ignore_ascii_case(rhs))
+}
+
+fn validate_derived_graph(graph: &Graph, _limits: &Limits) -> Result<(), Error> {
+    let expected_irm = classify_irm(&graph.map, &graph.definitions, &graph.transforms)?;
+    if graph.irm != expected_irm {
+        return Err(invalid(
+            "derived IRM profile does not match the DataSpaces graph",
+        ));
+    }
+    if graph.label_info.is_some() != graph.labels.is_some() {
+        return Err(invalid(
+            "LabelInfo bytes and its typed sensitivity-label view disagree",
+        ));
+    }
+    if graph.labels.is_some()
+        && !graph.irm.as_ref().is_some_and(|profile| {
+            graph.transforms.iter().any(|transform| {
+                transform.name == profile.transform_name
+                    && transform
+                        .irm
+                        .as_ref()
+                        .is_some_and(|metadata| metadata.publishing_license.is_some())
+            })
+        })
+    {
+        return Err(invalid(
+            "LabelInfo requires an IRM transform with a publishing license",
+        ));
+    }
+    if (graph.summary_information_integrity.is_some()
+        || graph.document_summary_information_integrity.is_some())
+        && graph.irm.is_none()
+        && !graph
+            .transforms
+            .iter()
+            .any(|transform| transform.encryption.is_some())
+    {
+        return Err(invalid(
+            "encrypted property hash stream is present without an encryption or IRM transform",
+        ));
+    }
+    validate_custom_xml_promotion(graph.custom_xml_data_store.as_ref(), graph.irm.as_ref())
+}
+
+fn encode_graph_streams(
+    graph: &Graph,
+    source: &Source,
+    limits: &Limits,
+) -> Result<Vec<SourceStream>, Error> {
+    validate_version_info(&graph.version)?;
+    validate_graph_model(&graph.map, &graph.definitions, &graph.transforms, limits)?;
+    let mut known = Vec::new();
+    known.push(SourceStream {
+        path: vec![STORAGE.to_string(), "Version".to_string()],
+        bytes: Arc::from(write_version_info(&graph.version, limits)?.into_boxed_slice()),
+    });
+    known.push(SourceStream {
+        path: vec![STORAGE.to_string(), "DataSpaceMap".to_string()],
+        bytes: Arc::from(write_map(&graph.map, limits)?.into_boxed_slice()),
+    });
+    for definition in &graph.definitions {
+        known.push(SourceStream {
+            path: vec![
+                STORAGE.to_string(),
+                "DataSpaceInfo".to_string(),
+                definition.name.clone(),
+            ],
+            bytes: Arc::from(write_definition(&definition.definition, limits)?.into_boxed_slice()),
+        });
+    }
+    for transform in &graph.transforms {
+        known.push(SourceStream {
+            path: vec![
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                transform.name.clone(),
+                PRIMARY.to_string(),
+            ],
+            bytes: Arc::from(encode_transform_primary(transform, limits)?.into_boxed_slice()),
+        });
+        for license in &transform.end_user_licenses {
+            known.push(SourceStream {
+                path: vec![
+                    STORAGE.to_string(),
+                    "TransformInfo".to_string(),
+                    transform.name.clone(),
+                    license.stream_name.clone(),
+                ],
+                bytes: Arc::from(write_license(license, limits)?.into_boxed_slice()),
+            });
+        }
+    }
+    if let Some(label_info) = &graph.label_info {
+        known.push(SourceStream {
+            path: vec![
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                "LabelInfo".to_string(),
+            ],
+            bytes: Arc::from(label_info.clone().into_boxed_slice()),
+        });
+    }
+    let mut encoded = known
+        .into_iter()
+        .map(|stream| (stream.path.clone(), stream))
+        .collect::<std::collections::HashMap<_, _>>();
+    let mut streams = Vec::with_capacity(source.streams.len());
+    for original in &source.streams {
+        if let Some(replacement) = encoded.remove(&original.path) {
+            streams.push(replacement);
+        } else {
+            streams.push(original.clone());
+        }
+    }
+    if !encoded.is_empty() {
+        return Err(invalid(
+            "DataSpaces edit changed the set of known metadata streams",
+        ));
+    }
+    Ok(streams)
+}
+
+fn encode_transform_primary(transform: &Transform, limits: &Limits) -> Result<Vec<u8>, Error> {
+    match (&transform.irm, &transform.encryption) {
+        (Some(irm), None) => write_irm_transform(irm, limits),
+        (None, Some(encryption)) => write_encryption_transform(encryption, limits),
+        (None, None) => {
+            let mut bytes = write_transform_header(&transform.header, limits)?;
+            append_output(&mut bytes, &transform.opaque_tail, limits)?;
+            Ok(bytes)
+        },
+        (Some(_), Some(_)) => Err(invalid(
+            "a transform cannot contain both IRM and encryption metadata",
+        )),
+    }
+}
+
+fn rebuild_ole<R: Read + Seek, W: Write + Seek>(
+    ole: &mut OleFile<R>,
+    changes: &[StreamChange],
+    output: &mut W,
+    limits: &Limits,
+) -> Result<(), Error> {
+    let (storages, mut streams) = collect_ole_layout(ole, limits)?;
+    let mut writer = OleWriter::with_sector_size(ole.sector_size())?;
+    if let Some(root) = ole.root_entry()
+        && let Some(clsid) = parse_clsid(&root.clsid)?
+    {
+        writer.set_root_clsid(clsid);
+    }
+    for storage in &storages {
+        let path = storage.path.iter().map(String::as_str).collect::<Vec<_>>();
+        writer.create_storage(&path)?;
+        if let Some(clsid) = storage.clsid {
+            writer.set_storage_clsid(&path, clsid)?;
+        }
+    }
+
+    // Word's legacy writer requires WordDocument to receive the first large
+    // stream allocation. Keep that format-specific invariant while preserving
+    // the source traversal order for every other stream.
+    streams.sort_by_key(|stream| u8::from(stream.path.as_slice() != ["WordDocument"]));
+    let mut payload_bytes = 0usize;
+    for stream in &streams {
+        let size = if let Some(change) = changes
+            .iter()
+            .find(|change| same_path(&change.path, &stream.path))
+        {
+            change.after.len()
+        } else {
+            usize::try_from(
+                ole.stream_len(&stream.path.iter().map(String::as_str).collect::<Vec<_>>())?,
+            )
+            .unwrap_or(usize::MAX)
+        };
+        payload_bytes = payload_bytes.checked_add(size).ok_or_else(|| {
+            limit_exceeded(LimitKind::OutputBytes, usize::MAX, limits.max_output_bytes)
+        })?;
+        if payload_bytes > limits.max_output_bytes {
+            return Err(limit_exceeded(
+                LimitKind::OutputBytes,
+                payload_bytes,
+                limits.max_output_bytes,
+            ));
+        }
+    }
+    for stream in streams {
+        let path = stream.path.iter().map(String::as_str).collect::<Vec<_>>();
+        let data = if let Some(change) = changes
+            .iter()
+            .find(|change| same_path(&change.path, &stream.path))
+        {
+            change.after.to_vec()
+        } else {
+            ole.open_stream(&path)?
+        };
+        writer.create_stream_owned(&path, data)?;
+    }
+    let mut bounded_output = BoundedOutput::new(output, limits.max_output_bytes);
+    match writer.write_to(&mut bounded_output) {
+        Ok(()) => {},
+        Err(error) => {
+            if let Some(observed) = bounded_output.exceeded() {
+                return Err(limit_exceeded(
+                    LimitKind::OutputBytes,
+                    observed,
+                    limits.max_output_bytes,
+                ));
+            }
+            return Err(error.into());
+        },
+    }
+    Ok(())
+}
+
+fn collect_ole_layout<R: Read + Seek>(
+    ole: &OleFile<R>,
+    limits: &Limits,
+) -> Result<(Vec<StorageCopy>, Vec<StreamCopy>), Error> {
+    let mut storages = Vec::new();
+    let mut streams = Vec::new();
+    let mut path = Vec::new();
+    collect_ole_layout_directory(ole, &mut path, &mut storages, &mut streams, 0, limits)?;
+    Ok((storages, streams))
+}
+
+fn collect_ole_layout_directory<R: Read + Seek>(
+    ole: &OleFile<R>,
+    path: &mut Vec<String>,
+    storages: &mut Vec<StorageCopy>,
+    streams: &mut Vec<StreamCopy>,
+    depth: usize,
+    limits: &Limits,
+) -> Result<(), Error> {
+    if depth > limits.max_xml_depth {
+        return Err(limit_exceeded(
+            LimitKind::XmlDepth,
+            depth,
+            limits.max_xml_depth,
+        ));
+    }
+    let reference_names = path.clone();
+    let references = reference_names
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    ole.visit_directory_entry_refs(&references, limits.max_components, |entry| {
+        let name = entry.name.clone();
+        let entry_type = entry.entry_type;
+        let clsid = entry.clsid.clone();
+        if name.is_empty() {
+            return Err(invalid("OLE directory entry has an empty name"));
+        }
+        path.push(name);
+        match entry_type {
+            STGTY_STORAGE => {
+                let current = storages.len().saturating_add(streams.len());
+                push_layout(
+                    storages,
+                    StorageCopy {
+                        path: path.clone(),
+                        clsid: parse_clsid(&clsid)?,
+                    },
+                    current,
+                    limits,
+                )?;
+                collect_ole_layout_directory(ole, path, storages, streams, depth + 1, limits)?;
+            },
+            STGTY_STREAM => {
+                let current = storages.len().saturating_add(streams.len());
+                push_layout(streams, StreamCopy { path: path.clone() }, current, limits)?;
+            },
+            _ => {
+                return Err(invalid(format!(
+                    "unsupported OLE directory entry type {entry_type} at '{}'",
+                    path.join("/")
+                )));
+            },
+        }
+        path.pop();
+        Ok(())
+    })
+    .map_err(|error| {
+        map_directory_visit_error(error, LimitKind::Components, limits.max_components)
+    })?;
+    Ok(())
+}
+
+struct BoundedOutput<'a, W> {
+    inner: &'a mut W,
+    limit: usize,
+    position: u64,
+    exceeded: Option<usize>,
+}
+
+impl<'a, W: Write + Seek> BoundedOutput<'a, W> {
+    fn new(inner: &'a mut W, limit: usize) -> Self {
+        Self {
+            inner,
+            limit,
+            position: 0,
+            exceeded: None,
+        }
+    }
+
+    fn exceeded(&self) -> Option<usize> {
+        self.exceeded
+    }
+}
+
+impl<W: Write + Seek> Write for BoundedOutput<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        let end = self
+            .position
+            .checked_add(u64::try_from(bytes.len()).unwrap_or(u64::MAX))
+            .unwrap_or(u64::MAX);
+        let maximum = u64::try_from(self.limit).unwrap_or(u64::MAX);
+        if end > maximum {
+            self.exceeded = Some(usize::try_from(end).unwrap_or(usize::MAX));
+            return Err(io::Error::other(
+                "DataSpaces output exceeds configured limit",
+            ));
+        }
+        let written = self.inner.write(bytes)?;
+        self.position = self
+            .position
+            .checked_add(u64::try_from(written).unwrap_or(u64::MAX))
+            .ok_or_else(|| io::Error::other("DataSpaces output position overflow"))?;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+impl<W: Write + Seek> Seek for BoundedOutput<'_, W> {
+    fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+        let next = self.inner.seek(position)?;
+        let maximum = u64::try_from(self.limit).unwrap_or(u64::MAX);
+        if next > maximum {
+            self.exceeded = Some(usize::try_from(next).unwrap_or(usize::MAX));
+            return Err(io::Error::other(
+                "DataSpaces output exceeds configured limit",
+            ));
+        }
+        self.position = next;
+        Ok(next)
+    }
+}
+
+fn push_layout<T>(
+    values: &mut Vec<T>,
+    value: T,
+    current: usize,
+    limits: &Limits,
+) -> Result<(), Error> {
+    if current >= limits.max_components {
+        return Err(limit_exceeded(
+            LimitKind::Components,
+            current.saturating_add(1),
+            limits.max_components,
+        ));
+    }
+    values.try_reserve(1).map_err(|_error| Error::Allocation {
+        resource: "OLE layout",
+    })?;
+    values.push(value);
+    Ok(())
+}
+
+fn push_bounded<T>(
+    values: &mut Vec<T>,
+    value: T,
+    kind: LimitKind,
+    maximum: usize,
+    resource: &'static str,
+) -> Result<(), Error> {
+    if values.len() >= maximum {
+        return Err(limit_exceeded(
+            kind,
+            values.len().saturating_add(1),
+            maximum,
+        ));
+    }
+    values
+        .try_reserve(1)
+        .map_err(|_error| Error::Allocation { resource })?;
+    values.push(value);
+    Ok(())
+}
+
+fn parse_clsid(value: &str) -> Result<Option<[u8; 16]>, Error> {
+    if value.is_empty() {
+        return Ok(None);
+    }
+    let fields = value.split('-').collect::<Vec<_>>();
+    if fields.len() != 5
+        || fields[0].len() != 8
+        || fields[1].len() != 4
+        || fields[2].len() != 4
+        || fields[3].len() != 4
+        || fields[4].len() != 12
+    {
+        return Err(invalid(format!("invalid CFB CLSID '{value}'")));
+    }
+    let data1 = u32::from_str_radix(fields[0], 16)
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    let data2 = u16::from_str_radix(fields[1], 16)
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    let data3 = u16::from_str_radix(fields[2], 16)
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    let mut bytes = [0u8; 16];
+    bytes[..4].copy_from_slice(&data1.to_le_bytes());
+    bytes[4..6].copy_from_slice(&data2.to_le_bytes());
+    bytes[6..8].copy_from_slice(&data3.to_le_bytes());
+    for (index, pair) in fields[3].as_bytes().as_chunks::<2>().0.iter().enumerate() {
+        bytes[8 + index] = u8::from_str_radix(
+            std::str::from_utf8(pair)
+                .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?,
+            16,
+        )
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    }
+    for (index, pair) in fields[4].as_bytes().as_chunks::<2>().0.iter().enumerate() {
+        bytes[10 + index] = u8::from_str_radix(
+            std::str::from_utf8(pair)
+                .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?,
+            16,
+        )
+        .map_err(|_err| invalid(format!("invalid CFB CLSID '{value}'")))?;
+    }
+    Ok(Some(bytes))
+}
+
+/// Parses a `DataSpaceVersionInfo` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_version_info(data: &[u8], limits: &Limits) -> Result<VersionInfo, Error> {
+    let limits = limits.validate()?;
+    let mut reader = SliceReader::new(data, &limits)?;
+    let value = VersionInfo {
+        feature_identifier: reader.unicode_lpp4()?,
+        reader: reader.version()?,
+        updater: reader.version()?,
+        writer: reader.version()?,
+    };
+    reader.finish()?;
+    validate_version_info(&value)?;
+    Ok(value)
+}
+
+/// Serializes a `DataSpaceVersionInfo` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_version_info(value: &VersionInfo, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_version_info(value)?;
+    let mut output = Vec::new();
+    write_unicode_lpp4(&mut output, &value.feature_identifier, &limits)?;
+    write_version(&mut output, value.reader, &limits)?;
+    write_version(&mut output, value.updater, &limits)?;
+    write_version(&mut output, value.writer, &limits)?;
+    Ok(output)
+}
+
+/// Parses a `DataSpaceMap` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_map(data: &[u8], limits: &Limits) -> Result<Map, Error> {
+    let limits = limits.validate()?;
+    let mut reader = SliceReader::new(data, &limits)?;
+    require_u32(reader.u32()?, HEADER_LENGTH, "DataSpaceMap.HeaderLength")?;
+    let count = bounded_count(reader.u32()?, "DataSpaceMap.EntryCount", &limits)?;
+    if count == 0 {
+        return Err(invalid("DataSpaceMap requires at least one entry"));
+    }
+    let mut entries = Vec::with_capacity(count);
+    for _ in 0..count {
+        let start = reader.position();
+        let length = usize::try_from(reader.u32()?)
+            .map_err(|_err| invalid("DataSpaceMapEntry.Length overflows usize"))?;
+        if length < 12 || start.checked_add(length).is_none_or(|end| end > data.len()) {
+            return Err(invalid("DataSpaceMapEntry.Length exceeds its stream"));
+        }
+        let reference_count = bounded_count(
+            reader.u32()?,
+            "DataSpaceMapEntry.ReferenceComponentCount",
+            &limits,
+        )?;
+        if reference_count == 0 {
+            return Err(invalid("DataSpaceMapEntry requires a reference component"));
+        }
+        let mut references = Vec::with_capacity(reference_count);
+        for _ in 0..reference_count {
+            let kind = match reader.u32()? {
+                0 => ReferenceKind::Stream,
+                1 => ReferenceKind::Storage,
+                value => {
+                    return Err(invalid(format!(
+                        "unknown DataSpaceReferenceComponent type {value}"
+                    )));
+                },
+            };
+            references.push(Reference {
+                kind,
+                component: reader.unicode_lpp4()?,
+            });
+        }
+        let data_space_name = reader.unicode_lpp4()?;
+        if reader.position() != start + length {
+            return Err(invalid(
+                "DataSpaceMapEntry.Length does not match its fields",
+            ));
+        }
+        entries.push(MapEntry {
+            references,
+            data_space_name,
+        });
+    }
+    reader.finish()?;
+    let value = Map { entries };
+    validate_map(&value)?;
+    Ok(value)
+}
+
+/// Serializes a `DataSpaceMap` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_map(value: &Map, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_map(value)?;
+    let mut output = Vec::new();
+    append_output(&mut output, &HEADER_LENGTH.to_le_bytes(), &limits)?;
+    write_count(
+        &mut output,
+        value.entries.len(),
+        "DataSpaceMap.EntryCount",
+        &limits,
+    )?;
+    for entry in &value.entries {
+        let start = output.len();
+        append_output(&mut output, &0u32.to_le_bytes(), &limits)?;
+        write_count(
+            &mut output,
+            entry.references.len(),
+            "DataSpaceMapEntry.ReferenceComponentCount",
+            &limits,
+        )?;
+        for reference in &entry.references {
+            let kind = match reference.kind {
+                ReferenceKind::Stream => 0u32,
+                ReferenceKind::Storage => 1u32,
+            };
+            append_output(&mut output, &kind.to_le_bytes(), &limits)?;
+            write_unicode_lpp4(&mut output, &reference.component, &limits)?;
+        }
+        write_unicode_lpp4(&mut output, &entry.data_space_name, &limits)?;
+        let length = u32::try_from(output.len() - start)
+            .map_err(|_err| invalid("DataSpaceMapEntry.Length exceeds u32"))?;
+        output[start..start + 4].copy_from_slice(&length.to_le_bytes());
+    }
+    Ok(output)
+}
+
+/// Parses a `DataSpaceDefinition` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_definition(data: &[u8], limits: &Limits) -> Result<Definition, Error> {
+    let limits = limits.validate()?;
+    let mut reader = SliceReader::new(data, &limits)?;
+    require_u32(
+        reader.u32()?,
+        HEADER_LENGTH,
+        "DataSpaceDefinition.HeaderLength",
+    )?;
+    let count = bounded_count(
+        reader.u32()?,
+        "DataSpaceDefinition.TransformReferenceCount",
+        &limits,
+    )?;
+    if count == 0 {
+        return Err(invalid(
+            "DataSpaceDefinition requires at least one transform",
+        ));
+    }
+    let mut transforms = Vec::with_capacity(count);
+    for _ in 0..count {
+        transforms.push(reader.unicode_lpp4()?);
+    }
+    reader.finish()?;
+    let value = Definition { transforms };
+    validate_definition(&value)?;
+    Ok(value)
+}
+
+/// Serializes a `DataSpaceDefinition` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_definition(value: &Definition, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_definition(value)?;
+    let mut output = Vec::new();
+    append_output(&mut output, &HEADER_LENGTH.to_le_bytes(), &limits)?;
+    write_count(
+        &mut output,
+        value.transforms.len(),
+        "DataSpaceDefinition.TransformReferenceCount",
+        &limits,
+    )?;
+    for transform in &value.transforms {
+        write_unicode_lpp4(&mut output, transform, &limits)?;
+    }
+    Ok(output)
+}
+
+/// Parses a transform header, returning the header and the byte count it consumed.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_transform_header(data: &[u8], limits: &Limits) -> Result<(Header, usize), Error> {
+    let limits = limits.validate()?;
+    parse_transform_header_with_compat(data, false, &limits)
+}
+
+fn parse_transform_header_with_compat(
+    data: &[u8],
+    allow_encryption_compatibility: bool,
+    limits: &Limits,
+) -> Result<(Header, usize), Error> {
+    let mut reader = SliceReader::new(data, limits)?;
+    let transform_length = usize::try_from(reader.u32()?)
+        .map_err(|_err| invalid("TransformLength overflows usize"))?;
+    require_u32(reader.u32()?, TRANSFORM_TYPE, "TransformType")?;
+    let transform_id = reader.unicode_lpp4()?;
+    let transform_name_boundary = reader.position();
+    let transform_name = reader.unicode_lpp4()?;
+    let canonical_length = transform_name_boundary == transform_length;
+    let legacy_mso2007_length = allow_encryption_compatibility
+        && transform_length == LEGACY_MSO2007_TRANSFORM_LENGTH
+        && transform_id == ENCRYPTION_ID
+        && transform_name == ENCRYPTION_NAME;
+    if !canonical_length && !legacy_mso2007_length {
+        return Err(invalid("TransformLength does not end before TransformName"));
+    }
+    let value = Header {
+        transform_id,
+        transform_name,
+        reader: reader.version()?,
+        updater: reader.version()?,
+        writer: reader.version()?,
+    };
+    validate_transform_header(&value)?;
+    Ok((value, reader.position()))
+}
+
+/// Serializes a transform header.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_transform_header(value: &Header, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_transform_header(value)?;
+    let mut output = Vec::new();
+    append_output(&mut output, &0u32.to_le_bytes(), &limits)?;
+    append_output(&mut output, &TRANSFORM_TYPE.to_le_bytes(), &limits)?;
+    write_unicode_lpp4(&mut output, &value.transform_id, &limits)?;
+    let transform_length =
+        u32::try_from(output.len()).map_err(|_err| invalid("TransformLength exceeds u32"))?;
+    output[..4].copy_from_slice(&transform_length.to_le_bytes());
+    write_unicode_lpp4(&mut output, &value.transform_name, &limits)?;
+    write_version(&mut output, value.reader, &limits)?;
+    write_version(&mut output, value.updater, &limits)?;
+    write_version(&mut output, value.writer, &limits)?;
+    Ok(output)
+}
+
+/// Parses an IRM transform stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_irm_transform(data: &[u8], limits: &Limits) -> Result<IrmTransform, Error> {
+    let limits = limits.validate()?;
+    let (header, consumed) = parse_transform_header_with_compat(data, false, &limits)?;
+    validate_drm_header(&header)?;
+    let mut reader = SliceReader::at(data, consumed, &limits)?;
+    require_u32(
+        reader.u32()?,
+        EXTENSIBILITY_HEADER_LENGTH,
+        "ExtensibilityHeader.Length",
+    )?;
+    let publishing_license = reader.utf8_lpp4()?;
+    let license = publishing_license
+        .as_deref()
+        .filter(|license| !license.is_empty())
+        .ok_or_else(|| invalid("IRM publishing license cannot be null or empty"))?;
+    validate_inert_xml(license, "IRM publishing license", &limits)?;
+    reader.finish()?;
+    Ok(IrmTransform {
+        header,
+        publishing_license,
+    })
+}
+
+/// Serializes an IRM transform.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_irm_transform(value: &IrmTransform, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_drm_header(&value.header)?;
+    let license = value
+        .publishing_license
+        .as_deref()
+        .filter(|license| !license.is_empty())
+        .ok_or_else(|| invalid("IRM publishing license cannot be null or empty"))?;
+    validate_inert_xml(license, "IRM publishing license", &limits)?;
+    let mut output = write_transform_header(&value.header, &limits)?;
+    append_output(
+        &mut output,
+        &EXTENSIBILITY_HEADER_LENGTH.to_le_bytes(),
+        &limits,
+    )?;
+    write_utf8_lpp4(&mut output, value.publishing_license.as_deref(), &limits)?;
+    Ok(output)
+}
+
+/// Parses an `EncryptionTransformInfo` stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_encryption_transform(
+    data: &[u8],
+    limits: &Limits,
+) -> Result<EncryptionTransform, Error> {
+    let limits = limits.validate()?;
+    parse_encryption_transform_with_compatibility(data, false, &limits)
+}
+
+fn parse_encryption_transform_with_compatibility(
+    data: &[u8],
+    allow_encryption_compatibility: bool,
+    limits: &Limits,
+) -> Result<EncryptionTransform, Error> {
+    let (header, consumed) =
+        parse_transform_header_with_compat(data, allow_encryption_compatibility, limits)?;
+    validate_encryption_header(&header)?;
+    let mut reader = SliceReader::at(data, consumed, limits)?;
+    let encryption_name = reader.utf8_lpp4()?;
+    let mut encryption_block_size = reader.u32()?;
+    if allow_encryption_compatibility && encryption_block_size == 0 {
+        // [MS-OFFCRYPTO] makes EncryptionInfo authoritative over this
+        // advisory DataSpaces value. Some native producers wrote zero here;
+        // normalize that one field for OOXML reads after the full header has
+        // identified StrongEncryptionTransform.
+        encryption_block_size = 16;
+    }
+    let value = EncryptionTransform {
+        header,
+        encryption_name,
+        encryption_block_size,
+        cipher_mode: reader.u32()?,
+    };
+    require_u32(reader.u32()?, 4, "EncryptionTransformInfo.Reserved")?;
+    reader.finish()?;
+    validate_encryption_transform(&value)?;
+    Ok(value)
+}
+
+/// Serializes an `EncryptionTransformInfo` value.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_encryption_transform(
+    value: &EncryptionTransform,
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_encryption_transform(value)?;
+    let mut output = write_transform_header(&value.header, &limits)?;
+    write_utf8_lpp4(&mut output, value.encryption_name.as_deref(), &limits)?;
+    append_output(
+        &mut output,
+        &value.encryption_block_size.to_le_bytes(),
+        &limits,
+    )?;
+    append_output(&mut output, &value.cipher_mode.to_le_bytes(), &limits)?;
+    append_output(&mut output, &4u32.to_le_bytes(), &limits)?;
+    Ok(output)
+}
+
+/// Parses an end-user license stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the input is truncated, malformed, or fails validation.
+pub fn parse_license(stream_name: &str, data: &[u8], limits: &Limits) -> Result<License, Error> {
+    let limits = limits.validate()?;
+    validate_eul_stream_name(stream_name)?;
+    let mut reader = SliceReader::new(data, &limits)?;
+    let header_start = reader.position();
+    let header_length = usize::try_from(reader.u32()?)
+        .map_err(|_err| invalid("EndUserLicenseHeader.Length overflows usize"))?;
+    if header_length < 8 || header_length > data.len() {
+        return Err(invalid("invalid EndUserLicenseHeader.Length"));
+    }
+    let encoded_license_id = reader
+        .utf8_lpp4()?
+        .ok_or_else(|| invalid("EndUserLicenseHeader.ID_String cannot be null"))?;
+    if reader.position() != header_start + header_length {
+        return Err(invalid(
+            "EndUserLicenseHeader.Length does not match ID_String",
+        ));
+    }
+    let certificate_chain = reader.utf8_lpp4()?;
+    let chain = certificate_chain
+        .as_deref()
+        .filter(|chain| !chain.is_empty())
+        .ok_or_else(|| invalid("end-user license certificate chain cannot be null or empty"))?;
+    validate_inert_xml(chain, "end-user license certificate chain", &limits)?;
+    reader.finish()?;
+    Ok(License {
+        stream_name: stream_name.to_string(),
+        encoded_license_id,
+        certificate_chain,
+    })
+}
+
+/// Serializes an end-user license stream.
+///
+/// # Errors
+///
+/// Returns [`Error::Invalid`] when the value fails validation.
+pub fn write_license(value: &License, limits: &Limits) -> Result<Vec<u8>, Error> {
+    let limits = limits.validate()?;
+    validate_eul_stream_name(&value.stream_name)?;
+    if value.encoded_license_id.is_empty() {
+        return Err(invalid("EndUserLicenseHeader.ID_String cannot be empty"));
+    }
+    let chain = value
+        .certificate_chain
+        .as_deref()
+        .filter(|chain| !chain.is_empty())
+        .ok_or_else(|| invalid("end-user license certificate chain cannot be null or empty"))?;
+    validate_inert_xml(chain, "end-user license certificate chain", &limits)?;
+    let mut output = Vec::new();
+    append_output(&mut output, &[0; 4], &limits)?;
+    write_utf8_lpp4(&mut output, Some(&value.encoded_license_id), &limits)?;
+    let header_length = u32::try_from(output.len())
+        .map_err(|_err| invalid("EndUserLicenseHeader.Length exceeds u32"))?;
+    output[..4].copy_from_slice(&header_length.to_le_bytes());
+    write_utf8_lpp4(&mut output, value.certificate_chain.as_deref(), &limits)?;
+    Ok(output)
+}
+
+/// Inspect and cross-validate a complete `DataSpaces` graph in an OLE file.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the OLE container or a `DataSpaces` stream cannot be read or validated.
+pub fn inspect<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    limits: &Limits,
+) -> Result<Option<Graph>, Error> {
+    let limits = limits.validate()?;
+    inspect_inner(ole, false, &limits)
+}
+
+/// Inspect an OOXML encryption DataSpaces graph with narrowly scoped native
+/// producer compatibility. Generic DataSpaces callers continue to use the
+/// strict [`inspect`] path.
+#[cfg(any(feature = "ooxml", test))]
+pub(crate) fn inspect_ooxml<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    limits: &Limits,
+) -> Result<Option<Graph>, Error> {
+    let limits = limits.validate()?;
+    inspect_inner(ole, true, &limits)
+}
+
+fn inspect_inner<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    allow_ooxml_encryption_compatibility: bool,
+    limits: &Limits,
+) -> Result<Option<Graph>, Error> {
+    let custom_xml_data_store = inspect_custom_xml(ole, custom_xml_limits(limits))
+        .map_err(|error| invalid(format!("MsoDataStore validation failed: {error}")))?;
+    if !ole.exists(&[STORAGE]) {
+        validate_custom_xml_promotion(custom_xml_data_store.as_ref(), None)?;
+        return Ok(None);
+    }
+    check_stream_budget(ole, limits)?;
+    let version = parse_version_info(&read_stream(ole, &[STORAGE, "Version"], limits)?, limits)?;
+    let map = parse_map(
+        &read_stream(ole, &[STORAGE, "DataSpaceMap"], limits)?,
+        limits,
+    )?;
+
+    let mut definition_names = Vec::new();
+    ole.visit_directory_entry_refs(&[STORAGE, "DataSpaceInfo"], limits.max_entries, |entry| {
+        if entry.entry_type != 2 {
+            return Err(invalid(format!(
+                "DataSpaceInfo child '{}' is not a stream",
+                entry.name
+            )));
+        }
+        push_bounded(
+            &mut definition_names,
+            entry.name.clone(),
+            LimitKind::Entries,
+            limits.max_entries,
+            "DataSpaceInfo names",
+        )
+    })
+    .map_err(|error| map_directory_visit_error(error, LimitKind::Entries, limits.max_entries))?;
+    definition_names.sort();
+    let mut definitions = Vec::new();
+    definitions
+        .try_reserve_exact(definition_names.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "DataSpaceInfo definitions",
+        })?;
+    for name in definition_names {
+        definitions.push(NamedDefinition {
+            definition: parse_definition(
+                &read_stream(ole, &[STORAGE, "DataSpaceInfo", &name], limits)?,
+                limits,
+            )?,
+            name,
+        });
+    }
+
+    let mut transform_names = Vec::new();
+    ole.visit_directory_entry_refs(&[STORAGE, "TransformInfo"], limits.max_entries, |entry| {
+        if entry.entry_type != 1 {
+            // LabelInfo is a permitted stream sibling, not a transform.
+            if entry.entry_type == 2 && entry.name == "LabelInfo" {
+                return Ok(());
+            }
+            return Err(invalid(format!(
+                "TransformInfo child '{}' is not a storage",
+                entry.name
+            )));
+        }
+        push_bounded(
+            &mut transform_names,
+            entry.name.clone(),
+            LimitKind::Entries,
+            limits.max_entries,
+            "TransformInfo names",
+        )
+    })
+    .map_err(|error| map_directory_visit_error(error, LimitKind::Entries, limits.max_entries))?;
+    transform_names.sort();
+    let mut transforms = Vec::new();
+    transforms
+        .try_reserve_exact(transform_names.len())
+        .map_err(|_error| Error::Allocation {
+            resource: "DataSpaces transforms",
+        })?;
+    for name in transform_names {
+        let mut child_entries = Vec::new();
+        ole.visit_directory_entry_refs(
+            &[STORAGE, "TransformInfo", &name],
+            limits.max_entries,
+            |entry| {
+                push_bounded(
+                    &mut child_entries,
+                    (entry.name.clone(), entry.entry_type),
+                    LimitKind::Entries,
+                    limits.max_entries,
+                    "transform-storage entries",
+                )
+            },
+        )
+        .map_err(|error| {
+            map_directory_visit_error(error, LimitKind::Entries, limits.max_entries)
+        })?;
+        let bytes = read_stream(ole, &[STORAGE, "TransformInfo", &name, PRIMARY], limits)?;
+        let encryption_compatibility =
+            allow_ooxml_encryption_compatibility && name == "StrongEncryptionTransform";
+        let (header, consumed) =
+            parse_transform_header_with_compat(&bytes, encryption_compatibility, limits)?;
+        let irm = if header.transform_id == DRM_ID && header.transform_name == DRM_NAME {
+            Some(parse_irm_transform(&bytes, limits)?)
+        } else {
+            None
+        };
+        let encryption =
+            if header.transform_id == ENCRYPTION_ID && header.transform_name == ENCRYPTION_NAME {
+                Some(parse_encryption_transform_with_compatibility(
+                    &bytes,
+                    encryption_compatibility,
+                    limits,
+                )?)
+            } else {
+                None
+            };
+        let parsed_known_transform = irm.is_some() || encryption.is_some();
+        let mut end_user_licenses = Vec::new();
+        for (child_name, entry_type) in child_entries {
+            if child_name == PRIMARY {
+                if entry_type != 2 {
+                    return Err(invalid("transform Primary entry is not a stream"));
+                }
+                continue;
+            }
+            if child_name.starts_with("EUL-") {
+                if entry_type != 2 {
+                    return Err(invalid("end-user license entry is not a stream"));
+                }
+                let license = parse_license(
+                    &child_name,
+                    &read_stream(ole, &[STORAGE, "TransformInfo", &name, &child_name], limits)?,
+                    limits,
+                )?;
+                push_bounded(
+                    &mut end_user_licenses,
+                    license,
+                    LimitKind::Entries,
+                    limits.max_entries,
+                    "end-user licenses",
+                )?;
+            } else if entry_type != STGTY_STREAM && entry_type != STGTY_STORAGE {
+                return Err(invalid(format!(
+                    "unsupported transform-storage entry '{child_name}'"
+                )));
+            }
+        }
+        if irm.is_some() && end_user_licenses.is_empty() {
+            return Err(invalid(format!(
+                "IRM transform '{name}' has no end-user license stream"
+            )));
+        }
+        transforms.push(Transform {
+            name,
+            header,
+            irm,
+            encryption,
+            end_user_licenses,
+            opaque_tail: if parsed_known_transform {
+                Vec::new()
+            } else {
+                bytes[consumed..].to_vec()
+            },
+        });
+    }
+
+    validate_graph(ole, &map, &definitions, &transforms, limits)?;
+    let irm = classify_irm(&map, &definitions, &transforms)?;
+    let (label_info, labels) = if ole.exists(&[STORAGE, "TransformInfo", "LabelInfo"]) {
+        let bytes = read_stream(ole, &[STORAGE, "TransformInfo", "LabelInfo"], limits)?;
+        let labels = labels::parse(&bytes, &labels::Limits::from_spaces(limits))
+            .map_err(map_labels_error)?;
+        (Some(bytes), Some(labels))
+    } else {
+        (None, None)
+    };
+    if labels.is_some()
+        && !irm.as_ref().is_some_and(|profile| {
+            transforms.iter().any(|transform| {
+                transform.name == profile.transform_name
+                    && transform
+                        .irm
+                        .as_ref()
+                        .is_some_and(|metadata| metadata.publishing_license.is_some())
+            })
+        })
+    {
+        return Err(invalid(
+            "LabelInfo requires an IRM transform with a publishing license",
+        ));
+    }
+    let summary_information_integrity =
+        inspect_integrity(ole, SUMMARY_HASH_STREAM, SUMMARY_STREAM, limits)?;
+    let document_summary_information_integrity = inspect_integrity(
+        ole,
+        DOCUMENT_SUMMARY_HASH_STREAM,
+        DOCUMENT_SUMMARY_STREAM,
+        limits,
+    )?;
+    if (summary_information_integrity.is_some() || document_summary_information_integrity.is_some())
+        && irm.is_none()
+        && !transforms
+            .iter()
+            .any(|transform| transform.encryption.is_some())
+    {
+        return Err(invalid(
+            "encrypted property hash stream is present without an encryption or IRM transform",
+        ));
+    }
+    validate_custom_xml_promotion(custom_xml_data_store.as_ref(), irm.as_ref())?;
+    Ok(Some(Graph {
+        version,
+        map,
+        definitions,
+        transforms,
+        irm,
+        label_info,
+        labels,
+        summary_information_integrity,
+        document_summary_information_integrity,
+        custom_xml_data_store,
+    }))
+}
+
+/// Derive the inert Custom XML profile from the selected DataSpaces profile.
+///
+/// Custom XML is an optional part of the same OLE graph. Using its defaults
+/// here would let a caller select a narrow DataSpaces policy while retaining
+/// a much larger Custom XML payload. Keep the shared codec's hard defaults as
+/// ceilings, but never admit more than the caller selected for the graph.
+fn custom_xml_limits(limits: &Limits) -> litchi_ole_common::custom_xml::Limits {
+    let defaults = litchi_ole_common::custom_xml::Limits::default();
+    litchi_ole_common::custom_xml::Limits {
+        max_items: limits.max_entries.min(defaults.max_items),
+        max_item_bytes: limits.max_stream_bytes.min(defaults.max_item_bytes),
+        max_properties_bytes: limits.max_stream_bytes.min(defaults.max_properties_bytes),
+        max_total_bytes: limits.max_total_bytes.min(defaults.max_total_bytes),
+        max_xml_depth: limits.max_xml_depth.min(defaults.max_xml_depth),
+        max_xml_elements: limits.max_xml_nodes.min(defaults.max_xml_elements),
+        max_schema_references: limits.max_entries.min(defaults.max_schema_references),
+        max_string_bytes: limits.max_string_bytes.min(defaults.max_string_bytes),
+    }
+}
+
+fn validate_custom_xml_promotion(store: Option<&Store>, irm: Option<&Irm>) -> Result<(), Error> {
+    if store.is_some_and(|inner| inner.promotion != Promotion::Unspecified) && irm.is_none() {
+        return Err(invalid(
+            "MsoDataStore promotion marker requires an IRM data space",
+        ));
+    }
+    Ok(())
+}
+
+/// Open an OLE compound file and inspect its `DataSpaces` graph.
+///
+/// # Errors
+///
+/// Returns [`Error`] when the bytes are not a valid OLE container or its `DataSpaces` graph cannot be read or validated.
+pub fn inspect_bytes(bytes: &[u8], limits: &Limits) -> Result<Option<Graph>, Error> {
+    let limits = limits.validate()?;
+    let mut ole = OleFile::open(io::Cursor::new(bytes), cfb_limits(&limits)?)?;
+    inspect(&mut ole, &limits)
+}
+
+fn cfb_limits(limits: &Limits) -> Result<litchi_cfb::OleFileLimits, Error> {
+    let selected = limits.max_total_bytes.max(limits.max_stream_bytes);
+    let selected = u64::try_from(selected).unwrap_or(u64::MAX);
+    let selected = selected.min(litchi_cfb::OleFileLimits::MAX_INPUT_BYTES);
+    litchi_cfb::OleFileLimits::new(selected)
+        .and_then(|value| value.with_max_directory_bytes(selected))
+        .and_then(|value| value.with_max_allocation_table_bytes(selected))
+        .map_err(Error::Ole)
+}
+
+fn inspect_integrity<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    info_stream: &str,
+    property_stream: &str,
+    limits: &Limits,
+) -> Result<Option<Integrity>, Error> {
+    if !ole.exists(&[info_stream]) {
+        return Ok(None);
+    }
+    if !ole.exists(&[property_stream]) {
+        return Err(invalid(format!(
+            "{info_stream} is present without {property_stream}"
+        )));
+    }
+    let info = integrity::parse(&read_stream(ole, &[info_stream], limits)?)
+        .map_err(|error| invalid(format!("{info_stream} is malformed: {error}")))?;
+    let valid = integrity::verify(&info, &read_stream(ole, &[property_stream], limits)?);
+    Ok(Some(Integrity { info, valid }))
+}
+
+fn check_stream_budget<R: Read + Seek>(ole: &OleFile<R>, limits: &Limits) -> Result<(), Error> {
+    let components = collect_components(ole, limits)?;
+    let mut total = 0usize;
+    for component in components {
+        if component.kind != ReferenceKind::Stream
+            || component.path.first().is_none_or(|name| name != STORAGE)
+        {
+            continue;
+        }
+        let references = component
+            .path
+            .iter()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        let declared = usize::try_from(ole.stream_len(&references)?).unwrap_or(usize::MAX);
+        if declared > limits.max_stream_bytes {
+            return Err(limit_exceeded(
+                LimitKind::StreamBytes,
+                declared,
+                limits.max_stream_bytes,
+            ));
+        }
+        total = total.checked_add(declared).ok_or_else(|| {
+            limit_exceeded(LimitKind::TotalBytes, usize::MAX, limits.max_total_bytes)
+        })?;
+        if total > limits.max_total_bytes {
+            return Err(limit_exceeded(
+                LimitKind::TotalBytes,
+                total,
+                limits.max_total_bytes,
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_graph<R: Read + Seek>(
+    ole: &OleFile<R>,
+    map: &Map,
+    definitions: &[NamedDefinition],
+    transforms: &[Transform],
+    limits: &Limits,
+) -> Result<(), Error> {
+    let components = collect_components(ole, limits)?;
+    validate_graph_model(map, definitions, transforms, limits)?;
+    validate_component_references(map, &components, limits)
+}
+
+fn classify_irm(
+    map: &Map,
+    definitions: &[NamedDefinition],
+    transforms: &[Transform],
+) -> Result<Option<Irm>, Error> {
+    if let Some(entry) = map
+        .entries
+        .iter()
+        .find(|entry| entry.data_space_name == "DRMEncryptedDataSpace")
+    {
+        if map.entries.len() != 1 {
+            return Err(invalid("OOXML IRM requires exactly one DataSpaceMap entry"));
+        }
+        require_single_stream(entry, "EncryptedPackage")?;
+        require_definition(
+            definitions,
+            "DRMEncryptedDataSpace",
+            &["DRMEncryptedTransform"],
+        )?;
+        require_drm_transform(transforms, "DRMEncryptedTransform")?;
+        return Ok(Some(Irm {
+            document_kind: DocumentKind::Ooxml,
+            protected_stream: "EncryptedPackage".to_string(),
+            viewer_content_stream: None,
+            transform_name: "DRMEncryptedTransform".to_string(),
+        }));
+    }
+    if let Some(entry) = map
+        .entries
+        .iter()
+        .find(|entry| entry.data_space_name == "0x09DRMDataSpace")
+    {
+        require_single_stream(entry, "0x09DRMContent")?;
+        require_definition(definitions, "0x09DRMDataSpace", &["0x09DRMTransform"])?;
+        require_drm_transform(transforms, "0x09DRMTransform")?;
+        let viewer_content_stream = if let Some(viewer) = map
+            .entries
+            .iter()
+            .find(|candidate| candidate.data_space_name == "0x09LZXDRMDataSpace")
+        {
+            require_single_stream(viewer, "0x09DRMViewerContent")?;
+            require_definition(
+                definitions,
+                "0x09LZXDRMDataSpace",
+                &["0x09DRMTransform", "0x09LZXTransform"],
+            )?;
+            require_named_transform(transforms, "0x09LZXTransform", LZX_ID, LZX_NAME)?;
+            Some("0x09DRMViewerContent".to_string())
+        } else {
+            None
+        };
+        let expected_entry_count = if viewer_content_stream.is_some() {
+            2
+        } else {
+            1
+        };
+        if map.entries.len() != expected_entry_count {
+            return Err(invalid(
+                "binary IRM contains an unexpected DataSpaceMap entry",
+            ));
+        }
+        return Ok(Some(Irm {
+            document_kind: DocumentKind::LegacyBinary,
+            protected_stream: "0x09DRMContent".to_string(),
+            viewer_content_stream,
+            transform_name: "0x09DRMTransform".to_string(),
+        }));
+    }
+    Ok(None)
+}
+
+fn require_single_stream(entry: &MapEntry, expected: &str) -> Result<(), Error> {
+    if entry.references.as_slice()
+        != [Reference {
+            kind: ReferenceKind::Stream,
+            component: expected.to_string(),
+        }]
+    {
+        return Err(invalid(format!(
+            "IRM data space '{}' does not reference exactly '{expected}'",
+            entry.data_space_name
+        )));
+    }
+    Ok(())
+}
+
+fn require_definition(
+    definitions: &[NamedDefinition],
+    name: &str,
+    expected: &[&str],
+) -> Result<(), Error> {
+    let definition = definitions
+        .iter()
+        .find(|definition| definition.name == name)
+        .ok_or_else(|| invalid(format!("missing IRM data space '{name}'")))?;
+    if definition
+        .definition
+        .transforms
+        .iter()
+        .map(String::as_str)
+        .ne(expected.iter().copied())
+    {
+        return Err(invalid(format!(
+            "IRM data space '{name}' has the wrong transform chain"
+        )));
+    }
+    Ok(())
+}
+
+fn require_drm_transform(transforms: &[Transform], name: &str) -> Result<(), Error> {
+    let transform = transforms
+        .iter()
+        .find(|transform| transform.name == name)
+        .ok_or_else(|| invalid(format!("missing IRM transform '{name}'")))?;
+    validate_drm_header(&transform.header)
+}
+
+fn require_named_transform(
+    transforms: &[Transform],
+    name: &str,
+    transform_id: &str,
+    transform_name: &str,
+) -> Result<(), Error> {
+    let transform = transforms
+        .iter()
+        .find(|transform| transform.name == name)
+        .ok_or_else(|| invalid(format!("missing transform '{name}'")))?;
+    if transform.header.transform_id != transform_id
+        || transform.header.transform_name != transform_name
+        || transform.header.reader != Version::V1_0
+        || transform.header.updater != Version::V1_0
+        || transform.header.writer != Version::V1_0
+    {
+        return Err(invalid(format!("transform '{name}' has an invalid header")));
+    }
+    Ok(())
+}
+
+fn validate_version_info(value: &VersionInfo) -> Result<(), Error> {
+    if value.feature_identifier != FEATURE
+        || value.reader != Version::V1_0
+        || value.updater != Version::V1_0
+        || value.writer != Version::V1_0
+    {
+        return Err(invalid("unsupported DataSpaceVersionInfo"));
+    }
+    Ok(())
+}
+
+fn validate_map(value: &Map) -> Result<(), Error> {
+    if value.entries.is_empty() || value.entries.len() > MAX_ENTRIES {
+        return Err(invalid("DataSpaceMap entry count is out of bounds"));
+    }
+    let mut names = std::collections::HashSet::with_capacity(value.entries.len());
+    for entry in &value.entries {
+        validate_name(&entry.data_space_name, "data space name")?;
+        if !names.insert(entry.data_space_name.as_str()) {
+            return Err(invalid("duplicate data space name"));
+        }
+        if entry.references.is_empty() || entry.references.len() > MAX_ENTRIES {
+            return Err(invalid("reference component count is out of bounds"));
+        }
+        for reference in &entry.references {
+            validate_name(&reference.component, "reference component")?;
+        }
+    }
+    Ok(())
+}
+
+fn validate_definition(value: &Definition) -> Result<(), Error> {
+    if value.transforms.is_empty() || value.transforms.len() > MAX_ENTRIES {
+        return Err(invalid("transform reference count is out of bounds"));
+    }
+    let mut names = std::collections::HashSet::with_capacity(value.transforms.len());
+    for transform in &value.transforms {
+        validate_name(transform, "transform reference")?;
+        if !names.insert(transform.as_str()) {
+            return Err(invalid("duplicate transform reference"));
+        }
+    }
+    Ok(())
+}
+
+fn validate_transform_header(value: &Header) -> Result<(), Error> {
+    validate_name(&value.transform_id, "transform identifier")?;
+    validate_name(&value.transform_name, "transform name")?;
+    Ok(())
+}
+
+fn validate_drm_header(value: &Header) -> Result<(), Error> {
+    if value.transform_id != DRM_ID
+        || value.transform_name != DRM_NAME
+        || value.reader != Version::V1_0
+        || value.updater != Version::V1_0
+        || value.writer != Version::V1_0
+    {
+        return Err(invalid("invalid IRM transform header"));
+    }
+    Ok(())
+}
+
+fn validate_encryption_header(value: &Header) -> Result<(), Error> {
+    if value.transform_id != ENCRYPTION_ID
+        || value.transform_name != ENCRYPTION_NAME
+        || value.reader != Version::V1_0
+        || value.updater != Version::V1_0
+        || value.writer != Version::V1_0
+    {
+        return Err(invalid("invalid encryption transform header"));
+    }
+    Ok(())
+}
+
+fn validate_encryption_transform(value: &EncryptionTransform) -> Result<(), Error> {
+    validate_encryption_header(&value.header)?;
+    if value.encryption_block_size == 0 {
+        return Err(invalid("encryption transform block size cannot be zero"));
+    }
+    if value
+        .encryption_name
+        .as_deref()
+        .is_some_and(|name| name.is_empty() || name.len() > MAX_STRING_BYTES)
+    {
+        return Err(invalid("invalid encryption transform algorithm name"));
+    }
+    Ok(())
+}
+
+fn validate_name(value: &str, label: &str) -> Result<(), Error> {
+    if value.is_empty()
+        || value.len() > MAX_STRING_BYTES
+        || value.chars().any(|character| character == '\0')
+    {
+        return Err(invalid(format!(
+            "{label} is empty, too long, or contains NUL"
+        )));
+    }
+    Ok(())
+}
+
+fn validate_eul_stream_name(value: &str) -> Result<(), Error> {
+    let Some(encoded_guid) = value.strip_prefix("EUL-") else {
+        return Err(invalid("end-user license stream name lacks EUL- prefix"));
+    };
+    if encoded_guid.len() != 26
+        || !encoded_guid
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric())
+    {
+        return Err(invalid(
+            "end-user license stream name does not contain a 26-character base-32 GUID",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_inert_xml(value: &str, label: &str, limits: &Limits) -> Result<(), Error> {
+    use quick_xml::Reader;
+    use quick_xml::events::Event;
+
+    if value.len() > limits.max_stream_bytes {
+        return Err(limit_exceeded(
+            LimitKind::StreamBytes,
+            value.len(),
+            limits.max_stream_bytes,
+        ));
+    }
+    let mut reader = Reader::from_str(value);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut roots = 0usize;
+    let mut nodes = 0usize;
+    loop {
+        match reader.read_event() {
+            Ok(Event::Start(_)) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlNodes, usize::MAX, limits.max_xml_nodes)
+                })?;
+                if nodes > limits.max_xml_nodes {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes,
+                    ));
+                }
+                if depth == 0 {
+                    roots += 1;
+                }
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth)
+                })?;
+                if depth > limits.max_xml_depth {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlDepth,
+                        depth,
+                        limits.max_xml_depth,
+                    ));
+                }
+            },
+            Ok(Event::Empty(_)) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlNodes, usize::MAX, limits.max_xml_nodes)
+                })?;
+                if nodes > limits.max_xml_nodes {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes,
+                    ));
+                }
+                let element_depth = depth.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlDepth, usize::MAX, limits.max_xml_depth)
+                })?;
+                if element_depth > limits.max_xml_depth {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlDepth,
+                        element_depth,
+                        limits.max_xml_depth,
+                    ));
+                }
+                if depth == 0 {
+                    roots += 1;
+                }
+            },
+            Ok(Event::End(_)) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlNodes, usize::MAX, limits.max_xml_nodes)
+                })?;
+                if nodes > limits.max_xml_nodes {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes,
+                    ));
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid(format!("{label} XML is unbalanced")))?;
+            },
+            Ok(Event::DocType(_)) => {
+                return Err(invalid(format!("{label} XML contains a forbidden DTD")));
+            },
+            Ok(Event::Text(text)) if depth == 0 => {
+                if !text
+                    .decode()
+                    .map_err(|error| invalid(format!("{label} XML text is invalid: {error}")))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid(format!("{label} XML has text outside its root")));
+                }
+            },
+            Ok(Event::CData(text)) if depth == 0 => {
+                if !text
+                    .decode()
+                    .map_err(|error| invalid(format!("{label} XML CDATA is invalid: {error}")))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid(format!("{label} XML has CDATA outside its root")));
+                }
+            },
+            Ok(Event::Eof) => break,
+            Ok(event) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit_exceeded(LimitKind::XmlNodes, usize::MAX, limits.max_xml_nodes)
+                })?;
+                if nodes > limits.max_xml_nodes {
+                    return Err(limit_exceeded(
+                        LimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes,
+                    ));
+                }
+                if matches!(event, Event::Comment(_) | Event::PI(_) | Event::CData(_)) {
+                    // Inert comments, processing instructions, and CDATA are
+                    // counted but otherwise retained only by the source bytes.
+                }
+            },
+            Err(error) => return Err(invalid(format!("{label} XML is malformed: {error}"))),
+        }
+    }
+    if roots != 1 || depth != 0 {
+        return Err(invalid(format!(
+            "{label} XML must contain exactly one complete root"
+        )));
+    }
+    Ok(())
+}
+
+fn bounded_count(value: u32, label: &str, limits: &Limits) -> Result<usize, Error> {
+    let count =
+        usize::try_from(value).map_err(|_err| invalid(format!("{label} overflows usize")))?;
+    limits.entries(count)?;
+    Ok(count)
+}
+
+fn write_count(
+    output: &mut Vec<u8>,
+    count: usize,
+    label: &str,
+    limits: &Limits,
+) -> Result<(), Error> {
+    limits.entries(count)?;
+    append_output(
+        output,
+        &u32::try_from(count)
+            .map_err(|_err| invalid(format!("{label} exceeds u32")))?
+            .to_le_bytes(),
+        limits,
+    )?;
+    Ok(())
+}
+
+fn require_u32(value: u32, expected: u32, label: &str) -> Result<(), Error> {
+    if value != expected {
+        return Err(invalid(format!(
+            "{label} is {value:#010X}, expected {expected:#010X}"
+        )));
+    }
+    Ok(())
+}
+
+fn write_version(output: &mut Vec<u8>, version: Version, limits: &Limits) -> Result<(), Error> {
+    append_output(output, &version.major.to_le_bytes(), limits)?;
+    append_output(output, &version.minor.to_le_bytes(), limits)
+}
+
+fn write_unicode_lpp4(output: &mut Vec<u8>, value: &str, limits: &Limits) -> Result<(), Error> {
+    validate_name(value, "UNICODE-LP-P4 string")?;
+    let unit_count = value.encode_utf16().count();
+    let byte_len = unit_count
+        .checked_mul(2)
+        .ok_or_else(|| invalid("UNICODE-LP-P4 length overflow"))?;
+    if byte_len > limits.max_string_bytes {
+        return Err(limit_exceeded(
+            LimitKind::StringBytes,
+            byte_len,
+            limits.max_string_bytes,
+        ));
+    }
+    let byte_len_u32 =
+        u32::try_from(byte_len).map_err(|_err| invalid("UNICODE-LP-P4 length exceeds u32"))?;
+    let padding = (4 - (byte_len % 4)) % 4;
+    let framed_len = 4usize
+        .checked_add(byte_len)
+        .and_then(|length| length.checked_add(padding))
+        .ok_or_else(|| {
+            limit_exceeded(LimitKind::OutputBytes, usize::MAX, limits.max_output_bytes)
+        })?;
+    let output_end = output.len().checked_add(framed_len).ok_or_else(|| {
+        limit_exceeded(LimitKind::OutputBytes, usize::MAX, limits.max_output_bytes)
+    })?;
+    if output_end > limits.max_output_bytes {
+        return Err(limit_exceeded(
+            LimitKind::OutputBytes,
+            output_end,
+            limits.max_output_bytes,
+        ));
+    }
+    let units = value.encode_utf16().collect::<Vec<_>>();
+    append_output(output, &byte_len_u32.to_le_bytes(), limits)?;
+    for unit in units {
+        append_output(output, &unit.to_le_bytes(), limits)?;
+    }
+    if padding > 0 {
+        append_output(output, &[0, 0], limits)?;
+    }
+    Ok(())
+}
+
+fn write_utf8_lpp4(
+    output: &mut Vec<u8>,
+    value: Option<&str>,
+    limits: &Limits,
+) -> Result<(), Error> {
+    let Some(text) = value else {
+        return append_output(output, &0u32.to_le_bytes(), limits);
+    };
+    if text.len() > limits.max_string_bytes {
+        return Err(limit_exceeded(
+            LimitKind::StringBytes,
+            text.len(),
+            limits.max_string_bytes,
+        ));
+    }
+    if text.contains('\0') {
+        return Err(invalid("UTF-8-LP-P4 string contains NUL"));
+    }
+    append_output(
+        output,
+        &u32::try_from(text.len())
+            .map_err(|_err| invalid("UTF-8-LP-P4 length exceeds u32"))?
+            .to_le_bytes(),
+        limits,
+    )?;
+    append_output(output, text.as_bytes(), limits)?;
+    let padding = output.len().next_multiple_of(4) - output.len();
+    if padding > 0 {
+        append_output(output, &vec![0; padding], limits)?;
+    }
+    Ok(())
+}
+
+fn append_output(output: &mut Vec<u8>, bytes: &[u8], limits: &Limits) -> Result<(), Error> {
+    let end = output.len().checked_add(bytes.len()).ok_or_else(|| {
+        limit_exceeded(LimitKind::OutputBytes, usize::MAX, limits.max_output_bytes)
+    })?;
+    if end > limits.max_output_bytes {
+        return Err(limit_exceeded(
+            LimitKind::OutputBytes,
+            end,
+            limits.max_output_bytes,
+        ));
+    }
+    output
+        .try_reserve(bytes.len())
+        .map_err(|_error| Error::Allocation { resource: "output" })?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn read_stream<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    path: &[&str],
+    limits: &Limits,
+) -> Result<Vec<u8>, Error> {
+    let declared = ole.stream_len(path)?;
+    let maximum = u64::try_from(limits.max_stream_bytes).unwrap_or(u64::MAX);
+    if declared > maximum {
+        return Err(limit_exceeded(
+            LimitKind::StreamBytes,
+            usize::try_from(declared).unwrap_or(usize::MAX),
+            limits.max_stream_bytes,
+        ));
+    }
+    read_bounded_stream(ole, path, limits.max_stream_bytes).map_err(map_stream_read_error)
+}
+
+fn map_stream_read_error(error: OleError) -> Error {
+    match error {
+        OleError::LimitExceeded {
+            observed, maximum, ..
+        } => limit_exceeded(
+            LimitKind::StreamBytes,
+            usize::try_from(observed).unwrap_or(usize::MAX),
+            usize::try_from(maximum).unwrap_or(usize::MAX),
+        ),
+        OleError::Allocation { resource, .. } => Error::Allocation { resource },
+        other => Error::Ole(other),
+    }
+}
+
+fn map_directory_visit_error(error: Error, kind: LimitKind, maximum: usize) -> Error {
+    match error {
+        Error::Ole(OleError::LimitExceeded { observed, .. }) => limit_exceeded(
+            kind,
+            usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum,
+        ),
+        Error::Ole(OleError::Allocation { resource, .. }) => Error::Allocation { resource },
+        other => other,
+    }
+}
+
+fn invalid_limit(kind: LimitKind, value: usize, maximum: usize) -> Error {
+    Error::InvalidLimit {
+        kind,
+        value,
+        maximum,
+    }
+}
+
+fn map_labels_error(error: labels::Error) -> Error {
+    match error {
+        labels::Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        } => Error::InvalidLimit {
+            kind: match kind {
+                labels::LimitKind::XmlBytes => LimitKind::StreamBytes,
+                labels::LimitKind::Labels | labels::LimitKind::Extensions => LimitKind::Entries,
+                labels::LimitKind::XmlDepth => LimitKind::XmlDepth,
+                labels::LimitKind::XmlNodes => LimitKind::XmlNodes,
+                labels::LimitKind::AttributeBytes => LimitKind::StringBytes,
+                labels::LimitKind::OutputBytes => LimitKind::OutputBytes,
+            },
+            value,
+            maximum,
+        },
+        labels::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::LimitExceeded {
+            kind: match kind {
+                labels::LimitKind::XmlBytes => LimitKind::StreamBytes,
+                labels::LimitKind::Labels | labels::LimitKind::Extensions => LimitKind::Entries,
+                labels::LimitKind::XmlDepth => LimitKind::XmlDepth,
+                labels::LimitKind::XmlNodes => LimitKind::XmlNodes,
+                labels::LimitKind::AttributeBytes => LimitKind::StringBytes,
+                labels::LimitKind::OutputBytes => LimitKind::OutputBytes,
+            },
+            observed,
+            maximum,
+        },
+        labels::Error::Allocation { resource } => Error::Allocation { resource },
+        labels::Error::Invalid(message) => {
+            invalid(format!("LabelInfo validation failed: {message}"))
+        },
+        labels::Error::Xml(message) => invalid(format!("LabelInfo validation failed: {message}")),
+    }
+}
+
+fn limit_exceeded(kind: LimitKind, observed: usize, maximum: usize) -> Error {
+    Error::LimitExceeded {
+        kind,
+        observed,
+        maximum,
+    }
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_cfb::OleWriter;
+    use std::io::Cursor;
+
+    fn parse_version_info(data: &[u8]) -> Result<VersionInfo, Error> {
+        super::parse_version_info(data, &Limits::default())
+    }
+
+    fn write_version_info(value: &VersionInfo) -> Result<Vec<u8>, Error> {
+        super::write_version_info(value, &Limits::default())
+    }
+
+    fn parse_map(data: &[u8]) -> Result<Map, Error> {
+        super::parse_map(data, &Limits::default())
+    }
+
+    fn write_map(value: &Map) -> Result<Vec<u8>, Error> {
+        super::write_map(value, &Limits::default())
+    }
+
+    fn parse_definition(data: &[u8]) -> Result<Definition, Error> {
+        super::parse_definition(data, &Limits::default())
+    }
+
+    fn write_definition(value: &Definition) -> Result<Vec<u8>, Error> {
+        super::write_definition(value, &Limits::default())
+    }
+
+    fn parse_transform_header(data: &[u8]) -> Result<(Header, usize), Error> {
+        super::parse_transform_header(data, &Limits::default())
+    }
+
+    fn write_transform_header(value: &Header) -> Result<Vec<u8>, Error> {
+        super::write_transform_header(value, &Limits::default())
+    }
+
+    fn parse_irm_transform(data: &[u8]) -> Result<IrmTransform, Error> {
+        super::parse_irm_transform(data, &Limits::default())
+    }
+
+    fn write_irm_transform(value: &IrmTransform) -> Result<Vec<u8>, Error> {
+        super::write_irm_transform(value, &Limits::default())
+    }
+
+    fn parse_encryption_transform(data: &[u8]) -> Result<EncryptionTransform, Error> {
+        super::parse_encryption_transform(data, &Limits::default())
+    }
+
+    fn write_encryption_transform(value: &EncryptionTransform) -> Result<Vec<u8>, Error> {
+        super::write_encryption_transform(value, &Limits::default())
+    }
+
+    fn parse_license(stream_name: &str, data: &[u8]) -> Result<License, Error> {
+        super::parse_license(stream_name, data, &Limits::default())
+    }
+
+    fn write_license(value: &License) -> Result<Vec<u8>, Error> {
+        super::write_license(value, &Limits::default())
+    }
+
+    fn inspect<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Option<Graph>, Error> {
+        super::inspect(ole, &Limits::default())
+    }
+
+    fn drm_header() -> Header {
+        Header {
+            transform_id: DRM_ID.to_string(),
+            transform_name: DRM_NAME.to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
+        }
+    }
+
+    fn editable_package() -> Vec<u8> {
+        editable_package_with_extra_stream(None)
+    }
+
+    fn editable_package_with_extra_stream(extra: Option<&[u8]>) -> Vec<u8> {
+        let map = write_map(&Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
+                    component: "Payload".to_string(),
+                }],
+                data_space_name: "DataSpace".to_string(),
+            }],
+        })
+        .unwrap();
+        let definition = write_definition(&Definition {
+            transforms: vec!["FirstTransform".to_string()],
+        })
+        .unwrap();
+        let first = Header {
+            transform_id: "{11111111-1111-1111-1111-111111111111}".to_string(),
+            transform_name: "FirstTransform".to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
+        };
+        let second = Header {
+            transform_id: "{22222222-2222-2222-2222-222222222222}".to_string(),
+            transform_name: "SecondTransform".to_string(),
+            reader: Version::V1_0,
+            updater: Version::V1_0,
+            writer: Version::V1_0,
+        };
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["Payload"], b"protected-but-inert")
+            .unwrap();
+        writer
+            .create_stream(&["Unrelated"], b"preserve-me-byte-for-byte")
+            .unwrap();
+        writer.create_storage(&["EmptyStorage"]).unwrap();
+        writer.create_storage(&[STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE, "DataSpaceInfo"]).unwrap();
+        writer.create_storage(&[STORAGE, "TransformInfo"]).unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "FirstTransform"])
+            .unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "SecondTransform"])
+            .unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "FirstTransform", "OpaqueStorage"])
+            .unwrap();
+        writer
+            .create_stream(
+                &[
+                    STORAGE,
+                    "TransformInfo",
+                    "FirstTransform",
+                    "OpaqueStorage",
+                    "OpaqueStream",
+                ],
+                b"opaque-transform-child",
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "Version"],
+                &write_version_info(&VersionInfo::default()).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceMap"], &map)
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceInfo", "DataSpace"], &definition)
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "TransformInfo", "FirstTransform", PRIMARY],
+                &write_transform_header(&first).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "TransformInfo", "SecondTransform", PRIMARY],
+                &write_transform_header(&second).unwrap(),
+            )
+            .unwrap();
+        if let Some(bytes) = extra {
+            writer
+                .create_stream(
+                    &[
+                        STORAGE,
+                        "TransformInfo",
+                        "FirstTransform",
+                        "OversizedOpaqueStream",
+                    ],
+                    bytes,
+                )
+                .unwrap();
+        }
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        bytes.into_inner()
+    }
+
+    fn encryption_package() -> Vec<u8> {
+        encryption_package_with_quirks(false, false, false)
+    }
+
+    fn encryption_package_with_quirks(
+        zero_block_size: bool,
+        legacy_transform_length: bool,
+        invalid_reserved: bool,
+    ) -> Vec<u8> {
+        let map = write_map(&Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
+                    component: "EncryptedPackage".to_string(),
+                }],
+                data_space_name: "StrongEncryptionDataSpace".to_string(),
+            }],
+        })
+        .unwrap();
+        let definition = write_definition(&Definition {
+            transforms: vec!["StrongEncryptionTransform".to_string()],
+        })
+        .unwrap();
+        let encryption = EncryptionTransform {
+            header: Header {
+                transform_id: ENCRYPTION_ID.to_string(),
+                transform_name: ENCRYPTION_NAME.to_string(),
+                reader: Version::V1_0,
+                updater: Version::V1_0,
+                writer: Version::V1_0,
+            },
+            encryption_name: None,
+            encryption_block_size: 16,
+            cipher_mode: 0,
+        };
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptedPackage"], b"encrypted-payload")
+            .unwrap();
+        writer.create_storage(&[STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE, "DataSpaceInfo"]).unwrap();
+        writer.create_storage(&[STORAGE, "TransformInfo"]).unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "StrongEncryptionTransform"])
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "Version"],
+                &write_version_info(&VersionInfo::default()).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceMap"], &map)
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "DataSpaceInfo", "StrongEncryptionDataSpace"],
+                &definition,
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[
+                    STORAGE,
+                    "TransformInfo",
+                    "StrongEncryptionTransform",
+                    PRIMARY,
+                ],
+                &mutated_encryption_transform(
+                    &encryption,
+                    zero_block_size,
+                    legacy_transform_length,
+                    invalid_reserved,
+                ),
+            )
+            .unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        bytes.into_inner()
+    }
+
+    fn mutated_encryption_transform(
+        encryption: &EncryptionTransform,
+        zero_block_size: bool,
+        legacy_transform_length: bool,
+        invalid_reserved: bool,
+    ) -> Vec<u8> {
+        let mut bytes = write_encryption_transform(encryption).unwrap();
+        let (_, consumed) = parse_transform_header(&bytes).unwrap();
+        let mut reader = SliceReader::at(&bytes, consumed, &Limits::default()).unwrap();
+        let _name = reader.utf8_lpp4().unwrap();
+        let block_size_offset = reader.position();
+        if zero_block_size {
+            bytes[block_size_offset..block_size_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+        }
+        if invalid_reserved {
+            let reserved_offset = block_size_offset + 8;
+            bytes[reserved_offset..reserved_offset + 4].copy_from_slice(&0u32.to_le_bytes());
+        }
+        if legacy_transform_length {
+            bytes[..4].copy_from_slice(&(LEGACY_MSO2007_TRANSFORM_LENGTH as u32).to_le_bytes());
+        }
+        bytes
+    }
+
+    #[test]
+    fn core_streams_round_trip() {
+        let version = VersionInfo::default();
+        assert_eq!(
+            parse_version_info(&write_version_info(&version).unwrap()).unwrap(),
+            version
+        );
+        let map = Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
+                    component: "EncryptedPackage".to_string(),
+                }],
+                data_space_name: "DRMEncryptedDataSpace".to_string(),
+            }],
+        };
+        assert_eq!(parse_map(&write_map(&map).unwrap()).unwrap(), map);
+        let definition = Definition {
+            transforms: vec!["DRMEncryptedTransform".to_string()],
+        };
+        assert_eq!(
+            parse_definition(&write_definition(&definition).unwrap()).unwrap(),
+            definition
+        );
+    }
+
+    #[test]
+    fn caller_limits_cover_exact_stream_entries_aggregate_depth_and_output() {
+        let invalid_profile = Limits {
+            max_output_bytes: 0,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::write_version_info(&VersionInfo::default(), &invalid_profile),
+            Err(Error::InvalidLimit {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+
+        let version_bytes = write_version_info(&VersionInfo::default()).unwrap();
+        let exact = Limits {
+            max_stream_bytes: version_bytes.len(),
+            max_output_bytes: version_bytes.len(),
+            ..Limits::default()
+        };
+        assert_eq!(
+            parse_version_info(&version_bytes).unwrap(),
+            VersionInfo::default()
+        );
+        assert!(
+            super::parse_version_info(&version_bytes, &exact).is_ok(),
+            "exact stream limit is inclusive"
+        );
+        let too_small_stream = Limits {
+            max_stream_bytes: version_bytes.len() - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::parse_version_info(&version_bytes, &too_small_stream),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::StreamBytes,
+                ..
+            })
+        ));
+        let too_small_output = Limits {
+            max_output_bytes: version_bytes.len() - 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::write_version_info(&VersionInfo::default(), &too_small_output),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+
+        let two_entry_map = Map {
+            entries: vec![
+                MapEntry {
+                    references: vec![Reference {
+                        kind: ReferenceKind::Stream,
+                        component: "PayloadA".to_string(),
+                    }],
+                    data_space_name: "SpaceA".to_string(),
+                },
+                MapEntry {
+                    references: vec![Reference {
+                        kind: ReferenceKind::Stream,
+                        component: "PayloadB".to_string(),
+                    }],
+                    data_space_name: "SpaceB".to_string(),
+                },
+            ],
+        };
+        let two_entry_bytes = super::write_map(&two_entry_map, &Limits::default()).unwrap();
+        let one_entry = Limits {
+            max_entries: 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::parse_map(&two_entry_bytes, &one_entry),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::Entries,
+                ..
+            })
+        ));
+
+        let package = editable_package();
+        let aggregate = Limits {
+            max_total_bytes: 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            inspect_bytes(&package, &aggregate),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::TotalBytes,
+                ..
+            })
+        ));
+
+        let inert = IrmTransform {
+            header: drm_header(),
+            publishing_license: Some("<a><b/></a>".to_string()),
+        };
+        let inert_bytes = super::write_irm_transform(&inert, &Limits::default()).unwrap();
+        let shallow = Limits {
+            max_xml_depth: 1,
+            ..Limits::default()
+        };
+        assert!(matches!(
+            super::parse_irm_transform(&inert_bytes, &shallow),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::XmlDepth,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn label_limit_errors_map_to_the_dataspaces_profile() {
+        let error = map_labels_error(labels::Error::LimitExceeded {
+            kind: labels::LimitKind::Labels,
+            observed: 2,
+            maximum: 1,
+        });
+        assert!(matches!(
+            error,
+            Error::LimitExceeded {
+                kind: LimitKind::Entries,
+                observed: 2,
+                maximum: 1,
+            }
+        ));
+    }
+
+    #[test]
+    fn irm_transform_round_trip_preserves_license() {
+        let transform = IrmTransform {
+            header: drm_header(),
+            publishing_license: Some("<XrML>inert</XrML>".to_string()),
+        };
+        assert_eq!(
+            parse_irm_transform(&write_irm_transform(&transform).unwrap()).unwrap(),
+            transform
+        );
+    }
+
+    #[test]
+    fn encryption_transform_round_trip_preserves_typed_parameters() {
+        let transform = EncryptionTransform {
+            header: Header {
+                transform_id: ENCRYPTION_ID.to_string(),
+                transform_name: ENCRYPTION_NAME.to_string(),
+                reader: Version::V1_0,
+                updater: Version::V1_0,
+                writer: Version::V1_0,
+            },
+            encryption_name: None,
+            encryption_block_size: 16,
+            cipher_mode: 0,
+        };
+        assert_eq!(
+            parse_encryption_transform(&write_encryption_transform(&transform).unwrap()).unwrap(),
+            transform
+        );
+    }
+
+    #[test]
+    fn ooxml_read_compatibility_accepts_native_header_quirks_only() {
+        let bytes = encryption_package_with_quirks(true, true, false);
+        let mut strict = OleFile::open(
+            Cursor::new(bytes.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        assert!(inspect(&mut strict).is_err());
+
+        let mut compatible =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+        let graph = inspect_ooxml(&mut compatible, &Limits::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(graph.transforms.len(), 1);
+        assert_eq!(
+            graph.transforms[0]
+                .encryption
+                .as_ref()
+                .unwrap()
+                .encryption_block_size,
+            16
+        );
+    }
+
+    #[test]
+    fn ooxml_read_compatibility_does_not_skip_reserved_field_validation() {
+        let bytes = encryption_package_with_quirks(true, true, true);
+        let mut compatible =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+        assert!(inspect_ooxml(&mut compatible, &Limits::default()).is_err());
+    }
+
+    #[test]
+    fn ooxml_transform_length_compatibility_is_limited_to_strong_encryption() {
+        let mut bytes = write_transform_header(&drm_header()).unwrap();
+        let mut reader = SliceReader::new(&bytes, &Limits::default()).unwrap();
+        let _length = reader.u32().unwrap();
+        let _type = reader.u32().unwrap();
+        let _id = reader.unicode_lpp4().unwrap();
+        let _name = reader.unicode_lpp4().unwrap();
+        let length = u32::try_from(reader.position()).unwrap();
+        bytes[..4].copy_from_slice(&length.to_le_bytes());
+
+        assert!(parse_transform_header(&bytes).is_err());
+        assert!(parse_transform_header_with_compat(&bytes, true, &Limits::default()).is_err());
+    }
+
+    #[test]
+    fn end_user_license_round_trip_preserves_inert_xml() {
+        let license = License {
+            stream_name: "EUL-ETRHA1143ZLUDD412YTI3M5CTZ".to_string(),
+            encoded_license_id: "VwBpAG4AZABvAHcAOgB1AHMAZQByAEA".to_string(),
+            certificate_chain: Some("<?xml version=\"1.0\"?><certificatechain/>".to_string()),
+        };
+        assert_eq!(
+            parse_license(&license.stream_name, &write_license(&license).unwrap()).unwrap(),
+            license
+        );
+    }
+
+    #[test]
+    fn rejects_malformed_lengths_padding_counts_and_drm_identity() {
+        let mut version = write_version_info(&VersionInfo::default()).unwrap();
+        version[0] = 3;
+        assert!(parse_version_info(&version).is_err());
+
+        let map = Map {
+            entries: Vec::new(),
+        };
+        assert!(write_map(&map).is_err());
+
+        let mut transform = write_irm_transform(&IrmTransform {
+            header: drm_header(),
+            publishing_license: Some("<XrML/>".to_string()),
+        })
+        .unwrap();
+        transform[4] = 2;
+        assert!(parse_irm_transform(&transform).is_err());
+        assert!(
+            write_irm_transform(&IrmTransform {
+                header: drm_header(),
+                publishing_license: Some("<!DOCTYPE x><x/>".to_string()),
+            })
+            .is_err()
+        );
+    }
+
+    #[test]
+    fn inspects_and_classifies_complete_ooxml_irm_graph() {
+        let map = write_map(&Map {
+            entries: vec![MapEntry {
+                references: vec![Reference {
+                    kind: ReferenceKind::Stream,
+                    component: "EncryptedPackage".to_string(),
+                }],
+                data_space_name: "DRMEncryptedDataSpace".to_string(),
+            }],
+        })
+        .unwrap();
+        let definition = write_definition(&Definition {
+            transforms: vec!["DRMEncryptedTransform".to_string()],
+        })
+        .unwrap();
+        let primary = write_irm_transform(&IrmTransform {
+            header: drm_header(),
+            publishing_license: Some("<XrML/>".to_string()),
+        })
+        .unwrap();
+        let end_user_license = License {
+            stream_name: "EUL-ETRHA1143ZLUDD412YTI3M5CTZ".to_string(),
+            encoded_license_id: "VwBpAG4AZABvAHcAOgB1AHMAZQByAEA".to_string(),
+            certificate_chain: Some("<certificatechain/>".to_string()),
+        };
+        let mut writer = OleWriter::new();
+        writer
+            .create_stream(&["EncryptedPackage"], &[0; 16])
+            .unwrap();
+        writer.create_storage(&[STORAGE]).unwrap();
+        writer.create_storage(&[STORAGE, "DataSpaceInfo"]).unwrap();
+        writer.create_storage(&[STORAGE, "TransformInfo"]).unwrap();
+        writer
+            .create_storage(&[STORAGE, "TransformInfo", "DRMEncryptedTransform"])
+            .unwrap();
+        writer
+            .create_stream(&[STORAGE, "DataSpaceMap"], &map)
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "DataSpaceInfo", "DRMEncryptedDataSpace"],
+                &definition,
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "TransformInfo", "DRMEncryptedTransform", PRIMARY],
+                &primary,
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[
+                    STORAGE,
+                    "TransformInfo",
+                    "DRMEncryptedTransform",
+                    &end_user_license.stream_name,
+                ],
+                &write_license(&end_user_license).unwrap(),
+            )
+            .unwrap();
+        writer
+            .create_stream(
+                &[STORAGE, "Version"],
+                &write_version_info(&VersionInfo::default()).unwrap(),
+            )
+            .unwrap();
+        let label_info = format!(
+            "<?xml version=\"1.0\" encoding=\"utf-8\"?><clbl:labelList xmlns:clbl=\"{}\"><clbl:label id=\"aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee\" enabled=\"1\" method=\"Standard\" siteId=\"12345678-1234-5678-90ab-1234567890ab\" contentBits=\"8\" removed=\"0\"/></clbl:labelList>",
+            labels::NAMESPACE
+        );
+        writer
+            .create_stream(
+                &[STORAGE, "TransformInfo", "LabelInfo"],
+                label_info.as_bytes(),
+            )
+            .unwrap();
+        let summary_information = b"public summary property set";
+        writer
+            .create_stream(&[SUMMARY_STREAM], summary_information)
+            .unwrap();
+        writer
+            .create_stream(
+                &[SUMMARY_HASH_STREAM],
+                &integrity::write(integrity::crc32(summary_information), &[]),
+            )
+            .unwrap();
+        let custom_properties = litchi_ole_common::custom_xml::Properties {
+            item_id: "{11111111-2222-3333-4444-555555555555}".parse().unwrap(),
+            schema_references: vec!["urn:test".to_string()],
+        };
+        let custom_item = litchi_ole_common::custom_xml::Item::new(
+            custom_properties.item_id.storage_name(),
+            br#"<test xmlns="urn:test"/>"#.to_vec(),
+            custom_properties,
+        )
+        .unwrap();
+        litchi_ole_common::custom_xml::write(
+            &mut writer,
+            &Store::new(Promotion::Modified, vec![custom_item]).unwrap(),
+            &litchi_ole_common::custom_xml::Limits::default(),
+        )
+        .unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let graph = inspect(&mut ole).unwrap().unwrap();
+        let irm = graph.irm.unwrap();
+        assert_eq!(irm.document_kind, DocumentKind::Ooxml);
+        assert_eq!(irm.protected_stream, "EncryptedPackage");
+        assert_eq!(graph.transforms[0].end_user_licenses, [end_user_license]);
+        assert_eq!(graph.labels.unwrap().labels.len(), 1);
+        assert_eq!(
+            graph.summary_information_integrity.unwrap().valid,
+            Some(true)
+        );
+        assert!(graph.document_summary_information_integrity.is_none());
+        let custom_xml = graph.custom_xml_data_store.unwrap();
+        assert_eq!(custom_xml.promotion, Promotion::Modified);
+        assert_eq!(custom_xml.items().len(), 1);
+    }
+
+    #[test]
+    fn classifies_binary_irm_with_optional_viewer_chain() {
+        let map = Map {
+            entries: vec![
+                MapEntry {
+                    references: vec![Reference {
+                        kind: ReferenceKind::Stream,
+                        component: "0x09DRMContent".to_string(),
+                    }],
+                    data_space_name: "0x09DRMDataSpace".to_string(),
+                },
+                MapEntry {
+                    references: vec![Reference {
+                        kind: ReferenceKind::Stream,
+                        component: "0x09DRMViewerContent".to_string(),
+                    }],
+                    data_space_name: "0x09LZXDRMDataSpace".to_string(),
+                },
+            ],
+        };
+        let definitions = vec![
+            NamedDefinition {
+                name: "0x09DRMDataSpace".to_string(),
+                definition: Definition {
+                    transforms: vec!["0x09DRMTransform".to_string()],
+                },
+            },
+            NamedDefinition {
+                name: "0x09LZXDRMDataSpace".to_string(),
+                definition: Definition {
+                    transforms: vec![
+                        "0x09DRMTransform".to_string(),
+                        "0x09LZXTransform".to_string(),
+                    ],
+                },
+            },
+        ];
+        let transforms = vec![
+            Transform {
+                name: "0x09DRMTransform".to_string(),
+                header: drm_header(),
+                irm: None,
+                encryption: None,
+                end_user_licenses: Vec::new(),
+                opaque_tail: Vec::new(),
+            },
+            Transform {
+                name: "0x09LZXTransform".to_string(),
+                header: Header {
+                    transform_id: LZX_ID.to_string(),
+                    transform_name: LZX_NAME.to_string(),
+                    reader: Version::V1_0,
+                    updater: Version::V1_0,
+                    writer: Version::V1_0,
+                },
+                irm: None,
+                encryption: None,
+                end_user_licenses: Vec::new(),
+                opaque_tail: Vec::new(),
+            },
+        ];
+
+        let irm = classify_irm(&map, &definitions, &transforms)
+            .unwrap()
+            .unwrap();
+        assert_eq!(irm.document_kind, DocumentKind::LegacyBinary);
+        assert_eq!(
+            irm.viewer_content_stream.as_deref(),
+            Some("0x09DRMViewerContent")
+        );
+    }
+
+    #[test]
+    fn rejects_custom_xml_promotion_without_irm() {
+        let store = Store::new(Promotion::Redundant, Vec::new()).unwrap();
+        assert!(validate_custom_xml_promotion(Some(&store), None).is_err());
+
+        let mut writer = OleWriter::new();
+        litchi_ole_common::custom_xml::write(
+            &mut writer,
+            &store,
+            &litchi_ole_common::custom_xml::Limits::default(),
+        )
+        .unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        let mut ole = OleFile::open(
+            Cursor::new(bytes.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        assert!(inspect(&mut ole).is_err());
+
+        let unspecified = Store::default();
+        assert!(validate_custom_xml_promotion(Some(&unspecified), None).is_ok());
+    }
+
+    #[test]
+    fn custom_xml_profile_is_derived_from_dataspaces_limits() {
+        let limits = Limits {
+            max_stream_bytes: 17,
+            max_total_bytes: 19,
+            max_entries: 23,
+            max_string_bytes: 29,
+            max_xml_depth: 31,
+            max_xml_nodes: 37,
+            ..Limits::default()
+        };
+        let selected = custom_xml_limits(&limits);
+        assert_eq!(selected.max_item_bytes, 17);
+        assert_eq!(selected.max_properties_bytes, 17);
+        assert_eq!(selected.max_total_bytes, 19);
+        assert_eq!(selected.max_items, 23);
+        assert_eq!(selected.max_schema_references, 23);
+        assert_eq!(selected.max_string_bytes, 29);
+        assert_eq!(selected.max_xml_depth, 31);
+        assert_eq!(selected.max_xml_elements, 37);
+    }
+
+    #[test]
+    fn unicode_writer_checks_framed_output_before_encoding_units() {
+        let limits = Limits {
+            max_output_bytes: 7,
+            ..Limits::default()
+        };
+        let mut output = Vec::new();
+        assert!(matches!(
+            write_unicode_lpp4(&mut output, "A", &limits),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
+                observed: 8,
+                maximum: 7,
+            })
+        ));
+        assert!(output.is_empty());
+    }
+
+    #[test]
+    fn snapshot_noop_replays_exact_dataspaces_source() {
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole, &Limits::default())
+            .unwrap()
+            .unwrap();
+        let commit = snapshot.edit().commit().unwrap();
+
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
+        assert_eq!(commit.package(), &snapshot);
+        assert_eq!(commit.patch().apply(&snapshot).unwrap(), snapshot);
+    }
+
+    #[test]
+    fn patch_write_to_enforces_selected_output_limit() {
+        let limits = Limits {
+            max_output_bytes: 1,
+            ..Limits::default()
+        };
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole, &limits).unwrap().unwrap();
+        let patch = snapshot.edit().commit().unwrap().patch().clone();
+        let mut output = Cursor::new(Vec::new());
+        assert!(matches!(
+            patch.write_to(&mut ole, &mut output),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::OutputBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn snapshot_rejects_oversized_opaque_stream_before_materialization() {
+        let oversized = vec![0u8; MAX_STREAM_BYTES + 1];
+        let bytes = editable_package_with_extra_stream(Some(&oversized));
+        let mut ole =
+            OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default()).unwrap();
+        assert!(matches!(
+            Snapshot::from_ole(&mut ole, &Limits::default()),
+            Err(Error::LimitExceeded {
+                kind: LimitKind::StreamBytes,
+                observed,
+                maximum,
+            }) if observed == MAX_STREAM_BYTES + 1 && maximum == MAX_STREAM_BYTES
+        ));
+    }
+
+    #[test]
+    fn transaction_changes_definition_and_rejects_stale_patch_sources() {
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole, &Limits::default())
+            .unwrap()
+            .unwrap();
+        let mut transaction = snapshot.edit();
+        transaction
+            .set_definition(
+                "DataSpace",
+                Definition {
+                    transforms: vec!["SecondTransform".to_string()],
+                },
+            )
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.patch().changes().len(), 1);
+        assert_eq!(
+            commit.patch().changes()[0].path(),
+            [
+                STORAGE.to_string(),
+                "DataSpaceInfo".to_string(),
+                "DataSpace".to_string()
+            ]
+        );
+        assert_eq!(commit.patch().apply(&snapshot).unwrap(), *commit.package());
+
+        // A separately opened package with the same DataSpaces content is a
+        // valid replay target.  The patch is source-content bound, not tied
+        // to the original snapshot allocation.
+        let mut equal_ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let equal_source = Snapshot::from_ole(&mut equal_ole, &Limits::default())
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            commit.patch().apply(&equal_source).unwrap(),
+            *commit.package()
+        );
+
+        assert!(matches!(
+            commit.patch().apply(commit.package()),
+            Err(Error::PatchConflict)
+        ));
+    }
+
+    #[test]
+    fn package_rebuild_preserves_unrelated_streams_and_empty_storages() {
+        let mut ole = OleFile::open(
+            Cursor::new(editable_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole, &Limits::default())
+            .unwrap()
+            .unwrap();
+        let mut transaction = snapshot.edit();
+        transaction
+            .set_definition(
+                "DataSpace",
+                Definition {
+                    transforms: vec!["SecondTransform".to_string()],
+                },
+            )
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+        let mut rebuilt = Cursor::new(Vec::new());
+        commit.patch().write_to(&mut ole, &mut rebuilt).unwrap();
+
+        let mut output = OleFile::open(
+            Cursor::new(rebuilt.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            output.open_stream(&["Payload"]).unwrap(),
+            b"protected-but-inert"
+        );
+        assert_eq!(
+            output.open_stream(&["Unrelated"]).unwrap(),
+            b"preserve-me-byte-for-byte"
+        );
+        assert_eq!(
+            output
+                .open_stream(&[
+                    STORAGE,
+                    "TransformInfo",
+                    "FirstTransform",
+                    "OpaqueStorage",
+                    "OpaqueStream",
+                ])
+                .unwrap(),
+            b"opaque-transform-child"
+        );
+        assert!(output.directory_exists(&["EmptyStorage"]));
+        let graph = inspect(&mut output).unwrap().unwrap();
+        assert_eq!(
+            graph.definitions[0].definition.transforms,
+            ["SecondTransform".to_string()]
+        );
+    }
+
+    #[test]
+    fn encryption_metadata_edit_does_not_touch_encrypted_payload() {
+        let mut ole = OleFile::open(
+            Cursor::new(encryption_package()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let snapshot = Snapshot::from_ole(&mut ole, &Limits::default())
+            .unwrap()
+            .unwrap();
+        let mut transaction = snapshot.edit();
+        transaction
+            .set_encryption_info("StrongEncryptionTransform", Some("AES".to_string()), 16, 0)
+            .unwrap();
+        let commit = transaction.commit().unwrap();
+        assert_eq!(commit.patch().changes().len(), 1);
+        assert_eq!(
+            commit.patch().changes()[0].path(),
+            [
+                STORAGE.to_string(),
+                "TransformInfo".to_string(),
+                "StrongEncryptionTransform".to_string(),
+                PRIMARY.to_string()
+            ]
+        );
+        let mut rebuilt = Cursor::new(Vec::new());
+        commit.patch().write_to(&mut ole, &mut rebuilt).unwrap();
+        let mut output = OleFile::open(
+            Cursor::new(rebuilt.into_inner()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        assert_eq!(
+            output.open_stream(&["EncryptedPackage"]).unwrap(),
+            b"encrypted-payload"
+        );
+        let graph = inspect(&mut output).unwrap().unwrap();
+        assert_eq!(
+            graph.transforms[0]
+                .encryption
+                .as_ref()
+                .unwrap()
+                .encryption_name
+                .as_deref(),
+            Some("AES")
+        );
+    }
+}

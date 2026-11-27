@@ -23,29 +23,19 @@ pub(crate) struct Criteria {
 
 pub(crate) fn parse_criteria(spec: &str) -> Option<Criteria> {
     let s = spec.trim();
-    let (op, rest) = if s.len() >= 2 {
-        let prefix = &s[..2];
-        match prefix {
-            ">=" => (CriteriaOperator::Ge, &s[2..]),
-            "<=" => (CriteriaOperator::Le, &s[2..]),
-            "<>" => (CriteriaOperator::Ne, &s[2..]),
-            _ => {
-                let first = s.chars().next().unwrap();
-                match first {
-                    '>' => (CriteriaOperator::Gt, &s[1..]),
-                    '<' => (CriteriaOperator::Lt, &s[1..]),
-                    '=' => (CriteriaOperator::Eq, &s[1..]),
-                    _ => (CriteriaOperator::Eq, s),
-                }
-            },
-        }
-    } else if let Some(first) = s.chars().next() {
-        match first {
-            '>' => (CriteriaOperator::Gt, &s[1..]),
-            '<' => (CriteriaOperator::Lt, &s[1..]),
-            '=' => (CriteriaOperator::Eq, &s[1..]),
-            _ => (CriteriaOperator::Eq, s),
-        }
+    // Operators are ASCII, so prefix stripping never splits a character.
+    let (op, rest) = if let Some(rest) = s.strip_prefix(">=") {
+        (CriteriaOperator::Ge, rest)
+    } else if let Some(rest) = s.strip_prefix("<=") {
+        (CriteriaOperator::Le, rest)
+    } else if let Some(rest) = s.strip_prefix("<>") {
+        (CriteriaOperator::Ne, rest)
+    } else if let Some(rest) = s.strip_prefix('>') {
+        (CriteriaOperator::Gt, rest)
+    } else if let Some(rest) = s.strip_prefix('<') {
+        (CriteriaOperator::Lt, rest)
+    } else if let Some(rest) = s.strip_prefix('=') {
+        (CriteriaOperator::Eq, rest)
     } else {
         (CriteriaOperator::Eq, s)
     };
@@ -150,6 +140,21 @@ pub(crate) fn matches_criteria(value: &CellValue, criteria: &Criteria) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn non_ascii_criteria_do_not_split_characters() {
+        for (spec, expected) in [
+            ("Köln", "Köln"),
+            ("ö", "ö"),
+            ("<>Köln", "Köln"),
+            (">é", "é"),
+        ] {
+            match parse_criteria(spec).expect("criteria").rhs {
+                CriteriaValue::Text(text) => assert_eq!(text, expected),
+                CriteriaValue::Number(_) => panic!("expected text for {spec}"),
+            }
+        }
+    }
 
     #[test]
     fn test_parse_criteria_empty() {

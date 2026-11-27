@@ -1,0 +1,332 @@
+[package]
+name = "litchi-iwa-protos-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+litchi-iwa-protos = { path = ".." }
+litchi-iwa-text-wire = { path = "../../litchi-iwa-text-wire" }
+prost = "0.14.6"
+
+[[bin]]
+name = "numbers_tile_storage"
+path = "fuzz_targets/numbers_tile_storage.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_formula_archive"
+path = "fuzz_targets/numbers_formula_archive.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_codec"
+path = "fuzz_targets/pages_section_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_text_codec"
+path = "fuzz_targets/pages_section_text_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_body_footnote_codec"
+path = "fuzz_targets/pages_body_footnote_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_footnote_graph_codec"
+path = "fuzz_targets/pages_footnote_graph_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_footnote_codec"
+path = "fuzz_targets/pages_footnote_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_movie_caption_codec"
+path = "fuzz_targets/pages_movie_caption_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_header_footer_codec"
+path = "fuzz_targets/pages_header_footer_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_data_list"
+path = "fuzz_targets/numbers_table_data_list.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table_dimension"
+path = "fuzz_targets/table_dimension.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table_info_codec"
+path = "fuzz_targets/table_info_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table_appearance"
+path = "fuzz_targets/table_appearance.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_sort_order_codec"
+path = "fuzz_targets/numbers_table_sort_order_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_header_settings_codec"
+path = "fuzz_targets/numbers_table_header_settings_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_title_codec"
+path = "fuzz_targets/numbers_table_title_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table_model_discovery_codec"
+path = "fuzz_targets/table_model_discovery_codec.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "comment_storage_codec"
+path = "fuzz_targets/comment_storage_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "comment_storage_reply_codec"
+path = "fuzz_targets/comment_storage_reply_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_title"
+path = "fuzz_targets/keynote_chart_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "chart_data_codec"
+path = "fuzz_targets/chart_data_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "chart_grid_creation_codec"
+path = "fuzz_targets/chart_grid_creation_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_legend_codec"
+path = "fuzz_targets/keynote_chart_legend_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_axis_title_codec"
+path = "fuzz_targets/keynote_chart_axis_title_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_axis_value_settings_codec"
+path = "fuzz_targets/keynote_chart_axis_value_settings_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_caption"
+path = "fuzz_targets/keynote_chart_caption.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_movie_caption"
+path = "fuzz_targets/keynote_movie_caption.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_pop_up_menu_codec"
+path = "fuzz_targets/numbers_table_cell_pop_up_menu_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_control_codec"
+path = "fuzz_targets/numbers_table_cell_control_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_number_format_codec"
+path = "fuzz_targets/numbers_table_cell_number_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_percentage_format_codec"
+path = "fuzz_targets/numbers_table_cell_percentage_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_currency_format_codec"
+path = "fuzz_targets/numbers_table_cell_currency_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_scientific_format_codec"
+path = "fuzz_targets/numbers_table_cell_scientific_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_fraction_format_codec"
+path = "fuzz_targets/numbers_table_cell_fraction_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_text_format_codec"
+path = "fuzz_targets/numbers_table_cell_text_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_date_time_format_codec"
+path = "fuzz_targets/numbers_table_cell_date_time_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_custom_format_codec"
+path = "fuzz_targets/numbers_table_cell_custom_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_duration_format_codec"
+path = "fuzz_targets/numbers_table_cell_duration_format_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "movie_playback_codec"
+path = "fuzz_targets/movie_playback_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_movie_geometry_codec"
+path = "fuzz_targets/keynote_movie_geometry_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_table_physical_sort_codec"
+path = "fuzz_targets/keynote_table_physical_sort_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "package_metadata_media_codec"
+path = "fuzz_targets/package_metadata_media_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_drawable_order_codec"
+path = "fuzz_targets/pages_drawable_order_codec.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "chart_metadata_codec"
+path = "fuzz_targets/chart_metadata_codec.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"
+
+[workspace]

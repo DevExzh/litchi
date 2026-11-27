@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document-styles
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:fo="urn:oasis:names:tc:opendocument:xmlns:xsl-fo-compatible:1.0"
+    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    office:version="1.3">
+    <office:styles>
+        <style:style style:name="Keep" style:family="paragraph"/>
+        <text:bibliography-configuration
+            text:prefix="["
+            text:suffix="]"
+            text:numbered-entries="true"
+            text:sort-by-position="false"
+            text:sort-algorithm="unicode"
+            fo:language="en"
+            fo:country="US"
+            fo:script="Latn"
+            style:rfc-language-tag="en-US">
+            <text:sort-key text:key="author" text:sort-ascending="true"/>
+            <text:sort-key text:key="year" text:sort-ascending="false"/>
+            <text:sort-key text:key="isbn"/>
+        </text:bibliography-configuration>
+    </office:styles>
+    <office:automatic-styles/>
+    <office:master-styles/>
+</office:document-styles>

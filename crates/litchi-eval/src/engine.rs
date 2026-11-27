@@ -42,12 +42,14 @@ mod registry;
 mod statistical;
 mod text;
 mod web;
+#[cfg(feature = "web_functions")]
+pub(crate) use web::MAX_RESPONSE_BYTES;
 
 #[cfg(test)]
 pub(crate) mod test_helpers {
     use super::*;
-    use crate::BoxFuture;
-    use litchi_core::sheet::Result;
+    #[cfg(feature = "web_functions")]
+    use crate::Fetch;
     use std::collections::HashMap;
     use std::sync::{Arc, RwLock};
 
@@ -58,6 +60,9 @@ pub(crate) mod test_helpers {
         cells: Arc<RwLock<TestCellMap>>,
         current_pos: Arc<RwLock<Option<(String, u32, u32)>>>,
         sheet_count: usize,
+        date1904: bool,
+        #[cfg(feature = "web_functions")]
+        fetch: Option<Arc<dyn Fetch>>,
     }
 
     impl TestEngine {
@@ -66,7 +71,21 @@ pub(crate) mod test_helpers {
                 cells: Arc::new(RwLock::new(HashMap::new())),
                 current_pos: Arc::new(RwLock::new(None)),
                 sheet_count: 1,
+                date1904: false,
+                #[cfg(feature = "web_functions")]
+                fetch: None,
             }
+        }
+
+        pub(crate) fn with_date_system(mut self, date1904: bool) -> Self {
+            self.date1904 = date1904;
+            self
+        }
+
+        #[cfg(feature = "web_functions")]
+        pub(crate) fn with_fetch(mut self, fetch: Arc<dyn Fetch>) -> Self {
+            self.fetch = Some(fetch);
+            self
         }
 
         /// Returns a reference to self as an EvalCtx
@@ -115,43 +134,38 @@ pub(crate) mod test_helpers {
     }
 
     impl EngineCtx for TestEngine {
-        fn get_cell_value<'a>(
-            &'a self,
-            sheet_name: &'a str,
-            row: u32,
-            col: u32,
-        ) -> BoxFuture<'a, Result<CellValue>> {
-            let cells = self.cells.clone();
-            let sheet = sheet_name.to_string();
-            Box::pin(async move {
-                let cells = cells.read().unwrap();
-                Ok(cells
-                    .get(&(sheet, row, col))
-                    .cloned()
-                    .unwrap_or(CellValue::Empty))
-            })
+        fn get_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
+            let cells = self.cells.read().unwrap();
+            Ok(cells
+                .get(&(sheet_name.to_string(), row, col))
+                .cloned()
+                .unwrap_or(CellValue::Empty))
         }
 
         fn current_position(&self) -> Option<(String, u32, u32)> {
             self.current_pos.read().unwrap().clone()
         }
 
-        fn raw_cell_value<'a>(
-            &'a self,
-            sheet_name: &'a str,
-            row: u32,
-            col: u32,
-        ) -> BoxFuture<'a, Result<CellValue>> {
+        fn raw_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
             self.get_cell_value(sheet_name, row, col)
         }
 
         fn is_1904_date_system(&self) -> bool {
-            false
+            self.date1904
         }
 
+        /// The test transports complete at once: poll the response here.
         #[cfg(feature = "web_functions")]
-        fn http_client(&self) -> &reqwest::Client {
-            panic!("TestEngine does not support HTTP client")
+        fn fetched(&self, url: &str) -> crate::Fetched {
+            let Some(fetch) = self.fetch.as_deref() else {
+                return crate::Fetched::NoTransport;
+            };
+            let mut future = fetch.get(url, MAX_RESPONSE_BYTES);
+            let mut context = std::task::Context::from_waker(std::task::Waker::noop());
+            match future.as_mut().poll(&mut context) {
+                std::task::Poll::Ready(response) => crate::Fetched::Body(response.ok()),
+                std::task::Poll::Pending => panic!("test transports complete at once"),
+            }
         }
 
         fn get_sheet_index(&self, _name: &str) -> Option<usize> {
@@ -167,7 +181,7 @@ pub(crate) mod test_helpers {
 }
 
 /// Evaluate a parsed expression in the context of an evaluation engine.
-pub(crate) async fn evaluate_expression(
+pub(crate) fn evaluate_expression(
     ctx: &dyn DispatchCtx,
     current_sheet: &str,
     expr: &Expr,
@@ -176,11 +190,11 @@ pub(crate) async fn evaluate_expression(
         Expr::Literal(v) => v.clone(),
         Expr::Reference { sheet, row, col } => {
             let sheet_name = sheet.as_str();
-            ctx.get_cell_value(sheet_name, *row, *col).await?
+            ctx.get_cell_value(sheet_name, *row, *col)?
         },
         Expr::Name(name) => match ctx.resolve_name(current_sheet, name.as_str())? {
             Some(ResolvedName::Cell { sheet, row, col }) => {
-                ctx.get_cell_value(sheet.as_str(), row, col).await?
+                ctx.get_cell_value(sheet.as_str(), row, col)?
             },
             Some(ResolvedName::Range(_range)) => CellValue::Error(format!(
                 "Named range '{}' cannot be used as a scalar expression",
@@ -195,7 +209,7 @@ pub(crate) async fn evaluate_expression(
             CellValue::Error("Range cannot be used as a scalar expression".to_string())
         },
         Expr::UnaryMinus(inner) => {
-            let v = Box::pin(evaluate_expression(ctx, current_sheet, inner)).await?;
+            let v = evaluate_expression(ctx, current_sheet, inner)?;
             match v {
                 CellValue::Int(i) => CellValue::Int(-i),
                 CellValue::Float(f) => CellValue::Float(-f),
@@ -203,12 +217,12 @@ pub(crate) async fn evaluate_expression(
             }
         },
         Expr::Binary { op, left, right } => {
-            let left_val = Box::pin(evaluate_expression(ctx, current_sheet, left)).await?;
-            let right_val = Box::pin(evaluate_expression(ctx, current_sheet, right)).await?;
+            let left_val = evaluate_expression(ctx, current_sheet, left)?;
+            let right_val = evaluate_expression(ctx, current_sheet, right)?;
             bin_op::eval_binary_op(*op, left_val, right_val)
         },
         Expr::FunctionCall { name, args } => {
-            dispatch::eval_function(ctx, current_sheet, name, args).await?
+            dispatch::eval_function(ctx, current_sheet, name, args)?
         },
     };
 
@@ -258,7 +272,7 @@ pub(crate) fn is_blank(value: &CellValue) -> bool {
     }
 }
 
-pub(crate) async fn for_each_value_in_expr<F>(
+pub(crate) fn for_each_value_in_expr<F>(
     ctx: &dyn DispatchCtx,
     current_sheet: &str,
     expr: &Expr,
@@ -282,14 +296,14 @@ where
 
             for row in sr..=er {
                 for col in sc..=ec {
-                    let v = ctx.get_cell_value(range.sheet.as_str(), row, col).await?;
+                    let v = ctx.get_cell_value(range.sheet.as_str(), row, col)?;
                     f(&v)?;
                 }
             }
         },
         Expr::Name(name) => match ctx.resolve_name(current_sheet, name.as_str())? {
             Some(ResolvedName::Cell { sheet, row, col }) => {
-                let v = ctx.get_cell_value(sheet.as_str(), row, col).await?;
+                let v = ctx.get_cell_value(sheet.as_str(), row, col)?;
                 f(&v)?;
             },
             Some(ResolvedName::Range(range)) => {
@@ -306,7 +320,7 @@ where
 
                 for row in sr..=er {
                     for col in sc..=ec {
-                        let v = ctx.get_cell_value(range.sheet.as_str(), row, col).await?;
+                        let v = ctx.get_cell_value(range.sheet.as_str(), row, col)?;
                         f(&v)?;
                     }
                 }
@@ -317,7 +331,7 @@ where
             },
         },
         other => {
-            let v = evaluate_expression(ctx, current_sheet, other).await?;
+            let v = evaluate_expression(ctx, current_sheet, other)?;
             f(&v)?;
         },
     }
@@ -331,7 +345,7 @@ pub(crate) struct FlatRange {
     pub(crate) cols: usize,
 }
 
-pub(crate) async fn flatten_range_expr(
+pub(crate) fn flatten_range_expr(
     ctx: &dyn DispatchCtx,
     current_sheet: &str,
     expr: &Expr,
@@ -355,7 +369,7 @@ pub(crate) async fn flatten_range_expr(
 
             for row in sr..=er {
                 for col in sc..=ec {
-                    let v = ctx.get_cell_value(range.sheet.as_str(), row, col).await?;
+                    let v = ctx.get_cell_value(range.sheet.as_str(), row, col)?;
                     values.push(v);
                 }
             }
@@ -364,7 +378,7 @@ pub(crate) async fn flatten_range_expr(
         },
         Expr::Name(name) => match ctx.resolve_name(current_sheet, name.as_str())? {
             Some(ResolvedName::Cell { sheet, row, col }) => {
-                let v = ctx.get_cell_value(sheet.as_str(), row, col).await?;
+                let v = ctx.get_cell_value(sheet.as_str(), row, col)?;
                 Ok(FlatRange {
                     values: vec![v],
                     rows: 1,
@@ -389,7 +403,7 @@ pub(crate) async fn flatten_range_expr(
 
                 for row in sr..=er {
                     for col in sc..=ec {
-                        let v = ctx.get_cell_value(range.sheet.as_str(), row, col).await?;
+                        let v = ctx.get_cell_value(range.sheet.as_str(), row, col)?;
                         values.push(v);
                     }
                 }
@@ -406,7 +420,7 @@ pub(crate) async fn flatten_range_expr(
             },
         },
         other => {
-            let v = evaluate_expression(ctx, current_sheet, other).await?;
+            let v = evaluate_expression(ctx, current_sheet, other)?;
             Ok(FlatRange {
                 values: vec![v],
                 rows: 1,

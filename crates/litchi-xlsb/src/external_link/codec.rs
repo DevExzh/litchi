@@ -1,0 +1,928 @@
+#![allow(
+    clippy::expect_used,
+    clippy::map_err_ignore,
+    reason = "legacy module confines extraction after an immediately preceding structural invariant check, normalization into the module's stable typed public error to this codec boundary"
+)]
+
+//! BIFF12 parsing for XLSB external-link streams.
+//!
+//! This module validates the checked-in `BrtSupBook` record grammar and
+//! constructs the inert semantic model from `model.rs`.
+
+use super::model::validate_defined_name;
+use super::*;
+
+/// A parsed source stream with the opaque records needed for lossless edits.
+#[derive(Debug, Clone)]
+pub(crate) struct Source {
+    pub(crate) parsed: Parsed,
+    pub(crate) bytes: Vec<u8>,
+    pub(crate) unknown_records: Vec<UnknownRecord>,
+}
+
+/// Parse one stream while consuming the caller's operation-scoped budget.
+pub(crate) fn parse_source_with_budget(data: &[u8], budget: &mut Budget) -> Result<Source> {
+    let parsed = parse_external_link_with_budget(data, budget)?;
+    let bytes = copy_bytes(data, "external-link source")?;
+    let limits = crate::raw::Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
+    let mut unknown_records = Vec::new();
+    let mut unknown_bytes = 0usize;
+    let mut after_known = 0usize;
+
+    for record in crate::raw::Records::new(data, limits) {
+        let record = record?;
+        let is_known = is_modeled_record(record.kind());
+        if is_known {
+            after_known = after_known
+                .checked_add(1)
+                .ok_or_else(|| invalid("modeled external-link record count overflow"))?;
+            continue;
+        }
+        if unknown_records.len() >= MAX_UNKNOWN_RECORDS {
+            return Err(Error::InvalidLength {
+                expected: MAX_UNKNOWN_RECORDS,
+                found: unknown_records.len() + 1,
+            });
+        }
+        let offset = record.offset();
+        let (_, header_len) = crate::raw::Header::parse(&data[offset..], limits)?;
+        let end = offset
+            .checked_add(header_len)
+            .and_then(|end| end.checked_add(record.len()))
+            .ok_or_else(|| invalid("opaque external-link record range overflow"))?;
+        let raw_len = end - offset;
+        let next_unknown_bytes = unknown_bytes
+            .checked_add(raw_len)
+            .ok_or_else(|| invalid("opaque external-link byte count overflow"))?;
+        if next_unknown_bytes > MAX_UNKNOWN_BYTES {
+            return Err(Error::InvalidLength {
+                expected: MAX_UNKNOWN_BYTES,
+                found: next_unknown_bytes,
+            });
+        }
+        budget.opaque(1, raw_len)?;
+        budget.retained_objects(1)?;
+        unknown_records
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "opaque external-link records",
+                source,
+            })?;
+        let raw = copy_bytes(&data[offset..end], "opaque external-link record")?;
+        unknown_bytes = next_unknown_bytes;
+        unknown_records.push(UnknownRecord::new(
+            u16::from(record.kind()),
+            after_known,
+            raw,
+            header_len,
+        ));
+    }
+
+    Ok(Source {
+        parsed,
+        bytes,
+        unknown_records,
+    })
+}
+
+pub(crate) fn is_modeled_record(kind: crate::raw::Kind) -> bool {
+    matches!(
+        kind,
+        crate::raw::kind::BEGIN_SUP_BOOK
+            | crate::raw::kind::SUP_TABS
+            | crate::raw::kind::SUP_NAME_START
+            | crate::raw::kind::SUP_NAME_FORMULA
+            | crate::raw::kind::SUP_NAME_BITS
+            | crate::raw::kind::SUP_NAME_VALUE_START
+            | crate::raw::kind::SUP_NAME_VALUE_END
+            | crate::raw::kind::SUP_NAME_NUM
+            | crate::raw::kind::SUP_NAME_ERROR
+            | crate::raw::kind::SUP_NAME_STRING
+            | crate::raw::kind::SUP_NAME_NIL
+            | crate::raw::kind::SUP_NAME_BOOL
+            | crate::raw::kind::SUP_NAME_END
+            | crate::raw::kind::END_SUP_BOOK
+    )
+}
+
+/// Parse one complete XLSB External Link part stream under an explicit
+/// finite resource policy.
+pub fn parse_external_link(data: &[u8], limits: ExternalLinkLimits) -> Result<Parsed> {
+    let mut budget = limits.budget();
+    parse_external_link_with_budget(data, &mut budget)
+}
+
+/// Parse one complete stream while consuming the caller's operation budget.
+pub(crate) fn parse_external_link_with_budget(data: &[u8], budget: &mut Budget) -> Result<Parsed> {
+    if data.len() > MAX_LINK_PART_BYTES {
+        return Err(Error::InvalidLength {
+            expected: MAX_LINK_PART_BYTES,
+            found: data.len(),
+        });
+    }
+    budget.begin_link_part(data.len())?;
+    // Stable retained-object accounting: one Link, one semantic item, one
+    // cache matrix, one dense cache cell, or one opaque record per object.
+    // Strings and formula tokens are charged by their semantic-byte limits.
+    budget.retained_objects(1)?;
+    let limits = crate::raw::Limits::new(MAX_LINK_PART_BYTES, MAX_WIDE_STRING_UNITS);
+    let mut link_type = None;
+    let mut target_key = String::new();
+    let mut target_detail = String::new();
+    let mut sheet_names = Vec::new();
+    let mut workbook_entries = Vec::new();
+    let mut dde_entries = Vec::new();
+    let mut ole_entries = Vec::new();
+    let mut saw_sup_tabs = false;
+    // 0 = outside a name, 1 = expect formula, 2 = expect bits,
+    // 3 = expect end/value start, 4 = inside a cached matrix.
+    let mut sup_name_state = 0u8;
+    let mut current_name = None;
+    let mut current_formula = None;
+    let mut current_bits = None;
+    let mut current_cache = None;
+    let mut cache_dimensions = None;
+    let mut cache_values = Vec::new();
+    let mut saw_end = false;
+    let mut extern_table_open = false;
+
+    for record in crate::raw::Records::new(data, limits) {
+        let record = record?;
+        let cache_region = extern_table_open
+            || record.kind() == crate::raw::kind::EXTERN_TABLE_START
+            || record.kind() == crate::raw::kind::EXTERN_TABLE_END;
+        budget.record(cache_region)?;
+        match record.kind() {
+            crate::raw::kind::EXTERN_TABLE_START => {
+                if extern_table_open {
+                    return Err(invalid("nested external table cache region"));
+                }
+                extern_table_open = true;
+            },
+            crate::raw::kind::EXTERN_TABLE_END => {
+                if !extern_table_open {
+                    return Err(invalid("external table cache region has no start"));
+                }
+                extern_table_open = false;
+            },
+            _ => {},
+        }
+        if saw_end {
+            return Err(invalid("external link has records after BrtEndSupBook"));
+        }
+        if link_type.is_none() && record.kind() != crate::raw::kind::BEGIN_SUP_BOOK {
+            return Err(invalid("external link does not start with BrtBeginSupBook"));
+        }
+        match record.kind() {
+            crate::raw::kind::BEGIN_SUP_BOOK => {
+                if link_type.is_some() || record.payload().len() < 10 {
+                    return Err(invalid("invalid BrtBeginSupBook framing"));
+                }
+                let mut cursor =
+                    crate::raw::Cursor::new(record.payload(), "BrtBeginSupBook", limits);
+                let kind = cursor.read_u16()?;
+                let first =
+                    read_external_wide_string(&mut cursor, budget, "BrtBeginSupBook string1")?;
+                let second = if kind == EXTERNAL_REFERENCE_WORKBOOK {
+                    read_external_nullable_wide_string(
+                        &mut cursor,
+                        budget,
+                        "BrtBeginSupBook string2",
+                    )?
+                } else {
+                    Some(read_external_wide_string(
+                        &mut cursor,
+                        budget,
+                        "BrtBeginSupBook string2",
+                    )?)
+                };
+                cursor.finish()?;
+                if kind > EXTERNAL_REFERENCE_OLE || first.is_empty() {
+                    return Err(invalid("invalid BrtBeginSupBook payload"));
+                }
+                if kind == EXTERNAL_REFERENCE_WORKBOOK && second.is_some() {
+                    return Err(invalid(
+                        "external workbook BrtBeginSupBook string2 is not NULL",
+                    ));
+                }
+                link_type = Some(kind);
+                target_key = first;
+                target_detail = second.unwrap_or_default();
+            },
+            crate::raw::kind::SUP_TABS => {
+                if link_type != Some(EXTERNAL_REFERENCE_WORKBOOK)
+                    || saw_sup_tabs
+                    || sup_name_state != 0
+                {
+                    return Err(invalid("unexpected BrtSupTabs"));
+                }
+                sheet_names = parse_external_sheet_names(record.payload(), limits, budget)?;
+                saw_sup_tabs = true;
+            },
+            crate::raw::kind::SUP_NAME_START => {
+                let kind =
+                    link_type.ok_or_else(|| invalid("BrtSupNameStart precedes BrtBeginSupBook"))?;
+                if sup_name_state != 0 || (kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs) {
+                    return Err(invalid("unexpected BrtSupNameStart"));
+                }
+                let mut cursor =
+                    crate::raw::Cursor::new(record.payload(), "BrtSupNameStart", limits);
+                let name = read_external_wide_string(&mut cursor, budget, "BrtSupNameStart")?;
+                cursor.finish()?;
+                validate_defined_name(&name)?;
+                current_name = Some(name);
+                sup_name_state = if kind == EXTERNAL_REFERENCE_WORKBOOK {
+                    1
+                } else {
+                    2
+                };
+            },
+            crate::raw::kind::SUP_NAME_FORMULA => {
+                if link_type != Some(EXTERNAL_REFERENCE_WORKBOOK) || sup_name_state != 1 {
+                    return Err(invalid("unexpected BrtSupNameFmla"));
+                }
+                let mut cursor =
+                    crate::raw::Cursor::new(record.payload(), "BrtSupNameFmla", limits);
+                if record.payload().len() < 4 {
+                    return Err(Error::InvalidLength {
+                        expected: 4,
+                        found: record.payload().len(),
+                    });
+                }
+                let formula_len = usize::try_from(cursor.read_u32()?)
+                    .map_err(|_| invalid("BrtSupNameFmla size overflow"))?;
+                if formula_len > 13 {
+                    return Err(Error::InvalidLength {
+                        expected: 13,
+                        found: formula_len,
+                    });
+                }
+                let formula_bytes = cursor.read_bytes(formula_len)?;
+                budget.token_bytes(formula_len)?;
+                let formula = copy_bytes(formula_bytes, "external name formula")?;
+                cursor.finish()?;
+                current_formula = if formula.is_empty() {
+                    None
+                } else {
+                    Some(NameFormula::from_tokens(formula)?)
+                };
+                sup_name_state = 2;
+            },
+            crate::raw::kind::SUP_NAME_BITS => {
+                if sup_name_state != 2 || record.payload().len() != 7 {
+                    return Err(invalid("unexpected BrtSupNameBits"));
+                }
+                let mut bits = [0u8; 7];
+                bits.copy_from_slice(record.payload());
+                validate_external_name_bits(
+                    link_type.expect("external link kind is present"),
+                    &bits,
+                )?;
+                current_bits = Some(bits);
+                sup_name_state = 3;
+            },
+            crate::raw::kind::SUP_NAME_VALUE_START => {
+                if !matches!(
+                    link_type,
+                    Some(EXTERNAL_REFERENCE_DDE | EXTERNAL_REFERENCE_OLE)
+                ) || sup_name_state != 3
+                    || record.payload().len() != 8
+                    || current_cache.is_some()
+                {
+                    return Err(invalid("unexpected BrtSupNameValueStart"));
+                }
+                let mut cursor =
+                    crate::raw::Cursor::new(record.payload(), "BrtSupNameValueStart", limits);
+                let rows = cursor.read_u32()?;
+                let columns = cursor.read_u32()?;
+                cursor.finish()?;
+                let count = usize::try_from(rows)
+                    .ok()
+                    .and_then(|rows| {
+                        usize::try_from(columns)
+                            .ok()
+                            .and_then(|columns| rows.checked_mul(columns))
+                    })
+                    .ok_or_else(|| invalid("external cached-value dimensions overflow"))?;
+                if count > MAX_XLSB_EXTERNAL_CACHED_VALUES {
+                    return Err(Error::InvalidLength {
+                        expected: MAX_XLSB_EXTERNAL_CACHED_VALUES,
+                        found: count,
+                    });
+                }
+                budget.matrix(1)?;
+                budget.cells(count)?;
+                budget.retained_objects(1)?;
+                budget.retained_objects(count)?;
+                cache_values.clear();
+                cache_values
+                    .try_reserve(count)
+                    .map_err(|source| Error::Allocation {
+                        resource: "external cached values",
+                        source,
+                    })?;
+                cache_dimensions = Some((rows, columns, count));
+                sup_name_state = 4;
+            },
+            crate::raw::kind::SUP_NAME_NIL
+            | crate::raw::kind::SUP_NAME_NUM
+            | crate::raw::kind::SUP_NAME_BOOL
+            | crate::raw::kind::SUP_NAME_ERROR
+            | crate::raw::kind::SUP_NAME_STRING => {
+                let Some((_, _, count)) = cache_dimensions else {
+                    return Err(invalid("cached external value occurs outside its matrix"));
+                };
+                if sup_name_state != 4 || cache_values.len() >= count {
+                    return Err(invalid("too many or misplaced cached external values"));
+                }
+                cache_values.push(parse_external_cached_value(
+                    record.kind(),
+                    record.payload(),
+                    limits,
+                    budget,
+                )?);
+            },
+            crate::raw::kind::SUP_NAME_VALUE_END => {
+                let Some((rows, columns, count)) = cache_dimensions.take() else {
+                    return Err(invalid("unexpected BrtSupNameValueEnd"));
+                };
+                if sup_name_state != 4
+                    || !record.payload().is_empty()
+                    || cache_values.len() != count
+                {
+                    return Err(invalid("invalid cached external value matrix"));
+                }
+                current_cache = Some(ValueMatrix::new(
+                    rows,
+                    columns,
+                    std::mem::take(&mut cache_values),
+                )?);
+                sup_name_state = 3;
+            },
+            crate::raw::kind::SUP_NAME_END => {
+                if sup_name_state != 3 || !record.payload().is_empty() {
+                    return Err(invalid("invalid BrtSupNameEnd"));
+                }
+                let kind = link_type.expect("external link kind is present");
+                let name = current_name
+                    .take()
+                    .ok_or_else(|| invalid("external name block has no name"))?;
+                let bits = current_bits
+                    .take()
+                    .ok_or_else(|| invalid("external name block has no properties"))?;
+                budget.items(1)?;
+                budget.retained_objects(1)?;
+                match kind {
+                    EXTERNAL_REFERENCE_WORKBOOK => {
+                        reserve_entry(&mut workbook_entries, "external workbook entries")?;
+                        let scope = u32::from_le_bytes([bits[2], bits[3], bits[4], bits[5]]);
+                        let mut entry = DefinedName::new(name)?
+                            .with_built_in(bits[0] & EXTERNAL_NAME_BUILT_IN != 0);
+                        if scope != 0 {
+                            entry = entry
+                                .with_sheet_scope(u16::try_from(scope - 1).map_err(|_| {
+                                    invalid("external defined-name scope overflow")
+                                })?);
+                        }
+                        if let Some(formula) = current_formula.take() {
+                            entry = entry.with_formula(formula);
+                        }
+                        entry = entry.with_wire_bits(bits);
+                        workbook_entries.push(entry);
+                    },
+                    EXTERNAL_REFERENCE_DDE => {
+                        reserve_entry(&mut dde_entries, "external DDE entries")?;
+                        let mut item = DdeItem::new(name)?
+                            .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
+                            .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
+                            .with_ole_support(bits[0] & DDE_ITEM_SUPPORTS_OLE != 0);
+                        if let Some(cache) = current_cache.take() {
+                            item = item.with_cached_values(cache);
+                        }
+                        item = item.with_wire_bits(bits);
+                        dde_entries.push(item);
+                    },
+                    EXTERNAL_REFERENCE_OLE => {
+                        reserve_entry(&mut ole_entries, "external OLE entries")?;
+                        let mut item = OleItem::new(name)?
+                            .with_advise(bits[0] & DATA_ITEM_WANT_ADVISE != 0)
+                            .with_picture(bits[0] & DATA_ITEM_WANT_PICTURE != 0)
+                            .with_icon(bits[0] & OLE_ITEM_DISPLAY_AS_ICON != 0);
+                        if let Some(cache) = current_cache.take() {
+                            item = item.with_cached_values(cache);
+                        }
+                        item = item.with_wire_bits(bits);
+                        ole_entries.push(item);
+                    },
+                    _ => unreachable!("external link kind was validated above"),
+                }
+                sup_name_state = 0;
+            },
+            crate::raw::kind::END_SUP_BOOK => {
+                if !record.payload().is_empty() {
+                    return Err(Error::InvalidLength {
+                        expected: 0,
+                        found: record.payload().len(),
+                    });
+                }
+                if sup_name_state != 0 {
+                    return Err(invalid(
+                        "BrtEndSupBook occurs inside an external-name block",
+                    ));
+                }
+                saw_end = true;
+            },
+            _ => {
+                // Future and producer-specific records are opaque. Their
+                // presence does not satisfy any required modeled record, so
+                // the state machine still rejects malformed ownership while
+                // the lossless layer can retain the exact wire image.
+            },
+        }
+    }
+
+    let kind = link_type.ok_or_else(|| invalid("external link has no BrtBeginSupBook"))?;
+    if !saw_end {
+        return Err(invalid("external link has no BrtEndSupBook"));
+    }
+    if kind == EXTERNAL_REFERENCE_WORKBOOK && !saw_sup_tabs {
+        return Err(invalid("external workbook link has no BrtSupTabs"));
+    }
+    if extern_table_open {
+        return Err(invalid("external table cache region has no end"));
+    }
+    let link_kind = match kind {
+        EXTERNAL_REFERENCE_WORKBOOK => Kind::Workbook,
+        EXTERNAL_REFERENCE_DDE => Kind::Dde,
+        EXTERNAL_REFERENCE_OLE => Kind::Ole,
+        _ => unreachable!("external link kind was validated above"),
+    };
+    let relationship_id = match link_kind {
+        Kind::Dde => None,
+        Kind::Workbook | Kind::Ole => Some(copy_string(
+            &target_key,
+            "external relationship identifier",
+            budget,
+        )?),
+    };
+    let entries = match kind {
+        EXTERNAL_REFERENCE_WORKBOOK => Entries::Workbook(workbook_entries),
+        EXTERNAL_REFERENCE_DDE => Entries::Dde(dde_entries),
+        EXTERNAL_REFERENCE_OLE => Entries::Ole(ole_entries),
+        _ => unreachable!("external link kind was validated above"),
+    };
+    let link = Link {
+        kind: link_kind,
+        source: target_key,
+        detail: match link_kind {
+            Kind::Dde | Kind::Ole => Some(target_detail),
+            Kind::Workbook => None,
+        },
+        sheet_names,
+        entries,
+    };
+    link.validate()?;
+    Ok(Parsed {
+        link,
+        relationship_id,
+    })
+}
+
+/// Explicitly named relationship-aware parser: the unresolved relationship
+/// metadata as well as the typed link, under an explicit policy.
+pub fn parse_external_link_with_relationship(
+    data: &[u8],
+    limits: ExternalLinkLimits,
+) -> Result<Parsed> {
+    parse_external_link(data, limits)
+}
+
+/// Parse only the inert semantic model of a stream under an explicit policy.
+pub fn parse_external_link_model(data: &[u8], limits: ExternalLinkLimits) -> Result<Link> {
+    parse_external_link(data, limits).map(Parsed::into_link)
+}
+
+fn parse_external_cached_value(
+    record_type: crate::raw::Kind,
+    data: &[u8],
+    limits: crate::raw::Limits,
+    budget: &mut Budget,
+) -> Result<CachedValue> {
+    match record_type {
+        crate::raw::kind::SUP_NAME_NIL if data.is_empty() => Ok(CachedValue::Empty),
+        crate::raw::kind::SUP_NAME_NUM if data.len() == 8 => {
+            let number = f64::from_le_bytes(data.try_into().expect("length was checked"));
+            validate_number(number)?;
+            Ok(CachedValue::Number(number))
+        },
+        crate::raw::kind::SUP_NAME_BOOL if data.len() == 1 && data[0] <= 1 => {
+            Ok(CachedValue::Boolean(data[0] != 0))
+        },
+        crate::raw::kind::SUP_NAME_ERROR if data.len() == 1 => {
+            Ok(CachedValue::Error(ErrorValue::from_code(data[0])?))
+        },
+        crate::raw::kind::SUP_NAME_STRING => {
+            if data.len() < 4 {
+                return Err(Error::InvalidLength {
+                    expected: 4,
+                    found: data.len(),
+                });
+            }
+            let mut cursor = crate::raw::Cursor::new(data, "BrtSupNameSt", limits);
+            let value = read_external_wide_string(&mut cursor, budget, "BrtSupNameSt")?;
+            cursor.finish()?;
+            Ok(CachedValue::String(value))
+        },
+        _ => Err(invalid("invalid cached external value record")),
+    }
+}
+
+fn parse_external_sheet_names(
+    data: &[u8],
+    limits: crate::raw::Limits,
+    budget: &mut Budget,
+) -> Result<Vec<String>> {
+    if data.len() < 4 {
+        return Err(Error::InvalidLength {
+            expected: 4,
+            found: data.len(),
+        });
+    }
+    let mut cursor = crate::raw::Cursor::new(data, "BrtSupTabs", limits);
+    let count = usize::try_from(cursor.read_u32()?)
+        .map_err(|_| invalid("external sheet-name count overflow"))?;
+    if count > MAX_COLLECTION_ITEMS {
+        return Err(invalid("external sheet-name count exceeds 65,535"));
+    }
+    let mut names = Vec::new();
+    budget.retained_objects(1)?;
+    budget.retained_objects(count)?;
+    names
+        .try_reserve(count)
+        .map_err(|source| Error::Allocation {
+            resource: "external sheet names",
+            source,
+        })?;
+    for _ in 0..count {
+        let name = read_external_wide_string(&mut cursor, budget, "BrtSupTabs")?;
+        let name_len = name.encode_utf16().count();
+        if name_len == 0
+            || name_len > 31
+            || name.contains(['\0', '\u{0003}', ':', '\\', '*', '?', '/', '[', ']'])
+            || name.starts_with('\'')
+            || name.ends_with('\'')
+        {
+            return Err(invalid(
+                "external sheet name does not follow sheet-name grammar",
+            ));
+        }
+        if names
+            .iter()
+            .any(|existing: &String| excel_name_eq(existing, &name))
+        {
+            return Err(invalid("duplicate external sheet name"));
+        }
+        names.push(name);
+    }
+    cursor.finish()?;
+    Ok(names)
+}
+
+fn validate_external_name_bits(kind: u16, bits: &[u8; 7]) -> Result<()> {
+    let reserved_word = &bits[2..6];
+    let valid = match kind {
+        EXTERNAL_REFERENCE_WORKBOOK => {
+            bits[0] & EXTERNAL_NAME_RESERVED_MASK == 0
+                && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG == 0
+        },
+        EXTERNAL_REFERENCE_DDE => {
+            bits[0] & DDE_ITEM_RESERVED_MASK == 0
+                && reserved_word == [0, 0, 0, 0]
+                && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG != 0
+        },
+        EXTERNAL_REFERENCE_OLE => {
+            bits[0] & OLE_ITEM_RESERVED_MASK == 0
+                && bits[0] & OLE_ITEM_REQUIRED_CLASS_FLAG != 0
+                && reserved_word == [0, 0, 0, 0]
+                && bits[6] & DATA_ITEM_REQUIRED_TRAILING_FLAG != 0
+        },
+        _ => false,
+    };
+    if !valid {
+        return Err(invalid(
+            "invalid BrtSupNameBits properties for external-link kind",
+        ));
+    }
+    Ok(())
+}
+
+fn invalid(message: &'static str) -> Error {
+    Error::InvalidFormula(message)
+}
+
+fn copy_bytes(data: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut copied = Vec::new();
+    copied
+        .try_reserve_exact(data.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.extend_from_slice(data);
+    Ok(copied)
+}
+
+fn copy_string(value: &str, resource: &'static str, budget: &mut Budget) -> Result<String> {
+    budget.string(value.encode_utf16().count(), value.len())?;
+    let mut copied = String::new();
+    copied
+        .try_reserve_exact(value.len())
+        .map_err(|source| Error::Allocation { resource, source })?;
+    copied.push_str(value);
+    Ok(copied)
+}
+
+fn read_external_nullable_wide_string(
+    cursor: &mut crate::raw::Cursor<'_>,
+    budget: &mut Budget,
+    context: &'static str,
+) -> Result<Option<String>> {
+    let length_offset = cursor.position();
+    let units = cursor.read_u32()?;
+    if units == u32::MAX {
+        return Ok(None);
+    }
+    read_external_wide_string_after_units(cursor, units, length_offset, budget, context).map(Some)
+}
+
+fn read_external_wide_string(
+    cursor: &mut crate::raw::Cursor<'_>,
+    budget: &mut Budget,
+    context: &'static str,
+) -> Result<String> {
+    let length_offset = cursor.position();
+    let units = cursor.read_u32()?;
+    read_external_wide_string_after_units(cursor, units, length_offset, budget, context)
+}
+
+fn read_external_wide_string_after_units(
+    cursor: &mut crate::raw::Cursor<'_>,
+    units: u32,
+    length_offset: usize,
+    budget: &mut Budget,
+    context: &'static str,
+) -> Result<String> {
+    let units = usize::try_from(units).map_err(|_| {
+        Error::Wire(crate::raw::Error::LengthOverflow {
+            what: "UTF-16 string",
+            length: usize::MAX,
+        })
+    })?;
+    if units > MAX_WIDE_STRING_UNITS {
+        return Err(Error::Wire(crate::raw::Error::StringLimit {
+            units,
+            limit: MAX_WIDE_STRING_UNITS,
+            offset: length_offset,
+        }));
+    }
+    let byte_len = units
+        .checked_mul(2)
+        .ok_or(Error::Wire(crate::raw::Error::LengthOverflow {
+            what: "UTF-16 string",
+            length: units,
+        }))?;
+    let string_offset = cursor.position();
+    let bytes = cursor.read_bytes(byte_len)?;
+    let exact_utf8_bytes = validate_external_utf16(bytes, string_offset)?;
+    budget.string(units, exact_utf8_bytes)?;
+    let mut output = String::new();
+    output
+        .try_reserve_exact(exact_utf8_bytes)
+        .map_err(|source| Error::Allocation {
+            resource: context,
+            source,
+        })?;
+    append_external_utf16(bytes, string_offset, &mut output)?;
+    Ok(output)
+}
+
+fn validate_external_utf16(bytes: &[u8], offset: usize) -> Result<usize> {
+    let mut exact_utf8_bytes = 0usize;
+    for decoded in std::char::decode_utf16(external_utf16_units(bytes)) {
+        let value = decoded.map_err(|_| Error::Wire(crate::raw::Error::InvalidUtf16 { offset }))?;
+        exact_utf8_bytes = exact_utf8_bytes
+            .checked_add(value.len_utf8())
+            .ok_or(Error::Wire(crate::raw::Error::LengthOverflow {
+                what: "UTF-8 string",
+                length: usize::MAX,
+            }))?;
+    }
+    Ok(exact_utf8_bytes)
+}
+
+fn append_external_utf16(bytes: &[u8], offset: usize, output: &mut String) -> Result<()> {
+    for decoded in std::char::decode_utf16(external_utf16_units(bytes)) {
+        let value = decoded.map_err(|_| Error::Wire(crate::raw::Error::InvalidUtf16 { offset }))?;
+        output.push(value);
+    }
+    Ok(())
+}
+
+fn external_utf16_units(bytes: &[u8]) -> impl Iterator<Item = u16> + '_ {
+    bytes
+        .as_chunks::<2>()
+        .0
+        .iter()
+        .map(|pair| u16::from_le_bytes([pair[0], pair[1]]))
+}
+
+fn reserve_entry<T>(entries: &mut Vec<T>, resource: &'static str) -> Result<()> {
+    if entries.len() >= MAX_COLLECTION_ITEMS {
+        return Err(Error::InvalidLength {
+            expected: MAX_COLLECTION_ITEMS,
+            found: entries.len() + 1,
+        });
+    }
+    entries
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation { resource, source })
+}
+
+fn excel_name_eq(left: &str, right: &str) -> bool {
+    left.chars()
+        .flat_map(char::to_lowercase)
+        .eq(right.chars().flat_map(char::to_lowercase))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::external_link::model::{
+        EXT_PTG_AREA, EXT_PTG_AREA_ERROR, EXT_PTG_ERROR, EXT_PTG_REFERENCE,
+        EXT_PTG_REFERENCE_ERROR, REFERENCE_ERROR_CODE,
+    };
+    use crate::raw::Encoder;
+
+    #[test]
+    fn accepts_exactly_the_five_external_name_token_structures() {
+        for (tokens, kind) in [
+            (
+                vec![EXT_PTG_REFERENCE, 0, 0, 0, 0, 3, 0, 2, 0],
+                NameFormulaKind::CellReference,
+            ),
+            (
+                vec![EXT_PTG_AREA, 0, 0, 0, 0, 1, 0, 3, 0, 2, 0, 4, 0],
+                NameFormulaKind::AreaReference,
+            ),
+            (
+                vec![EXT_PTG_REFERENCE_ERROR, 0, 0, 0, 0, 0, 0, 0, 0],
+                NameFormulaKind::CellReferenceError,
+            ),
+            (
+                vec![EXT_PTG_AREA_ERROR, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                NameFormulaKind::AreaReferenceError,
+            ),
+            (
+                vec![EXT_PTG_ERROR, REFERENCE_ERROR_CODE],
+                NameFormulaKind::ReferenceError,
+            ),
+        ] {
+            assert_eq!(NameFormula::from_tokens(tokens).unwrap().kind(), kind);
+        }
+    }
+
+    #[test]
+    fn rejects_external_name_tokens_outside_the_restricted_grammar() {
+        assert!(NameFormula::from_tokens(vec![0x1E, 1, 0]).is_err());
+        assert!(NameFormula::from_tokens(vec![EXT_PTG_ERROR, 0x2A]).is_err());
+        assert!(
+            NameFormula::from_tokens(vec![EXT_PTG_AREA, 0, 0, 0, 0, 3, 0, 1, 0, 0, 0, 0, 0,])
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn typed_external_name_formula_constructors_emit_canonical_tokens() {
+        let sheets = SheetRange::sheets(0, 1).unwrap();
+        let first = CellLocation::new(2, 3)
+            .with_column_relative(true)
+            .with_row_relative(true);
+        let last = CellLocation::new(4, 5);
+        let cell = NameFormula::cell_reference(CellReference::new(sheets, first));
+        assert_eq!(
+            cell.tokens(),
+            [EXT_PTG_REFERENCE, 0, 0, 1, 0, 2, 0, 3, 0xC0]
+        );
+        assert_eq!(cell.cell().unwrap().location(), first);
+        let area = NameFormula::area_reference(AreaReference::new(sheets, first, last).unwrap());
+        assert_eq!(
+            area.tokens(),
+            [EXT_PTG_AREA, 0, 0, 1, 0, 2, 0, 4, 0, 3, 0xC0, 5, 0]
+        );
+        assert_eq!(area.area().unwrap().first(), first);
+        assert_eq!(area.sheets(), Some(sheets));
+        assert_eq!(
+            NameFormula::cell_reference_error(SheetRange::missing()).kind(),
+            NameFormulaKind::CellReferenceError
+        );
+        assert_eq!(
+            NameFormula::area_reference_error(SheetRange::missing()).kind(),
+            NameFormulaKind::AreaReferenceError
+        );
+        assert_eq!(
+            NameFormula::reference_error().tokens(),
+            [EXT_PTG_ERROR, REFERENCE_ERROR_CODE]
+        );
+        assert!(matches!(
+            SheetRange::sheets(u16::MAX, u16::MAX),
+            Err(Error::InvalidFormula(_))
+        ));
+    }
+
+    #[test]
+    fn owner_stream_writer_and_parser_preserve_relationship_ids_and_metadata() {
+        let sheets = SheetRange::sheets(0, 1).unwrap();
+        let formula =
+            NameFormula::cell_reference(CellReference::new(sheets, CellLocation::new(3, 2)));
+        let link = Link::workbook_with_defined_names(
+            "Book.xlsx",
+            vec!["Data".to_string(), "Rates".to_string()],
+            vec![
+                DefinedName::new("ExchangeRate")
+                    .unwrap()
+                    .with_formula(formula)
+                    .with_built_in(true)
+                    .with_sheet_scope(1),
+            ],
+        )
+        .unwrap();
+
+        let bytes = write_external_link_stream(&link, Some("rIdPath"), ExternalLinkLimits::DEFAULT)
+            .unwrap();
+        let parsed = parse_external_link(&bytes, ExternalLinkLimits::DEFAULT).unwrap();
+        assert_eq!(parsed.relationship_id(), Some("rIdPath"));
+        assert_eq!(parsed.link().source(), "rIdPath");
+        assert_eq!(parsed.link().sheet_names(), link.sheet_names());
+        assert_eq!(parsed.link().defined_names(), link.defined_names());
+        assert_eq!(parsed.resolve_source("Book.xlsx").unwrap(), link);
+    }
+
+    #[test]
+    fn owner_stream_codec_preserves_inert_dde_and_ole_caches() {
+        let cache = ValueMatrix::new(
+            1,
+            3,
+            vec![
+                CachedValue::Number(7.0),
+                CachedValue::Boolean(true),
+                CachedValue::String("Ready".to_string()),
+            ],
+        )
+        .unwrap();
+        let dde = Link::dde_with_items(
+            "Excel",
+            "System",
+            vec![
+                DdeItem::new("StatusItem")
+                    .unwrap()
+                    .with_advise(true)
+                    .with_picture(true)
+                    .with_cached_values(cache.clone()),
+            ],
+        )
+        .unwrap();
+        let dde_bytes =
+            write_external_link_stream(&dde, None, ExternalLinkLimits::DEFAULT).unwrap();
+        let parsed_dde = parse_external_link(&dde_bytes, ExternalLinkLimits::DEFAULT)
+            .unwrap()
+            .into_link();
+        assert_eq!(parsed_dde, dde);
+
+        let ole = Link::ole_with_items(
+            "Model.xlsx",
+            "Acme.Server",
+            vec![
+                OleItem::new("ReportItem")
+                    .unwrap()
+                    .with_advise(true)
+                    .with_picture(true)
+                    .with_icon(true)
+                    .with_cached_values(cache),
+            ],
+        )
+        .unwrap();
+        let ole_bytes =
+            write_external_link_stream(&ole, Some("rIdOle"), ExternalLinkLimits::DEFAULT).unwrap();
+        let parsed_ole = parse_external_link(&ole_bytes, ExternalLinkLimits::DEFAULT).unwrap();
+        assert_eq!(parsed_ole.relationship_id(), Some("rIdOle"));
+        assert_eq!(parsed_ole.resolve_source("Model.xlsx").unwrap(), ole);
+    }
+
+    #[test]
+    fn owner_parser_rejects_trailing_records_after_end() {
+        let link = Link::dde("Excel", "System", vec!["StatusItem".to_string()]).unwrap();
+        let mut bytes =
+            write_external_link_stream(&link, None, ExternalLinkLimits::DEFAULT).unwrap();
+        Encoder::new(&mut bytes, crate::raw::Limits::DEFAULT)
+            .write_record(crate::raw::kind::SUP_NAME_END, &[])
+            .unwrap();
+        assert!(parse_external_link(&bytes, ExternalLinkLimits::DEFAULT).is_err());
+    }
+}

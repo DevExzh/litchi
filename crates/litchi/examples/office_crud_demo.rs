@@ -8,10 +8,10 @@
 //! cargo run --example office_crud_demo
 //! ```
 
-use litchi::ooxml::docx::Package as DocxPackage;
-use litchi::ooxml::pptx::Package as PptxPackage;
-use litchi::ooxml::xlsx::Workbook;
-use litchi::sheet::WorkbookTrait;
+use litchi::docx::{Builder as DocxBuilder, Package as DocxPackage};
+use litchi::pptx::Package as PptxPackage;
+use litchi::xlsx::{Formula, Package};
+use litchi_core::Metadata;
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -41,8 +41,8 @@ fn demo_docx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new document
     println!("Creating new Word document...");
-    let mut pkg = DocxPackage::new()?;
-    let doc = pkg.document_mut()?;
+    let mut builder = DocxBuilder::new()?;
+    let doc = builder.document()?;
 
     // Add content
     doc.add_heading("Product Catalog", 1)?;
@@ -79,9 +79,14 @@ fn demo_docx_operations() -> ExampleResult<()> {
     table.cell(3, 2).unwrap().set_text("200");
 
     // Set metadata
-    pkg.properties_mut().title = Some("Product Catalog".to_string());
-    pkg.properties_mut().creator = Some("Litchi Demo".to_string());
-    pkg.properties_mut().description = Some("Demonstration of DOCX creation".to_string());
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(Metadata {
+        title: Some("Product Catalog".to_owned()),
+        author: Some("Litchi Demo".to_owned()),
+        description: Some("Demonstration of DOCX creation".to_owned()),
+        ..Metadata::default()
+    });
+    let pkg = metadata.commit()?.into_package();
 
     // Save
     pkg.save("demo_catalog.docx")?;
@@ -100,21 +105,29 @@ fn demo_docx_operations() -> ExampleResult<()> {
     println!("  Found 'Widget' in {} paragraphs", matches.len());
 
     // Access metadata
-    if let Some(title) = &pkg.properties().title {
+    if let Some(title) = pkg.metadata().and_then(|props| props.title.as_deref()) {
         println!("  Title: {}", title);
     }
 
     // UPDATE: Modify existing document
     println!("Updating Word document...");
-    let mut pkg = DocxPackage::open("demo_catalog.docx")?;
-    let doc = pkg.document_mut()?;
-
-    doc.add_heading("Contact Information", 2)?;
-    doc.add_paragraph_with_text("For more information, please contact us:");
-    doc.add_paragraph_with_text("Email: sales@example.com");
-    doc.add_paragraph_with_text("Phone: (555) 123-4567");
-
-    pkg.properties_mut().last_modified_by = Some("Litchi Update".to_string());
+    let pkg = DocxPackage::open("demo_catalog.docx")?;
+    let end = pkg.document_snapshot()?.paragraph_count();
+    let mut edit = pkg.edit()?;
+    for (offset, text) in [
+        "Contact Information",
+        "For more information, please contact us:",
+        "Email: sales@example.com",
+        "Phone: (555) 123-4567",
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        edit.insert_paragraph(litchi::common::Position::new(end + offset), text)?;
+    }
+    let mut metadata = edit.commit()?.into_package().edit_metadata();
+    metadata.update(|props| props.last_modified_by = Some("Litchi Update".to_string()));
+    let pkg = metadata.commit()?.into_package();
     pkg.save("demo_catalog_updated.docx")?;
     println!("✓ Updated: demo_catalog_updated.docx");
 
@@ -127,50 +140,44 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new workbook
     println!("Creating new Excel workbook...");
-    let mut wb = Workbook::create()?;
+    let wb = Package::new()?;
+    let mut edit = wb.edit()?;
 
-    // Add data to first worksheet
+    // XLSX authoring is an atomic semantic transaction over an immutable
+    // workbook snapshot.
     {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_cell_value(1, 1, "Employee");
-        ws.set_cell_value(1, 2, "Department");
-        ws.set_cell_value(1, 3, "Salary");
-
-        ws.set_cell_value(2, 1, "Alice Johnson");
-        ws.set_cell_value(2, 2, "Engineering");
-        ws.set_cell_value(2, 3, 85000);
-
-        ws.set_cell_value(3, 1, "Bob Smith");
-        ws.set_cell_value(3, 2, "Marketing");
-        ws.set_cell_value(3, 3, 72000);
-
-        ws.set_cell_value(4, 1, "Carol Williams");
-        ws.set_cell_value(4, 2, "Sales");
-        ws.set_cell_value(4, 3, 68000);
-
-        ws.set_cell_value(5, 1, "David Brown");
-        ws.set_cell_value(5, 2, "Engineering");
-        ws.set_cell_value(5, 3, 92000);
-
-        // Set freeze panes
-        ws.freeze_panes(2, 1);
+        let mut sheet = edit
+            .sheet("Sheet1")?
+            .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Sheet1"))?;
+        sheet
+            .set("A1", "Employee")?
+            .set("B1", "Department")?
+            .set("C1", "Salary")?
+            .set("A2", "Alice Johnson")?
+            .set("B2", "Engineering")?
+            .set("C2", 85000_i32)?
+            .set("A3", "Bob Smith")?
+            .set("B3", "Marketing")?
+            .set("C3", 72000_i32)?
+            .set("A4", "Carol Williams")?
+            .set("B4", "Sales")?
+            .set("C4", 68000_i32)?
+            .set("A5", "David Brown")?
+            .set("B5", "Engineering")?
+            .set("C5", 92000_i32)?;
     }
 
-    // Add a second worksheet for summary
+    // Add a second worksheet for summary.
     {
-        let summary = wb.add_worksheet("Summary");
-        summary.set_cell_value(1, 1, "Department");
-        summary.set_cell_value(1, 2, "Average Salary");
-        summary.set_cell_value(2, 1, "Engineering");
-        summary.set_cell_formula(2, 2, "=AVERAGE(Sheet1!C2:C5)");
+        let mut summary = edit.add("Summary")?;
+        summary
+            .set("A1", "Department")?
+            .set("B1", "Average Salary")?
+            .set("A2", "Engineering")?
+            .set("B2", Formula::new("AVERAGE(Sheet1!C2:C5)")?)?;
     }
 
-    // Define named range
-    wb.define_name("EmployeeData", "Sheet1!$A$1:$C$5");
-
-    // Set metadata
-    wb.properties_mut().title = Some("Employee Database".to_string());
-    wb.properties_mut().creator = Some("Litchi Demo".to_string());
+    let wb = edit.commit()?.into_package();
 
     // Save
     wb.save("demo_employees.xlsx")?;
@@ -178,16 +185,23 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // READ: Open and read the workbook
     println!("Reading Excel workbook...");
-    let wb = Workbook::open("demo_employees.xlsx")?;
+    let wb = Package::open("demo_employees.xlsx")?;
 
-    println!("  Worksheets: {}", wb.worksheet_count());
-    for name in wb.worksheet_names() {
-        println!("    - {}", name);
+    println!("  Worksheets: {}", wb.workbook_ref().len());
+    for sheet in wb.workbook_ref().sheets() {
+        println!("    - {}", sheet.name());
     }
 
     // Read data from first worksheet
-    let ws = wb.worksheet_by_index(0)?;
-    println!("  Sheet '{}' dimensions: {:?}", ws.name(), ws.dimensions());
+    let ws = wb
+        .workbook_ref()
+        .sheet(0)?
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "first worksheet"))?;
+    println!(
+        "  Sheet '{}' stored extent: {:?}",
+        ws.name(),
+        ws.stored_extent()?
+    );
 
     // Note: Search functionality requires the concrete Worksheet type
     // For now, we can iterate cells to search
@@ -195,17 +209,16 @@ fn demo_xlsx_operations() -> ExampleResult<()> {
 
     // UPDATE: Modify existing workbook
     println!("Updating Excel workbook...");
-    let mut wb = Workbook::open("demo_employees.xlsx")?;
-
-    // Add new employee
-    {
-        let ws = wb.worksheet_mut(0)?;
-        ws.set_cell_value(6, 1, "Eve Davis");
-        ws.set_cell_value(6, 2, "HR");
-        ws.set_cell_value(6, 3, 65000);
-    }
-
-    wb.properties_mut().last_modified_by = Some("Litchi Update".to_string());
+    let wb = Package::open("demo_employees.xlsx")?;
+    let mut edit = wb.edit()?;
+    let mut sheet = edit
+        .sheet("Sheet1")?
+        .ok_or_else(|| std::io::Error::new(std::io::ErrorKind::NotFound, "Sheet1"))?;
+    sheet
+        .set("A6", "Eve Davis")?
+        .set("B6", "HR")?
+        .set("C6", 65000_i32)?;
+    let wb = edit.commit()?.into_package();
     wb.save("demo_employees_updated.xlsx")?;
     println!("✓ Updated: demo_employees_updated.xlsx");
 
@@ -218,8 +231,8 @@ fn demo_pptx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new presentation
     println!("Creating new PowerPoint presentation...");
-    let mut pkg = PptxPackage::new()?;
-    let pres = pkg.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let pres = builder.presentation()?;
 
     // Add title slide
     let slide1 = pres.add_slide()?;
@@ -261,11 +274,8 @@ fn demo_pptx_operations() -> ExampleResult<()> {
         914400,
     );
 
-    // Set metadata
-    pkg.properties_mut().title = Some("Company Overview Q4 2024".to_string());
-    pkg.properties_mut().creator = Some("Litchi Demo".to_string());
-
     // Save
+    let pkg = builder.build()?;
     pkg.save("demo_presentation.pptx")?;
     println!("✓ Created: demo_presentation.pptx");
 
@@ -285,25 +295,42 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     }
 
     // UPDATE: Modify existing presentation
+    //
+    // Builder authoring finishes before publication. Opened decks
+    // are edited through one detached, failure-atomic transaction whose commit
+    // the package publishes as a single patch; every part the transaction does
+    // not name keeps its exact source bytes.
     println!("Updating PowerPoint presentation...");
     let mut pkg = PptxPackage::open("demo_presentation.pptx")?;
-    let pres = pkg.presentation_mut()?;
+    let mut edit = pkg.edit()?;
 
-    // Add conclusion slide
-    let slide4 = pres.add_slide()?;
-    slide4.set_title("Conclusion");
-    slide4.add_text_box(
-        "Thank you for your attention!",
-        914400,
-        2743200,
-        7315200,
-        914400,
-    );
-    slide4.add_text_box("Questions?", 914400, 3657600, 7315200, 914400);
+    // Retitle the closing slide and append a closing note to it.
+    let closing = edit.slides()?.len() - 1;
+    edit.set_shape_text(closing, 0_usize, "Financial Performance — Q4 Final")?;
+    edit.add_text_box(
+        closing,
+        "Thank you for your attention! Questions?",
+        (914400, 4572000, 7315200, 914400),
+    )?;
 
-    pkg.properties_mut().last_modified_by = Some("Litchi Update".to_string());
+    let commit = edit.commit()?;
+    if !commit.diagnostics().changed() {
+        return Err("the opened-presentation transaction changed nothing".into());
+    }
+    pkg = commit.into_package();
+
     pkg.save("demo_presentation_updated.pptx")?;
     println!("✓ Updated: demo_presentation_updated.pptx");
+
+    // Read the update back so the demonstration proves the edit landed.
+    let updated = PptxPackage::open("demo_presentation_updated.pptx")?;
+    let pres = updated.presentation()?;
+    let slide = pres
+        .slides()?
+        .into_iter()
+        .nth(closing)
+        .ok_or("the updated deck lost its closing slide")?;
+    println!("  Closing slide now has {} shapes", slide.shape_count()?);
 
     Ok(())
 }

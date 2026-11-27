@@ -7,16 +7,19 @@
 //!
 //! to Markdown format with extensive customization options.
 //!
+//! Every input opens through `litchi::open`, which detects the format from
+//! the content; the `File` it returns converts itself to Markdown.
+//!
 //! # Usage
 //!
 //! Basic conversion:
 //! ```sh
-//! cargo run --example to_markdown -- input.docx -o output.md
+//! cargo run --example to_markdown --features all -- input.docx -o output.md
 //! ```
 //!
 //! Convert with options:
 //! ```sh
-//! cargo run --example to_markdown -- input.docx -o output.md \
+//! cargo run --example to_markdown --features all -- input.docx -o output.md \
 //!     --table-style markdown \
 //!     --no-styles \
 //!     --no-metadata
@@ -24,19 +27,19 @@
 //!
 //! Convert to directory (auto-generates filename):
 //! ```sh
-//! cargo run --example to_markdown -- input.docx -o output_dir/
+//! cargo run --example to_markdown --features all -- input.docx -o output_dir/
 //! ```
 //!
 //! Batch conversion:
 //! ```sh
-//! cargo run --example to_markdown -- *.docx -o output_dir/
+//! cargo run --example to_markdown --features all -- *.docx -o output_dir/
 //! ```
 
 use clap::{Parser, ValueEnum};
+use litchi::Family;
 use litchi::markdown::{
-    FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
+    EquationStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle, ToMarkdown,
 };
-use litchi::{Document, FileFormat, Presentation, detect_file_format};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -67,9 +70,9 @@ struct Args {
     #[arg(long, value_enum, default_value = "markdown")]
     table_style: TableStyleArg,
 
-    /// Formula conversion style
+    /// Equation rendering style
     #[arg(long, value_enum, default_value = "latex")]
-    formula_style: FormulaStyleArg,
+    equation_style: EquationStyleArg,
 
     /// Superscript/subscript style
     #[arg(long, value_enum, default_value = "html")]
@@ -117,20 +120,20 @@ impl From<TableStyleArg> for TableStyle {
     }
 }
 
-/// Formula style options for CLI
+/// Equation style options for CLI
 #[derive(Debug, Clone, Copy, ValueEnum)]
-enum FormulaStyleArg {
+enum EquationStyleArg {
     /// LaTeX math mode (\( \) and \[ \])
     Latex,
     /// Dollar signs ($ and $$) - GitHub flavored
     Dollar,
 }
 
-impl From<FormulaStyleArg> for FormulaStyle {
-    fn from(arg: FormulaStyleArg) -> Self {
+impl From<EquationStyleArg> for EquationStyle {
+    fn from(arg: EquationStyleArg) -> Self {
         match arg {
-            FormulaStyleArg::Latex => FormulaStyle::LaTeX,
-            FormulaStyleArg::Dollar => FormulaStyle::Dollar,
+            EquationStyleArg::Latex => EquationStyle::LaTeX,
+            EquationStyleArg::Dollar => EquationStyle::Dollar,
         }
     }
 }
@@ -208,7 +211,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Build markdown options
     let options = MarkdownOptions::new()
         .with_table_style(args.table_style.into())
-        .with_formula_style(args.formula_style.into())
+        .with_equation_style(args.equation_style.into())
         .with_script_style(args.script_style.into())
         .with_strikethrough_style(args.strikethrough_style.into())
         .with_styles(!args.no_styles)
@@ -258,7 +261,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             },
             Err(e) => {
                 error_count += 1;
-                eprintln!("✗ {}: {}", input.display(), e);
+                eprintln!("✗ {}: {}", input.display(), with_causes(&*e));
             },
         }
     }
@@ -278,6 +281,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+/// The error followed by its causes. A `litchi::Error` displays its code and
+/// a summary; the error of the format crate that failed is its source.
+fn with_causes(error: &dyn std::error::Error) -> String {
+    let mut text = error.to_string();
+    let mut cause = error.source();
+    while let Some(error) = cause {
+        text.push_str(": ");
+        text.push_str(&error.to_string());
+        cause = error.source();
+    }
+    text
+}
+
 /// Convert a single file to Markdown
 fn convert_file(
     input: &Path,
@@ -285,36 +301,37 @@ fn convert_file(
     options: &MarkdownOptions,
     verbose: bool,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Detect file format
-    let format = detect_file_format(input)
+    // One detection pass: the format comes from the content, and the
+    // container is indexed once, for the conversion below to read. Only an
+    // encrypted OOXML package whose name does not say what it holds has no
+    // knowable format.
+    let file = litchi::open(input)?;
+    let format = file
+        .format()
         .ok_or_else(|| format!("Could not detect file format for: {}", input.display()))?;
 
     if verbose {
         println!("  Detected format: {:?}", format);
     }
 
-    // Convert based on format
-    let markdown = match format {
-        FileFormat::Doc | FileFormat::Docx | FileFormat::Odt | FileFormat::Rtf => {
+    // Convert based on the format's family
+    let markdown = match Family::of(format) {
+        Family::Document => {
             // Word document formats
-            let doc = Document::open(input)?;
-
             if verbose {
                 println!("  Processing document...");
             }
 
-            doc.to_markdown_with_options(options)?
+            file.to_markdown_with_options(options)?
         },
-        FileFormat::Ppt | FileFormat::Pptx | FileFormat::Odp => {
+        Family::Presentation => {
             // PowerPoint presentation formats
-            let pres = Presentation::open(input)?;
-
             if verbose {
-                let slide_count = pres.slide_count()?;
+                let slide_count = file.presentation()?.slide_count()?;
                 println!("  Processing presentation ({} slides)...", slide_count);
             }
 
-            pres.to_markdown_with_options(options)?
+            file.to_markdown_with_options(options)?
         },
         _ => {
             return Err(format!(

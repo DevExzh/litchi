@@ -1,0 +1,25 @@
+//! Shared iWork table sort vocabulary exposed through the Numbers crate.
+//!
+//! The neutral owner is [`litchi_iwa_common::table::sort`]. Numbers keeps this
+//! focused module as its direct semantic entry point while native protobuf
+//! decoding and package mutation remain in the Numbers package adapter.
+
+/// Exact-source transactions for one rooted Numbers table's persisted sort
+/// configuration.
+pub mod transaction {
+    pub use crate::package::table_sort::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Path, Refusal,
+    };
+}
+
+/// Exact-source execution of a table's persisted sort order: the body rows
+/// move, as Numbers' **Sort Now** does.
+pub mod execution {
+    pub use crate::package::table_sort_execution::{
+        Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal, Unsupported,
+    };
+}
+
+pub use litchi_iwa_common::table::sort::{
+    ColumnIndex, Direction, Error, Order, Result, RowRange, Rule, Scope,
+};

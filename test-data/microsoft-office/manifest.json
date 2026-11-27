@@ -1,0 +1,729 @@
+{
+  "schema_version": 1,
+  "source": "Synthetic documents created in Microsoft Word, Excel and PowerPoint for Mac 16.110.2.",
+  "files": [
+    {
+      "path": "excel/excel-values-formulas-chart.xls",
+      "bytes": 38400,
+      "sha256": "76839878b09c8e32b0dc6099686d6dbfc7170f74102e2669a408c0740ce63ff8"
+    },
+    {
+      "path": "excel/excel-values-formulas-chart.xlsb",
+      "bytes": 17321,
+      "sha256": "ffa036d05e4fffc295c6c3b5d0df2bc9a423c83e9d1eaeb6a50a2c6c6b14ee5e"
+    },
+    {
+      "path": "excel/excel-values-formulas-chart.xlsx",
+      "bytes": 18686,
+      "sha256": "7b9b6602d687d3b0f65915611723c1cc60934e6ecca9c54bec44403904afbd57"
+    },
+    {
+      "path": "powerpoint/powerpoint-text-table.ppt",
+      "bytes": 108032,
+      "sha256": "91a6e2da4c2c571296a78fecb128c58f577cbc0cfe6ce8d4f59d6e2c49c24080"
+    },
+    {
+      "path": "powerpoint/powerpoint-text-table.pptx",
+      "bytes": 47832,
+      "sha256": "e7ea4ab085b481ccf026e0dacf2a59774a76e35dad925f8db5885861e96010c6"
+    },
+    {
+      "path": "word/word-text-structure.doc",
+      "bytes": 32768,
+      "sha256": "2c82662effffe296da4f2999db3a14811d6efe1c3c480a80e8310ad5b5e92e4c"
+    },
+    {
+      "path": "word/word-text-structure.docx",
+      "bytes": 21905,
+      "sha256": "7d53afea4431fae334095489dd70a86f1650de68390daa055f1387c69162a57a"
+    },
+    {
+      "path": "word/word-tables-layout.doc",
+      "bytes": 36352,
+      "sha256": "cde730cdfe835683c3e80f52cdb5c69742610155e2a34b9e09e21c2d57023f3a"
+    },
+    {
+      "path": "word/word-tables-layout.docx",
+      "bytes": 20955,
+      "sha256": "94bdb1fc73e7d5097637b0095f7c3c136e74157631c2c9f475979f5f7b0e81d0"
+    },
+    {
+      "path": "word/word-tables-layout.rtf",
+      "bytes": 79211,
+      "sha256": "34999eb1d97167904017ea056a9be222940ceb7c8fd827363958e74f4091910c"
+    },
+    {
+      "path": "word/word-review-controls.doc",
+      "bytes": 25600,
+      "sha256": "c8d0a57bf6b77c7999870b6d59e0d2f217c52b55c2344118c880715645b51736"
+    },
+    {
+      "path": "word/word-review-controls.docx",
+      "bytes": 19090,
+      "sha256": "b85582dfe2d04d0157252e1697bf67e64c1e50a1c3a7023fd1afc37238e49f9c"
+    },
+    {
+      "path": "word/word-review-controls.rtf",
+      "bytes": 51895,
+      "sha256": "d8c0845af1d7aaa55607299477d27683573b3f87d486c0e35aabce1b04e389fd"
+    },
+    {
+      "path": "word/word-recorded-macro.docm",
+      "bytes": 19304,
+      "sha256": "47c8419628481a99234a1454616411e69036a0693444eb06caa678994856468c"
+    },
+    {
+      "path": "word/word-recorded-macro.dotm",
+      "bytes": 19241,
+      "sha256": "af1d15a6e9ca38ebf2904118067b0dfaaa511332c5e9da8e601f3e45cad8ee0f"
+    },
+    {
+      "path": "word/word-recorded-macro.doc",
+      "bytes": 36352,
+      "sha256": "feb510658540c2a51282a8d458739041238a2dde2d3c6ce6c3adaf6488ef6d06"
+    },
+    {
+      "path": "word/word-recorded-macro.dot",
+      "bytes": 36352,
+      "sha256": "b69b1caeb749a0c7c56f505dd5a2fb3135acc1f74c21ff5319df6b7ebab82f6d"
+    },
+    {
+      "path": "excel/excel-interaction-print.xlsx",
+      "bytes": 13089,
+      "sha256": "85254132754529fb47ffd4cc047d64d519c86a1452917d56688e94de85c4e887"
+    },
+    {
+      "path": "excel/excel-interaction-print.xlsb",
+      "bytes": 11418,
+      "sha256": "11d9221b268f52749ad4a736937c55353080a183f7cd8345c64b02b797929fc8"
+    },
+    {
+      "path": "excel/excel-interaction-print.xls",
+      "bytes": 30208,
+      "sha256": "b9a980ff14f8ef73d54c80d3151671d27cb1603aa624c25d75530d315c5e65ec"
+    },
+    {
+      "path": "powerpoint/powerpoint-visual-objects.pptx",
+      "bytes": 146815,
+      "sha256": "ece3be475a78f0599166a54d9b923a7fc05b3e34f59aa502594f197ceced6d3e"
+    },
+    {
+      "path": "powerpoint/powerpoint-visual-objects.ppt",
+      "bytes": 352768,
+      "sha256": "b7f8150a0b717cd386e588b5af5bd6e0de1dd726c483383d1538479c051af48d"
+    },
+    {
+      "path": "excel/excel-recorded-macro.xlsm",
+      "bytes": 12750,
+      "sha256": "0f40ba95f9ed3cdeabf0dd2640497409d2134e69c60bf60c0581ec68fe232a55"
+    },
+    {
+      "path": "excel/excel-recorded-macro.xlsb",
+      "bytes": 12177,
+      "sha256": "c6f978530b0aa96857497cb076a860de396042de3aa6a92311705068b45c72e3"
+    },
+    {
+      "path": "excel/excel-recorded-macro.xltm",
+      "bytes": 12755,
+      "sha256": "3bf83e6fda698942bb8048aa75cb55d2b4791d78c0b6331a1fe8049569402433"
+    },
+    {
+      "path": "excel/excel-recorded-macro.xls",
+      "bytes": 28160,
+      "sha256": "6c377d5ec7e9493039b109404c72457497e76d250d3dda55733fb27dd55e31b9"
+    },
+    {
+      "path": "excel/excel-recorded-macro.xlt",
+      "bytes": 28160,
+      "sha256": "ae94bd7d9a30e261d4d91a0d4df54006b51c1e50ace4a372ac091e4d68642c53"
+    },
+    {
+      "path": "word/word-math-navigation.docx",
+      "bytes": 17521,
+      "sha256": "1a92918478af7b47327974f72428422b65290001ee124bb73f7a7aaf226a34ee"
+    },
+    {
+      "path": "word/word-math-navigation.dotx",
+      "bytes": 17499,
+      "sha256": "c3107f4aa9a4c2663505cb627761f68e10b21810ea6a6f590b6b86803a0e915d"
+    },
+    {
+      "path": "word/word-math-navigation.doc",
+      "bytes": 83456,
+      "sha256": "077d33455154e70c6b926eb69e74c8b2501cc9e6090ea217d77254ee4a6b0f2e"
+    },
+    {
+      "path": "word/word-math-navigation.rtf",
+      "bytes": 218344,
+      "sha256": "3e82fbc1a67118fed51e333f43970a4547f1d31b18f0c2cec2ccea381571ab27"
+    },
+    {
+      "path": "excel/excel-visual-analytics.xlsx",
+      "bytes": 16951,
+      "sha256": "6d4326832690c1c004e3881eae21e2e7614050b67f2824c191fc0d4b06b1875d"
+    },
+    {
+      "path": "excel/excel-visual-analytics.xltx",
+      "bytes": 16953,
+      "sha256": "ba1368a3bd02540fefc47ce3efcd526a3b766c1c4d62394f42253139af41eca2"
+    },
+    {
+      "path": "excel/excel-visual-analytics.xlsb",
+      "bytes": 14139,
+      "sha256": "c300d09300ab8f5acc59f979a75e97d1a1aea2a37f7aea6a30ac8b5ea6564170"
+    },
+    {
+      "path": "excel/excel-visual-analytics-strict.xlsx",
+      "bytes": 17243,
+      "sha256": "853aebfb724342846aab084fe8dfeeac0cc58a418f816417a640a26fae78c41d"
+    },
+    {
+      "path": "excel/excel-visual-analytics.xls",
+      "bytes": 26112,
+      "sha256": "7a0bab34cecbdc3673931ae55d34a0aba6bfcd93deffb5cfa6e08f12aac08f70"
+    },
+    {
+      "path": "word/word-rtf-minimal.rtf",
+      "bytes": 46744,
+      "sha256": "9d4d939a0228701679d49da35db613e3a6bc827b2b38509c0f332142d217f76c"
+    },
+    {
+      "path": "word/word-rtf-table-grid.rtf",
+      "bytes": 48528,
+      "sha256": "a51aa77ff69eb6102b16231cb732f5aa19bb3e2dc2f5598d964dfb44e8622a69"
+    },
+    {
+      "path": "powerpoint/powerpoint-visual-objects.potx",
+      "bytes": 146947,
+      "sha256": "32b984e41daad175f926de235f7b9332d1bfb1e31e4afa04dee418778e87c735"
+    },
+    {
+      "path": "powerpoint/powerpoint-visual-objects.ppsx",
+      "bytes": 146946,
+      "sha256": "bcacaefa1b30c32db879f9fe1262ea8a1c1db342049ced31f2ece99b2b3ee1d4"
+    },
+    {
+      "path": "powerpoint/powerpoint-visual-objects.pot",
+      "bytes": 346112,
+      "sha256": "1542c25eb684e950c474d4e83d3c49956d9cf81b0f5ae854ac18bf1fdb7a6ee6"
+    },
+    {
+      "path": "powerpoint/powerpoint-visual-objects.pps",
+      "bytes": 352768,
+      "sha256": "dab26b532f2308b728849b3f16d2306e539b9351e876c22756efae5ee33b886d"
+    },
+    {
+      "path": "powerpoint/powerpoint-navigation-review.pptx",
+      "bytes": 51319,
+      "sha256": "c38ffd02b373774a39b0c9760ae2e5474a9aa27828f027f74312f40b170d5877"
+    },
+    {
+      "path": "powerpoint/powerpoint-navigation-review.ppt",
+      "bytes": 119808,
+      "sha256": "6f01f04cca465cdb57e399866f08a4e565ee9e23cad6810cd5a09e9caed1b430"
+    },
+    {
+      "path": "powerpoint/powerpoint-media-objects.pptx",
+      "bytes": 183544,
+      "sha256": "35bf326a3d9374faee9f6a8837a3a5f9c3235de1b38013be0e9dc4cb76e4262f"
+    },
+    {
+      "path": "powerpoint/powerpoint-media-objects.ppt",
+      "bytes": 282624,
+      "sha256": "4d65988f789ceaa3a393e00e2a36bc437e974250b6b12963449cded417e940fa"
+    },
+    {
+      "path": "word/word-visual-objects.docx",
+      "bytes": 169925,
+      "sha256": "9a4ed67e560b1fac85ba3dec56e3d613862051a1a377cce9616db2795e5a74c4"
+    },
+    {
+      "path": "word/word-visual-objects.doc",
+      "bytes": 229376,
+      "sha256": "97911f12253131e23b1dd69f92329a891476bdb09bc9b3fb18a6bace7c075bf4"
+    },
+    {
+      "path": "word/word-visual-objects.rtf",
+      "bytes": 1005978,
+      "sha256": "25a188525ac0c8c83b61ce1f38a4a894f356029f815406bd01e0db8e87daf909"
+    },
+    {
+      "path": "powerpoint/powerpoint-passive-macro.pptm",
+      "bytes": 38889,
+      "sha256": "44fc80d7ec1cbf635edb2325640726172207127f1716e4f53f8751145bbe7c52"
+    },
+    {
+      "path": "powerpoint/powerpoint-passive-macro.potm",
+      "bytes": 38925,
+      "sha256": "7c210298ee28f3bc3146a0cf422c2dbc3903a133085cb5176e7b292fa9fe702c"
+    },
+    {
+      "path": "powerpoint/powerpoint-passive-macro.ppsm",
+      "bytes": 38929,
+      "sha256": "635fc588ef32aaade8f4793c3c7452b84b42614319517098ed08bb81f089f014"
+    },
+    {
+      "path": "powerpoint/powerpoint-passive-macro.ppt",
+      "bytes": 50176,
+      "sha256": "ea2ff3c6290bb5fc1a02ad88fea4afe88aac77d4b09f017c2757d91537185171"
+    },
+    {
+      "path": "excel/excel-conditional-drawings.xlsx",
+      "bytes": 14263,
+      "sha256": "dd3f5d866113dc6a102ae24a248f6321be6287dab522de7636fab86cd715d645"
+    },
+    {
+      "path": "excel/excel-conditional-drawings.xlsb",
+      "bytes": 12985,
+      "sha256": "9f8df8e4c5cfe5845e0a529f10fb9f9d15f45bf8939ec965b74c6d54b11f7f56"
+    },
+    {
+      "path": "excel/excel-conditional-drawings.xls",
+      "bytes": 34304,
+      "sha256": "d89e2115aa9e8fc47b464328417cf85ceb1240edba6ca35064b1fbf71042ac5e"
+    },
+    {
+      "path": "word/word-mailmerge-fields.docx",
+      "bytes": 14282,
+      "sha256": "e399b0a14088a534dd6564f92dd0cef891d94258ee6cd002cb19076e86c67d27"
+    },
+    {
+      "path": "word/word-mailmerge-fields.doc",
+      "bytes": 25600,
+      "sha256": "ff827594dce31dfab50128bf0b03e4cd044c28b884de4b50d3fbb4ff9d5a2418"
+    },
+    {
+      "path": "word/word-mailmerge-fields.rtf",
+      "bytes": 49788,
+      "sha256": "3400508a4557ed2bf76fe2472d344c9a4992b7bad5a79e9b578d596ae153d083"
+    },
+    {
+      "path": "word/word-mailmerge-source.docx",
+      "bytes": 13745,
+      "sha256": "a2a524e7bc796021563e781556712589d4920e6f949348b0c8c179a8465a3e43"
+    },
+    {
+      "path": "word/word-mailmerge-source.doc",
+      "bytes": 29184,
+      "sha256": "749ac1792eeacefb2f8bdeb7f78e179473eb1cd1a304f8dd708a0dfd1ac028bc"
+    },
+    {
+      "path": "word/word-document-protection.docx",
+      "bytes": 17771,
+      "sha256": "45ebd2ff9164a9112e07b7c053818f8283a58e8e2d24d089bb207757df81a4d8"
+    },
+    {
+      "path": "word/word-document-protection.doc",
+      "bytes": 25088,
+      "sha256": "79f4e1b7e29048d1c321affba757f70d60a8f083637af72e0e7dfa4d70b3d8f3"
+    },
+    {
+      "path": "word/word-document-protection.rtf",
+      "bytes": 48754,
+      "sha256": "31de5a6f8a38ac57fa9c1786b40c586a9eaf2d618ea14fad16a5e63d3ff28a5c"
+    },
+    {
+      "path": "word/word-legacy-form-unprotected.docx",
+      "bytes": 13759,
+      "sha256": "a4b37e93f7cf0c93213e419cb42796e361785f4354d50a585dcd5b60ed910778"
+    },
+    {
+      "path": "word/word-legacy-form.docx",
+      "bytes": 13788,
+      "sha256": "ef1672164fc05011927dd6f9f498cd0d90b6c7e99aaaf6ca2f5c5fe77c21f948"
+    },
+    {
+      "path": "word/word-legacy-form.doc",
+      "bytes": 29184,
+      "sha256": "f4b3e30d5d939bcb97d651f0cf920e1b56f2c0e782d154ce43b896f2cfb1ed79"
+    },
+    {
+      "path": "word/word-legacy-form.rtf",
+      "bytes": 48852,
+      "sha256": "35681f5af147dc4d80fdd28696c74d608345329fb6f7e86e9ab7c77ecca68879"
+    },
+    {
+      "path": "excel/excel-links-objects.xlsx",
+      "bytes": 61817,
+      "sha256": "4bf5b315001334a876283187c6c7634373ab938f23c4e4b9a7788a12b88bcd42"
+    },
+    {
+      "path": "excel/excel-links-objects.xlsb",
+      "bytes": 61091,
+      "sha256": "af752ae6b17f92d102d4d187fcad68753a389f5fec64f541442131c84048c311"
+    },
+    {
+      "path": "excel/excel-links-objects.xls",
+      "bytes": 69120,
+      "sha256": "6745cb956264ad6ae906f84433e0dbcceb03a2bcf166fa36884cbcfd59e846b5"
+    },
+    {
+      "path": "excel/excel-pivot-controls.xlsx",
+      "bytes": 28115,
+      "sha256": "24c9b605f4241d89913f8cdd1ae75047d550fd2a8ed9ad3c731a13cce6d3b2ef"
+    },
+    {
+      "path": "excel/excel-pivot-controls.xlsb",
+      "bytes": 24260,
+      "sha256": "bba0bc362bc05aad7b14804eac851e0b8eafe59d90c619acd266cba725b2d4bd"
+    },
+    {
+      "path": "excel/excel-pivot-controls.xls",
+      "bytes": 34304,
+      "sha256": "6664ad779de5e965d5a153bafd11ec4a0d1fc0200d5d80d65b13eb5ac2c8b94c"
+    },
+    {
+      "path": "excel/excel-form-controls.xlsx",
+      "bytes": 18143,
+      "sha256": "5ecc8fe96f9bc071c4d2db4f4f483975645a2a3119a23e83b7731d3d1063a96b"
+    },
+    {
+      "path": "excel/excel-form-controls.xlsb",
+      "bytes": 12295,
+      "sha256": "432d1eb8d8e90b684b64a14087911b0d096476ebb1d8bd6490811a986811bbab"
+    },
+    {
+      "path": "excel/excel-form-controls.xls",
+      "bytes": 29696,
+      "sha256": "6a5e3f76f4b76fc5008ffeb048dbc757840b5215f04eef62f8723508ba55fbac"
+    },
+    {
+      "path": "powerpoint/powerpoint-master-motion.pptx",
+      "bytes": 895283,
+      "sha256": "c23717ee6a2b8b6d96b128bf1f1bd0037ed57da359556ff8ff253e7c6a9e9dac"
+    },
+    {
+      "path": "powerpoint/powerpoint-master-motion.ppt",
+      "bytes": 4189184,
+      "sha256": "c4ea2315e305980ccc0a362097352cff66025f7cde408aa375737a40394e4084"
+    },
+    {
+      "path": "powerpoint/powerpoint-modern-media.pptx",
+      "bytes": 394407,
+      "sha256": "4aca2a5222721bd1670934460b97f966625f7334b275a81c412e716ff3e6b849"
+    },
+    {
+      "path": "powerpoint/powerpoint-modern-media.ppt",
+      "bytes": 518144,
+      "sha256": "6d09f45e7195ef5f36e8fa5622fc2749d237768ed48d15bc58fb14cc2fd3f62f"
+    },
+    {
+      "path": "excel/excel-formula-owners.xlsx",
+      "bytes": 12812,
+      "sha256": "1514e27b0f7334a786eea5adba316b032844c8d5de81d9b1807298a3b1ed8b87"
+    },
+    {
+      "path": "excel/excel-formula-owners.xlsb",
+      "bytes": 12035,
+      "sha256": "6626274eb76cf5bea84b061435188d613f90185d7d34583b60f377013af874ac"
+    },
+    {
+      "path": "excel/excel-formula-owners.xls",
+      "bytes": 34304,
+      "sha256": "12f87df75c876e833aaa4497bee9bfc26857cd353241f4e70b87fba97d104d4a"
+    },
+    {
+      "path": "excel/excel-connections.xlsx",
+      "bytes": 18558,
+      "sha256": "c956cdc60d4149327d7d3f0c5c1952fcbeec3ae978c668c9d1bc5a6a19e258b8"
+    },
+    {
+      "path": "excel/excel-connections.xlsb",
+      "bytes": 16589,
+      "sha256": "f24be09b3f7c7e0091a28c5b4b2f5457658cc3aba2ea67a4ec41b10c6d929e2d"
+    },
+    {
+      "path": "excel/excel-connections.xls",
+      "bytes": 34304,
+      "sha256": "5b273db0f35f6ba4f3de8bc63c40535bd14ac14ceb0677dc3ea0a6df3958cbb4"
+    },
+    {
+      "path": "word/word-embedded-fonts.docx",
+      "bytes": 2185903,
+      "sha256": "4a3a50878dc3f49d5e7eb1866805839267fd3fa548cf857cd01351fca66b9851"
+    },
+    {
+      "path": "word/word-embedded-fonts-subset.docx",
+      "bytes": 240501,
+      "sha256": "fa66049d598e03515336008450b7917a0470e7665faf8e3785b941881cc8b3bf"
+    },
+    {
+      "path": "word/word-embedded-fonts.doc",
+      "bytes": 691200,
+      "sha256": "62fbd2ea54f667d9d8a32021178e2a9b7eb23b875200611c001701754de55e20"
+    },
+    {
+      "path": "word/word-embedded-fonts.rtf",
+      "bytes": 47382,
+      "sha256": "f7484f24b8c0efd60f48c142d616a16efa36dc520054048dcdbfb00b8cdf462e"
+    },
+    {
+      "path": "excel/excel-date1904-breaks.xlsx",
+      "bytes": 10521,
+      "sha256": "6c8c3dcb769a54c5bd0847ef67a56cfc0fafca94f9e0718e01e2b3eb81a7d80b"
+    },
+    {
+      "path": "excel/excel-date1904-breaks.xlsb",
+      "bytes": 9642,
+      "sha256": "c527368af57d0d1cfa7bc81eb0e5e124c390ee6eee909f31928ffd6f7f209866"
+    },
+    {
+      "path": "excel/excel-date1904-breaks.xls",
+      "bytes": 28160,
+      "sha256": "9654784b8c93edff5e4ca85ab29997d8154987b807dbe6476fe14cd737b67421"
+    },
+    {
+      "path": "word/word-vector-diagram.docx",
+      "bytes": 41325,
+      "sha256": "971ecf71478aa0c51bdf46e8a665a49a531defffd251f490123cf3a69df78e79"
+    },
+    {
+      "path": "word/word-vector-diagram.doc",
+      "bytes": 84992,
+      "sha256": "f308869e4e010ec4548fa0b6ba6cfaf7fd7b8ea1f792e8fcbe728009eb14bb77"
+    },
+    {
+      "path": "word/word-vector-diagram.rtf",
+      "bytes": 225434,
+      "sha256": "c63056f55b095edd424a67aaf90625dbddb61995818d3af81f6eade884872a02"
+    },
+    {
+      "path": "excel/excel-chart-families.xlsx",
+      "bytes": 128168,
+      "sha256": "eae01ec29bec519fcdb2f474068eab3e2845ea63a14bdbad7ad662d209218fbd"
+    },
+    {
+      "path": "excel/excel-chart-families.xlsb",
+      "bytes": 128103,
+      "sha256": "d2f7a10375577f7014443eaf49a4215ff33d6bb48f15dc8bce77ca25c88b4da7"
+    },
+    {
+      "path": "excel/excel-chart-families.xls",
+      "bytes": 253952,
+      "sha256": "94aed9811a45661ee033e79738b46f0b98d8c89a76b7f2f5913ea01cd6ff5097"
+    },
+    {
+      "path": "word/word-glossary.dotx",
+      "bytes": 20155,
+      "sha256": "37b155e28b456aa9fb3cf51d659397e64d4f8c12b61ac569cf2c4a243beb95e1"
+    },
+    {
+      "path": "word/word-glossary.dot",
+      "bytes": 34304,
+      "sha256": "62aad141f3e48545549eefe778e721cf2ae2a00251edccfeb7351fcd7e4ee1d8"
+    },
+    {
+      "path": "word/word-glossary.docx",
+      "bytes": 13372,
+      "sha256": "ace5056f719daebfad5b61f18a69e3cd7e16c5d51966cdeb7506b1199a20e347"
+    },
+    {
+      "path": "word/word-bidi-eastasia.docx",
+      "bytes": 14353,
+      "sha256": "d35591780c9001c7229c275e25c9b4051cbd8763fc078664fb2ad35d02a08aa9"
+    },
+    {
+      "path": "word/word-bidi-eastasia.doc",
+      "bytes": 25600,
+      "sha256": "145fd239d3a555d33f81352b34ef390692a4426280c3e42925e1be20740eec19"
+    },
+    {
+      "path": "word/word-bidi-eastasia.rtf",
+      "bytes": 55704,
+      "sha256": "4c1faec1d945a3bfca15b3513a18d32786846229751a29502ebebb2a88a0df4a"
+    },
+    {
+      "path": "excel/excel-revisions.xlsx",
+      "bytes": 15052,
+      "sha256": "34d494b4ca8f2b8485be94b16841e0f26ac8f2be783534803877c026a878206d"
+    },
+    {
+      "path": "excel/excel-revisions.xlsb",
+      "bytes": 13369,
+      "sha256": "fe9ef9ff4170878c764db53f8bce9574c76f487f9ef264228de27e78c8160206"
+    },
+    {
+      "path": "excel/excel-revisions.xls",
+      "bytes": 28160,
+      "sha256": "3909544d1b48ff4f165c9d02b7cf2206d28fbaa69524e78be5a20b1f4f48acf9"
+    },
+    {
+      "path": "excel/excel-metadata.xlsx",
+      "bytes": 17941,
+      "sha256": "dedee8a1ee2175267630a652d4a60f2e495abc5eac8086ee27b73d2d5ce29d78"
+    },
+    {
+      "path": "excel/excel-metadata.xlsb",
+      "bytes": 17073,
+      "sha256": "953ae52533e2774aaa57c1336b858bbf2c4573993d48f71a9634593912c30fb9"
+    },
+    {
+      "path": "excel/excel-metadata.xls",
+      "bytes": 206848,
+      "sha256": "1b3b21d5bea5f8502bac2367cfdca2dc058f8e126b01631c61d19260d3ebc6b1"
+    },
+    {
+      "path": "word/word-layout-extensions.docx",
+      "bytes": 16505,
+      "sha256": "14dbe005b89b078823db8aee311a141b5a41e79a54c2cb3e55ab73708c847aaa"
+    },
+    {
+      "path": "word/word-layout-extensions.dotx",
+      "bytes": 16434,
+      "sha256": "da93dd32de50b211c15b271bd67b8303f1b1bacbd914771f518dec6dee4273c8"
+    },
+    {
+      "path": "word/word-layout-extensions.doc",
+      "bytes": 32768,
+      "sha256": "b589aeb5a31058ead69505398e1975b8f551ebd5898dabfcf9d23fbbe39af391"
+    },
+    {
+      "path": "word/word-layout-extensions.dot",
+      "bytes": 32768,
+      "sha256": "7701c62b10996044fc0ed5bf4253364321c1fb6a9f5ff6f2202650ac4b9d233f"
+    },
+    {
+      "path": "word/word-layout-extensions.rtf",
+      "bytes": 57955,
+      "sha256": "6b4b434ce131934e3287666efe8e995f54d09193330b89f4ab8c514a0b7ab95b"
+    },
+    {
+      "path": "excel/excel-legacy-sheets.xlsm",
+      "bytes": 9714,
+      "sha256": "9fcf8c04d6b0f28d7ff7fb6bb8d3ba967eb8df0ebe3740674cff564560b8a522"
+    },
+    {
+      "path": "excel/excel-legacy-sheets.xlsb",
+      "bytes": 9326,
+      "sha256": "39ac24811d4659ee485824db4adf2f25da95a9d9584a935ceaafcbbec43c0101"
+    },
+    {
+      "path": "excel/excel-legacy-sheets.xls",
+      "bytes": 26624,
+      "sha256": "1b92de8a6ee8fab102e10cf01661f91444822a6e29fbc03ec90feb40d6744a23"
+    },
+    {
+      "path": "powerpoint/powerpoint-fonts-math-handout.pptx",
+      "bytes": 264614,
+      "sha256": "0871811bbf80ec3883dc6c3a205db7942c244ae60565f6bc1b6391ce8e62872f"
+    },
+    {
+      "path": "powerpoint/powerpoint-fonts-math-handout.ppt",
+      "bytes": 251392,
+      "sha256": "1b03d9dd84d58e05d0daa7d0fd4a419ad53a66074a7becb37d2bb7b365461ad9"
+    },
+    {
+      "path": "word/word-master-document.docx",
+      "bytes": 13425,
+      "sha256": "c4b5d694a175ddc2d7f17dd6b5281c28f74acfe4f67ff3f9729c8ea841626f6a"
+    },
+    {
+      "path": "word/word-master-document/CHILD",
+      "bytes": 12461,
+      "sha256": "4052af1a9227fca1a652f811f9d51c1d67ad290838cbcb6fa74fe64f5e5a9332"
+    },
+    {
+      "path": "word/word-master-native.doc",
+      "bytes": 25088,
+      "sha256": "0fa511c1c0e5e04f6c4d9071d4e27c301581c57980bcb01375c15f16c745ed7b"
+    },
+    {
+      "path": "word/word-master-native/LEGACY",
+      "bytes": 22528,
+      "sha256": "7c579350d652a6f0b261aeb762b2f071dfadcf5b54651c6b839ae32b3420b9bb"
+    },
+    {
+      "path": "powerpoint/powerpoint-ink-stroke.pptx",
+      "bytes": 39302,
+      "sha256": "c1033a4e7427b9e1176ff5796ad33aaf0b5b386211883fae66667b9c43279df5"
+    },
+    {
+      "path": "powerpoint/powerpoint-ink-replay.pptx",
+      "bytes": 39729,
+      "sha256": "d124aa75d1cc219bd40d71ddb184074ec802bfae343792216b6d3e8cb83e3376"
+    },
+    {
+      "path": "excel/excel-encrypted.xlsx",
+      "bytes": 15360,
+      "sha256": "fdff80100da7f67c8a980ba3ccd648d5316765b013c302bd5cd5f60b32350416"
+    },
+    {
+      "path": "excel/excel-encrypted.xlsb",
+      "bytes": 14848,
+      "sha256": "53648d150a11b3b28c9f53bfe664e7c3e325b4fde2a3e2f19a8fa69b9698e14c"
+    },
+    {
+      "path": "excel/excel-encrypted.xls",
+      "bytes": 26112,
+      "sha256": "ef8dd4ead6cd9ad3a9b4887423c2955ab2109f1e6acaf422a18526612543148e"
+    },
+    {
+      "path": "powerpoint/powerpoint-encrypted.pptx",
+      "sha256": "1fe2172a04f6d8c0e49204d0ee9ebffe05174b1fd8614095d049f6489a9dacca",
+      "bytes": 43520
+    },
+    {
+      "path": "powerpoint/powerpoint-encrypted.ppt",
+      "sha256": "2b60c0b31601ce2fe52eba46f1dc768f5685ff57459290feee2ec09080174c59",
+      "bytes": 40960
+    },
+    {
+      "path": "word/word-tracked-moves.docx",
+      "bytes": 14475,
+      "sha256": "93970c2a65973afa1d7a63d9a02b1cc770aaf5b16052023e8f4af6c975367a65"
+    },
+    {
+      "path": "word/word-tracked-moves.doc",
+      "bytes": 24576,
+      "sha256": "a48cad2000150d06906d60a51dcec035a790b94880b518992d2e73fcc275c1f5"
+    },
+    {
+      "path": "word/word-tracked-moves.rtf",
+      "bytes": 48209,
+      "sha256": "da8546c48bce7aab640d77fad2499555944fc1736ff7228e46334db1261e3f31"
+    },
+    {
+      "path": "word/word-encrypted.docx",
+      "bytes": 19968,
+      "sha256": "724985af8f869ebd3daea454bac3057a646e6e41ac5b188fbf310cd43bd1bdc0"
+    },
+    {
+      "path": "word/word-encrypted.doc",
+      "bytes": 25088,
+      "sha256": "4ff94c46646d95076e161844d8780f58cdfd895c15f8b264ae07c5aed609f24c"
+    },
+    {
+      "path": "word/word-write-reservation.rtf",
+      "bytes": 46510,
+      "sha256": "fcb5556b87fd29ed3723c3b9cc3752f2a9cb6a70fa4ea06855544c9ae5fba205"
+    }
+  ],
+  "import_asset_manifest": {
+    "files": [
+      {
+        "path": "test-data/microsoft-office/assets/captions-007.vtt",
+        "format": "WebVTT",
+        "bytes": 94,
+        "sha256": "ef72ee0739e5bce54e8131e248a50d8ce65f825b9d20e64ca4d9db0fae591e9e"
+      },
+      {
+        "path": "test-data/microsoft-office/assets/svg-blue-yellow-007.svg",
+        "format": "SVG",
+        "bytes": 634,
+        "sha256": "7a9ddf774233cf05324a5f032d54003274d998e7cddda2185c899847e0ffead0"
+      },
+      {
+        "path": "test-data/microsoft-office/assets/colored-triangle-007.glb",
+        "format": "glTF binary",
+        "bytes": 1200,
+        "sha256": "0f2064d8a923c4cd8abda05f0cb9b2c13d300f14ae1df0446904202c280f6d17"
+      },
+      {
+        "path": "test-data/microsoft-office/assets/native-query-010.csv",
+        "format": "CSV",
+        "bytes": 66,
+        "sha256": "fa8a8effa0eb4a04dd5fb4e2f88ac45f15f942fe0f24850862e0b192296c8ecb"
+      }
+    ]
+  }
+}

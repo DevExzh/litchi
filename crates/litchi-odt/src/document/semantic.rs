@@ -1,0 +1,1100 @@
+//! Semantic ODT document queries and the public read facade.
+
+use crate::core::{Meta, Styles};
+use crate::elements::style::StyleRegistry;
+use crate::elements::table::Table as ElementTable;
+use crate::elements::text::{Paragraph as ElementParagraph, TextElements};
+use litchi_core::{Metadata, Result};
+
+use crate::header_footer::{Master, read};
+use crate::page_layout::{PageLayout, parse_page_layouts};
+use crate::page_sequence::{Sequence, parse_page_sequence};
+
+use super::codec::{parse_bookmark_names, parse_hyperlinks, parse_image_references};
+use super::model::Document;
+use std::io::Write;
+
+impl Document {
+    crate::package::scripts::script_facade_methods!();
+    crate::package::annotation::annotation_facade_methods!(Text);
+
+    /// Everything a tolerant read repaired while this document was opened.
+    ///
+    /// An empty report means the document conformed; see
+    /// [`litchi_odf_common::leniency::ToleranceReport`].
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        &self.state.tolerance
+    }
+
+    /// Extract all text content from the document.
+    ///
+    /// This method extracts plain text from all paragraphs, headings, and text elements
+    /// in the document, preserving paragraph breaks. Formatting, styles, and non-text
+    /// elements are omitted.
+    ///
+    /// # Performance
+    ///
+    /// This method parses the XML on each call. For repeated access, consider caching
+    /// the result.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let text = doc.text()?;
+    /// println!("Text content:\n{}", text);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn text(&self) -> Result<String> {
+        TextElements::extract_text(self.state.content.xml_content())
+    }
+
+    /// Write visible paragraphs and headings as bounded UTF-8 text to a
+    /// caller-owned sequential, non-seek sink.
+    ///
+    /// Headings are paragraph-like objects. Formatting is omitted, inline
+    /// `text:line-break` controls remain `\n`, and separators come from
+    /// `options`. Tracked-change definitions, note bodies, and ruby
+    /// pronunciation runs are excluded from visible text. The ODT parser
+    /// applies a hard 64 MiB decoded-text ceiling in addition to the shared
+    /// output limits in `options`.
+    ///
+    /// Output may be partial when parsing, a resource limit, or the sink
+    /// fails. This method never flushes or rolls back the caller-owned sink,
+    /// and it has no cancellation hook.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> std::result::Result<
+        litchi_core::TextOutputReport,
+        litchi_core::TextOutputError<litchi_core::Error>,
+    > {
+        TextElements::write_text_to(self.state.content.xml_content(), output, options)
+    }
+
+    /// The structural index of the text body: every paragraph, heading,
+    /// run, hyperlink, list, table, section, frame, note, annotation and
+    /// bookmark with its source byte range. Built on first use and shared by
+    /// every clone of this document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` has no text body or exceeds the
+    /// index limits.
+    pub fn body(&self) -> Result<crate::body::Body<'_>> {
+        let styles = self.state.styles.as_ref().map(Styles::xml_content);
+        let tree = match self.state.body.get() {
+            Some(tree) => tree,
+            None => {
+                let tree = crate::body::Tree::build(self.state.content.xml_content(), styles)?;
+                self.state.body.get_or_init(|| tree)
+            },
+        };
+        Ok(tree.view(self.state.content.xml_content(), styles))
+    }
+
+    /// Get the number of paragraphs in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let count = doc.paragraph_count()?;
+    /// println!("Paragraph count: {}", count);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn paragraph_count(&self) -> Result<usize> {
+        Ok(self.paragraphs()?.len())
+    }
+
+    /// Get all paragraphs in the document as structured elements.
+    ///
+    /// Returns a vector of `Paragraph` elements that can be used to access
+    /// individual paragraph content, styles, and attributes.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let paragraphs = doc.paragraphs()?;
+    ///
+    /// for para in paragraphs {
+    ///     println!("Paragraph: {}", para.text()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn paragraphs(&self) -> Result<Vec<ElementParagraph>> {
+        TextElements::parse_paragraphs(self.state.content.xml_content())
+    }
+
+    /// Get one paragraph by its zero-based paragraph index.
+    ///
+    /// Headings do not contribute to the index. The complete document XML is
+    /// still validated, but only the requested paragraph is retained.
+    pub fn paragraph(&self, index: usize) -> Result<Option<ElementParagraph>> {
+        TextElements::parse_paragraph_at(self.state.content.xml_content(), index)
+    }
+
+    /// Get all tables in the document.
+    ///
+    /// Returns a vector of `Table` elements representing all tables found
+    /// in the document body.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let tables = doc.tables()?;
+    ///
+    /// println!("Found {} tables", tables.len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn tables(&self) -> Result<Vec<ElementTable>> {
+        use crate::elements::table::TableElements;
+        TableElements::parse_tables_from_content(self.state.content.xml_content())
+    }
+
+    /// Get all document elements (paragraphs, headings, and tables) in document order.
+    ///
+    /// This method extracts both paragraphs (including headings) and tables, interleaved
+    /// in the order they appear in the document. This provides a more efficient way to
+    /// iterate through document content than calling `paragraphs()` and `tables()` separately,
+    /// and preserves the exact document order.
+    ///
+    /// # Returns
+    ///
+    /// A vector of `OrderElement` containing all paragraphs, headings, tables, and
+    /// lists in the order they appear in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    /// use litchi_odt::elements::parser::OrderElement;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let elements = doc.elements()?;
+    ///
+    /// for element in elements {
+    ///     match element {
+    ///         OrderElement::Paragraph(para) => {
+    ///             println!("Paragraph: {}", para.text()?);
+    ///         },
+    ///         OrderElement::NumberedParagraph(para) => {
+    ///             println!("Numbered paragraph: {}", para.text()?);
+    ///         },
+    ///         OrderElement::Heading(heading) => {
+    ///             println!("Heading: {}", heading.text()?);
+    ///         },
+    ///         OrderElement::Table(table) => {
+    ///             println!("Table with {} rows", table.row_count()?);
+    ///         },
+    ///         OrderElement::List(_) => {
+    ///             println!("List element");
+    ///         },
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn elements(&self) -> Result<Vec<crate::elements::parser::OrderElement>> {
+        use crate::elements::parser::Parser;
+
+        // Parse all elements in document order using the generic ODF parser
+        Parser::parse_elements_in_order(self.state.content.xml_content())
+    }
+
+    /// Get document metadata.
+    ///
+    /// Extracts metadata from the meta.xml file, including title, author,
+    /// creation date, modification date, word count, and other document properties.
+    ///
+    /// # Returns
+    ///
+    /// A `Metadata` struct containing all available metadata fields. Fields that
+    /// are not present in the document will be `None`.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let metadata = doc.metadata()?;
+    ///
+    /// if let Some(title) = &metadata.title {
+    ///     println!("Title: {}", title);
+    /// }
+    /// if let Some(author) = &metadata.author {
+    ///     println!("Author: {}", author);
+    /// }
+    /// if let Some(word_count) = metadata.word_count {
+    ///     println!("Words: {}", word_count);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn metadata(&self) -> Result<Metadata> {
+        if let Some(meta) = &self.state.meta {
+            meta.try_extract_metadata()
+        } else {
+            Ok(Metadata::default())
+        }
+    }
+
+    /// Get the complete format-specific `OpenDocument` metadata model.
+    pub fn odf_metadata(&self) -> Result<Option<crate::Metadata>> {
+        self.state.meta.as_ref().map(Meta::odf_metadata).transpose()
+    }
+
+    /// Return document interaction and protection policy metadata.
+    ///
+    /// The policy is inert: reading it never enforces protection or unlocks
+    /// tracked changes.
+    pub fn protection(&self) -> Result<crate::protection::Policy> {
+        let package = self.state.package.package()?;
+        if !package.has_file(crate::constants::ODF_SETTINGS) {
+            return Ok(crate::protection::Policy::default());
+        }
+        crate::protection::parse_package(&package.get_file(crate::constants::ODF_SETTINGS)?)
+    }
+
+    /// Get the style registry for this document.
+    ///
+    /// The style registry contains all styles defined in the document,
+    /// including both automatic styles and named styles.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let styles = doc.styles();
+    /// // Use the style registry to query styles...
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn styles(&self) -> &StyleRegistry {
+        &self.state.style_registry
+    }
+
+    /// Get typed named ruby style definitions from `styles.xml`.
+    pub fn ruby_styles(&self) -> Result<crate::ruby_family::Styles> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::parse_ruby_styles(styles.xml_content()),
+        )
+    }
+
+    /// Return font-face declarations stored in `content.xml`.
+    ///
+    /// This preserves stored metadata only. It does not fetch linked font
+    /// resources, load fonts, or inspect embedded font data.
+    pub fn content_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
+        crate::font_face::parse_content_font_face_declarations(
+            self.state.content.xml_content(),
+            &self.state.xml_limits,
+        )
+    }
+
+    /// Return font-face declarations stored in `styles.xml`.
+    ///
+    /// This preserves stored metadata only. It does not fetch linked font
+    /// resources, load fonts, or inspect embedded font data.
+    pub fn styles_font_face_declarations(&self) -> Result<Option<crate::font_face::Declarations>> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| {
+                crate::font_face::parse_styles_font_face_declarations(
+                    styles.xml_content(),
+                    &self.state.xml_limits,
+                )
+            },
+        )
+    }
+
+    /// Return named legacy and SVG drawing gradients from `styles.xml`.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites, load external data, or render gradients.
+    pub fn drawing_gradients(&self) -> Result<crate::drawing::resources::gradient::Collection> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::drawing::resources::gradient::parse_drawing_gradients(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// Return named drawing hatch resources from `styles.xml`.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites or render hatches.
+    pub fn drawing_hatches(&self) -> Result<crate::drawing::resources::hatch::Collection> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::drawing::resources::hatch::parse_drawing_hatches(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// Return named drawing stroke-dash resources from `styles.xml`.
+    ///
+    /// This exposes stored common-style resources only. It does not resolve
+    /// style use sites or render strokes.
+    pub fn drawing_stroke_dashes(
+        &self,
+    ) -> Result<crate::drawing::resources::stroke_dash::Collection> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::drawing::resources::stroke_dash::parse_drawing_stroke_dashes(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// Return named drawing fill-image definitions from `styles.xml`.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites, follow links, load linked resources, or render images.
+    pub fn drawing_fill_images(&self) -> Result<crate::drawing::resources::fill_image::Collection> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::drawing::resources::fill_image::parse_drawing_fill_images(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// Return named drawing marker definitions from `styles.xml`.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites or render marker paths.
+    pub fn drawing_markers(&self) -> Result<crate::drawing::resources::marker::Collection> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::drawing::resources::marker::parse_drawing_markers(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// Return named drawing opacity definitions from `styles.xml`.
+    ///
+    /// This exposes stored common-style metadata only. It does not resolve
+    /// style use sites or render opacity gradients.
+    pub fn drawing_opacities(&self) -> Result<crate::drawing::resources::opacity::Collection> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::drawing::resources::opacity::parse_drawing_opacities(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+                .map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// Parse master pages and their losslessly retained headers and footers.
+    pub fn master_pages(&self) -> Result<Vec<Master>> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| {
+                read(styles.xml_content(), self.state.xml_limits).map_err(litchi_core::Error::from)
+            },
+        )
+    }
+
+    /// The advanced-layout read view of `styles.xml` (master pages, page
+    /// layouts, section layouts), from which master-page and section-layout
+    /// transfers to another document are prepared.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the document has no `styles.xml` or it holds
+    /// malformed layout owners.
+    pub fn layouts(&self) -> Result<crate::header_footer::Snapshot> {
+        let styles = self.state.styles.as_ref().ok_or_else(|| {
+            litchi_core::Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::NotFound,
+                "odt.document.layouts",
+                "the document has no styles.xml",
+            ))
+        })?;
+        crate::header_footer::Snapshot::parse(
+            styles.xml_content().to_owned(),
+            self.state.xml_limits,
+        )
+    }
+
+    /// Parse automatic page layouts, their properties, and header/footer styles.
+    pub fn page_layouts(&self) -> Result<Vec<PageLayout>> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Vec::new()),
+            |styles| parse_page_layouts(styles.xml_content()),
+        )
+    }
+
+    /// The unnamed fallback page layout (`style:default-page-layout`), when
+    /// the document declares one.
+    pub fn default_page_layout(&self) -> Result<Option<PageLayout>> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| crate::page_layout::parse_default_page_layout(styles.xml_content()),
+        )
+    }
+
+    /// Return the stored footnote and endnote presentation configurations.
+    ///
+    /// These style declarations are retained as metadata only. This API does
+    /// not renumber notes, resolve style references, or render continuation
+    /// notices.
+    pub fn notes_configurations(&self) -> Result<crate::notes_configuration::Configurations> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| {
+                crate::notes_configuration::parse(styles.xml_content(), &self.state.xml_limits)
+            },
+        )
+    }
+
+    /// Return stored outline numbering styles.
+    ///
+    /// These are styles metadata only. This API does not apply styles to
+    /// headings, generate labels, or update tables of contents.
+    pub fn outline_styles(&self) -> Result<crate::outline_style::Styles> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(Default::default()),
+            |styles| crate::outline_style::parse_outline_styles(styles.xml_content()),
+        )
+    }
+
+    /// Return the stored document-wide bibliography formatting policy.
+    ///
+    /// This styles metadata remains inert: the API does not generate
+    /// bibliography entries, resolve citations, or access external sources.
+    pub fn bibliography_configuration(
+        &self,
+    ) -> Result<Option<crate::bibliography_configuration::Configuration>> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| {
+                crate::bibliography_configuration::parse_bibliography_configuration_with_xml_limits(
+                    styles.xml_content(),
+                    self.state.xml_limits,
+                )
+            },
+        )
+    }
+
+    /// Return the explicit master-page assignments from `text:page-sequence`, if present.
+    ///
+    /// This exposes stored page metadata only. It does not resolve master-page
+    /// styles, calculate page breaks, or paginate the document.
+    pub fn page_sequence(&self) -> Result<Option<Sequence>> {
+        parse_page_sequence(self.state.content.xml_content())
+    }
+
+    /// Return the stored document line-numbering configuration.
+    ///
+    /// This is presentation metadata from styles.xml only. It is never used to
+    /// paginate the document or generate line numbers.
+    pub fn line_numbering_configuration(
+        &self,
+    ) -> Result<Option<crate::line_numbering::Configuration>> {
+        self.state.styles.as_ref().map_or_else(
+            || Ok(None),
+            |styles| crate::line_numbering::parse(styles.xml_content()),
+        )
+    }
+
+    /// Get resolved style properties for a given style name.
+    ///
+    /// This method resolves style inheritance to provide the complete set of
+    /// properties that apply to elements using the specified style.
+    ///
+    /// # Arguments
+    ///
+    /// * `style_name` - Name of the style to resolve
+    ///
+    /// # Returns
+    ///
+    /// A `StyleProperties` struct containing all resolved properties for the style.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let props = doc.get_style_properties("Heading1");
+    ///
+    /// if let Some(font_size) = &props.text.font_size {
+    ///     println!("Heading 1 font size: {}", font_size);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get_style_properties(
+        &self,
+        style_name: &str,
+    ) -> crate::elements::style::StyleProperties<'_> {
+        self.state
+            .style_registry
+            .get_resolved_properties(style_name)
+    }
+
+    /// Get all tracked changes in the document.
+    ///
+    /// Tracked changes include insertions, deletions, and format changes made
+    /// by document collaborators.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let changes = doc.track_changes()?;
+    ///
+    /// for change in changes {
+    ///     println!("Change by {:?}: {:?}", change.author, change.change_type);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn track_changes(&self) -> Result<Vec<crate::parser::TrackChange>> {
+        crate::parser::Parser::parse_track_changes(self.state.content.xml_content())
+    }
+
+    /// Get tracked changes together with their inert container policy metadata.
+    ///
+    /// Protection-key material and digest identifiers are retained for round-trip and
+    /// inspection only; this method never unlocks, accepts, rejects, or evaluates changes.
+    pub fn tracked_changes(&self) -> Result<crate::parser::TrackedChanges> {
+        crate::parser::Parser::parse_tracked_changes(self.state.content.xml_content())
+    }
+
+    /// Get all comments/annotations in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let comments = doc.comments()?;
+    ///
+    /// for comment in comments {
+    ///     println!("Comment by {:?}: {}", comment.author, comment.content);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn comments(&self) -> Result<Vec<crate::parser::Comment>> {
+        crate::parser::Parser::parse_comments(self.state.content.xml_content())
+    }
+
+    /// Get all sections in the document.
+    ///
+    /// Sections are document subdivisions that can have protected content,
+    /// different formatting, or special layout properties.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let sections = doc.sections()?;
+    ///
+    /// for section in sections {
+    ///     println!("Section '{}': protected={}", section.name, section.protected);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn sections(&self) -> Result<Vec<crate::parser::Section>> {
+        crate::parser::Parser::parse_sections(self.state.content.xml_content())
+    }
+
+    /// Get all generated text indexes, including their inert source definitions and cached bodies.
+    ///
+    /// This covers tables of contents and illustration, table, object, user, alphabetical,
+    /// and bibliography indexes. Stored source declarations are never evaluated, and external
+    /// alphabetical auto-mark files are never fetched.
+    pub fn text_indexes(&self) -> Result<Vec<crate::TextIndex>> {
+        crate::index::parse_text_indexes(self.state.content.xml_content())
+    }
+
+    /// Get point and resolved range marks that contribute entries to generated text indexes.
+    pub fn text_index_marks(&self) -> Result<Vec<crate::TextIndexMark>> {
+        crate::index_mark::parse_text_index_marks(self.state.content.xml_content())
+    }
+
+    /// Get point and range targets used by `text:reference-ref` fields.
+    pub fn reference_marks(&self) -> Result<Vec<crate::ReferenceMark>> {
+        crate::reference_mark::parse_reference_marks(self.state.content.xml_content())
+    }
+
+    /// Read the bookmark targets (point and range `text:bookmark*`) in
+    /// document order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// bookmark markup.
+    pub fn bookmark_targets(&self) -> Result<Vec<crate::BookmarkTarget>> {
+        crate::parse_bookmark_targets(self.state.content.xml_content())
+    }
+
+    /// Read the form and control properties in document order, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn form_properties(&self) -> Result<Vec<crate::form::Property>> {
+        crate::form::form_properties(self.state.content.xml_content())
+    }
+
+    /// Read the text, textarea, formatted-text and fixed-text form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn text_controls(&self) -> Result<Vec<crate::form::TextControl>> {
+        crate::form::text_controls(self.state.content.xml_content())
+    }
+
+    /// Read the button and check-box form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn interactive_controls(&self) -> Result<Vec<crate::form::InteractiveControl>> {
+        crate::form::interactive_controls(self.state.content.xml_content())
+    }
+
+    /// Read the list-box and combo-box form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn selection_controls(&self) -> Result<Vec<crate::form::SelectionControl>> {
+        crate::form::selection_controls(self.state.content.xml_content())
+    }
+
+    /// Read the frame, image and hidden form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn visual_controls(&self) -> Result<Vec<crate::form::VisualControl>> {
+        crate::form::visual_controls(self.state.content.xml_content())
+    }
+
+    /// Read the generic (`form:generic-control`) form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn generic_form_controls(&self) -> Result<Vec<crate::form::GenericFormControl>> {
+        crate::form::generic_form_controls(self.state.content.xml_content())
+    }
+
+    /// Read the password and file form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn password_file_controls(&self) -> Result<Vec<crate::form::PasswordFileControl>> {
+        crate::form::password_file_controls(self.state.content.xml_content())
+    }
+
+    /// Read the image-frame form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn image_frame_controls(&self) -> Result<Vec<crate::form::ImageFrameControl>> {
+        crate::form::image_frame_controls(self.state.content.xml_content())
+    }
+
+    /// Read the value-range form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn value_range_controls(&self) -> Result<Vec<crate::form::ValueRangeControl>> {
+        crate::form::value_range_controls(self.state.content.xml_content())
+    }
+
+    /// Read the date, time and number form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn typed_value_controls(&self) -> Result<Vec<crate::form::TypedValueControl>> {
+        crate::form::typed_value_controls(self.state.content.xml_content())
+    }
+
+    /// Read the grid (table) form controls, without executing bindings or events.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `content.xml` holds malformed or over-budget
+    /// form markup.
+    pub fn grid_controls(&self) -> Result<Vec<crate::form::GridControl>> {
+        crate::form::grid_controls(self.state.content.xml_content())
+    }
+
+    /// Get all semantic footnotes and endnotes in document order.
+    pub fn notes(&self) -> Result<Vec<crate::Note>> {
+        crate::note::parse_notes(self.state.content.xml_content())
+    }
+
+    pub fn footnotes(&self) -> Result<Vec<crate::Note>> {
+        Ok(self
+            .notes()?
+            .into_iter()
+            .filter(|note| note.class() == crate::NoteClass::Footnote)
+            .collect())
+    }
+
+    pub fn endnotes(&self) -> Result<Vec<crate::Note>> {
+        Ok(self
+            .notes()?
+            .into_iter()
+            .filter(|note| note.class() == crate::NoteClass::Endnote)
+            .collect())
+    }
+
+    /// Get structure-preserving ruby annotations in document order.
+    pub fn ruby_annotations(&self) -> Result<crate::ruby_family::Annotations> {
+        crate::parse_ruby_annotations(self.state.content.xml_content())
+    }
+
+    /// Get simplified ruby base/pronunciation pairs in document order.
+    pub fn rubies(&self) -> Result<Vec<crate::ruby::Annotation>> {
+        crate::ruby::parse_rubies(self.state.content.xml_content())
+    }
+
+    /// Get all bookmarks in the document.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let bookmarks = doc.bookmarks()?;
+    ///
+    /// for bookmark in bookmarks {
+    ///     if let Some(name) = bookmark.name() {
+    ///         println!("Bookmark: {}", name);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bookmarks(&self) -> Result<Vec<crate::elements::bookmark::Bookmark>> {
+        use crate::elements::bookmark::BookmarkParser;
+        BookmarkParser::parse_bookmarks(self.state.content.xml_content())
+    }
+
+    /// Get all bookmark ranges in the document.
+    ///
+    /// Bookmark ranges span multiple paragraphs or sections.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let ranges = doc.bookmark_ranges()?;
+    ///
+    /// for range in ranges {
+    ///     if range.is_complete() {
+    ///         println!("Complete bookmark range: {}", range.name);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bookmark_ranges(&self) -> Result<Vec<crate::elements::bookmark::BookmarkRange>> {
+        use crate::elements::bookmark::BookmarkParser;
+        BookmarkParser::parse_bookmark_ranges(self.state.content.xml_content())
+    }
+
+    /// Get all fields in the document.
+    ///
+    /// Fields are dynamic content elements like page numbers, dates, and references.
+    /// Returned values are the document's cached display text; expressions, database
+    /// fields, and other dynamic sources are never evaluated or executed.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let fields = doc.fields()?;
+    ///
+    /// for field in fields {
+    ///     println!("Field type: {}, value: {}", field.field_type(), field.value());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn fields(&self) -> Result<Vec<crate::elements::field::Field>> {
+        use crate::elements::field::FieldParser;
+        FieldParser::parse_fields(self.state.content.xml_content())
+    }
+
+    /// Get conditional, hidden, and placeholder text fields in document order.
+    ///
+    /// Conditions and formulas are returned as inert strings. This method never
+    /// evaluates them and returns only the cached display text stored in the file.
+    pub fn dynamic_text_fields(&self) -> Result<Vec<crate::elements::field::DynamicTextField>> {
+        use crate::elements::field::FieldParser;
+        FieldParser::parse_dynamic_text_fields(self.state.content.xml_content())
+    }
+
+    /// Get all tables with repeated cells and rows expanded.
+    ///
+    /// ODF files can store repeated cells/rows compactly. This method expands
+    /// them into their full representation.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let expanded_tables = doc.tables_expanded()?;
+    ///
+    /// for table in expanded_tables {
+    ///     println!("Expanded table has {} rows", table.row_count()?);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn tables_expanded(&self) -> Result<Vec<crate::elements::table::Table>> {
+        use crate::elements::table_expansion::TableExpander;
+        let tables = self.tables()?;
+        TableExpander::expand_tables(tables)
+    }
+
+    /// Extract all hyperlinks from the document
+    ///
+    /// Returns a vector of tuples containing (link text, URL).
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let hyperlinks = doc.hyperlinks()?;
+    /// for (text, url) in hyperlinks {
+    ///     println!("{}: {}", text, url);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn hyperlinks(&self) -> Result<Vec<(String, String)>> {
+        parse_hyperlinks(self.state.content.xml_content())
+    }
+
+    /// Extract all bookmark names from the document
+    ///
+    /// Returns a vector of bookmark names.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let bookmark_names = doc.bookmark_names()?;
+    /// for bookmark in bookmark_names {
+    ///     println!("Bookmark: {}", bookmark);
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn bookmark_names(&self) -> Result<Vec<String>> {
+        parse_bookmark_names(self.state.content.xml_content())
+    }
+
+    /// Extract all linked image references from the document
+    ///
+    /// Returns package-local and external `xlink:href` values in document order.
+    /// Images stored inline as `office:binary-data` have no path and are omitted.
+    ///
+    /// # Examples
+    ///
+    /// ```no_run
+    /// use litchi_odt::Package;
+    ///
+    /// # fn main() -> litchi_core::Result<()> {
+    /// let doc = Package::open("document.odt")?.document()?;
+    /// let images = doc.image_paths()?;
+    /// for img_path in images {
+    ///     println!("Image: {}", img_path);
+    ///     // You can extract the image bytes with:
+    ///     // let bytes = doc.get_file(&img_path)?;
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn image_paths(&self) -> Result<Vec<String>> {
+        parse_image_references(self.state.content.xml_content())
+    }
+
+    /// Discover referenced, inline, missing, and inert linked images.
+    pub fn images(&self) -> Result<Vec<crate::Image>> {
+        let package = self.state.package.package()?;
+        crate::media::scan_package(
+            self.state.content.xml_content(),
+            self.state.styles.as_ref().map(Styles::xml_content),
+            &package,
+        )
+    }
+
+    /// Inspect classic forms without executing bindings, events, or external resources.
+    pub fn forms(&self) -> Result<crate::form::Forms> {
+        let mut parts = vec![(self.state.content.xml_content(), crate::form::Part::Content)];
+        if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
+            parts.push((styles, crate::form::Part::Styles));
+        }
+        crate::form::parse_form_parts(&parts)
+    }
+
+    /// Inspect in-content RDFa declarations and inline `text:meta` values.
+    ///
+    /// The returned model is lazy with respect to package access: only the
+    /// retained `content.xml` and optional `styles.xml` projections are
+    /// parsed. RDFa values and inline metadata remain inert strings/content;
+    /// no CURIE, datatype, link, or external resource is resolved.
+    pub fn in_content_metadata(&self) -> Result<crate::ContentMetadata> {
+        let mut parts = vec![(
+            self.state.content.xml_content(),
+            crate::MetadataPart::Content,
+        )];
+        if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
+            parts.push((styles, crate::MetadataPart::Styles));
+        }
+        crate::content_metadata::parse_parts_with_xml_limits(&parts, self.state.xml_limits)
+    }
+
+    /// Inspect inert XForms model declarations in `office:forms`.
+    pub fn xforms_models(&self) -> Result<Vec<crate::xforms::Model>> {
+        crate::xforms::parse_models_with_xml_limits(
+            self.state.content.xml_content(),
+            self.state.xml_limits,
+        )
+    }
+
+    pub fn rdf_graphs(&self) -> Result<Vec<crate::rdf::Graph>> {
+        crate::rdf::graphs(&self.state.package)
+    }
+
+    /// Inspect ordered ODF variable declarations without evaluating fields or formulas.
+    pub fn variable_declarations(&self) -> Result<crate::variable_declaration::Declarations> {
+        let mut parts = vec![(
+            self.state.content.xml_content(),
+            crate::variable_declaration::Part::Content,
+        )];
+        if let Some(styles) = self.state.styles.as_ref().map(Styles::xml_content) {
+            parts.push((styles, crate::variable_declaration::Part::Styles));
+        }
+        crate::variable_declaration::parse_parts_with_xml_limits(&parts, self.state.xml_limits)
+    }
+
+    /// Discover package, inline, missing, and inert linked embedded objects.
+    pub fn embedded_objects(&self) -> Result<Vec<crate::Object>> {
+        let package = self.state.package.package()?;
+        crate::embedded::scan_package(
+            self.state.content.xml_content(),
+            self.state.styles.as_ref().map(Styles::xml_content),
+            &package,
+        )
+    }
+
+    /// Open one inert embedded chart as a standalone chart document.
+    pub fn embedded_chart(&self, index: usize) -> Result<crate::odc::Document> {
+        crate::package::charts::open_embedded_chart(
+            &self.state.package,
+            self.state.content.xml_content(),
+            self.state.styles.as_ref().map(Styles::xml_content),
+            index,
+        )
+    }
+}

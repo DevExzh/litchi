@@ -1,0 +1,203 @@
+//! Bounded OLE2 and `[MS-OGRAPH]` chart payload decoding.
+
+use std::io::{Cursor, Write};
+
+use litchi_cfb::OleFile;
+use litchi_cfb::consts::STGTY_STREAM;
+use litchi_ograph::chart::Book;
+use litchi_ograph::{Limits, Package as OgraphPackage};
+
+use super::model::Kind;
+use crate::embedded::storage::{Compression, Kind as StorageKind, Storage};
+use crate::package::{Error, Result};
+use crate::presentation::Presentation;
+
+const MAX_EXCEL_ROOT_ENTRIES: usize = 64;
+const WORKBOOK: &str = "Workbook";
+const BOOK: &str = "Book";
+
+pub(super) enum Parsed {
+    Graph {
+        package: Box<OgraphPackage>,
+        book: Book,
+        compression: Compression,
+    },
+    Excel {
+        book: Book,
+    },
+}
+
+pub(super) fn decode(storage: Storage, limits: Limits) -> Result<Vec<u8>> {
+    if storage.kind() != StorageKind::OleObject {
+        return corrupted("chart persist ID does not reference an OLE object storage");
+    }
+    match storage.compression() {
+        Compression::Uncompressed => {
+            check_limit(
+                litchi_ograph::LimitKind::PackageBytes,
+                storage.stored_payload_len(),
+                limits.max_package_bytes,
+            )?;
+            Ok(storage.into_stored_bytes())
+        },
+        Compression::Zlib | Compression::ZlibSyncFlush => {
+            let uncompressed_len = storage.declared_uncompressed_len().ok_or_else(|| {
+                Error::Corrupted("compressed chart storage is missing its size".into())
+            })?;
+            let declared = usize::try_from(uncompressed_len)
+                .map_err(|_err| Error::Corrupted("chart storage size exceeds usize".into()))?;
+            check_limit(
+                litchi_ograph::LimitKind::PackageBytes,
+                declared,
+                limits.max_package_bytes,
+            )?;
+            storage.decompressed_bytes(declared)
+        },
+    }
+}
+
+/// Encode a replacement OLE payload with the same `PowerPoint` storage envelope
+/// as the source object. The compressed form receives the new payload length
+/// required by `ExOleObjStg`; its zlib bytes remain inert and are never opened
+/// here.
+pub(super) fn encode_storage(bytes: Vec<u8>, compression: Compression) -> Result<Storage> {
+    match compression {
+        Compression::Uncompressed => Storage::uncompressed(StorageKind::OleObject, bytes),
+        Compression::Zlib | Compression::ZlibSyncFlush => {
+            let declared = u32::try_from(bytes.len())
+                .map_err(|_err| Error::Corrupted("chart package exceeds u32 size".into()))?;
+            let mut encoder =
+                flate2::write::ZlibEncoder::new(Vec::new(), flate2::Compression::default());
+            encoder.write_all(&bytes)?;
+            let flushed_len = if compression == Compression::ZlibSyncFlush {
+                encoder.flush()?;
+                Some(encoder.get_ref().len())
+            } else {
+                None
+            };
+            let mut compressed = encoder.finish()?;
+            if let Some(length) = flushed_len {
+                compressed.truncate(length);
+            }
+            Storage::compressed(StorageKind::OleObject, declared, compressed)
+        },
+    }
+}
+
+pub(super) fn parse(
+    presentation: &Presentation,
+    persist_id: u32,
+    kind: Kind,
+    limits: Limits,
+) -> Result<Parsed> {
+    let storage = presentation.ole_storage(persist_id)?.ok_or_else(|| {
+        Error::Corrupted(format!(
+            "chart object persist ID {persist_id} has no storage"
+        ))
+    })?;
+    let compression = storage.compression();
+    let package_bytes = decode(storage, limits)?;
+    match kind {
+        Kind::Graph => {
+            let package = OgraphPackage::open_with_options(
+                package_bytes,
+                litchi_ograph::OpenOptions::new().limits(limits),
+            )?;
+            let workbook = package.workbook()?.into_bytes();
+            let book = Book::open(workbook, limits)?;
+            ensure_kind(&book, litchi_ograph::chart::Kind::Graph)?;
+            Ok(Parsed::Graph {
+                package: Box::new(package),
+                book,
+                compression,
+            })
+        },
+        Kind::Excel => {
+            let workbook = extract_excel_workbook(package_bytes, limits)?;
+            let book = Book::open(workbook, limits)?;
+            ensure_kind(&book, litchi_ograph::chart::Kind::Excel)?;
+            Ok(Parsed::Excel { book })
+        },
+    }
+}
+
+fn ensure_kind(book: &Book, expected: litchi_ograph::chart::Kind) -> Result<()> {
+    for chart in book.charts()? {
+        if chart?.kind() != expected {
+            return corrupted("chart Workbook grammar conflicts with its PPT object kind");
+        }
+    }
+    Ok(())
+}
+
+fn extract_excel_workbook(package: Vec<u8>, limits: Limits) -> Result<Vec<u8>> {
+    let mut cfb = OleFile::open(Cursor::new(package), litchi_cfb::OleFileLimits::default())?;
+    let stream = {
+        let entries = cfb.list_directory_entries(&[])?;
+        check_limit(
+            litchi_ograph::LimitKind::RootEntries,
+            entries.len(),
+            MAX_EXCEL_ROOT_ENTRIES,
+        )?;
+        let mut stream = None;
+        for entry in entries {
+            if entry.size > as_u64(limits.max_stream_bytes) {
+                return Err(limit_error(
+                    litchi_ograph::LimitKind::StreamBytes,
+                    entry.size,
+                    as_u64(limits.max_stream_bytes),
+                ));
+            }
+            let candidate =
+                entry.name.eq_ignore_ascii_case(WORKBOOK) || entry.name.eq_ignore_ascii_case(BOOK);
+            if !candidate {
+                continue;
+            }
+            if entry.entry_type != STGTY_STREAM {
+                return corrupted("Excel chart Workbook entry is not a stream");
+            }
+            if stream.replace(entry.name.clone()).is_some() {
+                return corrupted("Excel chart package has multiple Workbook streams");
+            }
+            if entry.size > as_u64(limits.max_workbook_bytes) {
+                return Err(limit_error(
+                    litchi_ograph::LimitKind::WorkbookBytes,
+                    entry.size,
+                    as_u64(limits.max_workbook_bytes),
+                ));
+            }
+        }
+        stream.ok_or_else(|| Error::Corrupted("chart package has no Workbook stream".into()))?
+    };
+    let workbook = cfb.open_stream(&[stream.as_str()])?;
+    check_limit(
+        litchi_ograph::LimitKind::WorkbookBytes,
+        workbook.len(),
+        limits.max_workbook_bytes,
+    )?;
+    Ok(workbook)
+}
+
+fn check_limit(kind: litchi_ograph::LimitKind, observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        return Err(limit_error(kind, as_u64(observed), as_u64(maximum)));
+    }
+    Ok(())
+}
+
+fn limit_error(kind: litchi_ograph::LimitKind, observed: u64, maximum: u64) -> Error {
+    litchi_ograph::Error::Limit {
+        kind,
+        observed,
+        maximum,
+    }
+    .into()
+}
+
+fn as_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+pub(super) fn corrupted<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::Corrupted(message.into()))
+}

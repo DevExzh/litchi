@@ -1,0 +1,883 @@
+//! `DrawingML` chart and user-shapes XML boundaries.
+
+use super::anchor::Anchor;
+use super::model::Chart;
+use crate::{Error, Result};
+use litchi_drawingml::chart::{axis::Axis, model::Chart as ChartModel, plot_area::TypeGroup};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::collections::HashSet;
+
+/// Parse a chart from chart XML and its worksheet anchor.
+///
+/// # Errors
+///
+/// Returns an error when the chart XML cannot be decoded.
+pub fn read(chart_xml: &[u8], anchor: Anchor) -> Result<Chart> {
+    let chart = decode(chart_xml)?;
+    Ok(Chart::new(chart, anchor))
+}
+
+/// Decode one `c:chartSpace` payload without attaching a worksheet anchor.
+///
+/// # Errors
+///
+/// Returns an error when the `DrawingML` chart payload is malformed or violates
+/// a modeled chart invariant.
+pub fn decode(chart_xml: &[u8]) -> Result<ChartModel> {
+    Ok(litchi_drawingml::chart::reader::read(
+        chart_xml,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )?)
+}
+
+/// Generate chart XML for a worksheet chart.
+///
+/// # Errors
+///
+/// Returns an error when the chart cannot be encoded as XML.
+pub fn write(chart: &ChartModel) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    litchi_drawingml::chart::writer::write(
+        &mut output,
+        chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+    )
+    .map_err(|error| Error::Encoding(error.to_string()))?;
+    Ok(output)
+}
+
+/// Generate chart XML with external-data and user-shapes relationship IDs.
+///
+/// # Errors
+///
+/// Returns an error when the chart cannot be encoded as XML.
+pub fn write_with_external_data_id(
+    chart: &ChartModel,
+    external_data_relationship_id: Option<&str>,
+    user_shapes_relationship_id: Option<&str>,
+) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    litchi_drawingml::chart::writer::write_with_rels(
+        &mut output,
+        chart,
+        &litchi_drawingml::chart::Limits::DEFAULT,
+        external_data_relationship_id,
+        user_shapes_relationship_id,
+    )
+    .map_err(|error| Error::Encoding(error.to_string()))?;
+    Ok(output)
+}
+
+/// Where the user-shapes scan is relative to `c:userShapes`. Nesting inside the root is not
+/// part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Prolog --root empty-element tag-------------> Closed
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE anywhere; a
+/// top-level element that is not `c:userShapes`, or a second one; text other
+/// than whitespace, CDATA and entity references outside the root; and the end
+/// of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
+/// # Errors
+///
+/// Returns an error when the user-shapes XML is malformed or has an invalid root.
+pub(crate) fn user_shapes_ids(xml: &[u8]) -> Result<HashSet<String>> {
+    const RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+    let processed_xml = litchi_ooxml_common::mce::process_ooxml(xml)
+        .map_err(|error| Error::Encoding(error.to_string()))?;
+    let mut reader = NsReader::from_reader(processed_xml.as_ref());
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut phase = RootPhase::Prolog;
+    let mut relationship_ids = HashSet::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| Error::Encoding(error.to_string()))?;
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                if depth == 0 {
+                    if phase != RootPhase::Prolog
+                        || !litchi_ooxml_common::xml::is_drawingml_chart_name(
+                            &namespace,
+                            element.name(),
+                            b"userShapes",
+                        )
+                    {
+                        return Err(Error::Invalid(
+                            "chart user-shapes XML must have one chart userShapes root".into(),
+                        ));
+                    }
+                    phase = RootPhase::Open;
+                }
+                for attribute_result in element.checked_attributes() {
+                    let attribute =
+                        attribute_result.map_err(|error| Error::Encoding(error.to_string()))?;
+                    let (attribute_namespace, _) =
+                        reader.resolver().resolve_attribute(attribute.key);
+                    if matches!(
+                        attribute_namespace,
+                        ResolveResult::Bound(Namespace(value))
+                            if value == RELATIONSHIPS_NAMESPACE
+                                || value == STRICT_RELATIONSHIPS_NAMESPACE
+                    ) {
+                        relationship_ids.insert(
+                            attribute
+                                .decoded_and_normalized_value(
+                                    XmlVersion::Explicit1_0,
+                                    reader.decoder(),
+                                )
+                                .map_err(|error| Error::Encoding(error.to_string()))?
+                                .into_owned(),
+                        );
+                    }
+                }
+                if matches!(event, Event::Start(_)) {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("chart user-shapes XML nesting is too deep".into())
+                    })?;
+                } else if depth == 0 {
+                    phase = RootPhase::Closed;
+                }
+            },
+            Event::End(ref element) => {
+                if depth == 0 {
+                    return Err(Error::Invalid(
+                        "chart user-shapes XML has an unmatched closing element".into(),
+                    ));
+                }
+                depth -= 1;
+                if depth == 0 {
+                    if !litchi_ooxml_common::xml::is_drawingml_chart_name(
+                        &namespace,
+                        element.name(),
+                        b"userShapes",
+                    ) {
+                        return Err(Error::Invalid(
+                            "chart user-shapes XML has an invalid root closing element".into(),
+                        ));
+                    }
+                    phase = RootPhase::Closed;
+                }
+            },
+            Event::Text(ref text)
+                if depth == 0
+                    && !text
+                        .decode()
+                        .map_err(|error| Error::Encoding(error.to_string()))?
+                        .trim()
+                        .is_empty() =>
+            {
+                return Err(Error::Invalid(
+                    "chart user-shapes XML contains text outside its root".into(),
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 0 => {
+                return Err(Error::Invalid(
+                    "chart user-shapes XML contains data outside its root".into(),
+                ));
+            },
+            Event::DocType(_) => {
+                return Err(Error::Invalid(
+                    "chart user-shapes XML cannot contain a document type".into(),
+                ));
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::GeneralRef(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_) => {},
+        }
+        buffer.clear();
+    }
+    match phase {
+        RootPhase::Closed if depth == 0 => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(Error::Invalid(
+                "chart user-shapes XML has no complete root".into(),
+            ));
+        },
+    }
+    Ok(relationship_ids)
+}
+
+fn append_chart_line_fragment<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    lines: Option<&'a litchi_drawingml::chart::Lines>,
+) {
+    if let Some(shape_properties) =
+        lines.and_then(|chart_lines| chart_lines.shape_properties.as_ref())
+    {
+        fragments.push(shape_properties.as_xml());
+    }
+}
+
+fn append_up_down_bar_fragments<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    bars: Option<&'a litchi_drawingml::chart::UpDownBars>,
+) {
+    let Some(up_down_bars) = bars else {
+        return;
+    };
+    append_chart_line_fragment(fragments, up_down_bars.up_bars.as_ref());
+    append_chart_line_fragment(fragments, up_down_bars.down_bars.as_ref());
+    if let Some(extension_list) = up_down_bars.extension_list.as_ref() {
+        fragments.push(extension_list.as_xml());
+    }
+}
+
+fn append_point_data_label_fragments<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    label: Option<&'a litchi_drawingml::chart::DataLabel>,
+) {
+    let Some(data_label) = label else {
+        return;
+    };
+    if let Some(shape_properties) = data_label.shape_properties.as_ref() {
+        fragments.push(shape_properties.as_xml());
+    }
+    if let Some(text_properties) = data_label.text_properties.as_ref() {
+        fragments.push(text_properties.as_xml());
+    }
+    if let Some(extension_list) = data_label.extension_list.as_ref() {
+        fragments.push(extension_list.as_xml());
+    }
+}
+
+fn append_data_label_fragments<'a>(
+    fragments: &mut Vec<&'a [u8]>,
+    labels: Option<&'a litchi_drawingml::chart::DataLabels>,
+) {
+    let Some(data_labels) = labels else {
+        return;
+    };
+    if let Some(shape_properties) = data_labels.shape_properties.as_ref() {
+        fragments.push(shape_properties.as_xml());
+    }
+    if let Some(text_properties) = data_labels.text_properties.as_ref() {
+        fragments.push(text_properties.as_xml());
+    }
+    append_chart_line_fragment(fragments, data_labels.leader_lines.as_ref());
+    if let Some(extension_list) = data_labels.extension_list.as_ref() {
+        fragments.push(extension_list.as_xml());
+    }
+    for label in &data_labels.labels {
+        append_point_data_label_fragments(fragments, Some(label));
+    }
+}
+
+pub(crate) fn fragment_ids(chart: &ChartModel) -> Result<HashSet<String>> {
+    const RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+        b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+    let mut relationship_ids = HashSet::new();
+    let mut fragments = Vec::new();
+    fragments.extend(
+        [
+            chart
+                .shape_properties
+                .as_ref()
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .text_properties
+                .as_ref()
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
+            chart
+                .extension_list
+                .as_ref()
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .chart_extension_list
+                .as_ref()
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .title
+                .as_ref()
+                .and(chart.title_shape_properties.as_ref())
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .title
+                .as_ref()
+                .and(chart.title_text_properties.as_ref())
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
+            chart
+                .title
+                .as_ref()
+                .and(chart.title_extension_list.as_ref())
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .plot_area
+                .shape_properties
+                .as_ref()
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .plot_area
+                .extension_list
+                .as_ref()
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .plot_area
+                .data_table
+                .as_ref()
+                .and_then(|table| table.shape_properties.as_ref())
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .plot_area
+                .data_table
+                .as_ref()
+                .and_then(|table| table.text_properties.as_ref())
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
+            chart
+                .plot_area
+                .data_table
+                .as_ref()
+                .and_then(|table| table.extension_list.as_ref())
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .floor
+                .as_ref()
+                .and_then(|surface| surface.shape_properties.as_ref())
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .back_wall
+                .as_ref()
+                .and_then(|surface| surface.shape_properties.as_ref())
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .side_wall
+                .as_ref()
+                .and_then(|surface| surface.shape_properties.as_ref())
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .floor
+                .as_ref()
+                .and_then(|surface| surface.extension_list.as_ref())
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .back_wall
+                .as_ref()
+                .and_then(|surface| surface.extension_list.as_ref())
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .side_wall
+                .as_ref()
+                .and_then(|surface| surface.extension_list.as_ref())
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            chart
+                .legend
+                .as_ref()
+                .and_then(|legend| legend.shape_properties.as_ref())
+                .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+            chart
+                .legend
+                .as_ref()
+                .and_then(|legend| legend.text_properties.as_ref())
+                .map(litchi_drawingml::chart::TextProperties::as_xml),
+            chart
+                .legend
+                .as_ref()
+                .and_then(|legend| legend.extension_list.as_ref())
+                .map(litchi_drawingml::chart::ExtensionList::as_xml),
+        ]
+        .into_iter()
+        .flatten(),
+    );
+    if let Some(legend) = chart.legend.as_ref() {
+        for entry in &legend.entries {
+            fragments.extend(
+                [
+                    entry
+                        .text_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::TextProperties::as_xml),
+                    entry
+                        .extension_list
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+        }
+    }
+    if let Some(formats) = chart.pivot_formats.as_ref() {
+        for format in formats {
+            fragments.extend(
+                [
+                    format
+                        .shape_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                    format
+                        .text_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::TextProperties::as_xml),
+                    format
+                        .extension_list
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                    format
+                        .marker
+                        .as_ref()
+                        .and_then(|marker| marker.shape_properties.as_ref())
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                    format
+                        .marker
+                        .as_ref()
+                        .and_then(|marker| marker.extension_list.as_ref())
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+            append_point_data_label_fragments(&mut fragments, format.data_label.as_ref());
+        }
+    }
+    for axis in &chart.plot_area.axes {
+        let common = axis.common();
+        fragments.extend(
+            [
+                common
+                    .title
+                    .as_ref()
+                    .and(common.title_shape_properties.as_ref())
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                common
+                    .title
+                    .as_ref()
+                    .and(common.title_text_properties.as_ref())
+                    .map(litchi_drawingml::chart::TextProperties::as_xml),
+                common
+                    .title
+                    .as_ref()
+                    .and(common.title_extension_list.as_ref())
+                    .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                common
+                    .major_gridlines
+                    .as_ref()
+                    .and_then(|lines| lines.shape_properties.as_ref())
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                common
+                    .minor_gridlines
+                    .as_ref()
+                    .and_then(|lines| lines.shape_properties.as_ref())
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                common
+                    .shape_properties
+                    .as_ref()
+                    .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                common
+                    .text_properties
+                    .as_ref()
+                    .map(litchi_drawingml::chart::TextProperties::as_xml),
+                common
+                    .scaling_extension_list
+                    .as_ref()
+                    .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                common
+                    .extension_list
+                    .as_ref()
+                    .map(litchi_drawingml::chart::ExtensionList::as_xml),
+            ]
+            .into_iter()
+            .flatten(),
+        );
+        if let Axis::Value(value_axis) = axis
+            && let Some(display_units) = value_axis.display_units.as_ref()
+        {
+            fragments.extend(
+                [
+                    display_units
+                        .label_shape_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                    display_units
+                        .label_text_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::TextProperties::as_xml),
+                    display_units
+                        .extension_list
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+        }
+    }
+    for type_group in &chart.plot_area.type_groups {
+        match type_group {
+            TypeGroup::Area(area_group) => {
+                append_chart_line_fragment(&mut fragments, area_group.drop_lines.as_ref());
+            },
+            TypeGroup::Area3D(area_group) => {
+                append_chart_line_fragment(&mut fragments, area_group.drop_lines.as_ref());
+            },
+            TypeGroup::Bar(bar_group) => {
+                for lines in &bar_group.series_lines {
+                    append_chart_line_fragment(&mut fragments, Some(lines));
+                }
+            },
+            TypeGroup::Line(line_group) => {
+                append_chart_line_fragment(&mut fragments, line_group.drop_lines.as_ref());
+                append_chart_line_fragment(&mut fragments, line_group.high_low_lines.as_ref());
+                append_up_down_bar_fragments(&mut fragments, line_group.up_down_bars.as_ref());
+            },
+            TypeGroup::Line3D(line_group) => {
+                append_chart_line_fragment(&mut fragments, line_group.drop_lines.as_ref());
+            },
+            TypeGroup::OfPie(of_pie_group) => {
+                for lines in &of_pie_group.series_lines {
+                    append_chart_line_fragment(&mut fragments, Some(lines));
+                }
+            },
+            TypeGroup::Stock(stock_group) => {
+                append_chart_line_fragment(&mut fragments, stock_group.drop_lines.as_ref());
+                append_chart_line_fragment(&mut fragments, stock_group.high_low_lines.as_ref());
+                append_up_down_bar_fragments(&mut fragments, stock_group.up_down_bars.as_ref());
+            },
+            TypeGroup::Surface(surface_group) => {
+                if let Some(formats) = surface_group.band_formats.as_ref() {
+                    for format in formats {
+                        if let Some(shape_properties) = format.shape_properties.as_ref() {
+                            fragments.push(shape_properties.as_xml());
+                        }
+                    }
+                }
+            },
+            TypeGroup::Surface3D(surface_group) => {
+                if let Some(formats) = surface_group.band_formats.as_ref() {
+                    for format in formats {
+                        if let Some(shape_properties) = format.shape_properties.as_ref() {
+                            fragments.push(shape_properties.as_xml());
+                        }
+                    }
+                }
+            },
+            TypeGroup::Bar3D(_)
+            | TypeGroup::Bubble(_)
+            | TypeGroup::Doughnut(_)
+            | TypeGroup::Pie(_)
+            | TypeGroup::Pie3D(_)
+            | TypeGroup::Radar(_)
+            | TypeGroup::Scatter(_) => {},
+        }
+        for series in &type_group.common().series {
+            fragments.extend(
+                [
+                    series
+                        .shape_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                    series
+                        .extension_list
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                    series
+                        .marker_shape_properties
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                    series
+                        .marker_extension_list
+                        .as_ref()
+                        .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                ]
+                .into_iter()
+                .flatten(),
+            );
+            append_data_label_fragments(&mut fragments, series.data_labels.as_ref());
+            for error_bar in &series.error_bars {
+                if let Some(shape_properties) = error_bar.shape_properties.as_ref() {
+                    fragments.push(shape_properties.as_xml());
+                }
+                if let Some(extension_list) = error_bar.extension_list.as_ref() {
+                    fragments.push(extension_list.as_xml());
+                }
+            }
+            for trendline in &series.trendlines {
+                fragments.extend(
+                    [
+                        trendline
+                            .shape_properties
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                        trendline
+                            .label_shape_properties
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                        trendline
+                            .label_text_properties
+                            .as_ref()
+                            .map(litchi_drawingml::chart::TextProperties::as_xml),
+                        trendline
+                            .label_extension_list
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                        trendline
+                            .extension_list
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
+            }
+            for point in &series.data_points {
+                fragments.extend(
+                    [
+                        point
+                            .shape_properties
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                        point
+                            .extension_list
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                        point
+                            .marker_shape_properties
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ShapeProperties::as_xml),
+                        point
+                            .marker_extension_list
+                            .as_ref()
+                            .map(litchi_drawingml::chart::ExtensionList::as_xml),
+                    ]
+                    .into_iter()
+                    .flatten(),
+                );
+            }
+        }
+        if let Some(extension_list) = type_group.common().extension_list.as_ref() {
+            fragments.push(extension_list.as_xml());
+        }
+    }
+    for xml in fragments {
+        let mut reader = NsReader::from_reader(xml);
+        let mut buffer = Vec::new();
+        loop {
+            let (_, event) = reader
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::Encoding(error.to_string()))?;
+            match event {
+                Event::Start(ref element) | Event::Empty(ref element) => {
+                    for attribute_result in element.checked_attributes() {
+                        let attribute =
+                            attribute_result.map_err(|error| Error::Encoding(error.to_string()))?;
+                        let (attribute_namespace, _) =
+                            reader.resolver().resolve_attribute(attribute.key);
+                        if matches!(
+                            attribute_namespace,
+                            ResolveResult::Bound(Namespace(value))
+                                if value == RELATIONSHIPS_NAMESPACE
+                                    || value == STRICT_RELATIONSHIPS_NAMESPACE
+                        ) {
+                            relationship_ids.insert(
+                                attribute
+                                    .decoded_and_normalized_value(
+                                        XmlVersion::Explicit1_0,
+                                        reader.decoder(),
+                                    )
+                                    .map_err(|error| Error::Encoding(error.to_string()))?
+                                    .into_owned(),
+                            );
+                        }
+                    }
+                },
+                Event::Eof => break,
+                Event::End(_)
+                | Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => {},
+            }
+            buffer.clear();
+        }
+    }
+    Ok(relationship_ids)
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the user-shapes relationship scan accepts before, around and after `c:userShapes`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The user-shapes relationship scan.
+    #[test]
+    fn user_shapes_envelope() {
+        let root = Root {
+            open: r#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">"#,
+            body: r#"<c:x r:id="rId1"/>"#,
+            close: r"</c:userShapes>",
+            empty: r#"<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"chart user-shapes XML has no complete root\")",
+                "whitespace only: Invalid(\"chart user-shapes XML has no complete root\")",
+                "declaration only: Invalid(\"chart user-shapes XML has no complete root\")",
+                "empty-element root: Ok(0)",
+                "start and end root: Ok(0)",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Ok(1)",
+                "root then text: Invalid(\"chart user-shapes XML contains text outside its root\")",
+                "root then second root: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "root then foreign start: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "root then foreign empty: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "declaration after root: Ok(1)",
+                "two declarations: Ok(1)",
+                "comment before declaration: Ok(1)",
+                "text before root: Invalid(\"chart user-shapes XML contains text outside its root\")",
+                "unterminated root: Invalid(\"chart user-shapes XML has no complete root\")",
+                "stray end tag: Encoding(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"chart user-shapes XML cannot contain a document type\")",
+                "top-level CDATA: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Ok(1)",
+                "PI before declaration: Ok(1)",
+                "comment then root: Ok(1)",
+                "PI then root: Ok(1)",
+                "root then text then second root: Invalid(\"chart user-shapes XML contains text outside its root\")",
+                "empty-element root then root: Invalid(\"chart user-shapes XML must have one chart userShapes root\")",
+                "declaration after empty-element root: Ok(0)",
+                "reference before root: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "reference after root: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "CDATA after root: Invalid(\"chart user-shapes XML contains data outside its root\")",
+                "end tag before root: Encoding(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(1)",
+                "text, CDATA and reference inside root: Ok(1)",
+            ],
+            |xml| {
+                outcome(super::user_shapes_ids(xml.as_bytes()), |ids| {
+                    ids.len().to_string()
+                })
+            },
+        );
+    }
+}

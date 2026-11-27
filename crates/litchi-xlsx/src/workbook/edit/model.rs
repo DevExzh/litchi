@@ -1,0 +1,3457 @@
+//! Semantic edit snapshots, changes, conflicts, and reversible patches.
+
+use super::codec::{ensure_unsigned, same_part, same_relationship, validate_web_integrity};
+use super::{Edit, MergeIntent, SheetActions};
+
+use std::collections::{BTreeMap, HashMap, HashSet};
+use std::fmt;
+use std::mem::{size_of, size_of_val};
+use std::sync::Arc;
+
+use litchi_ooxml_common::web as common_web;
+use litchi_opc::{
+    OpcPackage, OwnedContentTypes, OwnedRelationships, OwnedXmlPart, PackURI, Part, Relationship,
+    Relationships,
+};
+use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex};
+use quick_xml::events::Event;
+use quick_xml::reader::Reader;
+
+use super::{Visibility, Workbook, Worksheet};
+use crate::cell::{Cell, SharedStringKey, Stored};
+use crate::column::{Flags as ColumnFlags, Outline, Props as ColumnProps, State as ColumnState};
+use crate::drawing::DrawingAnchor;
+use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
+use crate::layout::{self, Defaults};
+use crate::raw::worksheet::edit::{
+    Action, ColumnAction, DefaultsAction, DescentEffect, HeightEffect, MergePlan, OptionalEffect,
+    Payload, RowAction, StyleEffect, WidthEffect,
+};
+use crate::row::{Flags as RowFlags, Props as RowProps, State as RowState};
+use crate::web::Bindings as WebBindings;
+use crate::{StyleKey, StyleState};
+
+/// Cell state recorded before or after one semantic change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum State {
+    Missing,
+    Cell {
+        content: Cell,
+        style: StyleState,
+        /// Exact workbook shared-string identity, including any rich runs.
+        shared_string: Option<SharedStringKey>,
+    },
+}
+
+impl State {
+    pub(super) fn read(value: Option<&Stored>, workbook: &Workbook) -> Self {
+        value.map_or(Self::Missing, |stored| Self::Cell {
+            content: stored.cell.clone(),
+            style: stored.style.map_or(StyleState::Default, |key| {
+                StyleState::Shared(StyleKey::new(
+                    key,
+                    Arc::clone(&workbook.inner.style_lineage),
+                ))
+            }),
+            shared_string: stored.shared_string.map(|index| {
+                SharedStringKey::new(index, Arc::clone(&workbook.inner.shared_string_lineage))
+            }),
+        })
+    }
+
+    pub(super) fn after(before: Option<&Stored>, action: &Action, workbook: &Workbook) -> Self {
+        let Action::Update { payload, style } = action else {
+            return Self::Missing;
+        };
+        let exists = before.is_some() || action.creates_missing();
+        if !exists {
+            return Self::Missing;
+        }
+        let content = match payload {
+            Some(Payload::Set(content)) => content.as_cell(),
+            Some(Payload::SharedString { text, .. }) => {
+                Cell::Value(crate::Value::Text(text.clone()))
+            },
+            Some(Payload::Rich(rich)) => {
+                Cell::Value(crate::Value::Text(crate::cell::Text::from(rich.text())))
+            },
+            Some(Payload::SharedFormula {
+                formula: Some(formula),
+                ..
+            }) => Cell::Formula(formula.clone()),
+            Some(Payload::SharedFormula { formula: None, .. }) => {
+                before.map_or(Cell::Empty, |stored| stored.cell.clone())
+            },
+            Some(Payload::Cache(value)) => match before.map(|stored| &stored.cell) {
+                Some(Cell::Formula(formula)) => Cell::Formula(formula.with_cache(value.clone())),
+                _ => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
+            },
+            Some(Payload::Clear | Payload::ClearIfPresent) => Cell::Empty,
+            None => before.map_or(Cell::Empty, |stored| stored.cell.clone()),
+        };
+        let style = match style {
+            Some(StyleEffect::Set(key)) => StyleState::Shared(StyleKey::new(
+                *key,
+                Arc::clone(&workbook.inner.style_lineage),
+            )),
+            Some(StyleEffect::Reset) => StyleState::Default,
+            None => before
+                .and_then(|stored| stored.style)
+                .map_or(StyleState::Default, |key| {
+                    StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ))
+                }),
+        };
+        let shared_string = match payload {
+            Some(Payload::SharedString { index, .. }) => Some(SharedStringKey::new(
+                *index,
+                Arc::clone(&workbook.inner.shared_string_lineage),
+            )),
+            Some(
+                Payload::Set(_)
+                | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
+                | Payload::Cache(_)
+                | Payload::Clear
+                | Payload::ClearIfPresent,
+            ) => None,
+            None => before.and_then(|stored| stored.shared_string).map(|index| {
+                SharedStringKey::new(index, Arc::clone(&workbook.inner.shared_string_lineage))
+            }),
+        };
+        Self::Cell {
+            content,
+            style,
+            shared_string,
+        }
+    }
+
+    pub(super) fn rebind_style(&mut self, workbook: &Workbook) {
+        if let Self::Cell {
+            style,
+            shared_string,
+            ..
+        } = self
+        {
+            style.rebind(&workbook.inner.style_lineage);
+            if let Some(shared_string) = shared_string {
+                shared_string.rebind(&workbook.inner.shared_string_lineage);
+            }
+        }
+    }
+
+    pub(super) const fn uses_shared_style(&self) -> bool {
+        matches!(
+            self,
+            Self::Cell {
+                style: StyleState::Shared(_),
+                ..
+            }
+        )
+    }
+
+    pub(super) fn calculation_content(&self) -> Option<&Cell> {
+        match self {
+            Self::Cell { content, .. } if !matches!(content, Cell::Empty) => Some(content),
+            Self::Missing | Self::Cell { .. } => None,
+        }
+    }
+}
+
+/// Semantic active-tab identity recorded in a patch without native Office IDs.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ActiveTab {
+    pub(super) name: Box<str>,
+    pub(super) position: usize,
+}
+
+impl ActiveTab {
+    /// Developer-facing sheet name at the source snapshot.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    /// Checked zero-based workbook position in the corresponding patch state.
+    #[must_use]
+    pub const fn position(&self) -> usize {
+        self.position
+    }
+}
+
+impl ColumnState {
+    pub(super) fn read(value: Option<&crate::column::Stored>, workbook: &Workbook) -> Self {
+        value.map_or(Self::Missing, |column| {
+            Self::Stored(ColumnProps {
+                width: column.properties.width,
+                style: column.properties.style.map_or(StyleState::Default, |key| {
+                    StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ))
+                }),
+                outline: column.properties.outline,
+                flags: column.properties.flags,
+            })
+        })
+    }
+
+    pub(super) fn after(
+        before: Option<&crate::column::Stored>,
+        action: ColumnAction,
+        workbook: &Workbook,
+    ) -> Self {
+        if before.is_none() && !action.materializes() {
+            return Self::Missing;
+        }
+        let mut properties = match Self::read(before, workbook) {
+            Self::Missing => ColumnProps {
+                width: None,
+                style: StyleState::Default,
+                outline: Outline::NONE,
+                flags: ColumnFlags::empty(),
+            },
+            Self::Stored(properties) => properties,
+        };
+        if let Some(hidden) = action.hidden {
+            properties.flags.set(ColumnFlags::HIDDEN, hidden);
+        }
+        if let Some(width) = action.width {
+            match width {
+                WidthEffect::Set(width) => {
+                    properties.width = Some(width);
+                    properties.flags.insert(ColumnFlags::CUSTOM_WIDTH);
+                },
+                WidthEffect::Reset => {
+                    properties.width = None;
+                    properties.flags.remove(ColumnFlags::CUSTOM_WIDTH);
+                },
+            }
+        }
+        if let Some(style) = action.style {
+            properties.style = match style {
+                StyleEffect::Set(key) => StyleState::Shared(StyleKey::new(
+                    key,
+                    Arc::clone(&workbook.inner.style_lineage),
+                )),
+                StyleEffect::Reset => StyleState::Default,
+            };
+        }
+        if let Some(best_fit) = action.best_fit {
+            properties.flags.set(ColumnFlags::BEST_FIT, best_fit);
+        }
+        if let Some(outline) = action.outline {
+            properties.outline = outline;
+        }
+        if let Some(collapsed) = action.collapsed {
+            properties.flags.set(ColumnFlags::COLLAPSED, collapsed);
+        }
+        if let Some(phonetic) = action.phonetic {
+            properties.flags.set(ColumnFlags::PHONETIC, phonetic);
+        }
+        Self::Stored(properties)
+    }
+}
+
+impl RowState {
+    pub(super) fn read(value: Option<&crate::row::Stored>, workbook: &Workbook) -> Self {
+        value.map_or(Self::Missing, |row| {
+            Self::Stored(RowProps {
+                height: row.properties.height,
+                descent: row.properties.descent,
+                style: row.properties.style.map_or(StyleState::Default, |key| {
+                    StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ))
+                }),
+                outline: row.properties.outline,
+                flags: row.properties.flags,
+            })
+        })
+    }
+
+    pub(super) fn after(
+        before: Option<&crate::row::Stored>,
+        action: RowAction,
+        workbook: &Workbook,
+    ) -> Self {
+        if before.is_none() && !action.materializes() {
+            return Self::Missing;
+        }
+        let mut properties = match Self::read(before, workbook) {
+            Self::Missing => RowProps {
+                height: None,
+                descent: None,
+                style: StyleState::Default,
+                outline: Outline::NONE,
+                flags: RowFlags::empty(),
+            },
+            Self::Stored(properties) => properties,
+        };
+        if let Some(hidden) = action.hidden {
+            properties.flags.set(RowFlags::HIDDEN, hidden);
+        }
+        if let Some(height) = action.height {
+            match height {
+                HeightEffect::Set(height) => {
+                    properties.height = Some(height);
+                    properties.flags.insert(RowFlags::CUSTOM_HEIGHT);
+                },
+                HeightEffect::Reset => {
+                    properties.height = None;
+                    properties.flags.remove(RowFlags::CUSTOM_HEIGHT);
+                },
+            }
+        }
+        if let Some(descent) = action.descent {
+            properties.descent = match descent {
+                DescentEffect::Set(value) => Some(value),
+                DescentEffect::Reset => None,
+            };
+        }
+        if let Some(style) = action.style {
+            match style {
+                StyleEffect::Set(key) => {
+                    properties.style = StyleState::Shared(StyleKey::new(
+                        key,
+                        Arc::clone(&workbook.inner.style_lineage),
+                    ));
+                    properties.flags.insert(RowFlags::CUSTOM_FORMAT);
+                },
+                StyleEffect::Reset => {
+                    properties.style = StyleState::Default;
+                    properties.flags.remove(RowFlags::CUSTOM_FORMAT);
+                },
+            }
+        }
+        if let Some(outline) = action.outline {
+            properties.outline = outline;
+        }
+        if let Some(collapsed) = action.collapsed {
+            properties.flags.set(RowFlags::COLLAPSED, collapsed);
+        }
+        if let Some(thick_top) = action.thick_top {
+            properties.flags.set(RowFlags::THICK_TOP, thick_top);
+        }
+        if let Some(thick_bottom) = action.thick_bottom {
+            properties.flags.set(RowFlags::THICK_BOTTOM, thick_bottom);
+        }
+        if let Some(phonetic) = action.phonetic {
+            properties.flags.set(RowFlags::PHONETIC, phonetic);
+        }
+        Self::Stored(properties)
+    }
+}
+
+pub(super) fn defaults_after(
+    before: Option<&Defaults>,
+    action: DefaultsAction,
+) -> std::result::Result<Option<Defaults>, crate::DefaultsEditBlock> {
+    if action.is_remove() {
+        return Ok(None);
+    }
+    if before.is_none() && !action.materializes() {
+        return Ok(None);
+    }
+    let effects = action.effects();
+    let mut defaults = match before {
+        Some(value) => value.clone(),
+        None => Defaults {
+            base_width: None,
+            width: None,
+            height: effects
+                .height
+                .ok_or(crate::DefaultsEditBlock::NeedsHeight)?,
+            descent: None,
+            row_outline: None,
+            column_outline: None,
+            flags: layout::Flags::empty(),
+            present: layout::Flags::empty(),
+        },
+    };
+    if let Some(effect) = effects.base_width {
+        defaults.base_width = match effect {
+            OptionalEffect::Set(value) => Some(value),
+            OptionalEffect::Reset => None,
+        };
+    }
+    if let Some(effect) = effects.width {
+        defaults.width = match effect {
+            OptionalEffect::Set(value) => Some(value),
+            OptionalEffect::Reset => None,
+        };
+    }
+    if let Some(height) = effects.height {
+        defaults.height = height;
+        defaults.flags.insert(layout::Flags::CUSTOM_HEIGHT);
+        defaults.present.insert(layout::Flags::CUSTOM_HEIGHT);
+    }
+    for (value, flag) in [
+        (effects.hidden, layout::Flags::HIDDEN),
+        (effects.thick_top, layout::Flags::THICK_TOP),
+        (effects.thick_bottom, layout::Flags::THICK_BOTTOM),
+    ] {
+        if let Some(value) = value {
+            defaults.flags.set(flag, value);
+            defaults.present.set(flag, value);
+        }
+    }
+    if let Some(effect) = effects.descent {
+        defaults.descent = match effect {
+            DescentEffect::Set(value) => Some(value),
+            DescentEffect::Reset => None,
+        };
+    }
+    Ok(Some(defaults))
+}
+
+pub(super) fn ensure_merge_area(sheet: &str, range: Rect) -> Result<()> {
+    if range.rows() == 1 && range.columns() == 1 {
+        return Err(Error::MergeEditBlocked {
+            sheet: sheet.to_owned(),
+            range,
+            reason: MergeEditBlock::SingleCell,
+        });
+    }
+    Ok(())
+}
+
+#[derive(Debug)]
+pub(super) struct MergeProjection {
+    pub(super) plan: MergePlan,
+    pub(super) changes: Vec<(Rect, crate::merge::Change)>,
+}
+
+fn rect_key(range: Rect) -> (u32, u32, u32, u32) {
+    let start = range.start();
+    let (end_row, end_column) = range.end();
+    (start.row().get(), start.column().get(), end_row, end_column)
+}
+
+fn has_content_after(before: Option<&Cell>, action: Option<&Action>) -> bool {
+    match action {
+        Some(Action::Remove) => false,
+        Some(Action::Update {
+            payload:
+                Some(
+                    Payload::Set(_)
+                    | Payload::SharedString { .. }
+                    | Payload::SharedFormula { .. }
+                    | Payload::Rich(_)
+                    | Payload::Cache(_),
+                ),
+            ..
+        }) => true,
+        Some(Action::Update {
+            payload: Some(Payload::Clear | Payload::ClearIfPresent),
+            ..
+        }) => false,
+        Some(Action::Update { payload: None, .. }) | None => {
+            before.is_some_and(|cell| !matches!(cell, Cell::Empty))
+        },
+    }
+}
+
+fn follower_content(
+    store: Option<&crate::cell::Store>,
+    cells: &BTreeMap<Address, Action>,
+    range: Rect,
+) -> Option<Address> {
+    let anchor = range.start();
+    let mut blocked = None;
+    if let Some(store) = store {
+        for (address, cell) in store.cells(range) {
+            if address != anchor && has_content_after(Some(cell), cells.get(&address)) {
+                blocked = Some(blocked.map_or(address, |current: Address| current.min(address)));
+            }
+        }
+    }
+    for (address, action) in cells.range(anchor..) {
+        if address.row().get() >= range.end().0 {
+            break;
+        }
+        if *address == anchor || !range.contains(*address) {
+            continue;
+        }
+        if store.is_some_and(|store| store.entry(*address).is_some()) {
+            continue;
+        }
+        if has_content_after(None, Some(action)) {
+            blocked = Some(blocked.map_or(*address, |current| current.min(*address)));
+        }
+    }
+    blocked
+}
+
+pub(super) fn project_merges(
+    sheet: &str,
+    worksheet: Option<&Worksheet>,
+    store: Option<&crate::cell::Store>,
+    intents: Vec<MergeIntent>,
+    cells: &BTreeMap<Address, Action>,
+) -> Result<MergeProjection> {
+    let base = store.map_or(&[][..], crate::cell::Store::merge_ranges);
+    let mut projected = Vec::new();
+    projected
+        .try_reserve_exact(base.len())
+        .map_err(|source| allocation("merged-range projection", source))?;
+    projected.extend_from_slice(base);
+    let mut table_ranges = None;
+    for intent in intents {
+        match intent {
+            MergeIntent::Add(range) => {
+                ensure_merge_area(sheet, range)?;
+                if projected.contains(&range) {
+                    continue;
+                }
+                if let Some(worksheet) = worksheet {
+                    if table_ranges.is_none() {
+                        let tables = worksheet.tables()?;
+                        let mut ranges = Vec::new();
+                        ranges
+                            .try_reserve_exact(tables.len())
+                            .map_err(|source| allocation("worksheet table ranges", source))?;
+                        for table in tables {
+                            ranges.push(table.table().range()?);
+                        }
+                        table_ranges = Some(ranges);
+                    }
+                    let ranges = table_ranges.as_deref().unwrap_or_default();
+                    if let Some(table) = ranges
+                        .iter()
+                        .copied()
+                        .find(|table| crate::merge::overlaps(*table, range))
+                    {
+                        return Err(Error::MergeEditBlocked {
+                            sheet: sheet.to_owned(),
+                            range,
+                            reason: MergeEditBlock::TableOverlap { table },
+                        });
+                    }
+                }
+                if let Some(existing) = projected
+                    .iter()
+                    .copied()
+                    .find(|existing| crate::merge::overlaps(*existing, range))
+                {
+                    return Err(Error::MergeEditBlocked {
+                        sheet: sheet.to_owned(),
+                        range,
+                        reason: MergeEditBlock::Overlap { existing },
+                    });
+                }
+                if let Some(address) = follower_content(store, cells, range) {
+                    return Err(Error::MergeEditBlocked {
+                        sheet: sheet.to_owned(),
+                        range,
+                        reason: MergeEditBlock::FollowerContent { address },
+                    });
+                }
+                projected
+                    .try_reserve(1)
+                    .map_err(|source| allocation("merged-range projection", source))?;
+                projected.push(range);
+            },
+            MergeIntent::Remove(range) => projected.retain(|candidate| *candidate != range),
+        }
+    }
+    let projected = crate::merge::Index::new(projected)?;
+    let projected = projected.as_slice();
+
+    let mut remove = Vec::new();
+    remove
+        .try_reserve_exact(base.len())
+        .map_err(|source| allocation("removed merged ranges", source))?;
+    remove.extend(
+        base.iter()
+            .copied()
+            .filter(|range| !projected.contains(range)),
+    );
+    let mut add = Vec::new();
+    add.try_reserve_exact(projected.len())
+        .map_err(|source| allocation("added merged ranges", source))?;
+    add.extend(
+        projected
+            .iter()
+            .copied()
+            .filter(|range| !base.contains(range)),
+    );
+    remove.sort_unstable_by_key(|range| rect_key(*range));
+    add.sort_unstable_by_key(|range| rect_key(*range));
+
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(remove.len().saturating_add(add.len()))
+        .map_err(|source| allocation("merged-range changes", source))?;
+    changes.extend(
+        remove
+            .iter()
+            .copied()
+            .map(|range| (range, crate::merge::Change::Remove)),
+    );
+    changes.extend(
+        add.iter()
+            .copied()
+            .map(|range| (range, crate::merge::Change::Add)),
+    );
+    Ok(MergeProjection {
+        plan: MergePlan { add, remove },
+        changes,
+    })
+}
+
+fn intersection(left: Rect, right: Rect) -> Option<Rect> {
+    if !crate::merge::overlaps(left, right) {
+        return None;
+    }
+    let start_row = left.start().row().get().max(right.start().row().get());
+    let start_column = left
+        .start()
+        .column()
+        .get()
+        .max(right.start().column().get());
+    let (left_end_row, left_end_column) = left.end();
+    let (right_end_row, right_end_column) = right.end();
+    Rect::at(
+        start_row,
+        start_column,
+        left_end_row.min(right_end_row),
+        left_end_column.min(right_end_column),
+    )
+    .ok()
+}
+
+pub(super) fn merge_conflicts(left: &SheetActions, right: &SheetActions) -> Vec<Rect> {
+    let mut ranges = Vec::new();
+    for left_intent in &left.merges {
+        for right_intent in &right.merges {
+            if let Some(overlap) = intersection(left_intent.range(), right_intent.range()) {
+                ranges.push(overlap);
+            }
+        }
+    }
+    for intent in &left.merges {
+        if let MergeIntent::Add(range) = intent {
+            ranges.extend(
+                right
+                    .cells
+                    .iter()
+                    .filter(|(address, action)| {
+                        **address != range.start()
+                            && range.contains(**address)
+                            && has_content_after(None, Some(action))
+                    })
+                    .map(|(address, _)| Rect::single(*address)),
+            );
+        }
+    }
+    for intent in &right.merges {
+        if let MergeIntent::Add(range) = intent {
+            ranges.extend(
+                left.cells
+                    .iter()
+                    .filter(|(address, action)| {
+                        **address != range.start()
+                            && range.contains(**address)
+                            && has_content_after(None, Some(action))
+                    })
+                    .map(|(address, _)| Rect::single(*address)),
+            );
+        }
+    }
+    ranges.sort_unstable_by_key(|range| rect_key(*range));
+    ranges.dedup();
+    ranges
+}
+
+/// One deterministic semantic change in a reversible patch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Change {
+    /// A worksheet was added at a checked logical position.
+    Create {
+        sheet: Box<str>,
+        position: usize,
+        visibility: Visibility,
+    },
+    /// A worksheet was removed at a checked logical position.
+    Remove {
+        sheet: Box<str>,
+        position: usize,
+        visibility: Visibility,
+    },
+    Rename {
+        position: usize,
+        before: Box<str>,
+        after: Box<str>,
+    },
+    Move {
+        sheet: Box<str>,
+        from: usize,
+        to: usize,
+    },
+    Active {
+        before: ActiveTab,
+        after: ActiveTab,
+    },
+    Visibility {
+        sheet: Box<str>,
+        position: usize,
+        before: Visibility,
+        after: Visibility,
+    },
+    Defaults {
+        sheet: Box<str>,
+        before: Option<Defaults>,
+        after: Option<Defaults>,
+    },
+    /// Worksheet Office Add-in range bindings changed as one validated set.
+    Web {
+        sheet: Box<str>,
+        before: WebBindings,
+        after: WebBindings,
+    },
+    Merge {
+        sheet: Box<str>,
+        range: Rect,
+        change: crate::merge::Change,
+    },
+    Cell {
+        sheet: Box<str>,
+        address: Address,
+        before: State,
+        after: State,
+    },
+    Row {
+        sheet: Box<str>,
+        row: RowIndex,
+        before: RowState,
+        after: RowState,
+    },
+    Column {
+        sheet: Box<str>,
+        column: ColumnIndex,
+        before: ColumnState,
+        after: ColumnState,
+    },
+    /// Direct worksheet row and column page-break state changed.
+    PageBreaks {
+        sheet: Box<str>,
+        before: crate::page_breaks::PageBreaks,
+        after: crate::page_breaks::PageBreaks,
+    },
+    /// Direct worksheet page-margin state changed.
+    PageMargins {
+        sheet: Box<str>,
+        before: Option<crate::page_margins::Margins>,
+        after: Option<crate::page_margins::Margins>,
+    },
+    /// Direct worksheet page-setup state changed.
+    PageSetup {
+        sheet: Box<str>,
+        before: Option<crate::page_setup::Setup>,
+        after: Option<crate::page_setup::Setup>,
+    },
+    /// Direct worksheet print-option state changed.
+    PrintOptions {
+        sheet: Box<str>,
+        before: Option<crate::print_options::PrintOptions>,
+        after: Option<crate::print_options::PrintOptions>,
+    },
+    /// One typed worksheet hyperlink was added, replaced, or removed.
+    Hyperlink {
+        sheet: Box<str>,
+        reference: crate::hyperlinks::HyperlinkReference,
+        before: Option<crate::hyperlinks::Hyperlink>,
+        after: Option<crate::hyperlinks::Hyperlink>,
+    },
+}
+
+impl Change {
+    #[must_use]
+    pub fn sheet(&self) -> &str {
+        match self {
+            Self::Create { sheet, .. } | Self::Remove { sheet, .. } => sheet,
+            Self::Rename { after, .. } => after,
+            Self::Active { after, .. } => after.name(),
+            Self::Move { sheet, .. }
+            | Self::Visibility { sheet, .. }
+            | Self::Defaults { sheet, .. }
+            | Self::Web { sheet, .. }
+            | Self::Merge { sheet, .. }
+            | Self::Cell { sheet, .. }
+            | Self::Row { sheet, .. }
+            | Self::Column { sheet, .. }
+            | Self::PageBreaks { sheet, .. }
+            | Self::PageMargins { sheet, .. }
+            | Self::PageSetup { sheet, .. }
+            | Self::PrintOptions { sheet, .. }
+            | Self::Hyperlink { sheet, .. } => sheet,
+        }
+    }
+
+    /// Ordered source/destination positions when this is a tab move.
+    #[must_use]
+    pub fn moved(&self) -> Option<(usize, usize)> {
+        match self {
+            Self::Move { from, to, .. } => Some((*from, *to)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Name transition when this is a dependency-aware sheet rename.
+    #[must_use]
+    pub fn renamed(&self) -> Option<(usize, &str, &str)> {
+        match self {
+            Self::Rename {
+                position,
+                before,
+                after,
+            } => Some((*position, before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Active-tab transition when this is a workbook-view change.
+    #[must_use]
+    pub fn active(&self) -> Option<(&ActiveTab, &ActiveTab)> {
+        match self {
+            Self::Active { before, after } => Some((before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Visibility state tuple when this is a workbook tab change.
+    #[must_use]
+    pub fn visibility(&self) -> Option<(usize, &Visibility, &Visibility)> {
+        match self {
+            Self::Visibility {
+                position,
+                before,
+                after,
+                ..
+            } => Some((*position, before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Worksheet-default transition when this changes `sheetFormatPr`.
+    #[must_use]
+    pub fn defaults(&self) -> Option<(Option<&Defaults>, Option<&Defaults>)> {
+        match self {
+            Self::Defaults { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Office Add-in range-binding transition, when applicable.
+    #[must_use]
+    pub fn web(&self) -> Option<(&WebBindings, &WebBindings)> {
+        match self {
+            Self::Web { before, after, .. } => Some((before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Merged-range membership transition, when applicable.
+    #[must_use]
+    pub const fn merged(&self) -> Option<(Rect, crate::merge::Change)> {
+        match self {
+            Self::Merge { range, change, .. } => Some((*range, *change)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Cell state tuple when this is an ordinary cell change.
+    #[must_use]
+    pub fn cell(&self) -> Option<(Address, &State, &State)> {
+        match self {
+            Self::Cell {
+                address,
+                before,
+                after,
+                ..
+            } => Some((*address, before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Row state tuple when this is a row-property change.
+    #[must_use]
+    pub fn row(&self) -> Option<(RowIndex, &RowState, &RowState)> {
+        match self {
+            Self::Row {
+                row, before, after, ..
+            } => Some((*row, before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Column state tuple when this is a column-property change.
+    #[must_use]
+    pub fn column(&self) -> Option<(ColumnIndex, &ColumnState, &ColumnState)> {
+        match self {
+            Self::Column {
+                column,
+                before,
+                after,
+                ..
+            } => Some((*column, before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Added worksheet identity when this is a structural create.
+    #[must_use]
+    pub fn created(&self) -> Option<(usize, &str)> {
+        match self {
+            Self::Create {
+                sheet, position, ..
+            } => Some((*position, sheet)),
+            Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Removed worksheet identity when this is a structural delete or inverse.
+    #[must_use]
+    pub fn removed(&self) -> Option<(usize, &str)> {
+        match self {
+            Self::Remove {
+                sheet, position, ..
+            } => Some((*position, sheet)),
+            Self::Create { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Direct page-break transition, when applicable.
+    #[must_use]
+    pub fn page_breaks(
+        &self,
+    ) -> Option<(
+        &crate::page_breaks::PageBreaks,
+        &crate::page_breaks::PageBreaks,
+    )> {
+        match self {
+            Self::PageBreaks { before, after, .. } => Some((before, after)),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Direct page-margin transition, when applicable.
+    #[must_use]
+    pub fn page_margins(
+        &self,
+    ) -> Option<(
+        Option<&crate::page_margins::Margins>,
+        Option<&crate::page_margins::Margins>,
+    )> {
+        match self {
+            Self::PageMargins { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Direct page-setup transition, when applicable.
+    #[must_use]
+    pub fn page_setup(
+        &self,
+    ) -> Option<(
+        Option<&crate::page_setup::Setup>,
+        Option<&crate::page_setup::Setup>,
+    )> {
+        match self {
+            Self::PageSetup { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    /// Direct print-option transition, when applicable.
+    #[must_use]
+    pub fn print_options(
+        &self,
+    ) -> Option<(
+        Option<&crate::print_options::PrintOptions>,
+        Option<&crate::print_options::PrintOptions>,
+    )> {
+        match self {
+            Self::PrintOptions { before, after, .. } => Some((before.as_ref(), after.as_ref())),
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::Cell { .. }
+            | Self::Row { .. }
+            | Self::Column { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::Hyperlink { .. } => None,
+        }
+    }
+
+    pub(super) fn inverse(&self) -> Self {
+        match self {
+            Self::Create {
+                sheet,
+                position,
+                visibility,
+            } => Self::Remove {
+                sheet: sheet.clone(),
+                position: *position,
+                visibility: visibility.clone(),
+            },
+            Self::Remove {
+                sheet,
+                position,
+                visibility,
+            } => Self::Create {
+                sheet: sheet.clone(),
+                position: *position,
+                visibility: visibility.clone(),
+            },
+            Self::Rename {
+                position,
+                before,
+                after,
+            } => Self::Rename {
+                position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Move { sheet, from, to } => Self::Move {
+                sheet: sheet.clone(),
+                from: *to,
+                to: *from,
+            },
+            Self::Active { before, after } => Self::Active {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Visibility {
+                sheet,
+                position,
+                before,
+                after,
+            } => Self::Visibility {
+                sheet: sheet.clone(),
+                position: *position,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Defaults {
+                sheet,
+                before,
+                after,
+            } => Self::Defaults {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Web {
+                sheet,
+                before,
+                after,
+            } => Self::Web {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Merge {
+                sheet,
+                range,
+                change,
+            } => Self::Merge {
+                sheet: sheet.clone(),
+                range: *range,
+                change: change.inverse(),
+            },
+            Self::Cell {
+                sheet,
+                address,
+                before,
+                after,
+            } => Self::Cell {
+                sheet: sheet.clone(),
+                address: *address,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Row {
+                sheet,
+                row,
+                before,
+                after,
+            } => Self::Row {
+                sheet: sheet.clone(),
+                row: *row,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Column {
+                sheet,
+                column,
+                before,
+                after,
+            } => Self::Column {
+                sheet: sheet.clone(),
+                column: *column,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::PageBreaks {
+                sheet,
+                before,
+                after,
+            } => Self::PageBreaks {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::PageMargins {
+                sheet,
+                before,
+                after,
+            } => Self::PageMargins {
+                sheet: sheet.clone(),
+                before: *after,
+                after: *before,
+            },
+            Self::PageSetup {
+                sheet,
+                before,
+                after,
+            } => Self::PageSetup {
+                sheet: sheet.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::PrintOptions {
+                sheet,
+                before,
+                after,
+            } => Self::PrintOptions {
+                sheet: sheet.clone(),
+                before: *after,
+                after: *before,
+            },
+            Self::Hyperlink {
+                sheet,
+                reference,
+                before,
+                after,
+            } => Self::Hyperlink {
+                sheet: sheet.clone(),
+                reference: reference.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+        }
+    }
+
+    pub(super) fn rebind_style(&mut self, workbook: &Workbook) {
+        match self {
+            Self::Cell { before, after, .. } => {
+                before.rebind_style(workbook);
+                after.rebind_style(workbook);
+            },
+            Self::Column { before, after, .. } => {
+                before.rebind_style(&workbook.inner.style_lineage);
+                after.rebind_style(&workbook.inner.style_lineage);
+            },
+            Self::Row { before, after, .. } => {
+                before.rebind_style(&workbook.inner.style_lineage);
+                after.rebind_style(&workbook.inner.style_lineage);
+            },
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => {},
+        }
+    }
+
+    pub(super) fn uses_shared_style(&self) -> bool {
+        match self {
+            Self::Cell { before, after, .. } => {
+                before.uses_shared_style() || after.uses_shared_style()
+            },
+            Self::Column { before, after, .. } => {
+                before.uses_shared_style() || after.uses_shared_style()
+            },
+            Self::Row { before, after, .. } => {
+                before.uses_shared_style() || after.uses_shared_style()
+            },
+            Self::Create { .. }
+            | Self::Remove { .. }
+            | Self::Rename { .. }
+            | Self::Move { .. }
+            | Self::Active { .. }
+            | Self::Visibility { .. }
+            | Self::Defaults { .. }
+            | Self::Web { .. }
+            | Self::Merge { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlink { .. } => false,
+        }
+    }
+}
+
+/// Overlapping effects on one logical workbook sheet.
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Conflict {
+    /// Both branches edit the bounded form-control owner on one worksheet.
+    FormControls {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Remove {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Name {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Order {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Active {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Tab {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Defaults {
+        sheet: Box<str>,
+        position: usize,
+        fields: layout::Fields,
+    },
+    Web {
+        sheet: Box<str>,
+        position: usize,
+    },
+    Merges {
+        sheet: Box<str>,
+        position: usize,
+        ranges: Box<[Rect]>,
+    },
+    Cells {
+        sheet: Box<str>,
+        position: usize,
+        addresses: Box<[Address]>,
+    },
+    Rows {
+        sheet: Box<str>,
+        position: usize,
+        rows: Box<[RowIndex]>,
+    },
+    Columns {
+        sheet: Box<str>,
+        position: usize,
+        columns: Box<[ColumnIndex]>,
+    },
+    /// Both branches replace page breaks on the same worksheet.
+    PageBreaks {
+        sheet: Box<str>,
+        position: usize,
+    },
+    /// Both branches replace page margins on the same worksheet.
+    PageMargins {
+        sheet: Box<str>,
+        position: usize,
+    },
+    /// Both branches replace page setup on the same worksheet.
+    PageSetup {
+        sheet: Box<str>,
+        position: usize,
+    },
+    /// Both branches replace print options on the same worksheet.
+    PrintOptions {
+        sheet: Box<str>,
+        position: usize,
+    },
+    /// Both branches edit the same checked hyperlink ranges.
+    Hyperlinks {
+        sheet: Box<str>,
+        position: usize,
+        references: Box<[Rect]>,
+    },
+}
+
+impl Conflict {
+    /// Developer-facing sheet name.
+    #[must_use]
+    pub fn sheet(&self) -> &str {
+        match self {
+            Self::Remove { sheet, .. }
+            | Self::Name { sheet, .. }
+            | Self::Order { sheet, .. }
+            | Self::Active { sheet, .. }
+            | Self::Tab { sheet, .. }
+            | Self::Defaults { sheet, .. }
+            | Self::FormControls { sheet, .. }
+            | Self::Web { sheet, .. }
+            | Self::Merges { sheet, .. }
+            | Self::Cells { sheet, .. }
+            | Self::Rows { sheet, .. }
+            | Self::Columns { sheet, .. }
+            | Self::PageBreaks { sheet, .. }
+            | Self::PageMargins { sheet, .. }
+            | Self::PageSetup { sheet, .. }
+            | Self::PrintOptions { sheet, .. }
+            | Self::Hyperlinks { sheet, .. } => sheet,
+        }
+    }
+
+    /// Checked zero-based sheet position in the shared base snapshot.
+    #[must_use]
+    pub fn position(&self) -> usize {
+        match self {
+            Self::Remove { position, .. }
+            | Self::Name { position, .. }
+            | Self::Order { position, .. }
+            | Self::Active { position, .. }
+            | Self::Tab { position, .. }
+            | Self::Defaults { position, .. }
+            | Self::FormControls { position, .. }
+            | Self::Web { position, .. }
+            | Self::Merges { position, .. }
+            | Self::Cells { position, .. }
+            | Self::Rows { position, .. }
+            | Self::Columns { position, .. }
+            | Self::PageBreaks { position, .. }
+            | Self::PageMargins { position, .. }
+            | Self::PageSetup { position, .. }
+            | Self::PrintOptions { position, .. }
+            | Self::Hyperlinks { position, .. } => *position,
+        }
+    }
+
+    /// Whether both edits target this sheet's catalog name.
+    #[must_use]
+    pub const fn is_name(&self) -> bool {
+        matches!(self, Self::Name { .. })
+    }
+
+    /// Whether both edits remove or otherwise overlap one removed sheet.
+    #[must_use]
+    pub const fn is_remove(&self) -> bool {
+        matches!(self, Self::Remove { .. })
+    }
+
+    /// Whether both edits target this sheet tab's visibility.
+    #[must_use]
+    pub const fn is_tab(&self) -> bool {
+        matches!(self, Self::Tab { .. })
+    }
+
+    /// Whether both edits target the workbook's one active-tab facet.
+    #[must_use]
+    pub const fn is_active(&self) -> bool {
+        matches!(self, Self::Active { .. })
+    }
+
+    /// Whether both edits target the workbook's one tab-order facet.
+    #[must_use]
+    pub const fn is_order(&self) -> bool {
+        matches!(self, Self::Order { .. })
+    }
+
+    /// Overlapping worksheet-default facets, when applicable.
+    #[must_use]
+    pub const fn defaults(&self) -> Option<layout::Fields> {
+        match self {
+            Self::Defaults { fields, .. } => Some(*fields),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
+        }
+    }
+
+    /// Whether both edits target the bounded form-control owner on one worksheet.
+    #[must_use]
+    pub const fn is_form_controls(&self) -> bool {
+        matches!(self, Self::FormControls { .. })
+    }
+
+    /// Whether both edits replace bindings on the same worksheet.
+    #[must_use]
+    pub const fn is_web(&self) -> bool {
+        matches!(self, Self::Web { .. })
+    }
+
+    /// Whether both edits replace page breaks on the same worksheet.
+    #[must_use]
+    pub const fn is_page_breaks(&self) -> bool {
+        matches!(self, Self::PageBreaks { .. })
+    }
+
+    /// Whether both edits replace page margins on the same worksheet.
+    #[must_use]
+    pub const fn is_page_margins(&self) -> bool {
+        matches!(self, Self::PageMargins { .. })
+    }
+
+    /// Whether both edits replace page setup on the same worksheet.
+    #[must_use]
+    pub const fn is_page_setup(&self) -> bool {
+        matches!(self, Self::PageSetup { .. })
+    }
+
+    /// Whether both edits replace print options on the same worksheet.
+    #[must_use]
+    pub const fn is_print_options(&self) -> bool {
+        matches!(self, Self::PrintOptions { .. })
+    }
+
+    /// Whether both edits touch overlapping typed hyperlink ranges.
+    #[must_use]
+    pub const fn is_hyperlinks(&self) -> bool {
+        matches!(self, Self::Hyperlinks { .. })
+    }
+
+    /// Overlapping typed hyperlink ranges, when applicable.
+    #[must_use]
+    pub fn hyperlinks(&self) -> Option<&[Rect]> {
+        match self {
+            Self::Hyperlinks { references, .. } => Some(references),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => None,
+        }
+    }
+
+    /// Structurally overlapping merged ranges, when applicable.
+    #[must_use]
+    pub fn merges(&self) -> Option<&[Rect]> {
+        match self {
+            Self::Merges { ranges, .. } => Some(ranges),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
+        }
+    }
+
+    /// Deterministically ordered cells written by both edits, when applicable.
+    #[must_use]
+    pub fn cells(&self) -> Option<&[Address]> {
+        match self {
+            Self::Cells { addresses, .. } => Some(addresses),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Rows { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
+        }
+    }
+
+    /// Deterministically ordered rows written by both edits, when applicable.
+    #[must_use]
+    pub fn rows(&self) -> Option<&[RowIndex]> {
+        match self {
+            Self::Rows { rows, .. } => Some(rows),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Cells { .. }
+            | Self::Columns { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
+        }
+    }
+
+    /// Deterministically ordered columns written by both edits, when
+    /// applicable.
+    #[must_use]
+    pub fn columns(&self) -> Option<&[ColumnIndex]> {
+        match self {
+            Self::Columns { columns, .. } => Some(columns),
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::Defaults { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::Merges { .. }
+            | Self::Cells { .. }
+            | Self::Rows { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. }
+            | Self::Hyperlinks { .. } => None,
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Remove { .. }
+            | Self::Name { .. }
+            | Self::Order { .. }
+            | Self::Active { .. }
+            | Self::Tab { .. }
+            | Self::FormControls { .. }
+            | Self::Web { .. }
+            | Self::PageBreaks { .. }
+            | Self::PageMargins { .. }
+            | Self::PageSetup { .. }
+            | Self::PrintOptions { .. } => 1,
+            Self::Defaults { fields, .. } => fields.bits().count_ones() as usize,
+            Self::Merges { ranges, .. } => ranges.len(),
+            Self::Cells { addresses, .. } => addresses.len(),
+            Self::Rows { rows, .. } => rows.len(),
+            Self::Columns { columns, .. } => columns.len(),
+            Self::Hyperlinks { references, .. } => references.len(),
+        }
+    }
+}
+
+/// Structured overlap report returned by [`Edit::join`].
+#[derive(Debug, PartialEq, Eq)]
+pub struct ConflictSet {
+    pub(super) conflicts: Box<[Conflict]>,
+}
+
+/// Fixed classification of a source-equivalence planning failure returned when
+/// two deferred edits are joined.  The original [`crate::Error`] is retained
+/// by [`JoinError`] as its error source; this enum is deliberately free of
+/// document text and therefore remains equality-comparable.
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JoinNormalization {
+    /// A format-family edit limit rejected the normalization census.
+    Limit {
+        /// The bounded dimension that was exceeded.
+        kind: crate::error::LimitKind,
+        /// The amount required by the normalized effects.
+        observed: u64,
+        /// The configured maximum.
+        maximum: u64,
+    },
+    /// A shared hierarchical resource budget rejected the census.
+    ResourceLimit,
+    /// The package or OPC source could not be inspected.
+    Package,
+    /// Markup-compatibility preprocessing failed.
+    MarkupCompatibility,
+    /// OOXML decoding failed.
+    Xml,
+    /// A shared dependency or drawing decoder failed.
+    Dependency,
+    /// A shared OOXML service failed.
+    Common,
+    /// A domain value or structural invariant was invalid.
+    Invalid,
+    /// A bounded allocation could not be reserved.
+    Allocation,
+    /// A typed edit was refused by workbook structure or policy.
+    Refused,
+    /// The requested operation is unsupported by this facade.
+    Unsupported,
+    /// A stale patch or signed source prevented publication.
+    Publication,
+    /// A failure outside the known source-equivalence classes.
+    Other,
+}
+
+impl fmt::Display for JoinNormalization {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(formatter, "{kind}: {observed} exceeds {maximum}"),
+            Self::ResourceLimit => formatter.write_str("resource limit"),
+            Self::Package => formatter.write_str("package source error"),
+            Self::MarkupCompatibility => formatter.write_str("markup-compatibility error"),
+            Self::Xml => formatter.write_str("OOXML decoding error"),
+            Self::Dependency => formatter.write_str("source dependency error"),
+            Self::Common => formatter.write_str("shared OOXML service error"),
+            Self::Invalid => formatter.write_str("invalid source or edit state"),
+            Self::Allocation => formatter.write_str("allocation error"),
+            Self::Refused => formatter.write_str("edit refused"),
+            Self::Unsupported => formatter.write_str("unsupported operation"),
+            Self::Publication => formatter.write_str("publication error"),
+            Self::Other => formatter.write_str("source-equivalence planning error"),
+        }
+    }
+}
+
+impl ConflictSet {
+    /// Conflicts in deterministic workbook-effect and sheet order.
+    #[must_use]
+    pub fn conflicts(&self) -> &[Conflict] {
+        &self.conflicts
+    }
+
+    /// Number of overlapping effects across the workbook.
+    pub fn len(&self) -> usize {
+        self.conflicts.iter().map(Conflict::len).sum()
+    }
+
+    /// Whether no overlapping effects were found.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.conflicts.is_empty()
+    }
+}
+
+impl fmt::Display for ConflictSet {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            formatter,
+            "{} overlapping effect(s) across {} conflict group(s)",
+            self.len(),
+            self.conflicts.len()
+        )
+    }
+}
+
+/// Why two independently prepared edits could not be joined.
+#[derive(Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum JoinFailure {
+    /// The edits were not created from the same immutable snapshot lineage.
+    DifferentSnapshot,
+    /// Both edits write at least one of the same effect facets.
+    Overlap(ConflictSet),
+    /// Joining the edits would exceed a bounded resource budget.
+    ResourceLimit(litchi_core::ResourceLimit),
+    /// Both edits replace the workbook's one persisted task-pane graph.
+    TaskPanes,
+    /// Both edits replace the complete workbook defined-name catalog.
+    DefinedNames,
+    /// Both edits stage worksheet drawing graph transfers that cannot be joined.
+    DrawingTransfer,
+    /// Planning the deferred source-equivalence effect projection failed.
+    Normalization(JoinNormalization),
+}
+
+/// Recoverable join failure that returns ownership of the rejected edit.
+pub struct JoinError {
+    pub(super) failure: JoinFailure,
+    pub(super) rejected: Box<Edit>,
+    pub(super) normalization_source: Option<Box<Error>>,
+}
+
+impl fmt::Debug for JoinError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("JoinError")
+            .field("failure", &self.failure)
+            .field("rejected_effects", &self.rejected.len())
+            .field("normalization_source", &self.normalization_source)
+            .finish()
+    }
+}
+
+impl JoinError {
+    /// Structured reason the join was refused.
+    #[must_use]
+    pub fn failure(&self) -> &JoinFailure {
+        &self.failure
+    }
+
+    /// The original typed source failure behind a normalization refusal.
+    #[must_use]
+    pub fn normalization_source(&self) -> Option<&Error> {
+        self.normalization_source.as_deref()
+    }
+
+    /// Overlapping effects, or `None` when the failure is not an effect conflict.
+    #[must_use]
+    pub fn conflicts(&self) -> Option<&ConflictSet> {
+        match &self.failure {
+            JoinFailure::Overlap(conflicts) => Some(conflicts),
+            JoinFailure::DifferentSnapshot
+            | JoinFailure::ResourceLimit(_)
+            | JoinFailure::TaskPanes
+            | JoinFailure::DefinedNames
+            | JoinFailure::DrawingTransfer
+            | JoinFailure::Normalization(_) => None,
+        }
+    }
+
+    /// Borrow the edit that was not merged.
+    #[must_use]
+    pub fn rejected(&self) -> &Edit {
+        &self.rejected
+    }
+
+    /// Recover the edit that was not merged.
+    #[must_use]
+    pub fn into_rejected(self) -> Edit {
+        *self.rejected
+    }
+
+    /// Recover both the structured reason and rejected edit.
+    #[must_use]
+    pub fn into_parts(self) -> (JoinFailure, Edit) {
+        (self.failure, *self.rejected)
+    }
+
+    /// Recover the structured reason, its original normalization source, and
+    /// the rejected edit without flattening the source diagnostic.
+    #[must_use]
+    pub fn into_parts_with_source(self) -> (JoinFailure, Option<Box<Error>>, Edit) {
+        (self.failure, self.normalization_source, *self.rejected)
+    }
+}
+
+impl fmt::Display for JoinError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match &self.failure {
+            JoinFailure::DifferentSnapshot => {
+                formatter.write_str("edits belong to different workbook snapshots")
+            },
+            JoinFailure::Overlap(conflicts) => {
+                write!(formatter, "edit effects overlap: {conflicts}")
+            },
+            JoinFailure::ResourceLimit(limit) => {
+                write!(formatter, "edit join resource limit: {limit}")
+            },
+            JoinFailure::TaskPanes => {
+                formatter.write_str("both edits replace the persisted task-pane graph")
+            },
+            JoinFailure::DefinedNames => {
+                formatter.write_str("both edits replace the workbook defined-name catalog")
+            },
+            JoinFailure::DrawingTransfer => {
+                formatter.write_str("worksheet drawing graph transfers overlap")
+            },
+            JoinFailure::Normalization(reason) => {
+                write!(formatter, "edit effect normalization failed: {reason}")
+            },
+        }
+    }
+}
+
+impl std::error::Error for JoinError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        self.normalization_source.as_deref().map(|source| {
+            let source: &(dyn std::error::Error + 'static) = source;
+            source
+        })
+    }
+}
+
+/// One package-owned semantic change, including worksheet-owned satellite parts.
+#[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
+pub enum PackageChange {
+    /// One worksheet control's paired properties and VML scalar state changed.
+    FormControl {
+        sheet: Box<str>,
+        control: usize,
+        before: Box<crate::form_control::Properties>,
+        after: Box<crate::form_control::Properties>,
+    },
+    /// Persisted Office Add-in task panes and their inert package graph changed.
+    TaskPanes {
+        before: Option<common_web::Panes>,
+        after: Option<common_web::Panes>,
+    },
+    /// Complete inert workbook defined-name catalog changed.
+    DefinedNames {
+        before: Box<[crate::raw::DefinedName]>,
+        after: Box<[crate::raw::DefinedName]>,
+    },
+    /// Selected worksheet drawing anchors and their image graph were cloned.
+    DrawingTransfer {
+        source: Box<str>,
+        target: Box<str>,
+        anchors: usize,
+        added: bool,
+    },
+    /// One existing worksheet picture gained or lost its embedded SVG owner.
+    SvgLifecycle {
+        sheet: Box<str>,
+        drawing: usize,
+        picture: usize,
+        attached: bool,
+    },
+}
+
+impl PackageChange {
+    /// Borrow the task-pane transition represented by this change.
+    #[must_use]
+    pub fn task_panes(&self) -> (Option<&common_web::Panes>, Option<&common_web::Panes>) {
+        match self {
+            Self::TaskPanes { before, after } => (before.as_ref(), after.as_ref()),
+            Self::FormControl { .. }
+            | Self::DefinedNames { .. }
+            | Self::DrawingTransfer { .. }
+            | Self::SvgLifecycle { .. } => (None, None),
+        }
+    }
+
+    /// Borrow the complete defined-name transition, when applicable.
+    #[must_use]
+    pub fn defined_names(
+        &self,
+    ) -> Option<(&[crate::raw::DefinedName], &[crate::raw::DefinedName])> {
+        match self {
+            Self::DefinedNames { before, after } => Some((before, after)),
+            Self::FormControl { .. }
+            | Self::TaskPanes { .. }
+            | Self::DrawingTransfer { .. }
+            | Self::SvgLifecycle { .. } => None,
+        }
+    }
+
+    pub(super) fn inverse(&self) -> Self {
+        match self {
+            Self::FormControl {
+                sheet,
+                control,
+                before,
+                after,
+            } => Self::FormControl {
+                sheet: sheet.clone(),
+                control: *control,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::TaskPanes { before, after } => Self::TaskPanes {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::DefinedNames { before, after } => Self::DefinedNames {
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::DrawingTransfer {
+                source,
+                target,
+                anchors,
+                added,
+            } => Self::DrawingTransfer {
+                source: source.clone(),
+                target: target.clone(),
+                anchors: *anchors,
+                added: !added,
+            },
+            Self::SvgLifecycle {
+                sheet,
+                drawing,
+                picture,
+                attached,
+            } => Self::SvgLifecycle {
+                sheet: sheet.clone(),
+                drawing: *drawing,
+                picture: *picture,
+                attached: !attached,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct PartChange {
+    pub(super) uri: PackURI,
+    pub(super) before: Arc<Vec<u8>>,
+    pub(super) after: Arc<Vec<u8>>,
+    pub(super) before_source: Option<OwnedXmlPart>,
+    pub(super) after_source: Option<OwnedXmlPart>,
+}
+
+/// One source-checked worksheet relationship transition.
+///
+/// Relationship IDs remain private implementation data. Public semantic
+/// changes carry only checked hyperlink values; this delta is retained solely
+/// so patch application can validate and mutate the OPC graph atomically with
+/// the worksheet XML Part.
+#[derive(Debug, Clone)]
+pub(super) struct RelationshipChange {
+    pub(super) owner: PackURI,
+    pub(super) before: Option<Relationship>,
+    pub(super) after: Option<Relationship>,
+    pub(super) before_source: Option<OwnedRelationships>,
+    pub(super) after_source: Option<OwnedRelationships>,
+}
+
+/// Source snapshots read by an SVG lifecycle patch before it plans the
+/// drawing dependency closure.
+///
+/// SVG edits inspect worksheet XML and the package relationship graph to
+/// resolve a semantic picture.  Keep those reads as bounded, exact guards so
+/// an in-memory patch cannot be replayed onto a package whose selector
+/// topology changed.  The guard intentionally stores immutable bytes rather
+/// than an owning workbook: durable patches continue to use their complete
+/// package snapshot, while in-memory inverse patches remain valid after a
+/// save/reopen.
+#[derive(Debug, Clone)]
+pub(super) struct SvgReadGuard {
+    pub(super) owner: PackURI,
+    pub(super) before_xml: Option<Arc<Vec<u8>>>,
+    pub(super) after_xml: Option<Arc<Vec<u8>>>,
+    pub(super) before_relationships: OwnedRelationships,
+    pub(super) after_relationships: OwnedRelationships,
+}
+
+impl SvgReadGuard {
+    fn validate(&self, package: &OpcPackage) -> Result<()> {
+        if let Some(expected) = &self.before_xml {
+            let current = package
+                .get_part(&self.owner)
+                .map(|part| part.blob_arc())
+                .map_err(|_| Error::PatchConflict {
+                    part: self.owner.to_string(),
+                })?;
+            if current.as_slice() != expected.as_slice() {
+                return Err(Error::PatchConflict {
+                    part: self.owner.to_string(),
+                });
+            }
+        }
+        let current = package
+            .source_relationships(&self.owner, package.read_limits())
+            .map_err(|_| Error::PatchConflict {
+                part: self.owner.to_string(),
+            })?;
+        if current != self.before_relationships {
+            return Err(Error::PatchConflict {
+                part: self.owner.to_string(),
+            });
+        }
+        Ok(())
+    }
+}
+
+impl RelationshipChange {
+    fn relationship_id(&self) -> Result<&str> {
+        self.after
+            .as_ref()
+            .or(self.before.as_ref())
+            .map(Relationship::r_id)
+            .ok_or_else(|| invalid("relationship delta has no relationship identity"))
+    }
+
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        if let Some(expected) = &self.before_source {
+            let current = package.source_relationships(expected.owner(), package.read_limits())?;
+            if current != *expected {
+                return Err(Error::PatchConflict {
+                    part: expected.owner().to_string(),
+                });
+            }
+        }
+        let current = package
+            .get_part(&self.owner)?
+            .rels()
+            .get(self.relationship_id()?)
+            .cloned();
+        match (&self.before, current) {
+            (None, None) => Ok(()),
+            (Some(expected), Some(actual)) if same_relationship(expected, &actual) => Ok(()),
+            _ => Err(Error::PatchConflict {
+                part: self.owner.to_string(),
+            }),
+        }
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        if let (Some(expected), Some(replacement)) = (&self.before_source, &self.after_source) {
+            package.try_replace_relationships(expected, replacement, package.read_limits())?;
+            return Ok(());
+        }
+        let relationship_id = self.relationship_id()?.to_owned();
+        let relationships = package.get_part_mut(&self.owner)?.rels_mut();
+        relationships.remove(&relationship_id);
+        if let Some(after) = &self.after {
+            relationships.try_add_relationship(
+                after.reltype().to_owned(),
+                after.target_ref().to_owned(),
+                relationship_id,
+                after.target_mode(),
+            )?;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct StyleGuard {
+    pub(super) uri: PackURI,
+    pub(super) content: Arc<Vec<u8>>,
+}
+
+impl StyleGuard {
+    fn validate(&self, workbook: &Workbook) -> Result<()> {
+        let matches = workbook.inner.styles_uri.as_ref() == Some(&self.uri)
+            && workbook
+                .inner
+                .package
+                .get_part(&self.uri)
+                .is_ok_and(|part| part.blob() == self.content.as_slice());
+        if matches {
+            Ok(())
+        } else {
+            Err(Error::PatchConflict {
+                part: self.uri.to_string(),
+            })
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum GraphAction {
+    Add,
+    Remove,
+}
+
+#[derive(Clone)]
+pub(super) struct GraphChange {
+    pub(super) action: GraphAction,
+    pub(super) source: PackURI,
+    pub(super) relationship: Relationship,
+    pub(super) part: Box<dyn Part + Send + Sync>,
+}
+
+impl fmt::Debug for GraphChange {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("GraphChange")
+            .field("action", &self.action)
+            .field("source", &self.source)
+            .field("relationship", &self.relationship.r_id())
+            .field("part", self.part.partname())
+            .finish()
+    }
+}
+
+/// Versioned reversible patch produced by a successful transaction.
+///
+/// The in-memory representation keeps semantic public changes free of native
+/// Office IDs while private deltas retain exact changed-part bytes and
+/// relationship fields. [`Patch::durable`] projects the committed source and
+/// target snapshots onto the common bounded deterministic wire.
+#[derive(Debug, Clone, Default)]
+pub struct Patch {
+    pub(super) changes: Box<[Change]>,
+    pub(super) package_changes: Box<[PackageChange]>,
+    pub(super) parts: Box<[PartChange]>,
+    pub(super) relationships: Box<[RelationshipChange]>,
+    pub(super) content_types: Option<ContentTypesChange>,
+    pub(super) svg_parts: Box<[SvgPartChange]>,
+    pub(super) graph: Box<[GraphChange]>,
+    pub(super) web: Option<common_web::Patch>,
+    pub(super) style_guard: Option<StyleGuard>,
+    pub(super) source: Option<Workbook>,
+    pub(super) target: Option<Workbook>,
+    pub(super) svg_read_guards: Box<[SvgReadGuard]>,
+    /// Paired source/target semantic readback expectations for every SVG
+    /// selector touched by the transaction.  These are deliberately kept
+    /// private: they are a replay proof, rather than another public selector
+    /// or an Office-native identifier.
+    pub(super) svg_final_guards: Box<[SvgFinalGuard]>,
+    // Cross-workbook scalar transfers are stricter than the ordinary
+    // byte-checked patch path. Keep their exact immutable lineage pair so a
+    // worksheet-only delta cannot be replayed onto a foreign or protected
+    // workbook that happens to share changed-part bytes. Durable patches bind
+    // complete package bytes through their wire envelope and do not use this.
+    pub(super) authority: Option<PatchAuthority>,
+    /// [`Self::retained_bytes`], computed once: a bounded commit checks it
+    /// and the caller then reads it again for its own snapshot budget, and
+    /// each computation walks both endpoint workbooks.
+    pub(super) retained: std::sync::OnceLock<usize>,
+}
+
+/// Exact final semantic state captured for one selected worksheet picture.
+///
+/// The source and target XML/relationship/content-type tokens retain the
+/// package's source lineage, while the bounded source anchor and media
+/// projections are read again through the worksheet seam.  Keeping both snapshots in
+/// one guard lets [`Patch::inverse`] validate the original state after a
+/// durable save/reopen without relying on an in-memory workbook identity.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SvgFinalState {
+    pub(super) drawing: PackURI,
+    pub(super) worksheet_xml: Arc<Vec<u8>>,
+    pub(super) worksheet_relationships: OwnedRelationships,
+    pub(super) drawing_xml: Arc<Vec<u8>>,
+    pub(super) drawing_relationships: OwnedRelationships,
+    pub(super) content_types: OwnedContentTypes,
+    pub(super) anchor: DrawingAnchor,
+    pub(super) raster_relationship_id: Box<str>,
+    pub(super) raster_relationship_type: Box<str>,
+    pub(super) raster_target_mode: litchi_opc::TargetMode,
+    pub(super) raster_part: PackURI,
+    pub(super) raster_content_type: Box<str>,
+    pub(super) raster_bytes: Arc<Vec<u8>>,
+    pub(super) svg: Option<SvgFinalMedia>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct SvgFinalMedia {
+    pub(super) relationship_id: Box<str>,
+    pub(super) relationship_type: Box<str>,
+    pub(super) target_mode: litchi_opc::TargetMode,
+    pub(super) part: PackURI,
+    pub(super) content_type: Box<str>,
+    pub(super) bytes: Arc<Vec<u8>>,
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct SvgFinalGuard {
+    pub(super) worksheet: PackURI,
+    pub(super) drawing_ordinal: usize,
+    pub(super) picture_ordinal: usize,
+    pub(super) before: SvgFinalState,
+    pub(super) after: SvgFinalState,
+    pub(super) expected_attached: bool,
+}
+
+/// Source-bound `[Content_Types].xml` transition retained for a graph edit.
+/// The OPC token preserves unrelated defaults, comments, and ordering.
+#[derive(Debug, Clone)]
+pub(super) struct ContentTypesChange {
+    pub(super) before: OwnedContentTypes,
+    pub(super) after: OwnedContentTypes,
+}
+
+#[derive(Clone)]
+pub(super) struct SvgPartChange {
+    pub(super) action: GraphAction,
+    pub(super) part: Box<dyn Part + Send + Sync>,
+}
+
+impl fmt::Debug for SvgPartChange {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SvgPartChange")
+            .field("action", &self.action)
+            .field("part", self.part.partname())
+            .finish()
+    }
+}
+
+impl ContentTypesChange {
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        if package.source_content_types(package.read_limits())? != self.before {
+            return Err(Error::PatchConflict {
+                part: "[Content_Types].xml".to_owned(),
+            });
+        }
+        Ok(())
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        package.try_replace_content_types(
+            self.before.bytes(),
+            &self.after,
+            package.read_limits(),
+        )?;
+        Ok(())
+    }
+}
+
+impl SvgPartChange {
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        match self.action {
+            GraphAction::Add => {
+                if package
+                    .validate_new_part_name(self.part.partname())
+                    .is_err()
+                {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+            GraphAction::Remove => {
+                let current = package.get_part(self.part.partname())?;
+                if current.blob() != self.part.blob()
+                    || current.content_type() != self.part.content_type()
+                    || !relationships_match(current.rels(), self.part.rels())
+                {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+        }
+        Ok(())
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        match self.action {
+            GraphAction::Add => package.try_add_part(self.part.clone())?,
+            GraphAction::Remove => {
+                if !package.remove_part(self.part.partname()) {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+        }
+        Ok(())
+    }
+}
+
+fn relationships_match(left: &Relationships, right: &Relationships) -> bool {
+    left.len() == right.len()
+        && left.iter().all(|relationship| {
+            right.get(relationship.r_id()).is_some_and(|candidate| {
+                candidate.r_id() == relationship.r_id()
+                    && candidate.reltype() == relationship.reltype()
+                    && candidate.target_ref() == relationship.target_ref()
+                    && candidate.target_mode() == relationship.target_mode()
+            })
+        })
+}
+
+/// Verify the final SVG package closure and the retained caller resource
+/// ceilings after every ordinary graph effect has become visible.
+///
+/// This is one post-transition census.  It checks removed-target reachability
+/// while it totals relationship members, relationship XML bytes/events,
+/// relationship edges, and graph targets, so closure validation does not scan
+/// the package once per removed target and resource validation does not repeat
+/// the same relationship walk.
+pub(super) fn validate_svg_final_removals(
+    package: &OpcPackage,
+    changes: &[SvgPartChange],
+) -> Result<()> {
+    let limits = package.read_limits();
+    package.source_content_types(limits)?;
+
+    let part_count = package.part_count();
+    if part_count > limits.max_parts() {
+        return Err(invalid(format!(
+            "SVG lifecycle candidate parts exceed {}",
+            limits.max_parts()
+        )));
+    }
+    let mut total_part_bytes = 0u64;
+    // The per-part and aggregate ceilings are charged against inflated bytes,
+    // so this census decodes every payload (ADR 0030). It runs only for a
+    // transaction that carries SVG lifecycle changes.
+    for part in package.try_iter_parts() {
+        let part = part?;
+        if part.blob().len() > usize::try_from(limits.max_part_bytes()).unwrap_or(usize::MAX) {
+            return Err(invalid(format!(
+                "SVG lifecycle candidate part '{}' exceeds {} bytes",
+                part.partname(),
+                limits.max_part_bytes()
+            )));
+        }
+        total_part_bytes = total_part_bytes
+            .checked_add(part.blob().len() as u64)
+            .ok_or_else(|| invalid("SVG lifecycle candidate part bytes overflow"))?;
+    }
+    if total_part_bytes > limits.max_total_part_bytes() {
+        return Err(invalid(format!(
+            "SVG lifecycle candidate part bytes exceed {}",
+            limits.max_total_part_bytes()
+        )));
+    }
+
+    let mut targets = HashMap::new();
+    targets
+        .try_reserve(changes.len())
+        .map_err(|source| allocation("SVG lifecycle final targets", source))?;
+    for change in changes {
+        if change.action == GraphAction::Remove {
+            targets.insert(
+                change.part.partname().as_str().to_ascii_lowercase(),
+                change.part.partname().clone(),
+            );
+        }
+    }
+
+    let mut relationship_parts = 0usize;
+    let mut relationship_xml_bytes = 0usize;
+    let mut relationship_xml_events = 0usize;
+    let mut relationship_count = 0usize;
+    let mut graph_nodes = HashSet::new();
+    let root = PackURI::new("/").map_err(invalid)?;
+    let mut visit = |owner: &PackURI, relationships: &Relationships| -> Result<()> {
+        let source = package.source_relationships(owner, limits)?;
+        if source.member_present() {
+            relationship_parts = relationship_parts
+                .checked_add(1)
+                .ok_or_else(|| invalid("SVG lifecycle relationship part count overflow"))?;
+            relationship_xml_bytes = relationship_xml_bytes
+                .checked_add(source.bytes().len())
+                .ok_or_else(|| invalid("SVG lifecycle relationship XML bytes overflow"))?;
+            relationship_xml_events = relationship_xml_events
+                .checked_add(relationship_xml_event_count(
+                    source.bytes(),
+                    limits.max_events(),
+                )?)
+                .ok_or_else(|| invalid("SVG lifecycle relationship XML events overflow"))?;
+        }
+        relationship_count = relationship_count
+            .checked_add(relationships.len())
+            .ok_or_else(|| invalid("SVG lifecycle relationship count overflow"))?;
+        for relationship in relationships.iter() {
+            if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+                continue;
+            }
+            let referenced = relationship.target_partname()?;
+            let canonical = package
+                .get_part(&referenced)
+                .map(|part| part.partname().clone())
+                .unwrap_or(referenced);
+            let mut canonical_key = String::new();
+            canonical_key
+                .try_reserve_exact(canonical.as_str().len())
+                .map_err(|source| allocation("SVG lifecycle graph node name", source))?;
+            canonical_key.push_str(canonical.as_str());
+            canonical_key.make_ascii_lowercase();
+            if let Some(target) = targets.get(&canonical_key) {
+                return Err(Error::PatchConflict {
+                    part: target.to_string(),
+                });
+            }
+            if !graph_nodes.contains(&canonical_key) {
+                if graph_nodes.len() >= limits.max_relationship_graph_nodes() {
+                    return Err(invalid(format!(
+                        "SVG lifecycle relationship graph nodes exceed {}",
+                        limits.max_relationship_graph_nodes()
+                    )));
+                }
+                graph_nodes
+                    .try_reserve(1)
+                    .map_err(|source| allocation("SVG lifecycle final graph nodes", source))?;
+                graph_nodes.insert(canonical_key);
+            }
+        }
+        Ok(())
+    };
+    visit(&root, package.rels())?;
+    for part in package.iter_parts() {
+        visit(part.partname(), part.rels())?;
+    }
+    if relationship_parts > limits.max_relationship_parts() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship parts exceed {}",
+            limits.max_relationship_parts()
+        )));
+    }
+    if relationship_xml_bytes > limits.max_total_relationship_xml_bytes() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship XML bytes exceed {}",
+            limits.max_total_relationship_xml_bytes()
+        )));
+    }
+    if relationship_xml_events > limits.max_total_relationship_xml_events() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship XML events exceed {}",
+            limits.max_total_relationship_xml_events()
+        )));
+    }
+    if relationship_count > limits.max_total_relationships() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationships exceed {}",
+            limits.max_total_relationships()
+        )));
+    }
+    if graph_nodes.len() > limits.max_relationship_graph_nodes() {
+        return Err(invalid(format!(
+            "SVG lifecycle relationship graph nodes exceed {}",
+            limits.max_relationship_graph_nodes()
+        )));
+    }
+    for target in targets.values() {
+        // Only `PartNotFound` proves a removed target absent; any other
+        // refusal propagates rather than passing as absence (ADR 0030).
+        match package.get_part(target) {
+            Ok(_) => {
+                return Err(Error::PatchConflict {
+                    part: target.to_string(),
+                });
+            },
+            Err(litchi_opc::OpcError::PartNotFound(_)) => {},
+            Err(error) => return Err(error.into()),
+        }
+    }
+    Ok(())
+}
+
+fn relationship_xml_event_count(bytes: &[u8], maximum: usize) -> Result<usize> {
+    let mut reader = Reader::from_reader(bytes);
+    let mut buffer = Vec::new();
+    let mut count = 0usize;
+    loop {
+        count = count
+            .checked_add(1)
+            .ok_or_else(|| invalid("SVG lifecycle relationship XML event count overflow"))?;
+        if count > maximum {
+            return Err(invalid(format!(
+                "SVG lifecycle relationship XML events exceed {maximum}"
+            )));
+        }
+        let event = reader
+            .read_event_into(&mut buffer)
+            .map_err(|error| invalid(error.to_string()))?;
+        if matches!(event, Event::Eof) {
+            return Ok(count);
+        }
+        buffer.clear();
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(super) struct PatchAuthority {
+    source: Workbook,
+    target: Workbook,
+}
+
+impl PatchAuthority {
+    pub(super) fn new(source: Workbook, target: Workbook) -> Self {
+        Self { source, target }
+    }
+
+    fn inverse(&self) -> Self {
+        Self {
+            source: self.target.clone(),
+            target: self.source.clone(),
+        }
+    }
+
+    fn validate(&self, workbook: &Workbook) -> Result<()> {
+        if !Arc::ptr_eq(&workbook.inner, &self.source.inner) {
+            return Err(Error::PatchConflict {
+                part: "workbook lineage".to_owned(),
+            });
+        }
+        if workbook.workbook_protection_metadata()?.is_some() {
+            return Err(Error::Unsupported {
+                feature: "applying a source-bound workbook patch to a protected workbook",
+            });
+        }
+        Ok(())
+    }
+}
+
+impl Patch {
+    pub const VERSION: u16 = 1;
+
+    #[must_use]
+    pub const fn version(&self) -> u16 {
+        Self::VERSION
+    }
+
+    #[must_use]
+    pub fn changes(&self) -> &[Change] {
+        &self.changes
+    }
+
+    /// Package-owned semantic changes, including worksheet satellite parts.
+    #[must_use]
+    pub fn package_changes(&self) -> &[PackageChange] {
+        &self.package_changes
+    }
+
+    /// Number of semantic changes retained by this patch.
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.changes
+            .len()
+            .saturating_add(self.package_changes.len())
+    }
+
+    /// Whether the patch carries no change category at all.
+    pub(crate) fn is_structurally_empty(&self) -> bool {
+        self.changes.is_empty()
+            && self.package_changes.is_empty()
+            && self.parts.is_empty()
+            && self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
+            && self.svg_read_guards.is_empty()
+            && self.svg_final_guards.is_empty()
+    }
+
+    /// The immutable source workbook retained by this patch.
+    ///
+    /// A patch built by a successful native commit always has both endpoints.
+    /// The fallible accessor keeps a manually constructed default patch from
+    /// turning a missing proof into a panic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when this patch has no source
+    /// endpoint.
+    pub fn source(&self) -> Result<&Workbook> {
+        self.source.as_ref().ok_or(Error::Unsupported {
+            feature: "patch has no source workbook endpoint",
+        })
+    }
+
+    /// The immutable target workbook retained by this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when this patch has no target
+    /// endpoint.
+    pub fn target(&self) -> Result<&Workbook> {
+        self.target.as_ref().ok_or(Error::Unsupported {
+            feature: "patch has no target workbook endpoint",
+        })
+    }
+
+    /// Whether applying this patch leaves the package bytes unchanged.
+    ///
+    /// A commit that published nothing returns its source snapshot, and its
+    /// patch is a no-op. A patch whose only package delta is a set of part
+    /// payloads that equal their sources byte for byte is a no-op as well.
+    /// The check is proportional to the changed closure, never to the
+    /// package; use [`crate::Package::same_content`] to compare two complete
+    /// snapshots, for example the endpoints of an `A -> B -> A` sequence of
+    /// separate commits.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        if let (Some(source), Some(target)) = (&self.source, &self.target) {
+            if Arc::ptr_eq(&source.inner, &target.inner) {
+                return true;
+            }
+        }
+        if self.is_structurally_empty() {
+            return true;
+        }
+        self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
+            && self
+                .parts
+                .iter()
+                .all(|part| part.before.as_slice() == part.after.as_slice())
+    }
+
+    /// Content-free facts about the publication this patch describes.
+    #[must_use]
+    pub fn diagnostics(&self) -> super::Diagnostics {
+        super::Diagnostics {
+            changed: !self.is_noop(),
+            changes: self.changes.len(),
+            package_changes: self.package_changes.len(),
+            changed_parts: self.parts.len(),
+        }
+    }
+
+    /// Conservative retained-data charge for this patch.
+    ///
+    /// Both complete native endpoints are charged, even when their payload
+    /// allocations are shared, because an operations history may retain both
+    /// owners independently. Changed part and graph closures are then added
+    /// on top of the endpoint charge for the patch's own delta buffers. Every
+    /// addition saturates so this accounting cannot wrap on hostile input.
+    /// The result is a bounded retained-data charge for the native owners and
+    /// patch buffers; it is not a claim about allocator overhead or every
+    /// lazily derived cache allocation.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        *self.retained.get_or_init(|| self.compute_retained_bytes())
+    }
+
+    fn compute_retained_bytes(&self) -> usize {
+        let archive_hint = self
+            .source
+            .as_ref()
+            .and_then(|workbook| workbook.inner.package.exact_source_len())
+            .into_iter()
+            .chain(
+                self.target
+                    .as_ref()
+                    .and_then(|workbook| workbook.inner.package.exact_source_len()),
+            )
+            .max()
+            .unwrap_or(0);
+
+        let mut bytes = 0usize;
+        if let Some(source) = &self.source {
+            bytes = bytes.saturating_add(workbook_retained_bytes(source, archive_hint));
+        }
+        if let Some(target) = &self.target {
+            bytes = bytes.saturating_add(workbook_retained_bytes(target, archive_hint));
+        }
+
+        // The endpoint payloads account for the package's complete graph.
+        // These terms account for patch-owned transition buffers and their
+        // private source guards, including payloads that are also shared by an
+        // endpoint. Counting them twice is intentional and conservative.
+        bytes = bytes.saturating_add(self.changes.len().saturating_mul(size_of::<Change>()));
+        bytes = bytes.saturating_add(
+            self.package_changes
+                .len()
+                .saturating_mul(size_of::<PackageChange>()),
+        );
+        bytes = bytes.saturating_add(self.parts.len().saturating_mul(size_of::<PartChange>()));
+        for change in &self.parts {
+            bytes = bytes
+                .saturating_add(change.uri.as_str().len())
+                .saturating_add(change.before.capacity())
+                .saturating_add(change.after.capacity());
+        }
+        bytes = bytes.saturating_add(
+            self.relationships
+                .len()
+                .saturating_mul(size_of::<RelationshipChange>()),
+        );
+        for change in &self.relationships {
+            bytes = bytes.saturating_add(change.owner.as_str().len());
+            for relationship in [&change.before, &change.after].into_iter().flatten() {
+                bytes = bytes
+                    .saturating_add(size_of::<Relationship>())
+                    .saturating_add(relationship.r_id().len())
+                    .saturating_add(relationship.reltype().len())
+                    .saturating_add(relationship.target_ref().len())
+                    .saturating_add(relationship.base_uri().len())
+                    .saturating_add(relationship.source_uri().map_or(0, str::len));
+            }
+        }
+        if let Some(change) = &self.content_types {
+            bytes = bytes
+                .saturating_add(size_of::<ContentTypesChange>())
+                .saturating_add(change.before.bytes().len())
+                .saturating_add(change.after.bytes().len());
+        }
+        bytes = bytes.saturating_add(
+            self.svg_parts
+                .len()
+                .saturating_mul(size_of::<SvgPartChange>()),
+        );
+        for change in &self.svg_parts {
+            bytes = bytes
+                .saturating_add(change.part.partname().as_str().len())
+                .saturating_add(change.part.content_type().len())
+                .saturating_add(change.part.blob().len());
+        }
+        bytes = bytes.saturating_add(self.graph.len().saturating_mul(size_of::<GraphChange>()));
+        for change in &self.graph {
+            bytes = bytes
+                .saturating_add(change.source.as_str().len())
+                .saturating_add(size_of::<Relationship>())
+                .saturating_add(change.relationship.r_id().len())
+                .saturating_add(change.relationship.reltype().len())
+                .saturating_add(change.relationship.target_ref().len())
+                .saturating_add(change.relationship.base_uri().len())
+                .saturating_add(change.relationship.source_uri().map_or(0, str::len))
+                .saturating_add(change.part.partname().as_str().len())
+                .saturating_add(change.part.content_type().len())
+                .saturating_add(change.part.blob().len());
+        }
+        bytes
+    }
+
+    /// Build the inverse without copying part payloads.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        // A stylesheet PartChange already checks the exact source bytes. A
+        // standalone StyleGuard is intentionally retained only for patches
+        // whose stylesheet is unchanged; keeping the old guard on an inverse
+        // stylesheet patch would validate the wrong endpoint.
+        let style_part_changed = self
+            .style_guard
+            .as_ref()
+            .is_some_and(|guard| self.parts.iter().any(|part| part.uri == guard.uri));
+        Self {
+            changes: self
+                .changes
+                .iter()
+                .rev()
+                .map(Change::inverse)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            package_changes: self
+                .package_changes
+                .iter()
+                .rev()
+                .map(PackageChange::inverse)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            parts: self
+                .parts
+                .iter()
+                .rev()
+                .map(|part| PartChange {
+                    uri: part.uri.clone(),
+                    before: Arc::clone(&part.after),
+                    after: Arc::clone(&part.before),
+                    before_source: part.after_source.clone(),
+                    after_source: part.before_source.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            relationships: self
+                .relationships
+                .iter()
+                .rev()
+                .map(|change| RelationshipChange {
+                    owner: change.owner.clone(),
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                    before_source: change.after_source.clone(),
+                    after_source: change.before_source.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            content_types: self
+                .content_types
+                .as_ref()
+                .map(|change| ContentTypesChange {
+                    before: change.after.clone(),
+                    after: change.before.clone(),
+                }),
+            svg_parts: self
+                .svg_parts
+                .iter()
+                .rev()
+                .map(|change| SvgPartChange {
+                    action: match change.action {
+                        GraphAction::Add => GraphAction::Remove,
+                        GraphAction::Remove => GraphAction::Add,
+                    },
+                    part: change.part.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            graph: self
+                .graph
+                .iter()
+                .rev()
+                .map(|change| GraphChange {
+                    action: match change.action {
+                        GraphAction::Add => GraphAction::Remove,
+                        GraphAction::Remove => GraphAction::Add,
+                    },
+                    source: change.source.clone(),
+                    relationship: change.relationship.clone(),
+                    part: change.part.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            web: self.web.as_ref().map(common_web::Patch::inverse),
+            style_guard: (!style_part_changed)
+                .then(|| self.style_guard.clone())
+                .flatten(),
+            source: self.target.clone(),
+            target: self.source.clone(),
+            authority: self.authority.as_ref().map(PatchAuthority::inverse),
+            retained: std::sync::OnceLock::new(),
+            svg_read_guards: self
+                .svg_read_guards
+                .iter()
+                .rev()
+                .map(|guard| SvgReadGuard {
+                    owner: guard.owner.clone(),
+                    before_xml: guard.after_xml.clone(),
+                    after_xml: guard.before_xml.clone(),
+                    before_relationships: guard.after_relationships.clone(),
+                    after_relationships: guard.before_relationships.clone(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+            svg_final_guards: self
+                .svg_final_guards
+                .iter()
+                .rev()
+                .map(|guard| SvgFinalGuard {
+                    worksheet: guard.worksheet.clone(),
+                    drawing_ordinal: guard.drawing_ordinal,
+                    picture_ordinal: guard.picture_ordinal,
+                    before: guard.after.clone(),
+                    after: guard.before.clone(),
+                    expected_attached: guard.before.svg.is_some(),
+                })
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        }
+    }
+
+    /// Convert this exact in-memory patch to the bounded durable wire form.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this patch was not produced by a transaction or
+    /// application commit, a package exceeds finite bounds, or the core wire
+    /// envelope cannot be constructed.
+    pub fn durable(&self) -> Result<super::DurablePatch> {
+        super::DurablePatch::from_patch(self)
+    }
+
+    pub(crate) fn apply_to(&self, workbook: &Workbook) -> Result<Commit> {
+        if let Some(authority) = &self.authority {
+            authority.validate(workbook)?;
+        }
+        for guard in &self.svg_read_guards {
+            guard.validate(&workbook.inner.package)?;
+        }
+        let source = workbook.clone();
+        if let Some(guard) = &self.style_guard {
+            guard.validate(workbook)?;
+        }
+        if self.parts.is_empty()
+            && self.relationships.is_empty()
+            && self.content_types.is_none()
+            && self.svg_parts.is_empty()
+            && self.graph.is_empty()
+            && self.web.is_none()
+            && self.svg_read_guards.is_empty()
+            && self.svg_final_guards.is_empty()
+        {
+            let mut patch = self.clone();
+            patch.source = Some(workbook.clone());
+            patch.target = Some(workbook.clone());
+            if patch.authority.is_some() {
+                patch.authority = Some(PatchAuthority {
+                    source: workbook.clone(),
+                    target: workbook.clone(),
+                });
+            }
+            return Ok(Commit {
+                package: crate::Package::from_workbook(workbook.clone()),
+                patch,
+            });
+        }
+        // An empty patch returns the source, a signed one included; a changed
+        // one refuses a signed workbook (ADR 0006).
+        ensure_unsigned(workbook)?;
+        if !self.svg_final_guards.is_empty() {
+            super::svg_lifecycle::validate_before_guards(workbook, &self.svg_final_guards)?;
+        }
+        let mut package = workbook.inner.package.clone();
+        for change in &self.parts {
+            let part = package.get_part(&change.uri)?;
+            if part.blob() != change.before.as_slice() {
+                return Err(Error::PatchConflict {
+                    part: change.uri.to_string(),
+                });
+            }
+        }
+        for change in &self.relationships {
+            change.validate(&package)?;
+        }
+        if let Some(change) = &self.content_types {
+            change.validate(&package)?;
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Add {
+                change.validate(&package)?;
+            }
+        }
+        for change in &self.parts {
+            if let (Some(expected), Some(replacement)) =
+                (&change.before_source, &change.after_source)
+            {
+                if expected.bytes() != change.before.as_slice()
+                    || replacement.bytes() != change.after.as_slice()
+                {
+                    return Err(Error::PatchConflict {
+                        part: change.uri.to_string(),
+                    });
+                }
+                package.try_replace_owned_xml_part(expected.bytes(), replacement.clone())?;
+            } else if package.get_part(&change.uri)?.content_type()
+                == crate::form_control::CONTROL_PROPERTIES_CONTENT_TYPE
+            {
+                package.try_replace_owned_xml_part_bytes(
+                    &change.uri,
+                    change.before.as_slice(),
+                    Arc::clone(&change.after),
+                )?;
+            } else {
+                package
+                    .get_part_mut(&change.uri)?
+                    .set_blob_shared(Arc::clone(&change.after));
+            }
+        }
+        if let Some(change) = &self.content_types {
+            change.apply(&mut package)?;
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Add {
+                change.apply(&mut package)?;
+            }
+        }
+        for change in &self.relationships {
+            change.apply(&mut package)?;
+        }
+        for change in &self.graph {
+            change.validate(&package)?;
+            change.apply(&mut package)?;
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Remove {
+                change.validate(&package)?;
+            }
+        }
+        for change in &self.svg_parts {
+            if change.action == GraphAction::Remove {
+                change.apply(&mut package)?;
+            }
+        }
+        if let Some(web) = &self.web {
+            let commit = web.apply(&package)?;
+            package = commit.into_package();
+        }
+        if !self.svg_final_guards.is_empty() || !self.svg_parts.is_empty() {
+            validate_svg_final_removals(&package, &self.svg_parts)?;
+        }
+        let workbook = Workbook::from_package_with_styles(package, Some(workbook))?;
+        if !self.svg_final_guards.is_empty() {
+            super::svg_lifecycle::validate_final_guards(&workbook, &self.svg_final_guards)?;
+        }
+        if self.web.is_some()
+            || self
+                .changes
+                .iter()
+                .any(|change| matches!(change, Change::Web { .. }))
+        {
+            validate_web_integrity(&workbook)?;
+        }
+        let mut patch = self.clone();
+        for change in &mut patch.changes {
+            change.rebind_style(&workbook);
+        }
+        if self.authority.is_some() {
+            patch.authority = Some(PatchAuthority {
+                source: source.clone(),
+                target: workbook.clone(),
+            });
+        }
+        patch.source = Some(source);
+        patch.target = Some(workbook.clone());
+        Ok(Commit::new(workbook, patch))
+    }
+}
+
+/// Count one immutable workbook endpoint without forcing lazy projections.
+/// The optional archive hint is charged for every endpoint: source-backed
+/// descendants can share a retained ZIP, but a history budget must account
+/// for each endpoint independently. Derived cell and shared-string read
+/// caches are intentionally excluded: reading must not change the semantic
+/// retained-data admission charge.
+pub(crate) fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
+    let package = &workbook.inner.package;
+    let mut bytes = size_of_val(workbook)
+        .saturating_add(size_of_val(workbook.inner.as_ref()))
+        .saturating_add(size_of_val(package))
+        .saturating_add(archive_hint);
+
+    bytes = bytes
+        .saturating_add(workbook.inner.workbook_uri.as_str().len())
+        .saturating_add(
+            workbook
+                .inner
+                .shared_strings_uri
+                .as_ref()
+                .map_or(0, |uri| uri.as_str().len()),
+        )
+        .saturating_add(
+            workbook
+                .inner
+                .styles_uri
+                .as_ref()
+                .map_or(0, |uri| uri.as_str().len()),
+        );
+
+    for sheet in &workbook.inner.sheets {
+        bytes = bytes
+            .saturating_add(size_of_val(sheet.as_ref()))
+            .saturating_add(sheet.name.capacity())
+            .saturating_add(sheet.name_key.len())
+            .saturating_add(sheet.part_uri.as_str().len())
+            .saturating_add(sheet.relationship_id.capacity());
+    }
+    for name in &workbook.inner.external_reference_ids {
+        bytes = bytes.saturating_add(name.capacity());
+    }
+    bytes = bytes.saturating_add(
+        workbook
+            .inner
+            .defined_names
+            .len()
+            .saturating_mul(size_of::<crate::raw::DefinedName>()),
+    );
+    bytes = bytes.saturating_add(
+        workbook
+            .inner
+            .pivot_caches
+            .len()
+            .saturating_mul(size_of::<crate::raw::PivotCache>()),
+    );
+
+    for metadata in package.iter_parts() {
+        // The archive hint covers deferred source payloads.
+        bytes = bytes
+            .saturating_add(size_of_val(&metadata))
+            .saturating_add(metadata.partname().as_str().len())
+            .saturating_add(metadata.content_type().len())
+            .saturating_add(relationship_retained_bytes(metadata.rels()))
+            .saturating_add(metadata.decoded_payload_capacity().unwrap_or(0));
+    }
+    bytes.saturating_add(relationship_retained_bytes(package.rels()))
+}
+
+fn relationship_retained_bytes(relationships: &Relationships) -> usize {
+    let mut bytes = size_of_val(relationships);
+    for relationship in relationships.iter() {
+        bytes = bytes
+            .saturating_add(size_of::<Relationship>())
+            .saturating_add(relationship.r_id().len())
+            .saturating_add(relationship.reltype().len())
+            .saturating_add(relationship.target_ref().len())
+            .saturating_add(relationship.base_uri().len())
+            .saturating_add(relationship.source_uri().map_or(0, str::len));
+    }
+    bytes
+}
+
+/// Successful atomic transaction result.
+///
+/// The commit carries the published immutable [`crate::Package`], the
+/// reversible [`Patch`] from its source, and content-free
+/// [`super::Diagnostics`].
+#[derive(Debug)]
+pub struct Commit {
+    pub(super) package: crate::Package,
+    pub(super) patch: Patch,
+}
+
+impl Commit {
+    pub(super) fn new(workbook: Workbook, patch: Patch) -> Self {
+        Self {
+            package: crate::Package::from_workbook(workbook),
+            patch,
+        }
+    }
+
+    /// The published immutable package.
+    #[must_use]
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// The reversible patch from the source package.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Content-free publication facts.
+    #[must_use]
+    pub fn diagnostics(&self) -> super::Diagnostics {
+        self.patch.diagnostics()
+    }
+
+    /// Consume the commit into its published package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.package
+    }
+
+    /// Consume the commit into its published package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    /// Record this committed snapshot in bounded undo/redo history.
+    ///
+    /// The retained transition weight is the complete canonical durable JSON
+    /// length. The history's current snapshot must satisfy the patch's exact
+    /// source precondition.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a stale history head, durable serialization
+    /// failure, or a transition heavier than the history budget.
+    pub fn record(&self, history: &mut crate::workbook::History) -> Result<Vec<crate::Package>> {
+        let durable = self.patch.durable()?;
+        let next = durable.apply(history.current())?;
+        let weight = u64::try_from(durable.to_deterministic_json()?.len())
+            .map_err(|error| invalid(format!("durable patch weight exceeds u64: {error}")))?;
+        Ok(history.record(next, weight)?)
+    }
+}
+
+impl GraphChange {
+    pub(super) fn validate(&self, package: &OpcPackage) -> Result<()> {
+        let source = package.get_part(&self.source)?;
+        match self.action {
+            GraphAction::Remove => {
+                let relationship =
+                    source.rels().get(self.relationship.r_id()).ok_or_else(|| {
+                        Error::PatchConflict {
+                            part: self.source.to_string(),
+                        }
+                    })?;
+                if !same_relationship(relationship, &self.relationship) {
+                    return Err(Error::PatchConflict {
+                        part: self.source.to_string(),
+                    });
+                }
+                let part = package.get_part(self.part.partname())?;
+                if !same_part(part, &*self.part) {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+            GraphAction::Add => {
+                if source.rels().get(self.relationship.r_id()).is_some()
+                    || package
+                        .validate_new_part_name(self.part.partname())
+                        .is_err()
+                {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+        }
+        Ok(())
+    }
+
+    pub(super) fn apply(&self, package: &mut OpcPackage) -> Result<()> {
+        match self.action {
+            GraphAction::Remove => {
+                package
+                    .get_part_mut(&self.source)?
+                    .rels_mut()
+                    .remove(self.relationship.r_id())
+                    .ok_or_else(|| Error::PatchConflict {
+                        part: self.source.to_string(),
+                    })?;
+                if !package.remove_part(self.part.partname()) {
+                    return Err(Error::PatchConflict {
+                        part: self.part.partname().to_string(),
+                    });
+                }
+            },
+            GraphAction::Add => {
+                package.try_add_part(self.part.clone())?;
+                package
+                    .get_part_mut(&self.source)?
+                    .rels_mut()
+                    .try_add_relationship(
+                        self.relationship.reltype().to_owned(),
+                        self.relationship.target_ref().to_owned(),
+                        self.relationship.r_id().to_owned(),
+                        self.relationship.target_mode(),
+                    )?;
+            },
+        }
+        Ok(())
+    }
+}

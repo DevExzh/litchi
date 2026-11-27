@@ -1,0 +1,2112 @@
+use litchi_core::{HistoryLimits, Metadata, Position};
+use litchi_oth::{
+    Block, Builder, CapabilityState, History, JoinFailure, Package, Patch, ResourceMember,
+    SecurityPolicy, TransferPolicy, TransferSelector, field,
+    form::{Control, Form},
+    heading::Heading,
+    inline::{Content as Inline, Field as InlineField, Span},
+    link::Link,
+    list::{Item, List},
+    paragraph::Paragraph,
+    resource,
+    style::{Slant, Style, TextProperties, Weight},
+};
+use soapberry_zip::office::StreamingArchiveWriter;
+use std::sync::Arc;
+
+const COMPACT_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">"#,
+    r#"<office:body><office:text><text:p>compact</text:p></office:text></office:body>"#,
+    r#"</office:document-content>"#,
+);
+
+const NONCOMPACT_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3">"#,
+    "\n<office:body><office:text/></office:body></office:document-content>",
+);
+
+const SEMANTIC_WHITESPACE_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">"#,
+    "<office:body><office:text><text:p>line one\n  line two</text:p></office:text>",
+    "</office:body></office:document-content>",
+);
+
+const PREFIX_ALIASED_TEXT_WEB: &str = include_str!("fixtures/odf14-text-web.xml");
+const WRONG_FAMILY: &str = include_str!("fixtures/wrong-family.xml");
+const DUPLICATE_BODY: &str = include_str!("fixtures/duplicate-body.xml");
+
+fn raw_negative_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.text-web";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text-web"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
+
+fn resource_package(content: &str, members: &[(&str, &[u8], &str)]) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.text-web";
+    let mut manifest = String::from(
+        r#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.text-web"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/>"#,
+    );
+    for (path, _bytes, media_type) in members {
+        manifest.push_str(r#"<manifest:file-entry manifest:full-path=""#);
+        manifest.push_str(path);
+        manifest.push_str(r#"" manifest:media-type=""#);
+        manifest.push_str(media_type);
+        manifest.push_str(r#""/>"#);
+    }
+    manifest.push_str("</manifest:manifest>");
+
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    for (path, bytes, _media_type) in members {
+        archive.write_deflated(path, bytes).unwrap();
+    }
+    archive
+        .write_deflated("META-INF/manifest.xml", manifest.as_bytes())
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
+
+#[test]
+fn focused_modules_are_the_canonical_semantic_api() {
+    assert_eq!(Paragraph::new("Welcome").text(), "Welcome");
+    let link = Link::new("https://example.test", "Example");
+    assert_eq!(link.href(), "https://example.test");
+    assert_eq!(link.label(), "Example");
+
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert!(template.document().content_xml().contains("<office:text"));
+}
+
+#[test]
+fn typed_builder_writes_byte_minimal_escaped_blocks() {
+    let heading = Heading::styled(2, "A & B", "Heading").unwrap();
+    let bytes = Builder::new()
+        .heading(heading)
+        .paragraph(Paragraph::styled("<body>", "Body"))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert!(template.document().content_xml().contains(
+        "<text:h text:outline-level=\"2\" text:style-name=\"Heading\">A &amp; B</text:h>"
+    ));
+    assert!(
+        template
+            .document()
+            .content_xml()
+            .contains("<text:p text:style-name=\"Body\">&lt;body&gt;</text:p>")
+    );
+    assert!(!template.document().content_xml().contains('\n'));
+    assert!(!template.document().content_xml().contains(" />"));
+    assert!(
+        Builder::new()
+            .content_xml(COMPACT_CONTENT)
+            .paragraph(Paragraph::new("ambiguous"))
+            .build()
+            .is_err()
+    );
+}
+
+#[test]
+fn compact_authored_content_is_published_without_rewriting() {
+    let template = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
+    assert_eq!(template.document().content_xml(), COMPACT_CONTENT);
+    assert!(!template.document().content_xml().contains("\n<"));
+    assert!(!template.document().content_xml().contains(" />"));
+}
+
+#[test]
+fn noncompact_authored_content_returns_a_typed_error() {
+    assert!(matches!(
+        Builder::new()
+            .content_xml(NONCOMPACT_CONTENT)
+            .build()
+            .unwrap_err(),
+        litchi_oth::Error::Core(litchi_core::Error::XmlCompactness {
+            kind: litchi_core::xml::CompactnessKind::FormattingWhitespace,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn builder_authors_compact_optional_xml_parts_and_reopens_before_publication() {
+    const META: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-meta xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:meta/></office:document-meta>"#;
+    const SETTINGS: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-settings xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:settings/></office:document-settings>"#;
+    const STYLES: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><office:styles/></office:document-styles>"#;
+    let bytes = Builder::new()
+        .meta_xml(META)
+        .settings_xml(SETTINGS)
+        .styles_xml(STYLES)
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(template.document().styles_xml(), Some(STYLES));
+    assert!(
+        template
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "settings.xml")
+    );
+    assert!(
+        Builder::new()
+            .styles_xml("<office:document-styles />")
+            .build()
+            .is_err()
+    );
+}
+
+#[test]
+fn fresh_builder_authors_common_semantics_and_resource_closure() {
+    let metadata = Metadata {
+        title: Some("Fresh OTH".to_string()),
+        page_count: Some(2),
+        ..Metadata::default()
+    };
+    let body_style = Style::new("Body", "paragraph").unwrap();
+    let strong_style = Style::new("Strong", "text")
+        .unwrap()
+        .with_text_properties(TextProperties::new().with_weight(Weight::Bold));
+    let form =
+        Form::new("search").with_control(Control::new("text").with_id("query").with_name("q"));
+    let nested = List::new([Item::new(Paragraph::new("outer"))
+        .with_nested_list(List::new([Item::new(Paragraph::new("inner"))]))]);
+
+    let builder = Builder::new()
+        .metadata(metadata)
+        .style(body_style)
+        .style(strong_style)
+        .form(form)
+        .list(nested);
+    let builder = builder
+        .rich_heading(
+            1,
+            [
+                Inline::text("Fresh "),
+                Inline::Link(Link::new("https://example.test/heading", "heading")),
+            ],
+        )
+        .unwrap();
+    let builder = builder
+        .styled_rich_paragraph(
+            "Body",
+            [
+                Inline::bookmark("point"),
+                Inline::text("Rich "),
+                Inline::Span(Span::new("Strong", "span")),
+                Inline::text(" "),
+                Inline::Field(
+                    InlineField::new(field::Kind::PageCount, "2")
+                        .with_name("pages")
+                        .fixed(),
+                ),
+            ],
+        )
+        .unwrap();
+    let builder = builder
+        .resource_with_payload(
+            resource::Resource::new(resource::Kind::Image, "Pictures/fresh.bin").unwrap(),
+            "image/png",
+            b"fresh-image".to_vec(),
+        )
+        .unwrap();
+    let builder = builder
+        .object_with_members(
+            resource::Resource::new(resource::Kind::Object, "./Object 1").unwrap(),
+            [
+                ResourceMember::new("content.xml", "text/xml", b"<object/>".to_vec()).unwrap(),
+                ResourceMember::new("settings.xml", "text/xml", b"<settings/>".to_vec()).unwrap(),
+            ],
+        )
+        .unwrap();
+    let bytes = builder
+        .external_resource(
+            resource::Resource::new(resource::Kind::Image, "https://example.test/image.png")
+                .unwrap(),
+        )
+        .unwrap()
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert!(!template.document().content_xml().contains(">\n<"));
+    assert!(!template.document().meta_xml().unwrap().contains(">\n<"));
+    assert!(!template.document().styles_xml().unwrap().contains(">\n<"));
+    assert_eq!(
+        template.document().metadata().unwrap().title.as_deref(),
+        Some("Fresh OTH")
+    );
+    assert_eq!(template.document().metadata().unwrap().page_count, Some(2));
+    assert_eq!(template.document().styles().len(), 2);
+    let body = template.document().text_body().unwrap();
+    assert_eq!(body.forms()[0].controls()[0].name(), Some("q"));
+    assert_eq!(body.resources().len(), 3);
+    assert_eq!(body.headings()[0].text(), "Fresh heading");
+    assert_eq!(body.headings()[0].links().len(), 1);
+    assert_eq!(body.paragraphs()[2].text(), "Rich span 2");
+    assert_eq!(
+        body.paragraphs()[2].formatting_runs()[0].style_name(),
+        "Strong"
+    );
+    let rich_paragraph = &body.paragraphs()[2];
+    let display_range = rich_paragraph.fields()[0].display_range().clone();
+    assert_eq!(&rich_paragraph.text()[display_range], "2");
+    assert_eq!(body.bookmarks().len(), 1);
+    assert_eq!(body.lists()[1].items()[0].nested_lists().len(), 1);
+    let files = template.document().files().unwrap();
+    for expected in [
+        "Pictures/fresh.bin",
+        "Object 1/content.xml",
+        "Object 1/settings.xml",
+    ] {
+        assert!(files.iter().any(|path| path == expected));
+    }
+    template
+        .document()
+        .check_security(SecurityPolicy {
+            allow_embedded_objects: true,
+            allow_external_resources: true,
+            allow_forms: true,
+            ..SecurityPolicy::default()
+        })
+        .unwrap();
+    let reopened = Package::from_bytes(template.as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), bytes.as_slice());
+    assert_eq!(
+        reopened.document().text_body().unwrap().resources(),
+        body.resources()
+    );
+
+    assert!(
+        Builder::new()
+            .content_xml(COMPACT_CONTENT)
+            .form(Form::new("conflict"))
+            .build()
+            .is_err()
+    );
+    assert!(
+        Builder::new()
+            .meta_xml("<office:document-meta/>")
+            .metadata(Metadata::default())
+            .build()
+            .is_err()
+    );
+    assert!(
+        Builder::new()
+            .styles_xml("<office:document-styles/>")
+            .style(Style::new("Conflict", "text").unwrap())
+            .build()
+            .is_err()
+    );
+    assert!(ResourceMember::new("../escape", "text/xml", Vec::new()).is_err());
+    assert!(
+        Builder::new()
+            .object_with_members(
+                resource::Resource::new(resource::Kind::Object, "Object 2").unwrap(),
+                [],
+            )
+            .is_err()
+    );
+    assert!(
+        Builder::new()
+            .resource_with_payload(
+                resource::Resource::new(resource::Kind::Image, "content.xml").unwrap(),
+                "text/xml",
+                b"<collision/>".to_vec(),
+            )
+            .unwrap()
+            .build()
+            .is_err()
+    );
+}
+
+#[test]
+fn semantic_whitespace_is_preserved_exactly() {
+    let template = Builder::new()
+        .content_xml(SEMANTIC_WHITESPACE_CONTENT)
+        .build()
+        .unwrap();
+    assert_eq!(
+        template.document().content_xml(),
+        SEMANTIC_WHITESPACE_CONTENT
+    );
+}
+
+#[test]
+fn loaded_template_snapshot_remains_byte_exact() {
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(template.as_bytes(), bytes.as_slice());
+    assert_eq!(template.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn shared_archive_input_opens_without_changing_the_source_bytes() {
+    let bytes = Arc::new(Builder::new().build().unwrap().to_bytes().unwrap());
+    let original_bytes = bytes.as_slice().to_vec();
+    let original_ptr = bytes.as_ptr();
+    let template = Package::from_shared_bytes(Arc::clone(&bytes)).unwrap();
+    assert_eq!(template.as_bytes().as_ptr(), original_ptr);
+    assert_eq!(template.as_bytes(), original_bytes.as_slice());
+    assert_eq!(bytes.as_slice(), original_bytes.as_slice());
+    assert!(std::ptr::eq(template.as_bytes(), bytes.as_slice()));
+    drop(template);
+    assert_eq!(Arc::strong_count(&bytes), 1);
+}
+
+#[test]
+fn local_odf14_fixture_uses_namespace_aware_text_web_contract() {
+    let bytes = Builder::new()
+        .content_xml(PREFIX_ALIASED_TEXT_WEB)
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let template = Package::from_bytes(&bytes).unwrap();
+    let body = template.document().text_body().unwrap();
+    assert_eq!(body.paragraphs().len(), 1);
+    assert_eq!(body.paragraphs()[0].text(), "prefix-safe text");
+}
+
+#[test]
+fn local_invalid_family_fixtures_fail_before_package_publication() {
+    for xml in [WRONG_FAMILY, DUPLICATE_BODY] {
+        assert!(Builder::new().content_xml(xml).build().is_err());
+    }
+}
+
+#[test]
+fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
+    for xml in [WRONG_FAMILY, DUPLICATE_BODY] {
+        assert!(Package::from_bytes(&raw_negative_package(xml)).is_err());
+    }
+    // A prologue DOCTYPE is ignored without being processed (the shared ODF
+    // repair, as LibreOffice's SAX import does), so the template
+    // opens with the same body; an entity such a DTD would declare stays
+    // undeclared, so a body that references one is still refused.
+    let dtd = COMPACT_CONTENT.replacen(
+        "<office:document-content",
+        "<!DOCTYPE office:document-content><office:document-content",
+        1,
+    );
+    let tolerated = Package::from_bytes(&raw_negative_package(&dtd)).unwrap();
+    assert_eq!(
+        tolerated.document().text_body().unwrap().paragraphs().len(),
+        Package::from_bytes(&raw_negative_package(COMPACT_CONTENT))
+            .unwrap()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()
+            .len()
+    );
+    let entity = COMPACT_CONTENT
+        .replacen(
+            "<office:document-content",
+            "<!DOCTYPE office:document-content [<!ENTITY x \"unsafe\">]><office:document-content",
+            1,
+        )
+        .replacen("<office:text>", "<office:text>&x;", 1);
+    assert!(Package::from_bytes(&raw_negative_package(&entity)).is_err());
+    let pretty_misplaced_inline = concat!(
+        "<?xml version=\"1.0\"?>\n",
+        "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
+        "xmlns:text=\"urn:oasis:names:tc:opendocument:xmlns:text:1.0\">\n",
+        "  <office:body>\n    <office:text>\n",
+        "      <text:span>outside block</text:span>\n",
+        "    </office:text>\n  </office:body>\n</office:document-content>",
+    );
+    assert!(Package::from_bytes(&raw_negative_package(pretty_misplaced_inline)).is_err());
+}
+
+#[test]
+fn odf_grammar_derived_list_and_form_negatives_are_test_only_raw() {
+    const PREFIX: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0">"#,
+        r#"<office:body><office:text>"#,
+    );
+    const SUFFIX: &str = "</office:text></office:body></office:document-content>";
+    // Representative constraints derived from ODF list/form grammar. These
+    // deliberately bypass Builder; OTH does not claim full Relax NG support.
+    for invalid_body in [
+        "<text:list/>",
+        "<text:list><text:p>direct</text:p></text:list>",
+        "<text:list><text:list-item/></text:list>",
+        "<text:list-item><text:p>orphan</text:p></text:list-item>",
+        "<text:span>inline-outside-block</text:span>",
+        "<office:forms><form:text/></office:forms>",
+    ] {
+        let xml = format!("{PREFIX}{invalid_body}{SUFFIX}");
+        assert!(Package::from_bytes(&raw_negative_package(&xml)).is_err());
+    }
+}
+
+#[test]
+fn exact_noop_edit_is_source_checked_and_atomic() {
+    let source = Builder::new().build().unwrap();
+    let alternate = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
+    let commit = source.edit().commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
+    assert_eq!(
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+    assert!(alternate.apply(commit.patch()).is_err());
+    let mut absent_removal_edit = source.edit();
+    absent_removal_edit.remove_metadata();
+    absent_removal_edit.remove_styles();
+    let absent_removal_commit = absent_removal_edit.commit().unwrap();
+    assert!(!absent_removal_commit.diagnostics().changed());
+    assert_eq!(
+        absent_removal_commit.package().as_bytes(),
+        source.as_bytes()
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes(),
+    );
+}
+
+#[test]
+fn paragraph_edit_is_bounded_reversible_and_preserves_unknown_content() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+        r#"<office:body><office:text><text:p>before</text:p><foreign:keep xmlns:foreign="urn:example">opaque</foreign:keep></office:text></office:body></office:document-content>"#,
+    );
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    let mut edit = source.edit();
+    edit.set_paragraph_text(Position::new(0), "after & exact")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(
+        commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
+        "after & exact"
+    );
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("<foreign:keep xmlns:foreign=\"urn:example\">opaque</foreign:keep>")
+    );
+    assert_eq!(
+        commit.patch().change().unwrap().paragraph(),
+        Position::new(0)
+    );
+    assert_eq!(commit.patch().change().unwrap().before(), "before");
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn paragraph_edit_refuses_nested_markup_that_cannot_be_rewritten_losslessly() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+        r#"<office:body><office:text><text:p>plain <text:span>nested</text:span></text:p></office:text></office:body></office:document-content>"#,
+    );
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    let mut edit = source.edit();
+    assert!(
+        edit.set_paragraph_text(Position::new(0), "replacement")
+            .is_err()
+    );
+}
+
+#[test]
+fn projects_headings_links_styles_and_odf_whitespace_as_inert_values() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
+        r#"<office:body><office:text><text:h text:outline-level="2">Welcome</text:h>"#,
+        r#"<text:p text:style-name="Body">one<text:s text:c="2"/><text:a xlink:href="https://example.test/value">link</text:a><text:tab/><text:line-break/>two</text:p>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let template = Builder::new().content_xml(CONTENT).build().unwrap();
+    let body = template.document().text_body().unwrap();
+    assert_eq!(body.headings()[0].level(), 2);
+    assert_eq!(body.paragraphs()[0].text(), "one  link\t\ntwo");
+    assert_eq!(body.paragraphs()[0].style_name(), Some("Body"));
+    assert_eq!(body.paragraphs()[0].links()[0].label(), "link");
+    let blocks = body.blocks().collect::<Vec<_>>();
+    assert!(matches!(blocks[0], Block::Heading(_)));
+    assert!(matches!(blocks[1], Block::Paragraph(_)));
+}
+
+#[test]
+fn projects_lists_bookmarks_fields_formatting_resources_forms_and_styles() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
+        r#"<office:automatic-styles><style:style style:name="Strong" style:family="text"/></office:automatic-styles>"#,
+        r#"<office:body><office:text><text:p>pre<text:bookmark-start text:name="chapter"/><text:span text:style-name="Strong">bold <text:date office:date-value="2026-08-10" text:fixed="true">today</text:date></text:span></text:p>"#,
+        r#"<text:list text:style-name="Numbered"><text:list-item text:start-value="3"><text:p>three<text:bookmark-end text:name="chapter"/></text:p></text:list-item><text:list-item><text:p>four</text:p></text:list-item></text:list>"#,
+        r#"<text:p><draw:frame><draw:image xlink:href="Pictures/pic.png"/><draw:object xlink:href="./Object 1"/></draw:frame></text:p>"#,
+        r#"<office:forms><form:form form:name="Search"><form:text form:id="query" form:name="q"/></form:form></office:forms>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    const STYLES: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-styles "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"><office:styles>"#,
+        r#"<style:style style:name="Body" style:family="paragraph" style:parent-style-name="Standard"/>"#,
+        r#"</office:styles></office:document-styles>"#,
+    );
+    let template = Builder::new()
+        .content_xml(CONTENT)
+        .styles_xml(STYLES)
+        .build()
+        .unwrap();
+    let body = template.document().text_body().unwrap();
+    assert_eq!(body.lists().len(), 1);
+    assert_eq!(body.lists()[0].style_name(), Some("Numbered"));
+    assert_eq!(body.lists()[0].items()[0].start_value(), Some(3));
+    assert_eq!(body.lists()[0].items()[0].paragraphs()[0].text(), "three");
+    assert_eq!(body.bookmarks()[0].name(), "chapter");
+    assert_eq!(body.bookmarks()[0].start().block(), Position::new(0));
+    assert_eq!(body.bookmarks()[0].end().unwrap().block(), Position::new(1));
+    assert_eq!(
+        body.paragraphs()[0].formatting_runs()[0].style_name(),
+        "Strong"
+    );
+    let projected_field = &body.paragraphs()[0].fields()[0];
+    assert!(matches!(projected_field.kind(), field::Kind::Date));
+    assert!(projected_field.is_fixed());
+    assert_eq!(projected_field.value(), Some("2026-08-10"));
+    assert_eq!(body.resources().len(), 2);
+    assert_eq!(body.resources()[0].kind(), resource::Kind::Image);
+    assert!(body.resources()[0].is_embedded());
+    assert_eq!(body.forms()[0].name(), Some("Search"));
+    assert_eq!(body.forms()[0].controls()[0].kind(), "text");
+    assert_eq!(body.forms()[0].controls()[0].id(), Some("query"));
+    assert_eq!(template.document().styles().len(), 2);
+    assert_eq!(
+        template.document().styles()[1].parent_name(),
+        Some("Standard")
+    );
+}
+
+#[test]
+fn typed_list_builder_append_composition_history_and_refusals_reopen() {
+    let bytes = Builder::new()
+        .paragraph(Paragraph::new("before"))
+        .list(List::styled(
+            "Numbered",
+            [
+                Item::new(Paragraph::new("one")),
+                Item::new(Paragraph::new("two")),
+            ],
+        ))
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let source = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(
+        source.document().text_body().unwrap().lists()[0]
+            .items()
+            .len(),
+        2
+    );
+
+    let mut text_edit = source.edit();
+    text_edit
+        .set_paragraph_text(Position::new(0), "after")
+        .unwrap();
+    let mut append_edit = source.edit();
+    append_edit
+        .append_block(List::new([Item::new(Paragraph::new("tail"))]))
+        .unwrap();
+    text_edit.join(append_edit).unwrap();
+    let commit = text_edit.commit().unwrap();
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("<text:list>")
+    );
+    assert!(!commit.package().document().content_xml().contains("\n<"));
+    assert_eq!(
+        commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()
+            .len(),
+        2
+    );
+    assert_eq!(commit.patch().appended().len(), 1);
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes(),
+    );
+
+    let target = commit.package().clone();
+    let mut history = History::new(source.clone(), HistoryLimits::new(4, 1_000_000));
+    history.record(commit).unwrap();
+    assert_eq!(history.current().as_bytes(), target.as_bytes());
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), source.as_bytes());
+    assert!(history.redo());
+
+    let mut first = source.edit();
+    first.set_paragraph_text(Position::new(0), "first").unwrap();
+    let mut second = source.edit();
+    second
+        .set_paragraph_text(Position::new(0), "second")
+        .unwrap();
+    let error = first.join(second).err().unwrap();
+    assert_eq!(error.failure(), JoinFailure::Paragraph(Position::new(0)));
+    assert!(
+        error
+            .into_rejected()
+            .commit()
+            .unwrap()
+            .diagnostics()
+            .changed()
+    );
+
+    let alternate = Builder::new()
+        .paragraph(Paragraph::new("alternate"))
+        .build()
+        .unwrap();
+    let mut base_edit = source.edit();
+    let cross_lineage = base_edit.join(alternate.edit()).err().unwrap();
+    assert_eq!(cross_lineage.failure(), JoinFailure::DifferentSnapshot);
+
+    let mut first_append = source.edit();
+    first_append
+        .append_block(Paragraph::new("first tail"))
+        .unwrap();
+    let mut second_append = source.edit();
+    second_append
+        .append_block(Paragraph::new("second tail"))
+        .unwrap();
+    assert_eq!(
+        first_append.join(second_append).err().unwrap().failure(),
+        JoinFailure::Append
+    );
+}
+
+#[test]
+fn rich_semantic_ranges_and_resources_fail_closed() {
+    const PREFIX: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text>"#,
+    );
+    const SUFFIX: &str = "</office:text></office:body></office:document-content>";
+    for body in [
+        r#"<text:p><text:bookmark-start text:name="open"/>text</text:p>"#,
+        r#"<text:p><text:bookmark-end text:name="missing"/></text:p>"#,
+        r"<text:p><draw:image/></text:p>",
+        r"<text:list-item><text:p>orphan</text:p></text:list-item>",
+    ] {
+        let xml = format!("{PREFIX}{body}{SUFFIX}");
+        assert!(Builder::new().content_xml(xml).build().is_err());
+    }
+}
+
+fn structural_source() -> Package {
+    Builder::new()
+        .heading(Heading::new(1, "Heading").unwrap())
+        .paragraph(Paragraph::new("outside"))
+        .list(List::new([
+            Item::new(Paragraph::new("one")),
+            Item::new(Paragraph::new("two")),
+        ]))
+        .build()
+        .unwrap()
+}
+
+#[test]
+fn heading_list_durable_and_merge_workflows_are_source_checked() {
+    let source = structural_source();
+    let mut left = source.edit();
+    left.set_heading_text(Position::new(0), "Changed heading")
+        .unwrap();
+    left.set_paragraph_text(Position::new(0), "changed outside")
+        .unwrap();
+    let left_commit = left.commit().unwrap();
+
+    let wire = left_commit.patch().to_bytes().unwrap();
+    assert_eq!(wire, left_commit.patch().to_bytes().unwrap());
+    let durable = Patch::from_bytes(&wire).unwrap();
+    assert_eq!(durable.heading_changes()[0].before(), "Heading");
+    assert_eq!(
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        left_commit.package().as_bytes()
+    );
+    let alternate = Builder::new().build().unwrap();
+    assert!(alternate.apply(&durable).is_err());
+    let inverse_wire = durable.inverse().to_bytes().unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    assert_eq!(
+        left_commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut right = source.edit();
+    right
+        .set_list(
+            Position::new(0),
+            List::styled("Bullets", [Item::new(Paragraph::new("replacement"))]),
+        )
+        .unwrap();
+    let right_commit = right.commit().unwrap();
+    let right_wire = right_commit.patch().to_bytes().unwrap();
+    let right_durable = Patch::from_bytes(&right_wire).unwrap();
+    assert_eq!(right_durable.list_changes().len(), 1);
+    assert_eq!(
+        right_durable.list_changes()[0]
+            .after()
+            .and_then(List::style_name),
+        Some("Bullets")
+    );
+    assert_eq!(
+        source
+            .apply(&right_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        right_commit.package().as_bytes()
+    );
+    let plan = Patch::plan_three_way(&source, left_commit.patch(), right_commit.patch()).unwrap();
+    assert!(plan.conflicts().is_empty());
+    let merged = plan.publish().unwrap();
+    assert_eq!(
+        merged.document().text_body().unwrap().headings()[0].text(),
+        "Changed heading"
+    );
+    assert_eq!(
+        merged.document().text_body().unwrap().lists()[0].style_name(),
+        Some("Bullets")
+    );
+
+    let mut remove = source.edit();
+    remove.remove_list(Position::new(0)).unwrap();
+    let removed = remove.commit().unwrap();
+    assert!(
+        removed
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()
+            .is_empty()
+    );
+    let removed_wire = removed.patch().to_bytes().unwrap();
+    let durable_removed = Patch::from_bytes(&removed_wire).unwrap();
+    assert!(durable_removed.list_changes()[0].after().is_none());
+    let restored_wire = durable_removed.inverse().to_bytes().unwrap();
+    let durable_restored = Patch::from_bytes(&restored_wire).unwrap();
+    assert_eq!(
+        removed
+            .package()
+            .apply(&durable_restored)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn rich_inline_crud_is_durable_reversible_and_reopened() {
+    let source = structural_source();
+    let content = [
+        Inline::text("before "),
+        Inline::bookmark("point"),
+        Inline::Link(Link::new("https://example.test/oth", "linked")),
+        Inline::Span(Span::new("Strong", " styled")),
+        Inline::Field(
+            InlineField::new(field::Kind::Date, " today")
+                .with_value("2026-08-10")
+                .fixed(),
+        ),
+        Inline::bookmark_start("range"),
+        Inline::text(" ranged"),
+        Inline::bookmark_end("range"),
+    ];
+    let mut edit = source.edit();
+    edit.set_paragraph_inline(Position::new(0), &content)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let body = commit.package().document().text_body().unwrap();
+    let paragraph = &body.paragraphs()[0];
+    assert_eq!(paragraph.text(), "before linked styled today ranged");
+    assert_eq!(paragraph.links()[0].href(), "https://example.test/oth");
+    assert_eq!(paragraph.formatting_runs()[0].style_name(), "Strong");
+    assert!(matches!(paragraph.fields()[0].kind(), field::Kind::Date));
+    assert_eq!(body.bookmarks().len(), 2);
+    assert!(!commit.package().document().content_xml().contains(">\n<"));
+
+    let wire = commit.patch().to_bytes().unwrap();
+    let durable = Patch::from_bytes(&wire).unwrap();
+    assert_eq!(durable.inline_changes().len(), 1);
+    assert_eq!(
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
+    );
+    let inverse_wire = durable.inverse().to_bytes().unwrap();
+    let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}
+
+#[test]
+fn inline_boundary_splices_preserve_unknown_nested_markup_and_resource_packages() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink" "#,
+        r#"xmlns:foreign="urn:example:producer"><office:body><office:text>"#,
+        r#"<text:h text:outline-level="1">head <foreign:opaque foreign:id="heading">opaque</foreign:opaque></text:h>"#,
+        r#"<text:list><text:list-item><text:p>outer</text:p><text:list><text:list-item>"#,
+        r#"<text:p>inner <foreign:opaque foreign:id="nested"><text:span>opaque</text:span></foreign:opaque></text:p>"#,
+        r#"</text:list-item></text:list></text:list-item></text:list>"#,
+        r#"<text:p><draw:frame><draw:image xlink:href="Pictures/source.bin"/></draw:frame></text:p>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source = Package::from_bytes(&resource_package(
+        CONTENT,
+        &[("Pictures/source.bin", b"source-pixels", "image/png")],
+    ))
+    .unwrap();
+    let source_bytes = source.as_bytes().to_vec();
+
+    let mut boundary = source.edit();
+    boundary
+        .prepend_heading_inline(Position::new(0), &[Inline::text("[")])
+        .unwrap();
+    boundary
+        .append_heading_inline(Position::new(0), &[Inline::text("]")])
+        .unwrap();
+    boundary
+        .append_paragraph_inline(
+            Position::new(0),
+            &[Inline::Link(Link::new(
+                "https://example.test/list",
+                " linked",
+            ))],
+        )
+        .unwrap();
+    boundary
+        .prepend_paragraph_inline(
+            Position::new(1),
+            &[Inline::bookmark("nested-start"), Inline::text("before ")],
+        )
+        .unwrap();
+    boundary
+        .append_paragraph_inline(
+            Position::new(1),
+            &[Inline::Field(
+                InlineField::new(field::Kind::PageNumber, " after").fixed(),
+            )],
+        )
+        .unwrap();
+    let commit = boundary.commit().unwrap();
+    assert_eq!(commit.patch().inline_changes().len(), 3);
+    assert!(commit.package().document().content_xml().contains(
+        r#"<foreign:opaque foreign:id="nested"><text:span>opaque</text:span></foreign:opaque>"#
+    ));
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains(r#"<foreign:opaque foreign:id="heading">opaque</foreign:opaque>"#)
+    );
+    assert!(!commit.package().document().content_xml().contains(">\n<"));
+    let body = commit.package().document().text_body().unwrap();
+    assert_eq!(body.headings()[0].text(), "[head opaque]");
+    assert_eq!(body.paragraphs()[0].text(), "outer linked");
+    assert_eq!(body.paragraphs()[1].text(), "before inner opaque after");
+    assert_eq!(body.bookmarks().len(), 1);
+    assert_eq!(body.resources().len(), 1);
+    assert!(
+        commit
+            .package()
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/source.bin")
+    );
+
+    let reopened = Package::from_bytes(commit.package().as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
+    assert_eq!(
+        reopened.document().text_body().unwrap().paragraphs()[1].text(),
+        "before inner opaque after"
+    );
+    let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
+    );
+    let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source_bytes
+    );
+
+    let mut payload = source.edit();
+    payload
+        .set_resource_payload(Position::new(0), "image/png", b"changed-pixels".to_vec())
+        .unwrap();
+    let payload_commit = payload.commit().unwrap();
+    let plan = Patch::plan_three_way(&source, commit.patch(), payload_commit.patch()).unwrap();
+    assert!(plan.conflicts().is_empty());
+    let merged = plan.publish().unwrap();
+    assert_eq!(
+        merged.document().text_body().unwrap().paragraphs()[1].text(),
+        "before inner opaque after"
+    );
+    assert_eq!(merged.document().text_body().unwrap().resources().len(), 1);
+
+    let mut history = History::new(source.clone(), HistoryLimits::new(3, 1_000_000));
+    history.record(commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), source.as_bytes());
+    assert!(history.redo());
+    assert_eq!(
+        history
+            .current()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[1]
+            .text(),
+        "before inner opaque after"
+    );
+
+    let destination = Builder::new().build().unwrap();
+    let paragraph_transfer = destination
+        .plan_transfer_from(
+            history.current(),
+            TransferSelector::Paragraph(Position::new(0)),
+            TransferPolicy {
+                security: SecurityPolicy {
+                    allow_embedded_objects: true,
+                    ..SecurityPolicy::default()
+                },
+                ..TransferPolicy::default()
+            },
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    assert_eq!(
+        paragraph_transfer
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
+        "outer linked"
+    );
+    let resource_transfer = destination
+        .plan_transfer_from(
+            history.current(),
+            TransferSelector::Resource(Position::new(0)),
+            TransferPolicy {
+                security: SecurityPolicy {
+                    allow_embedded_objects: true,
+                    ..SecurityPolicy::default()
+                },
+                ..TransferPolicy::default()
+            },
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    assert!(
+        resource_transfer
+            .package()
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/source.bin")
+    );
+
+    const EMPTY: &str = concat!(
+        r#"<?xml version="1.0"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0">"#,
+        r#"<office:body><office:text><text:p/></office:text></office:body></office:document-content>"#,
+    );
+    let empty = Builder::new().content_xml(EMPTY).build().unwrap();
+    let mut fill = empty.edit();
+    fill.append_paragraph_inline(Position::new(0), &[Inline::text("filled")])
+        .unwrap();
+    let filled = fill.commit().unwrap();
+    assert_eq!(
+        filled
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
+        "filled"
+    );
+    assert!(
+        filled
+            .package()
+            .document()
+            .content_xml()
+            .contains("<text:p>filled</text:p>")
+    );
+}
+
+#[test]
+fn inert_form_catalog_crud_is_durable_and_atomic() {
+    let source = structural_source();
+    let search =
+        Form::new("Search").with_control(Control::new("text").with_id("query").with_name("q"));
+    let mut create = source.edit();
+    create.set_forms(&[search]).unwrap();
+    let created = create.commit().unwrap();
+    assert_eq!(
+        created
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .forms()
+            .len(),
+        1
+    );
+    assert_eq!(
+        created.package().document().text_body().unwrap().forms()[0].controls()[0].id(),
+        Some("query")
+    );
+    let durable = Patch::from_bytes(&created.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(durable.forms_change().unwrap().after().len(), 1);
+
+    let updated_form = Form::new("Search").with_control(Control::new("button").with_name("go"));
+    let mut update = created.package().edit();
+    update.set_forms(&[updated_form]).unwrap();
+    let updated = update.commit().unwrap();
+    assert_eq!(
+        updated.package().document().text_body().unwrap().forms()[0].controls()[0].kind(),
+        "button"
+    );
+
+    let mut remove = updated.package().edit();
+    remove.set_forms(&[]).unwrap();
+    let removed = remove.commit().unwrap();
+    assert!(
+        removed
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .forms()
+            .is_empty()
+    );
+    assert_eq!(
+        removed
+            .package()
+            .apply(&removed.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        updated.package().as_bytes()
+    );
+}
+
+#[test]
+fn isolated_nested_list_replace_remove_is_durable() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text>"#,
+        r#"<text:list><text:list-item><text:p>outer</text:p><text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list></text:list-item></text:list>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    assert_eq!(source.document().text_body().unwrap().lists()[0].level(), 2);
+    let mut replacement_edit = source.edit();
+    replacement_edit
+        .set_list(
+            Position::new(0),
+            List::new([Item::new(Paragraph::new("nested replacement"))]),
+        )
+        .unwrap();
+    let replacement_commit = replacement_edit.commit().unwrap();
+    assert_eq!(
+        replacement_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()[0]
+            .level(),
+        2
+    );
+    assert_eq!(
+        replacement_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()[0]
+            .items()[0]
+            .paragraphs()[0]
+            .text(),
+        "nested replacement"
+    );
+    let durable = Patch::from_bytes(&replacement_commit.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(durable.list_changes()[0].before().unwrap().level(), 2);
+
+    let replacement_tree = List::new([Item::new(Paragraph::new("new outer"))
+        .with_nested_list(List::new([Item::new(Paragraph::new("new inner"))]))]);
+    let mut outer_edit = source.edit();
+    outer_edit
+        .set_list(Position::new(1), replacement_tree)
+        .unwrap();
+    let outer_commit = outer_edit.commit().unwrap();
+    let outer_body = outer_commit.package().document().text_body().unwrap();
+    assert_eq!(outer_body.lists().len(), 2);
+    assert_eq!(
+        outer_body.lists()[1].items()[0].paragraphs()[0].text(),
+        "new outer"
+    );
+    assert_eq!(
+        outer_body.lists()[1].items()[0].nested_lists()[0].items()[0].paragraphs()[0].text(),
+        "new inner"
+    );
+    let outer_durable = Patch::from_bytes(&outer_commit.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        outer_durable.list_changes()[0].after().unwrap().items()[0]
+            .nested_lists()
+            .len(),
+        1
+    );
+    assert_eq!(
+        outer_commit
+            .package()
+            .apply(&outer_durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut removal_edit = source.edit();
+    removal_edit.remove_list(Position::new(0)).unwrap();
+    let removal_commit = removal_edit.commit().unwrap();
+    assert_eq!(
+        removal_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()
+            .len(),
+        1
+    );
+    assert_eq!(
+        removal_commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .lists()[0]
+            .level(),
+        1
+    );
+}
+
+#[test]
+fn metadata_and_styles_are_durable_and_reversible() {
+    let source = structural_source();
+    let metadata = Metadata {
+        title: Some("Durable title".to_string()),
+        author: Some("Template author".to_string()),
+        page_count: Some(3),
+        ..Metadata::default()
+    };
+    let body_style = Style::new("Body2", "paragraph")
+        .unwrap()
+        .with_parent("Standard")
+        .unwrap()
+        .with_text_properties(
+            TextProperties::new()
+                .with_color("#aa00cc")
+                .unwrap()
+                .with_background_color("#00ff00")
+                .unwrap()
+                .with_weight(Weight::Bold)
+                .with_slant(Slant::Italic),
+        );
+    let mut parts = source.edit();
+    parts.set_metadata(&metadata).unwrap();
+    parts.set_styles(&[body_style]).unwrap();
+    let parts_commit = parts.commit().unwrap();
+    assert_eq!(
+        parts_commit
+            .package()
+            .document()
+            .metadata()
+            .and_then(|value| value.title.as_deref()),
+        Some("Durable title")
+    );
+    assert_eq!(
+        parts_commit.package().document().styles()[0].name(),
+        "Body2"
+    );
+    assert_eq!(
+        parts_commit.package().document().styles()[0].parent_name(),
+        Some("Standard")
+    );
+    let parts_document = parts_commit.package().document();
+    let properties = parts_document.styles()[0].text_properties().unwrap();
+    assert_eq!(properties.color(), Some("#AA00CC"));
+    assert_eq!(properties.background_color(), Some("#00FF00"));
+    assert_eq!(properties.weight(), Some(Weight::Bold));
+    assert_eq!(properties.slant(), Some(Slant::Italic));
+    let parts_wire = parts_commit.patch().to_bytes().unwrap();
+    let parts_durable = Patch::from_bytes(&parts_wire).unwrap();
+    assert_eq!(
+        source
+            .apply(&parts_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        parts_commit.package().as_bytes()
+    );
+    assert_eq!(
+        parts_commit
+            .package()
+            .apply(&parts_durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut removal = parts_commit.package().edit();
+    removal.remove_metadata();
+    removal.remove_styles();
+    let removed = removal.commit().unwrap();
+    assert!(removed.package().document().meta_xml().is_none());
+    assert!(removed.package().document().styles_xml().is_none());
+    assert!(removed.patch().removes_metadata());
+    assert!(removed.patch().removes_styles());
+    let removal_wire = removed.patch().to_bytes().unwrap();
+    let durable_removal = Patch::from_bytes(&removal_wire).unwrap();
+    assert!(durable_removal.removes_metadata());
+    assert!(durable_removal.removes_styles());
+    assert_eq!(
+        removed
+            .package()
+            .apply(&durable_removal.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        parts_commit.package().as_bytes()
+    );
+}
+
+#[test]
+fn security_policy_is_explicit_and_default_deny() {
+    let baseline = Builder::new().build().unwrap();
+    let validation = baseline.document().validation_capabilities();
+    assert_eq!(
+        validation.namespace_family_envelope(),
+        CapabilityState::Supported
+    );
+    assert_eq!(validation.semantic_subset(), CapabilityState::Supported);
+    assert_eq!(validation.compact_publication(), CapabilityState::Supported);
+    assert_eq!(validation.odf_relax_ng(), CapabilityState::Refused);
+    let security = baseline.document().security_capabilities();
+    assert_eq!(security.inert_inventory(), CapabilityState::Supported);
+    assert_eq!(security.policy_gate(), CapabilityState::Supported);
+    assert_eq!(security.external_resolution(), CapabilityState::Refused);
+    assert_eq!(security.active_execution(), CapabilityState::Refused);
+    assert_eq!(security.password_open(), CapabilityState::Refused);
+    assert_eq!(security.signature_verification(), CapabilityState::Refused);
+    assert_eq!(
+        security.changed_signed_publication(),
+        CapabilityState::Refused
+    );
+
+    const ACTIVE: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text>"#,
+        r#"<text:p><draw:image xlink:href="Pictures/a.png"/><draw:image xlink:href="https://example.test/a.png"/></text:p>"#,
+        r#"<office:forms><form:form form:name="f"><form:text form:name="q"/></form:form></office:forms>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let active = Builder::new().content_xml(ACTIVE).build().unwrap();
+    assert!(
+        active
+            .document()
+            .check_security(SecurityPolicy::default())
+            .is_err()
+    );
+    let report = active
+        .document()
+        .check_security(SecurityPolicy {
+            allow_embedded_objects: true,
+            allow_external_resources: true,
+            allow_forms: true,
+            allow_scripts: false,
+            allow_signatures: false,
+        })
+        .unwrap();
+    assert_eq!(report.embedded_objects, 1);
+    assert_eq!(report.external_resources, 1);
+    assert_eq!(report.forms, 1);
+
+    let protected_bytes = resource_package(
+        COMPACT_CONTENT,
+        &[
+            ("Scripts/main.js", b"inert script", "application/javascript"),
+            (
+                "META-INF/documentsignatures.xml",
+                b"<signatures/>",
+                "text/xml",
+            ),
+        ],
+    );
+    let protected = Package::from_bytes(&protected_bytes).unwrap();
+    assert_eq!(protected.as_bytes(), protected_bytes.as_slice());
+    assert!(
+        protected
+            .document()
+            .check_security(SecurityPolicy::default())
+            .is_err()
+    );
+    let protected_report = protected
+        .document()
+        .check_security(SecurityPolicy {
+            allow_scripts: true,
+            allow_signatures: true,
+            ..SecurityPolicy::default()
+        })
+        .unwrap();
+    assert_eq!(protected_report.scripts, 1);
+    assert!(protected_report.signed);
+    let mut changed = protected.edit();
+    changed
+        .set_paragraph_text(Position::new(0), "changed")
+        .unwrap();
+    assert!(changed.commit().is_err());
+    assert_eq!(protected.as_bytes(), protected_bytes.as_slice());
+}
+
+#[test]
+fn transfer_plan_resolves_style_parents_and_refuses_collisions() {
+    let source_without_styles = Builder::new()
+        .paragraph(Paragraph::styled("transfer me", "Body"))
+        .build()
+        .unwrap();
+    let parent = Style::new("Base", "paragraph").unwrap();
+    let body = Style::new("Body", "paragraph")
+        .unwrap()
+        .with_parent("Base")
+        .unwrap()
+        .with_text_properties(TextProperties::new().with_weight(Weight::Bold));
+    let mut source_edit = source_without_styles.edit();
+    source_edit
+        .set_styles(&[parent.clone(), body.clone()])
+        .unwrap();
+    let source = source_edit.commit().unwrap().into_package();
+    let destination = Builder::new().build().unwrap();
+
+    let plan = destination
+        .plan_transfer_from(
+            &source,
+            TransferSelector::Paragraph(Position::new(0)),
+            TransferPolicy::default(),
+        )
+        .unwrap();
+    assert_eq!(plan.imported_styles().len(), 2);
+    let published = plan.publish().unwrap();
+    assert_eq!(
+        published
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
+        "transfer me"
+    );
+    assert!(
+        published
+            .package()
+            .document()
+            .styles()
+            .iter()
+            .any(|style| style.name() == "Base")
+    );
+
+    assert!(
+        destination
+            .plan_transfer_from(
+                &source,
+                TransferSelector::Paragraph(Position::new(0)),
+                TransferPolicy {
+                    include_styles: false,
+                    ..TransferPolicy::default()
+                },
+            )
+            .is_err()
+    );
+
+    let colliding_source = Builder::new().build().unwrap();
+    let mut colliding_edit = colliding_source.edit();
+    colliding_edit
+        .set_styles(&[Style::new("Body", "text").unwrap()])
+        .unwrap();
+    let colliding = colliding_edit.commit().unwrap().into_package();
+    assert!(
+        colliding
+            .plan_transfer_from(
+                &source,
+                TransferSelector::Paragraph(Position::new(0)),
+                TransferPolicy::default(),
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn resource_reference_and_payload_crud_is_durable_mergeable_and_fail_closed() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:body><office:text>"#,
+        r#"<text:p>ordinary</text:p><text:p><draw:frame><draw:image xlink:href="Pictures/a.bin"/><draw:object xlink:href="./Object 1"/></draw:frame></text:p>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source = Package::from_bytes(&resource_package(
+        CONTENT,
+        &[
+            ("Pictures/a.bin", b"before", "image/png"),
+            ("Object 1/content.xml", b"<object/>", "text/xml"),
+            ("Object 1/settings.xml", b"<settings/>", "text/xml"),
+        ],
+    ))
+    .unwrap();
+
+    let mut dangling = source.edit();
+    dangling.remove_resource_payload(Position::new(0)).unwrap();
+    assert!(dangling.commit().is_err());
+
+    let mut edit = source.edit();
+    edit.set_resource(
+        Position::new(0),
+        resource::Resource::new(resource::Kind::Image, "Pictures/b.bin").unwrap(),
+    )
+    .unwrap();
+    edit.set_resource_payload(Position::new(0), "image/png", b"after".to_vec())
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.patch().resource_changes().len(), 1);
+    assert_eq!(commit.patch().resource_payload_changes().len(), 1);
+    assert_eq!(
+        commit.package().document().text_body().unwrap().resources()[0].href(),
+        "Pictures/b.bin"
+    );
+    assert!(
+        commit
+            .package()
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/b.bin")
+    );
+
+    let durable = Patch::from_bytes(&commit.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        source.apply(&durable).unwrap().into_package().as_bytes(),
+        commit.package().as_bytes()
+    );
+    let inverse = Patch::from_bytes(&durable.inverse().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .apply(&inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+
+    let mut ordinary = source.edit();
+    ordinary
+        .set_paragraph_text(Position::new(0), "merged ordinary")
+        .unwrap();
+    let ordinary_commit = ordinary.commit().unwrap();
+    let merge = Patch::plan_three_way(&source, commit.patch(), ordinary_commit.patch()).unwrap();
+    assert!(merge.conflicts().is_empty());
+    let merged = merge.publish().unwrap();
+    assert_eq!(
+        merged.document().text_body().unwrap().paragraphs()[0].text(),
+        "merged ordinary"
+    );
+    assert_eq!(
+        merged.document().text_body().unwrap().resources()[0].href(),
+        "Pictures/b.bin"
+    );
+
+    let mut history = History::new(source.clone(), HistoryLimits::new(3, 1_000_000));
+    history.record(commit).unwrap();
+    assert!(history.undo());
+    assert_eq!(history.current().as_bytes(), source.as_bytes());
+    assert!(history.redo());
+
+    let mut object_member = source.edit();
+    object_member
+        .set_resource_payload_member(
+            Position::new(1),
+            "content.xml",
+            "text/xml",
+            b"<changed/>".to_vec(),
+        )
+        .unwrap();
+    let object_member_commit = object_member.commit().unwrap();
+    assert_eq!(
+        object_member_commit.patch().resource_payload_changes()[0].path(),
+        "Object 1/content.xml"
+    );
+    assert!(Patch::from_bytes(&object_member_commit.patch().to_bytes().unwrap()).is_ok());
+
+    let mut dangling_object = source.edit();
+    dangling_object
+        .remove_resource_payload(Position::new(1))
+        .unwrap();
+    assert!(dangling_object.commit().is_err());
+
+    let mut remove_object = source.edit();
+    remove_object
+        .remove_resource_payload(Position::new(1))
+        .unwrap();
+    remove_object.remove_resource(Position::new(1)).unwrap();
+    let object_removed = remove_object.commit().unwrap();
+    assert!(
+        object_removed
+            .package()
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .all(|path| !path.starts_with("Object 1/"))
+    );
+
+    let mut coordinated = source.edit();
+    coordinated
+        .remove_resource_payload(Position::new(0))
+        .unwrap();
+    coordinated.remove_resource(Position::new(0)).unwrap();
+    let removed = coordinated.commit().unwrap();
+    assert_eq!(
+        removed
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .resources()
+            .len(),
+        1
+    );
+    assert!(
+        removed
+            .package()
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .all(|path| path != "Pictures/a.bin")
+    );
+
+    let empty = Builder::new().build().unwrap();
+    let mut create = empty.edit();
+    create
+        .append_resource_with_payload(
+            resource::Resource::new(resource::Kind::Image, "Pictures/new.bin").unwrap(),
+            "image/png",
+            b"new".to_vec(),
+        )
+        .unwrap();
+    let created = create.commit().unwrap();
+    assert_eq!(
+        created
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .resources()
+            .len(),
+        1
+    );
+    assert!(created.patch().resource_changes()[0].before().is_none());
+    assert_eq!(
+        created.patch().resource_payload_changes()[0].after(),
+        Some(b"new".as_slice())
+    );
+}
+
+#[test]
+fn exact_rich_nested_and_object_transfer_closes_dependencies() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+        r#"xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0" "#,
+        r#"xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0" "#,
+        r#"xmlns:xlink="http://www.w3.org/1999/xlink"><office:automatic-styles>"#,
+        r#"<style:style style:name="Strong" style:family="text"/></office:automatic-styles>"#,
+        r#"<office:body><office:text><text:p>rich <text:span text:style-name="Strong">span</text:span> <text:a xlink:href="https://example.test/oth">link</text:a></text:p>"#,
+        r#"<text:list><text:list-item><text:p>outer</text:p><text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list></text:list-item></text:list>"#,
+        r#"<text:p><draw:frame><draw:object xlink:href="./Object 1"/></draw:frame></text:p>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source = Package::from_bytes(&resource_package(
+        CONTENT,
+        &[
+            ("Object 1/content.xml", b"<object/>", "text/xml"),
+            ("Object 1/settings.xml", b"<settings/>", "text/xml"),
+        ],
+    ))
+    .unwrap();
+    let destination = Builder::new().build().unwrap();
+    let policy = TransferPolicy {
+        security: SecurityPolicy {
+            allow_embedded_objects: true,
+            ..SecurityPolicy::default()
+        },
+        ..TransferPolicy::default()
+    };
+
+    let rich = destination
+        .plan_transfer_from(
+            &source,
+            TransferSelector::Paragraph(Position::new(0)),
+            policy,
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    let rich_body = rich.package().document().text_body().unwrap();
+    let rich_paragraph = &rich_body.paragraphs()[0];
+    assert_eq!(rich_paragraph.text(), "rich span link");
+    assert_eq!(rich_paragraph.formatting_runs()[0].style_name(), "Strong");
+    assert_eq!(rich_paragraph.links()[0].href(), "https://example.test/oth");
+    let rich_durable = Patch::from_bytes(&rich.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        destination
+            .apply(&rich_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        rich.package().as_bytes()
+    );
+
+    let inner_list = destination
+        .plan_transfer_from(&source, TransferSelector::List(Position::new(0)), policy)
+        .unwrap()
+        .publish()
+        .unwrap();
+    let inner_list_body = inner_list.package().document().text_body().unwrap();
+    assert_eq!(inner_list_body.lists().len(), 1);
+    assert_eq!(inner_list_body.lists()[0].level(), 1);
+    assert_eq!(
+        inner_list_body.lists()[0].items()[0].paragraphs()[0].text(),
+        "inner"
+    );
+    assert!(inner_list.package().document().content_xml().contains(
+        "<text:list><text:list-item><text:p>inner</text:p></text:list-item></text:list>"
+    ));
+    let inner_list_durable = Patch::from_bytes(&inner_list.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        destination
+            .apply(&inner_list_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        inner_list.package().as_bytes()
+    );
+    assert_eq!(
+        inner_list
+            .package()
+            .apply(&inner_list_durable.inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        destination.as_bytes()
+    );
+
+    let inner_paragraph = destination
+        .plan_transfer_from(
+            &source,
+            TransferSelector::Paragraph(Position::new(2)),
+            policy,
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    let inner_paragraph_body = inner_paragraph.package().document().text_body().unwrap();
+    assert_eq!(inner_paragraph_body.lists().len(), 0);
+    assert_eq!(inner_paragraph_body.paragraphs()[0].text(), "inner");
+    assert!(
+        inner_paragraph
+            .package()
+            .document()
+            .content_xml()
+            .contains("<text:p>inner</text:p>")
+    );
+
+    let nested = destination
+        .plan_transfer_from(&source, TransferSelector::List(Position::new(1)), policy)
+        .unwrap()
+        .publish()
+        .unwrap();
+    let nested_body = nested.package().document().text_body().unwrap();
+    assert_eq!(nested_body.lists().len(), 2);
+    assert_eq!(nested_body.lists()[1].items()[0].nested_lists().len(), 1);
+    assert_eq!(
+        nested_body.lists()[1].items()[0].nested_lists()[0].items()[0].paragraphs()[0].text(),
+        "inner"
+    );
+    let nested_durable = Patch::from_bytes(&nested.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        destination
+            .apply(&nested_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        nested.package().as_bytes()
+    );
+
+    let object = destination
+        .plan_transfer_from(
+            &source,
+            TransferSelector::Resource(Position::new(0)),
+            policy,
+        )
+        .unwrap()
+        .publish()
+        .unwrap();
+    assert_eq!(object.patch().resource_changes().len(), 1);
+    assert_eq!(object.patch().resource_payload_changes().len(), 2);
+    let object_files = object.package().document().files().unwrap();
+    assert!(
+        object_files
+            .iter()
+            .any(|path| path == "Object 1/content.xml")
+    );
+    assert!(
+        object_files
+            .iter()
+            .any(|path| path == "Object 1/settings.xml")
+    );
+    let object_durable = Patch::from_bytes(&object.patch().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        destination
+            .apply(&object_durable)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        object.package().as_bytes()
+    );
+    let object_inverse = Patch::from_bytes(&object_durable.inverse().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        object
+            .package()
+            .apply(&object_inverse)
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        destination.as_bytes()
+    );
+
+    let collision = Package::from_bytes(&resource_package(
+        COMPACT_CONTENT,
+        &[("Object 1/content.xml", b"different", "text/xml")],
+    ))
+    .unwrap();
+    assert!(
+        collision
+            .plan_transfer_from(
+                &source,
+                TransferSelector::Resource(Position::new(0)),
+                policy,
+            )
+            .is_err()
+    );
+}
+
+#[test]
+fn transfer_refuses_unprojected_inline_content_without_flattening_it() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"><office:body><office:text>"#,
+        r#"<text:p>before<foreign:opaque xmlns:foreign="urn:example">unknown</foreign:opaque>after</text:p>"#,
+        r#"</office:text></office:body></office:document-content>"#,
+    );
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    let destination = Builder::new().build().unwrap();
+    assert!(
+        destination
+            .plan_transfer_from(
+                &source,
+                TransferSelector::Paragraph(Position::new(0)),
+                TransferPolicy::default(),
+            )
+            .is_err()
+    );
+    assert!(source.document().content_xml().contains("<foreign:opaque"));
+}
+
+#[test]
+fn multi_paragraph_edit_is_atomic_and_can_fill_an_empty_element() {
+    const CONTENT: &str = concat!(
+        r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+        r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+        r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+        r#"<office:body><office:text><text:p/><text:p>second</text:p><text:p>third</text:p></office:text></office:body></office:document-content>"#,
+    );
+    let source = Builder::new().content_xml(CONTENT).build().unwrap();
+    let mut edit = source.edit();
+    edit.set_paragraph_text(Position::new(0), "first & ready")
+        .unwrap();
+    edit.set_paragraph_text(Position::new(2), "last").unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.patch().changes().len(), 2);
+    assert!(
+        commit
+            .package()
+            .document()
+            .content_xml()
+            .contains("<text:p>first &amp; ready</text:p>")
+    );
+    let body = commit.package().document().text_body().unwrap();
+    let texts = body
+        .paragraphs()
+        .iter()
+        .map(Paragraph::text)
+        .collect::<Vec<_>>();
+    assert_eq!(texts, ["first & ready", "second", "last"]);
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes(),
+    );
+}
+
+#[test]
+fn opens_and_edits_the_pretty_printed_libreoffice_web_template() {
+    let bytes = include_bytes!("fixtures/libreoffice-desktop-html.oth").to_vec();
+    let source = Package::from_bytes(&bytes).unwrap();
+    assert_eq!(source.as_bytes(), bytes);
+    assert_eq!(
+        source.document().text_body().unwrap().paragraphs()[0].style_name(),
+        Some("Standard")
+    );
+
+    let mut edit = source.edit();
+    edit.set_paragraph_text(Position::new(0), "Web template")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .document()
+            .text_body()
+            .unwrap()
+            .paragraphs()[0]
+            .text(),
+        "Web template"
+    );
+    assert_eq!(
+        commit.package().document().meta_xml(),
+        source.document().meta_xml()
+    );
+    assert_eq!(
+        commit.package().document().styles_xml(),
+        source.document().styles_xml()
+    );
+    assert!(commit.package().document().styles_xml().is_some());
+    let mut rich_edit = commit.package().edit();
+    rich_edit
+        .set_paragraph_inline(
+            Position::new(0),
+            &[
+                Inline::bookmark("writer-web"),
+                Inline::text("Web "),
+                Inline::Link(Link::new("https://example.test/writer", "template")),
+            ],
+        )
+        .unwrap();
+    let rich_commit = rich_edit.commit().unwrap();
+    let rich_reopen = Package::from_bytes(rich_commit.package().as_bytes()).unwrap();
+    assert_eq!(
+        rich_reopen.document().text_body().unwrap().paragraphs()[0].text(),
+        "Web template"
+    );
+    assert_eq!(
+        rich_reopen
+            .document()
+            .text_body()
+            .unwrap()
+            .bookmarks()
+            .len(),
+        1
+    );
+    let mut resource_edit = rich_reopen.edit();
+    resource_edit
+        .append_resource_with_payload(
+            resource::Resource::new(resource::Kind::Image, "Pictures/derived.bin").unwrap(),
+            "image/png",
+            b"derived-pixels".to_vec(),
+        )
+        .unwrap();
+    let resource_commit = resource_edit.commit().unwrap();
+    let resource_reopen = Package::from_bytes(resource_commit.package().as_bytes()).unwrap();
+    assert_eq!(
+        resource_reopen
+            .document()
+            .text_body()
+            .unwrap()
+            .resources()
+            .len(),
+        1
+    );
+    assert!(
+        resource_reopen
+            .document()
+            .files()
+            .unwrap()
+            .iter()
+            .any(|path| path == "Pictures/derived.bin")
+    );
+    assert_eq!(
+        resource_reopen.document().meta_xml(),
+        source.document().meta_xml()
+    );
+    assert_eq!(
+        resource_reopen.document().styles_xml(),
+        source.document().styles_xml()
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        source.as_bytes()
+    );
+}

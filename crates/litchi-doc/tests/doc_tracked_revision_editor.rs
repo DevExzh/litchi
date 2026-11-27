@@ -1,0 +1,465 @@
+use litchi_cfb::OleFile;
+use litchi_doc::builder::Builder;
+use litchi_doc::raw::Reader;
+use litchi_doc::tracked_revision::{Edit, Limits, RevisionKind, RevisionMetadata};
+use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
+use litchi_doc::{EditOptions, Leniency, OpenOptions, Package};
+use std::io::Cursor;
+
+/// A tracked-revision edit of the package `bytes` under explicit limits.
+fn open_revisions(bytes: Vec<u8>, limits: Limits) -> litchi_doc::tracked_revision::Result<Edit> {
+    // The revision engine edits the exact source; a stylesheet defect the
+    // read model would repair does not block it.
+    let options = OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects);
+    Package::from_bytes_with_options(&bytes, options)?
+        .edit_tracked_revisions_with_options(EditOptions::default().revision_limits(limits))
+}
+
+/// Publishing a staged edit, as the exact package bytes it produces.
+trait Finish {
+    fn finish(self) -> litchi_doc::tracked_revision::Result<Vec<u8>>;
+}
+
+impl Finish for Edit {
+    fn finish(self) -> litchi_doc::tracked_revision::Result<Vec<u8>> {
+        Ok(self.commit()?.patch().after_bytes().to_vec())
+    }
+}
+
+fn base_doc() -> Vec<u8> {
+    let mut writer = Builder::new();
+    writer
+        .add_paragraph_runs(
+            vec![
+                ("kept ".to_string(), CharacterFormatting::default()),
+                (
+                    "old".to_string(),
+                    CharacterFormatting {
+                        deletion_revision: Some(
+                            TextRevision::new("Existing").with_revision_save_id(7),
+                        ),
+                        ..Default::default()
+                    },
+                ),
+                (" tail".to_string(), CharacterFormatting::default()),
+            ],
+            ParagraphFormatting::default(),
+        )
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+fn root_stream_start(bytes: &[u8], name: &str) -> (u32, u64) {
+    let ole = OleFile::open(
+        Cursor::new(bytes.to_vec()),
+        litchi_cfb::OleFileLimits::default(),
+    )
+    .expect("DOC CFB should open");
+    let entry = ole
+        .list_directory_entries(&[])
+        .expect("DOC root directory should open")
+        .into_iter()
+        .find(|entry| entry.name == name)
+        .expect("DOC stream should exist");
+    (entry.start_sector, entry.size)
+}
+
+#[test]
+fn lists_authors_and_mutates_insertions_and_deletions_transactionally() {
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
+    assert!(
+        editor
+            .authors()
+            .expect("revision authors")
+            .contains(&"Existing".to_string())
+    );
+    let deletion = editor
+        .revisions()
+        .unwrap()
+        .into_iter()
+        .find(|r| r.kind == RevisionKind::Deletion)
+        .unwrap();
+    let insertion = editor
+        .add_text(
+            0,
+            "new ",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice").with_revision_save_id(9),
+        )
+        .unwrap();
+    assert_eq!((insertion.start_cp, insertion.end_cp), (0, 4));
+    let deletion_index = editor
+        .revisions()
+        .unwrap()
+        .iter()
+        .position(|r| r.author == "Existing")
+        .unwrap();
+    editor.reject(deletion_index).unwrap();
+    let insertion_index = editor
+        .revisions()
+        .unwrap()
+        .iter()
+        .position(|r| r.author == "Alice")
+        .unwrap();
+    editor.accept(insertion_index).unwrap();
+    assert!(
+        editor
+            .revisions()
+            .unwrap()
+            .iter()
+            .all(|r| r.author != "Alice" && r.author != "Existing")
+    );
+    let bytes = editor.finish().unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
+    let text = package.document().unwrap().text().unwrap().to_string();
+    assert!(text.contains("new kept old tail"));
+    assert_eq!(deletion.author, "Existing");
+}
+
+#[test]
+fn accepts_deletion_rejects_insertion_and_pairs_moves_by_rsid() {
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
+    let deletion_index = editor
+        .revisions()
+        .unwrap()
+        .iter()
+        .position(|r| r.kind == RevisionKind::Deletion)
+        .unwrap();
+    editor.accept(deletion_index).unwrap();
+    editor
+        .add_text(
+            0,
+            "temporary",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Alice"),
+        )
+        .unwrap();
+    let insertion_index = editor
+        .revisions()
+        .unwrap()
+        .iter()
+        .position(|r| r.author == "Alice")
+        .unwrap();
+    editor.reject(insertion_index).unwrap();
+    let bytes = editor.finish().unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
+    let text = package.document().unwrap().text().unwrap().to_string();
+    assert!(!text.contains("old"));
+    assert!(!text.contains("temporary"));
+}
+
+#[test]
+fn shared_rsid_exposes_binary_insertion_and_deletion_as_a_move_pair() {
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
+    let metadata = RevisionMetadata::new("Mover").with_revision_save_id(0xAABBCCDD);
+    editor
+        .add(0, 4, RevisionKind::MoveFrom, metadata.clone())
+        .unwrap();
+    editor
+        .add_text(0, "kept", RevisionKind::MoveTo, metadata)
+        .unwrap();
+    let revisions = editor.revisions().unwrap();
+    let from = revisions
+        .iter()
+        .find(|r| r.kind == RevisionKind::MoveFrom)
+        .unwrap();
+    let to = revisions
+        .iter()
+        .find(|r| r.kind == RevisionKind::MoveTo)
+        .unwrap();
+    assert_eq!(from.move_pair_id, Some(0xAABBCCDD));
+    assert_eq!(to.move_pair_id, from.move_pair_id);
+}
+
+#[test]
+fn malformed_ranges_controls_and_failed_updates_roll_back() {
+    let mut editor = open_revisions(base_doc(), Limits::default()).unwrap();
+    let before = editor.revisions().unwrap();
+    assert!(
+        editor
+            .add_text(
+                0,
+                "\u{13} MACROBUTTON",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("Mallory")
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .add(
+                20_000,
+                20_001,
+                RevisionKind::Deletion,
+                RevisionMetadata::new("Mallory")
+            )
+            .is_err()
+    );
+    assert!(
+        editor
+            .replace(0, RevisionMetadata::new("Mallory").with_reason(0x2c))
+            .is_err()
+    );
+    assert_eq!(editor.revisions().unwrap(), before);
+}
+
+#[test]
+fn bundled_word_and_libreoffice_redline_fixtures_are_strictly_gated() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let fixtures = [
+        root.join("test-data/libreoffice-core/sw/qa/extras/ww8import/data/changes-in-footnote.doc"),
+        root.join("test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc"),
+        root.join("test-data/libreoffice-core/sw/qa/core/data/ww8/fail/redline-1.doc"),
+    ];
+    for path in fixtures {
+        let original = std::fs::read(&path).unwrap();
+        match open_revisions(original.clone(), Limits::default()) {
+            Ok(mut editor) => {
+                let _ = editor.revisions().unwrap();
+                assert_eq!(std::fs::read(&path).unwrap(), original);
+            },
+            Err(_) => assert_eq!(std::fs::read(&path).unwrap(), original),
+        }
+    }
+}
+
+#[test]
+fn ordinary_tracked_revision_save_reuses_the_opened_doc_layout() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let source_path = root.join("test-data/ole/doc/picture.doc");
+    // LibreOffice's Word 2002 FIB (cswNew 0) and 610-byte DOP carry no
+    // protection, so the producer fixture is edited as checked in.
+    let source = std::fs::read(source_path).expect("DOC fixture should exist");
+    let table_name = {
+        let ole = OleFile::open(
+            Cursor::new(source.clone()),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .expect("DOC CFB should open");
+        ole.list_directory_entries(&[])
+            .expect("DOC root directory should open")
+            .into_iter()
+            .find(|entry| entry.name == "0Table" || entry.name == "1Table")
+            .expect("DOC table stream should exist")
+            .name
+            .clone()
+    };
+    let before = root_stream_start(&source, &table_name);
+
+    let mut editor = open_revisions(source.clone(), Limits::default())
+        .expect("DOC fixture should enter the tracked editor");
+    editor
+        .add_text(
+            0,
+            "inserted ",
+            RevisionKind::Insertion,
+            RevisionMetadata::new("Rev0"),
+        )
+        .expect("tracked edit should commit");
+    let output = editor.finish().expect("tracked DOC save should finish");
+    let after = root_stream_start(&output, &table_name);
+    assert_eq!(after.0, before.0, "DOC table allocation moved during save");
+    assert_ne!(output, source, "the tracked edit should publish a change");
+}
+
+fn ole_doc_fixture(name: &str) -> Vec<u8> {
+    let path = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/doc")
+        .join(name);
+    std::fs::read(path).expect("DOC fixture should exist")
+}
+
+/// Every readable checked-in DOC fixture. None carries document or range
+/// protection, so each accepts a tracked insertion at CP 0 as checked in,
+/// including the 24 that the strict protection grammar refused and the 11 whose
+/// saved selection is a caret at CP 0.
+const READABLE_FIXTURES: [&str; 35] = [
+    "3endnotes.doc",
+    "DiffFirstPageHeadFoot.doc",
+    "FancyFoot.doc",
+    "FloatingPictures.doc",
+    "HeaderFooterProblematic.doc",
+    "HeaderFooterUnicode.doc",
+    "Lists.doc",
+    "NoHeadFoot.doc",
+    "PngPicture.doc",
+    "ThreeColFoot.doc",
+    "ThreeColHead.doc",
+    "ThreeColHeadFoot.doc",
+    "cfb-truncated-final-sector.doc",
+    "cjklist30.doc",
+    "cjklist31.doc",
+    "cjklist34.doc",
+    "cjklist35.doc",
+    "commented-table.doc",
+    "documentProperties.doc",
+    "duplicate-style-names.doc",
+    "empty.doc",
+    "endingnote.doc",
+    "equation.doc",
+    "first-header-footer.doc",
+    "footnote.doc",
+    "hyperlink.doc",
+    "image-comment-at-char.doc",
+    "inline-endnote-and-footnote.doc",
+    "lists-margins.doc",
+    "picture.doc",
+    "pictures_escher.doc",
+    "table-merged-cells.doc",
+    "tdf71749_with_footnote.doc",
+    "testPictures.doc",
+    "watermark.doc",
+];
+
+#[test]
+fn every_readable_fixture_accepts_a_tracked_insertion_at_cp_zero() {
+    for name in READABLE_FIXTURES {
+        let source = ole_doc_fixture(name);
+        let mut editor = open_revisions(source.clone(), Limits::default())
+            .unwrap_or_else(|error| panic!("{name} should open: {error}"));
+        let inserted = editor
+            .add_text(
+                0,
+                "Rev1 ",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("Rev1"),
+            )
+            .unwrap_or_else(|error| panic!("{name} should accept the insertion: {error}"));
+        assert_eq!((inserted.start_cp, inserted.end_cp), (0, 5), "{name}");
+        let output = editor
+            .finish()
+            .unwrap_or_else(|error| panic!("{name} should publish: {error}"));
+        assert_ne!(output, source, "{name}");
+
+        let mut reopened = open_revisions(output.clone(), Limits::default())
+            .unwrap_or_else(|error| panic!("{name} output should reopen: {error}"));
+        assert!(
+            reopened.revisions().unwrap().iter().any(|revision| {
+                revision.kind == RevisionKind::Insertion
+                    && (revision.start_cp, revision.end_cp) == (0, 5)
+                    && revision.author == "Rev1"
+            }),
+            "{name}"
+        );
+        assert_eq!(
+            reopened.finish().unwrap(),
+            output,
+            "{name}: unchanged republication"
+        );
+        // The public reader accepts the output exactly when it accepts the
+        // source; its strict stylesheet rules are independent of the edit.
+        match public_text(&source) {
+            Some(_) => assert!(
+                public_text(&output).is_some_and(|text| text.contains("Rev1 ")),
+                "{name}"
+            ),
+            None => assert!(public_text(&output).is_none(), "{name}"),
+        }
+    }
+}
+
+fn public_text(bytes: &[u8]) -> Option<String> {
+    let mut package = Reader::from_reader(Cursor::new(bytes.to_vec())).ok()?;
+    let document = package.document().ok()?;
+    document.text().ok().map(|text| text.to_string())
+}
+
+#[test]
+fn unreadable_fixtures_remain_refused_at_open() {
+    for name in [
+        "PasswordProtected.doc",
+        "cfb-v3-uninitialized-size-high-word.doc",
+        "word6-no-table-stream.doc",
+    ] {
+        assert!(
+            open_revisions(ole_doc_fixture(name), Limits::default()).is_err(),
+            "{name}"
+        );
+    }
+}
+
+fn saved_selection_cps(bytes: &[u8]) -> (u32, u32, u32) {
+    let mut package = Reader::from_reader(Cursor::new(bytes.to_vec())).unwrap();
+    let document = package.document().unwrap();
+    let selection = document.saved_selection().unwrap().unwrap();
+    (
+        selection.cp_first(),
+        selection.cp_lim(),
+        selection.cp_anchor(),
+    )
+}
+
+/// A tracked insertion at the saved caret leaves the caret on its recorded CP,
+/// before the new text; rejecting the insertion restores the recorded Selsf.
+#[test]
+fn tracked_insertion_at_the_saved_caret_keeps_the_caret_before_the_new_text() {
+    for (name, recorded, inserted) in [
+        ("cjklist30.doc", (0, 0, 0), (0, 0, 0)),
+        ("empty.doc", (0, 0, 0), (0, 0, 0)),
+        ("HeaderFooterUnicode.doc", (0, 0, 407), (0, 0, 412)),
+        ("NoHeadFoot.doc", (179, 179, 179), (184, 184, 184)),
+    ] {
+        let source = ole_doc_fixture(name);
+        assert_eq!(saved_selection_cps(&source), recorded, "{name}");
+        let mut editor = open_revisions(source, Limits::default()).unwrap();
+        editor
+            .add_text(
+                0,
+                "Rev1 ",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("Rev1"),
+            )
+            .unwrap();
+        let output = editor.clone().finish().unwrap();
+        assert_eq!(saved_selection_cps(&output), inserted, "{name}");
+
+        let index = editor
+            .revisions()
+            .unwrap()
+            .iter()
+            .position(|revision| revision.author == "Rev1")
+            .unwrap();
+        editor.reject(index).unwrap();
+        let rejected = editor.finish().unwrap();
+        assert_eq!(saved_selection_cps(&rejected), recorded, "{name}");
+    }
+}
+
+/// Tracked insertions into these real documents rebuild CHPX FKP pages whose
+/// even-rounded size estimate fills a page exactly while the first CHPX placed
+/// below the count byte needs one more byte. The pages must still reopen.
+#[test]
+fn tracked_insertions_keep_rebuilt_chpx_pages_readable() {
+    let root = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    for path in [
+        "test-data/poi/test-data/document/saved-by-table.doc",
+        "test-data/libreoffice-core/sw/qa/core/doc/data/bookmark-delete-redline.doc",
+        "test-data/poi/test-data/document/au.edu.utas.www___data_assets_word_doc_0003_154335_International-Travel-Approval-Request-Form.doc",
+    ] {
+        let source = std::fs::read(root.join(path)).expect("DOC fixture should exist");
+        let mut editor = open_revisions(source, Limits::default())
+            .unwrap_or_else(|error| panic!("{path} should open: {error}"));
+        editor
+            .add_text(
+                0,
+                "x",
+                RevisionKind::Insertion,
+                RevisionMetadata::new("Rev1"),
+            )
+            .unwrap_or_else(|error| panic!("{path} should accept the insertion: {error}"));
+        let output = editor.finish().unwrap();
+        let mut reopened = open_revisions(output.clone(), Limits::default())
+            .unwrap_or_else(|error| panic!("{path} output should reopen: {error}"));
+        assert!(
+            reopened.revisions().unwrap().iter().any(|revision| (
+                revision.start_cp,
+                revision.end_cp
+            ) == (0, 1)
+                && revision.author == "Rev1"),
+            "{path}"
+        );
+        assert_eq!(reopened.finish().unwrap(), output, "{path}");
+    }
+}

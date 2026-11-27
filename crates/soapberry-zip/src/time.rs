@@ -721,7 +721,7 @@ const NTFS_EPOCH_OFFSET: u64 = 11644473600; // Seconds between 1601-01-01 and 19
 
 /// Returns true if the given year is a leap year.
 const fn is_leap(year: u16) -> bool {
-    year % 4 == 0 && (year % 100 != 0 || year % 400 == 0)
+    year.is_multiple_of(4) && (!year.is_multiple_of(100) || year.is_multiple_of(400))
 }
 
 /// Returns the last valid day of the given month in the given year.
@@ -1154,7 +1154,7 @@ mod property_tests {
             return;
         };
 
-        let dt = timestamp.to_zoned(jiff::tz::TimeZone::UTC);
+        let dt = timestamp.to_zoned_datetime(jiff::tz::TimeZone::UTC);
 
         assert_eq!(zip_datetime.year(), dt.year() as u16, "year");
         assert_eq!(zip_datetime.month(), dt.month() as u8, "month");
@@ -1191,7 +1191,7 @@ mod property_tests {
             return;
         };
 
-        let dt = jiff_timestamp.to_zoned(jiff::tz::TimeZone::UTC);
+        let dt = jiff_timestamp.to_zoned_datetime(jiff::tz::TimeZone::UTC);
 
         assert_eq!(zip_datetime.year(), dt.year() as u16, "year");
         assert_eq!(zip_datetime.month(), dt.month() as u8, "month");

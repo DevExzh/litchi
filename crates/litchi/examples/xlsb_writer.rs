@@ -7,11 +7,11 @@
 //! cargo run --example xlsb_writer --features ooxml --no-default-features
 //! ```
 
-use litchi::ooxml::xlsb::comments::Comment;
-use litchi::ooxml::xlsb::hyperlinks::Hyperlink;
-use litchi::ooxml::xlsb::merged_cells::MergedCell;
-use litchi::ooxml::xlsb::writer::{MutableXlsbWorksheet, XlsbWorkbookWriter};
 use litchi::sheet::CellValue;
+use litchi::xlsb::builder::{self, Builder};
+use litchi::xlsb::comments::Record;
+use litchi::xlsb::hyperlinks::Hyperlink;
+use litchi::xlsb::merged_cells::MergedCell;
 use std::fs::File;
 
 fn main() {
@@ -36,7 +36,7 @@ fn main() {
 }
 
 fn create_workbook(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = XlsbWorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.set_date_system(false); // 1900 date system
 
     println!("Creating worksheets...\n");
@@ -53,15 +53,15 @@ fn create_workbook(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Save
     println!("Writing workbook to file...");
     let file = File::create(filename)?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     Ok(())
 }
 
-fn create_basic_sheet(workbook: &mut XlsbWorkbookWriter) -> Result<(), Box<dyn std::error::Error>> {
+fn create_basic_sheet(workbook: &mut Builder) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Sheet 1: Basic Data Types...");
 
-    let mut sheet = MutableXlsbWorksheet::new("BasicData");
+    let mut sheet = builder::Worksheet::new("BasicData");
 
     // Headers
     sheet.set_cell(0, 0, CellValue::String("Type".to_string()));
@@ -89,12 +89,10 @@ fn create_basic_sheet(workbook: &mut XlsbWorkbookWriter) -> Result<(), Box<dyn s
     Ok(())
 }
 
-fn create_formula_sheet(
-    workbook: &mut XlsbWorkbookWriter,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn create_formula_sheet(workbook: &mut Builder) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Sheet 2: Formulas...");
 
-    let mut sheet = MutableXlsbWorksheet::new("Formulas");
+    let mut sheet = builder::Worksheet::new("Formulas");
 
     // Data
     sheet.set_cell(0, 0, CellValue::Float(10.0));
@@ -129,12 +127,10 @@ fn create_formula_sheet(
     Ok(())
 }
 
-fn create_advanced_sheet(
-    workbook: &mut XlsbWorkbookWriter,
-) -> Result<(), Box<dyn std::error::Error>> {
+fn create_advanced_sheet(workbook: &mut Builder) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Sheet 3: Advanced Features...");
 
-    let mut sheet = MutableXlsbWorksheet::new("Advanced");
+    let mut sheet = builder::Worksheet::new("Advanced");
 
     // Title with merge
     sheet.set_cell(0, 0, CellValue::String("Sales Report".to_string()));
@@ -151,7 +147,7 @@ fn create_advanced_sheet(
     sheet.add_hyperlink(link);
 
     // Comment
-    let comment = Comment::new(
+    let comment = Record::new(
         2,
         1,
         "Manager".to_string(),

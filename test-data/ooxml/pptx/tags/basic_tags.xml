@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:tagLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:ext="urn:litchi:fixture" ext:origin="local">
+  <p:tag name="OWNER" val="Alice" ext:source="fixture"/>
+  <p:tag name="INERT" val="&lt;not-a-command/&gt;"/>
+</p:tagLst>

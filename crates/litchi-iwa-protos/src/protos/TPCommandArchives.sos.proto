@@ -1,0 +1,20 @@
+syntax = "proto2";
+
+import "TSACommandArchives.sos.proto";
+import "TSKArchives.proto";
+import "TSPMessages.proto";
+package TPSOS;
+
+message InducedVerifyDocumentWithServerCommandArchive {
+  required .TSK.CommandArchive super = 1;
+  repeated .TSP.UUID drawables_z_order_list = 2;
+  optional bool drawables_z_order_list_undefined = 3;
+}
+
+message InducedVerifyDrawableZOrdersWithServerCommandArchive {
+  required .TSASOS.InducedVerifyDrawableZOrdersWithServerCommandArchive super = 1;
+}
+
+message ReapplyPageTemplateCommandArchive {
+  required .TSASOS.CommandReapplyMasterArchive super = 1;
+}

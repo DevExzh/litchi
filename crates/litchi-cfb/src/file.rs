@@ -1,8 +1,231 @@
-use super::consts::*;
-use fixedbitset::FixedBitSet;
-use std::io::{self, Read, Seek, SeekFrom};
+use super::consts::{
+    DIFSECT, DIRENTRY_SIZE, ENDOFCHAIN, FATSECT, FREESECT, HEADER_DIFAT_ENTRIES,
+    HEADER_DIFAT_OFFSET, MAGIC, MAXREGSECT, MINIMAL_OLEFILE_SIZE, NOSTREAM, RANGE_LOCK_SECTOR_V4,
+    SECTOR_SIZE_V3, SECTOR_SIZE_V4, STGTY_EMPTY, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM,
+    TWO_GIB_BYTES,
+};
+#[cfg(test)]
+use crate::directory_name::directory_name_data;
+use crate::directory_name::{
+    DirectoryNameData, DirectoryNameError, ascii_lookup_key,
+    directory_name_data_allowing_forbidden, has_forbidden_character,
+};
+use crate::leniency::{AllocationDefect, DirectoryDefect, HeaderDefect, ToleranceReport};
+use crate::writer::{PublishFailure, SystemSteps, TemporaryIdentity, publish_staged};
+use litchi_core::Durability;
+use smallvec::SmallVec;
+use std::cmp::Ordering;
+use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::num::NonZeroUsize;
+use std::ops::Range;
+use std::path::Path;
 use zerocopy::{FromBytes, LE, U16, U32, U64};
 use zerocopy_derive::FromBytes as DeriveFromBytes;
+
+const BITSET_WORD_BITS: usize = u64::BITS as usize;
+
+/// A reusable chain map is restored sector by sector only when the chain is
+/// shorter than an eighth (one over this ratio) of the table's words, and by
+/// clearing the table's words otherwise. Restoring every shorter chain sector
+/// by sector ran more instructions on small tables than the bulk clear it
+/// replaced. The ratio keeps small tables, which most files have, on the bulk
+/// clear, and still bounds every restoration by eight word writes per sector
+/// of its chain.
+const CLEAR_BY_SECTOR_RATIO: usize = 8;
+
+/// Capacity, in bytes, above which a reader frees its retained chain buffer
+/// after a read instead of keeping it for the next read.
+///
+/// An [`OleFile`] keeps the buffers its reads collect chains into, so that
+/// reading many streams costs time proportional to their chains. Kept for the
+/// reader's lifetime, the chain buffer would pin one `u32` per sector of the
+/// longest chain ever read, about 8 MiB after one 1 GiB stream of 512-byte
+/// sectors. The chain buffer grows by doubling, so a capacity above 1 MiB
+/// follows a chain of more than 262,144 sectors: a stream of more than
+/// 128 MiB even at 512-byte sectors, whose own buffer that read allocated
+/// anyway. The
+/// next such read allocates the chain buffer again; reads of shorter chains
+/// keep theirs, so the common small-file path is unchanged.
+///
+/// The visited map is kept whatever its size. It holds one bit per entry of
+/// the larger table read, a thirty-second of the memory that table's `u32`
+/// entries already take in the reader for its lifetime, and freeing it would
+/// make every later read allocate and zero a table-sized map again, the cost
+/// keeping it avoids.
+const RETAINED_CHAIN_SCRATCH_BYTES: usize = 1 << 20;
+
+/// Upper bound, in bytes, on the scratch buffer the FAT and MiniFAT loaders
+/// use to batch physically contiguous sector reads.
+///
+/// Both loaders parse entries out of this scratch straight into their final
+/// `u32` table, so the buffer replaces the single reusable sector buffer they
+/// read into before — not an aggregate byte buffer the size of the whole
+/// table, which is the allocation those loaders were written to avoid. Peak
+/// metadata bytes therefore rise from one sector to at most this constant,
+/// independent of how large the FAT or MiniFAT is.
+///
+/// 64 KiB is 128 sectors of a 512-byte compound file and 16 of a 4096-byte
+/// one. The longest physically contiguous FAT run in the project's OLE corpus
+/// is 21 sectors, so one read covers it. A table shorter than the bound only
+/// allocates the sectors it has, which keeps the common single-FAT-sector file
+/// at its historical one-sector footprint.
+const SECTOR_BATCH_SCRATCH_BYTES: usize = 64 * 1024;
+
+/// A fallible, compact bit set for indexes originating in a compound file.
+///
+/// `fixedbitset::FixedBitSet` is efficient, but its constructor and `insert`
+/// operation intentionally panic on allocation and bounds failures.  CFB
+/// indexes are untrusted, so the read path uses this small equivalent with
+/// fallible allocation and checked insertion instead.
+#[derive(Debug, Default)]
+struct CheckedBitSet {
+    words: Vec<u64>,
+    bit_len: usize,
+}
+
+impl CheckedBitSet {
+    fn try_with_capacity(bit_len: usize, resource: &'static str) -> Result<Self, OleError> {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(word_count)
+            .map_err(|source| OleError::allocation(resource, source))?;
+        words.resize(word_count, 0);
+        Ok(Self { words, bit_len })
+    }
+
+    #[inline]
+    fn contains(&self, bit: usize) -> bool {
+        if bit >= self.bit_len {
+            return false;
+        }
+        let word = bit / BITSET_WORD_BITS;
+        let mask = 1u64 << (bit % BITSET_WORD_BITS);
+        self.words.get(word).is_some_and(|value| value & mask != 0)
+    }
+
+    fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+        if bit >= self.bit_len {
+            return Err(OleError::CorruptedFile(format!(
+                "bit index {bit} exceeds checked bit-set capacity {}",
+                self.bit_len
+            )));
+        }
+        let word = bit / BITSET_WORD_BITS;
+        let mask = 1u64 << (bit % BITSET_WORD_BITS);
+        let value = self.words.get_mut(word).ok_or_else(|| {
+            OleError::CorruptedFile(format!("bit index {bit} has no backing word"))
+        })?;
+        *value |= mask;
+        Ok(())
+    }
+
+    /// Covers the first `bit_len` bits for a chain walk over a table of that
+    /// length, as a reusable map whose every bit is clear between walks.
+    ///
+    /// Only growth writes words: the new words arrive clear, and the existing
+    /// ones are clear by the invariant. `bit_len` then bounds `contains` and
+    /// `insert` exactly as a fresh map of that length would.
+    #[inline]
+    fn cover(&mut self, bit_len: usize, resource: &'static str) -> Result<(), OleError> {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        if self.words.len() < word_count {
+            let growth = word_count - self.words.len();
+            self.words
+                .try_reserve_exact(growth)
+                .map_err(|source| OleError::allocation(resource, source))?;
+            // The fallible reserve above makes this resize infallible.
+            self.words.resize(word_count, 0);
+            visited_map_work::record(growth);
+        }
+        self.bit_len = bit_len;
+        Ok(())
+    }
+
+    /// Restores the all-clear invariant after a walk over a table of
+    /// `bit_len` entries that set exactly the bits of `recorded`.
+    ///
+    /// Every set bit is then a recorded one, so zeroing the whole word that
+    /// holds a recorded bit is exact: its other set bits are recorded too. A
+    /// chain shorter than an eighth of the table's words is restored that
+    /// way, one store per recorded sector; any other chain, and every short
+    /// table, clears the table's words, which is cheaper there. A walk
+    /// therefore costs at most eight word writes per sector of its chain, and
+    /// never more than the table's words.
+    #[inline]
+    fn clear_walk(&mut self, recorded: &[u32], bit_len: usize) {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        if recorded.len().saturating_mul(CLEAR_BY_SECTOR_RATIO) < word_count {
+            for &sector in recorded {
+                if let Some(word) = usize::try_from(sector)
+                    .ok()
+                    .and_then(|index| self.words.get_mut(index / BITSET_WORD_BITS))
+                {
+                    *word = 0;
+                }
+            }
+            visited_map_work::record(recorded.len());
+        } else {
+            self.clear_table(bit_len);
+        }
+    }
+
+    /// Whether every bit of the map is clear: the invariant a reusable chain
+    /// map keeps between walks, which the walks assert in debug builds.
+    fn is_clear(&self) -> bool {
+        self.words.iter().all(|&word| word == 0)
+    }
+
+    /// Clears every word covering the first `bit_len` bits: the restoration
+    /// of a walk whose set bits are not all recorded, such as a failed one.
+    #[inline]
+    fn clear_table(&mut self, bit_len: usize) {
+        let word_count = bit_len.div_ceil(BITSET_WORD_BITS);
+        if let Some(words) = self.words.get_mut(..word_count) {
+            words.fill(0);
+            visited_map_work::record(word_count);
+        } else {
+            // A walk never sets a bit its table does not cover; clearing the
+            // whole map keeps the invariant without relying on that.
+            visited_map_work::record(self.words.len());
+            self.words.fill(0);
+        }
+    }
+}
+
+/// Accounting of the words a reusable chain map writes, which the tests read
+/// to bound the work per stream without timing it. Outside tests it compiles
+/// to nothing.
+#[cfg(test)]
+pub(crate) mod visited_map_work {
+    use std::cell::Cell;
+
+    thread_local! {
+        static WORDS: Cell<u64> = const { Cell::new(0) };
+    }
+
+    /// Adds `words` written words to this thread's count.
+    pub(crate) fn record(words: usize) {
+        WORDS.with(|count| {
+            count.set(
+                count
+                    .get()
+                    .saturating_add(u64::try_from(words).unwrap_or(u64::MAX)),
+            );
+        });
+    }
+
+    /// Returns this thread's count and resets it to zero.
+    pub(crate) fn take() -> u64 {
+        WORDS.with(|count| count.replace(0))
+    }
+}
+
+#[cfg(not(test))]
+mod visited_map_work {
+    #[inline(always)]
+    pub(super) fn record(_words: usize) {}
+}
 
 /// Raw OLE directory entry structure (128 bytes)
 ///
@@ -39,6 +262,177 @@ struct RawDirectoryEntry {
     stream_size: U64<LE>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum DirectoryNodeColor {
+    Red = 0,
+    Black = 1,
+}
+
+impl TryFrom<u8> for DirectoryNodeColor {
+    type Error = OleError;
+
+    fn try_from(value: u8) -> Result<Self, Self::Error> {
+        match value {
+            0 => Ok(Self::Red),
+            1 => Ok(Self::Black),
+            _ => Err(OleError::CorruptedFile(format!(
+                "invalid CFB directory node color {value}"
+            ))),
+        }
+    }
+}
+
+#[derive(Debug)]
+struct ValidatedDirectoryEntry {
+    sid: u32,
+    name: String,
+    name_data: DirectoryNameData,
+    entry_type: u8,
+    node_color: DirectoryNodeColor,
+    sid_left: u32,
+    sid_right: u32,
+    sid_child: u32,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum PhysicalSectorRole {
+    #[default]
+    Unclaimed,
+    Fat,
+    Difat,
+    Directory,
+    MiniFat,
+    MiniStream,
+    RegularStream,
+    RangeLock,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PendingPhysicalRange {
+    physical: u64,
+    output_start: usize,
+    length: usize,
+    sector: u32,
+}
+
+impl PhysicalSectorRole {
+    fn label(self) -> &'static str {
+        match self {
+            Self::Unclaimed => "unclaimed",
+            Self::Fat => "FAT",
+            Self::Difat => "DIFAT",
+            Self::Directory => "directory",
+            Self::MiniFat => "MiniFAT",
+            Self::MiniStream => "mini stream",
+            Self::RegularStream => "regular stream",
+            Self::RangeLock => "range lock",
+        }
+    }
+}
+
+#[cold]
+#[inline(never)]
+fn claim_sector_index_error(sector: u32, role: PhysicalSectorRole) -> OleError {
+    OleError::CorruptedFile(format!(
+        "{} sector {sector} does not fit usize",
+        role.label()
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn claim_sector_bounds_error(sector: u32, role: PhysicalSectorRole) -> OleError {
+    OleError::CorruptedFile(format!(
+        "{} sector {sector} is outside the file",
+        role.label()
+    ))
+}
+
+#[cold]
+#[inline(never)]
+fn claim_sector_conflict_error(
+    sector: u32,
+    existing: PhysicalSectorRole,
+    role: PhysicalSectorRole,
+) -> OleError {
+    OleError::CorruptedFile(format!(
+        "Sector {sector} is claimed by both {} and {}",
+        existing.label(),
+        role.label()
+    ))
+}
+
+/// Where the root mini stream ends, in mini sectors: the bound every byte of a
+/// mini stream must lie within.
+///
+/// The root entry's stream size is the size of the mini stream in bytes
+/// (MS-CFB 2.6.1), and MS-CFB does not require it to be a whole number of
+/// 64-byte mini sectors. A mini stream's bytes are the first `size` bytes of
+/// its chain's mini sectors (MS-CFB 2.7): all of each sector but the last,
+/// and the rest of the stream in its last. Each of those bytes must lie
+/// inside the mini stream. The unused tail of a stream's last sector holds
+/// none of them, so it may extend past the root size. That can happen only
+/// at the partial mini sector a root size that is not a multiple of 64 ends
+/// in, and only for the sector that ends a stream. A real producer writes
+/// exactly that: POI's `BlockSize512.zvi` ends its root mini stream at the
+/// last byte of the stream in its partial last mini sector.
+#[derive(Clone, Copy, Debug)]
+struct MiniStreamEnd {
+    /// Mini sectors wholly inside the mini stream.
+    full_sectors: usize,
+    /// Bytes of mini sector `full_sectors` inside the mini stream: zero when
+    /// the root size is a whole number of mini sectors.
+    partial_bytes: u64,
+    /// The mini sector size, nonzero.
+    mini_sector_size: u64,
+}
+
+impl MiniStreamEnd {
+    fn new(root_size: u64, mini_sector_size: usize) -> Result<Self, OleError> {
+        let mini_sector_size = u64::try_from(mini_sector_size)
+            .ok()
+            .filter(|&size| size > 0)
+            .ok_or_else(|| OleError::CorruptedFile("Invalid mini sector size".to_string()))?;
+        Ok(Self {
+            full_sectors: usize::try_from(root_size / mini_sector_size).map_err(|_err| {
+                OleError::CorruptedFile("Root mini stream is too large".to_string())
+            })?,
+            partial_bytes: root_size % mini_sector_size,
+            mini_sector_size,
+        })
+    }
+
+    /// Whether the root size ends inside a mini sector, which a capacity
+    /// rounded up to whole mini sectors counts whole.
+    #[inline]
+    fn has_partial_sector(self) -> bool {
+        self.partial_bytes != 0
+    }
+
+    /// Whether a mini stream of `size` bytes whose `chain` lies below the
+    /// rounded-up capacity takes only bytes inside the mini stream from the
+    /// partial mini sector.
+    ///
+    /// The chain may use that sector only as its last one, holding no more of
+    /// the stream than the root size covers; a chain that does not use it
+    /// qualifies. A validated chain holds each sector once.
+    #[cold]
+    fn admits_chain_end(self, chain: &[u32], size: u64) -> bool {
+        let Some(position) = chain.iter().position(|&sector| {
+            usize::try_from(sector).is_ok_and(|index| index == self.full_sectors)
+        }) else {
+            return true;
+        };
+        // The bytes of the stream in its last mini sector, 1 to 64.
+        let last_sector_bytes = size
+            .checked_sub(1)
+            .map(|bytes| bytes % self.mini_sector_size + 1);
+        position + 1 == chain.len()
+            && last_sector_bytes.is_some_and(|bytes| bytes <= self.partial_bytes)
+    }
+}
+
 /// Main OLE file parser structure
 ///
 /// This struct represents an OLE2 structured storage file and provides
@@ -59,14 +453,62 @@ pub struct OleFile<R: Read + Seek> {
     fat: Vec<u32>,
     /// Mini FAT - for streams smaller than cutoff size
     minifat: Vec<u32>,
+    /// Validated physical sectors of the root mini stream in logical order.
+    root_chain: Vec<u32>,
     /// First sector of directory stream
     first_dir_sector: u32,
     /// Root directory entry
     root: Option<DirectoryEntry>,
     /// All directory entries indexed by SID
     dir_entries: Vec<Option<DirectoryEntry>>,
+    /// Validated MS-CFB directory-name comparison data indexed by SID.
+    dir_name_data: Vec<Option<DirectoryNameData>>,
     /// Mini stream data (loaded on demand)
     ministream: Option<Vec<u8>>,
+    /// Exclusive ownership of every physical sector in the file.
+    sector_roles: Vec<PhysicalSectorRole>,
+    /// Chain buffers [`Self::open_stream`] reuses, so a read collects its
+    /// chain in time proportional to the chain rather than allocating and
+    /// clearing a map the size of the FAT or MiniFAT for every stream. Empty
+    /// until the first read, they then retain one bit per entry of the larger
+    /// table read and one `u32` per sector of the longest chain read: 1/128
+    /// (512-byte sectors) or 1/1024 (4096-byte sectors) of a FAT-chained
+    /// stream's bytes, and at most 64 for a validated mini stream's chain.
+    /// A read frees the chain (sector) buffer once its capacity exceeds
+    /// [`RETAINED_CHAIN_SCRATCH_BYTES`]. The visited map is deliberately kept
+    /// (freeing it would bring back a table-sized clear per read); its bound is
+    /// one bit per entry of the larger table read, i.e. 1/32 of that table's
+    /// memory, which can exceed [`RETAINED_CHAIN_SCRATCH_BYTES`] for very large
+    /// files (e.g. a v4 file over 32 GiB has more than 8.4M FAT entries).
+    stream_chain: EndChainScratch,
+    /// Every reference-compatible repair the open applied.
+    tolerance: ToleranceReport,
+    /// Whether some sibling tree violates the MS-CFB 2.6.4 name ordering,
+    /// so name lookups must scan instead of descending.
+    misordered_siblings: bool,
+}
+
+/// The validated, cursor-independent portion of an OLE file.
+///
+/// This stays crate-private so the positional reader can retain exactly the
+/// metadata validated by [`OleFile::open`] without exposing CFB physical
+/// sector identifiers as public API.
+pub(crate) struct ParsedOleIndex {
+    pub(crate) file_size: u64,
+    pub(crate) sector_size: usize,
+    pub(crate) mini_sector_size: usize,
+    pub(crate) fat: Vec<u32>,
+    pub(crate) minifat: Vec<u32>,
+    /// Validated physical sectors of the root mini stream in logical order.
+    pub(crate) root_chain: Vec<u32>,
+    pub(crate) first_dir_sector: u32,
+    pub(crate) root: Option<DirectoryEntry>,
+    pub(crate) dir_entries: Vec<Option<DirectoryEntry>>,
+    pub(crate) dir_name_data: Vec<Option<DirectoryNameData>>,
+    /// Every reference-compatible repair the open applied.
+    pub(crate) tolerance: ToleranceReport,
+    /// Whether name lookups must scan sibling trees.
+    pub(crate) misordered_siblings: bool,
 }
 
 /// Represents an OLE directory entry (stream or storage)
@@ -86,11 +528,19 @@ pub struct DirectoryEntry {
     pub sid_child: u32,
     /// CLSID of this entry
     pub clsid: String,
+    /// User-defined state bits from the CFB directory entry.
+    pub state_bits: u32,
+    /// Exact Windows FILETIME creation value stored in the directory entry.
+    /// Values are retained verbatim, including values emitted by legacy
+    /// producers that do not satisfy the stream-field recommendation.
+    pub creation_time: u64,
+    /// Exact Windows FILETIME modification value stored in the directory entry.
+    pub modified_time: u64,
     /// First sector of the stream
     pub start_sector: u32,
     /// Size of the stream in bytes
     pub size: u64,
-    /// Whether this stream is in MiniFAT
+    /// Whether this stream is in `MiniFAT`
     pub is_minifat: bool,
     /// Child entries (for storages)
     pub children: Vec<DirectoryEntry>,
@@ -100,16 +550,237 @@ pub struct DirectoryEntry {
 #[derive(Debug)]
 pub enum OleError {
     Io(io::Error),
+    /// A bounded writer could not reserve the memory required for `resource`.
+    Allocation {
+        resource: &'static str,
+        source: std::collections::TryReserveError,
+    },
+    /// The destination was replaced, but its parent directory could not be
+    /// synchronized, so durability of the new name is not known.
+    Committed {
+        source: io::Error,
+    },
+    /// The source or parsed CFB metadata exceeded a finite ingress limit.
+    LimitExceeded {
+        /// Resource whose configured ceiling was crossed.
+        resource: &'static str,
+        /// Observed source or metadata size.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A caller supplied a limit outside the CFB hard safety ceiling.
+    InvalidLimit {
+        /// Resource whose limit was invalid.
+        resource: &'static str,
+        /// Requested limit.
+        value: u64,
+        /// Largest supported limit.
+        maximum: u64,
+    },
     InvalidFormat(String),
     InvalidData(String),
     NotOleFile,
     CorruptedFile(String),
     StreamNotFound,
+    /// The positional source changed while a shared CFB view was opening or
+    /// reading a stream.
+    SourceChanged {
+        /// Version captured before the operation started.
+        expected: litchi_core::SourceVersion,
+        /// Version observed after the operation completed.
+        observed: litchi_core::SourceVersion,
+    },
+}
+
+/// Finite resource limits for the low-level CFB reader.
+///
+/// The input limit is checked immediately after obtaining the reader length and
+/// before the parser allocates its physical-sector map or traverses any CFB
+/// metadata. The directory limit is checked before the directory stream and
+/// derived directory-entry allocations. The allocation-table limit is checked
+/// from the header counts before the physical-sector map or FAT/DIFAT/MiniFAT
+/// tables are reserved. All defaults are deliberately finite and the shared
+/// reader carries the same policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct OleFileLimits {
+    max_input_bytes: u64,
+    max_directory_bytes: u64,
+    max_allocation_table_bytes: u64,
+}
+
+impl OleFileLimits {
+    /// Default source ceiling; larger version-4 files require explicit limits.
+    pub const DEFAULT_MAX_INPUT_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Largest source admitted by this reader's bounded input profile.
+    ///
+    /// This 32-GiB resource ceiling is deliberately below the format maximum.
+    /// Version-3 files remain limited to 2 GiB even with a larger input ceiling.
+    pub const MAX_INPUT_BYTES: u64 = 32 * 1024 * 1024 * 1024;
+    /// Default directory stream ceiling used by the low-level CFB reader.
+    pub const DEFAULT_MAX_DIRECTORY_BYTES: u64 = 64 * 1024 * 1024;
+    /// Largest directory stream ceiling accepted by the low-level CFB reader.
+    pub const MAX_DIRECTORY_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+    /// Default combined decoded FAT/DIFAT/MiniFAT table ceiling.
+    pub const DEFAULT_MAX_ALLOCATION_TABLE_BYTES: u64 = 64 * 1024 * 1024;
+    /// Largest combined decoded FAT/DIFAT/MiniFAT table ceiling accepted by
+    /// the low-level CFB reader.
+    pub const MAX_ALLOCATION_TABLE_BYTES: u64 = 2 * 1024 * 1024 * 1024;
+
+    /// Largest v4 artifact a checked writer plan can describe. This is kept
+    /// separate from the public ingress ceiling so ordinary untrusted input
+    /// remains bounded at 2 GiB while a writer validates its already checked
+    /// `MAXREGSECT` plan without imposing a hidden v3-sized cap on 4096-byte
+    /// output.
+    pub(crate) const MAX_WRITER_INPUT_BYTES: u64 =
+        (MAXREGSECT as u64 + 1) * (SECTOR_SIZE_V4 as u64);
+
+    /// Builds limits for a checked writer candidate. The writer has already
+    /// bounded its sector count and supplies the exact directory image size,
+    /// so validation may use the v4 representable bound and avoid the public
+    /// default's 64 MiB directory ceiling. The candidate's allocation tables
+    /// were built by the writer as well, so they are checked against the
+    /// reader's hard allocation-table ceiling rather than the public default.
+    pub(crate) fn for_writer(
+        max_input_bytes: u64,
+        max_directory_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_input_bytes == 0 || max_input_bytes > Self::MAX_WRITER_INPUT_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB writer candidate bytes",
+                value: max_input_bytes,
+                maximum: Self::MAX_WRITER_INPUT_BYTES,
+            });
+        }
+        if max_directory_bytes == 0 || max_directory_bytes > Self::MAX_WRITER_INPUT_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB writer candidate directory bytes",
+                value: max_directory_bytes,
+                maximum: Self::MAX_WRITER_INPUT_BYTES,
+            });
+        }
+        Ok(Self {
+            max_input_bytes,
+            max_directory_bytes,
+            max_allocation_table_bytes: Self::MAX_ALLOCATION_TABLE_BYTES,
+        })
+    }
+
+    /// Creates a finite input ceiling for one CFB source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// the low-level CFB hard ingress ceiling. Use the `with_max_*` methods to
+    /// select directory and allocation-table ceilings.
+    pub const fn new(max_input_bytes: u64) -> Result<Self, OleError> {
+        if max_input_bytes == 0 || max_input_bytes > Self::MAX_INPUT_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB input bytes",
+                value: max_input_bytes,
+                maximum: Self::MAX_INPUT_BYTES,
+            });
+        }
+        Ok(Self {
+            max_input_bytes,
+            max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
+        })
+    }
+
+    /// Maximum source length accepted before parsing begins.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+
+    /// Selects the maximum padded directory-stream size accepted while
+    /// parsing one CFB source.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// [`Self::MAX_DIRECTORY_BYTES`].
+    pub const fn with_max_directory_bytes(
+        mut self,
+        max_directory_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_directory_bytes == 0 || max_directory_bytes > Self::MAX_DIRECTORY_BYTES {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB directory bytes",
+                value: max_directory_bytes,
+                maximum: Self::MAX_DIRECTORY_BYTES,
+            });
+        }
+        self.max_directory_bytes = max_directory_bytes;
+        Ok(self)
+    }
+
+    /// Maximum padded directory-stream size accepted during parsing.
+    #[must_use]
+    pub const fn max_directory_bytes(self) -> u64 {
+        self.max_directory_bytes
+    }
+
+    /// Selects the combined decoded FAT/DIFAT/MiniFAT table ceiling accepted
+    /// while parsing one CFB source.
+    ///
+    /// The observed value includes the declared FAT, DIFAT, and MiniFAT
+    /// sector bytes plus the `u32` location vectors used for those sectors.
+    /// It excludes the directory stream, physical-sector role map, chain
+    /// scratch, source bytes, and total process memory.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::InvalidLimit`] if the ceiling is zero or exceeds
+    /// [`Self::MAX_ALLOCATION_TABLE_BYTES`].
+    pub const fn with_max_allocation_table_bytes(
+        mut self,
+        max_allocation_table_bytes: u64,
+    ) -> Result<Self, OleError> {
+        if max_allocation_table_bytes == 0
+            || max_allocation_table_bytes > Self::MAX_ALLOCATION_TABLE_BYTES
+        {
+            return Err(OleError::InvalidLimit {
+                resource: "CFB allocation table bytes",
+                value: max_allocation_table_bytes,
+                maximum: Self::MAX_ALLOCATION_TABLE_BYTES,
+            });
+        }
+        self.max_allocation_table_bytes = max_allocation_table_bytes;
+        Ok(self)
+    }
+
+    /// Maximum combined decoded FAT/DIFAT/MiniFAT table bytes accepted during
+    /// parsing.
+    #[must_use]
+    pub const fn max_allocation_table_bytes(self) -> u64 {
+        self.max_allocation_table_bytes
+    }
+}
+
+impl Default for OleFileLimits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
+            max_directory_bytes: Self::DEFAULT_MAX_DIRECTORY_BYTES,
+            max_allocation_table_bytes: Self::DEFAULT_MAX_ALLOCATION_TABLE_BYTES,
+        }
+    }
 }
 
 impl From<io::Error> for OleError {
     fn from(err: io::Error) -> Self {
         OleError::Io(err)
+    }
+}
+
+impl OleError {
+    pub(crate) fn allocation(
+        resource: &'static str,
+        source: std::collections::TryReserveError,
+    ) -> Self {
+        Self::Allocation { resource, source }
     }
 }
 
@@ -122,17 +793,59 @@ impl From<litchi_core::binary::BinaryError> for OleError {
 impl std::fmt::Display for OleError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            OleError::Io(e) => write!(f, "IO error: {}", e),
-            OleError::InvalidFormat(s) => write!(f, "Invalid format: {}", s),
-            OleError::InvalidData(s) => write!(f, "Invalid data: {}", s),
+            OleError::Io(e) => write!(f, "IO error: {e}"),
+            OleError::Allocation { resource, source } => {
+                write!(f, "could not reserve memory for CFB {resource}: {source}")
+            },
+            OleError::Committed { source } => write!(
+                f,
+                "CFB destination was replaced but directory durability could not be confirmed: {source}"
+            ),
+            OleError::LimitExceeded {
+                resource,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "CFB {resource} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            OleError::InvalidLimit {
+                resource,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid CFB {resource} limit {value}; maximum is {maximum}"
+            ),
+            OleError::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
+            OleError::InvalidData(s) => write!(f, "Invalid data: {s}"),
             OleError::NotOleFile => write!(f, "Not an OLE file"),
-            OleError::CorruptedFile(s) => write!(f, "Corrupted file: {}", s),
+            OleError::CorruptedFile(s) => write!(f, "Corrupted file: {s}"),
             OleError::StreamNotFound => write!(f, "Stream not found"),
+            OleError::SourceChanged { expected, observed } => write!(
+                f,
+                "CFB positional source changed during read (expected {expected:?}, observed {observed:?})"
+            ),
         }
     }
 }
 
-impl std::error::Error for OleError {}
+impl std::error::Error for OleError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(source) | Self::Committed { source } => Some(source),
+            Self::Allocation { source, .. } => Some(source),
+            Self::InvalidFormat(_)
+            | Self::InvalidData(_)
+            | Self::LimitExceeded { .. }
+            | Self::InvalidLimit { .. }
+            | Self::NotOleFile
+            | Self::CorruptedFile(_)
+            | Self::StreamNotFound
+            | Self::SourceChanged { .. } => None,
+        }
+    }
+}
 
 // Convert CFB-substrate errors into the unified `litchi_core::Error`.
 //
@@ -144,28 +857,203 @@ impl From<OleError> for litchi_core::Error {
     fn from(err: OleError) -> Self {
         match err {
             OleError::Io(e) => litchi_core::Error::Io(e),
-            OleError::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
-            OleError::InvalidData(s) => litchi_core::Error::InvalidFormat(s),
+            OleError::Allocation { resource, source } => {
+                litchi_core::Error::Allocation { resource, source }
+            },
+            OleError::Committed { source } => litchi_core::Error::Committed(source),
+            OleError::LimitExceeded {
+                resource,
+                observed,
+                maximum,
+            } => litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed,
+                limit: maximum,
+                scope: resource.into(),
+            }),
+            error @ OleError::InvalidLimit { .. } => {
+                litchi_core::Error::InvalidFormat(error.to_string())
+            },
+            OleError::InvalidFormat(s) | OleError::InvalidData(s) => {
+                litchi_core::Error::InvalidFormat(s)
+            },
             OleError::NotOleFile => litchi_core::Error::NotOfficeFile,
             OleError::CorruptedFile(s) => litchi_core::Error::CorruptedFile(s),
             OleError::StreamNotFound => {
                 litchi_core::Error::ComponentNotFound("Stream not found".to_string())
             },
+            error @ OleError::SourceChanged { .. } => litchi_core::Error::Other(error.to_string()),
         }
     }
 }
 
 impl<R: Read + Seek> OleFile<R> {
-    /// Open and parse an OLE file from a reader
+    /// Borrows the reader retained by this parsed CFB view.
+    ///
+    /// The reader is the source used for the bounded parse. Callers that need
+    /// to retain source bytes should do so only after completing their own
+    /// validation of the parsed view.
+    #[must_use]
+    pub fn get_ref(&self) -> &R {
+        &self.reader
+    }
+
+    /// Consumes this parsed CFB view and returns its reader.
+    ///
+    /// Parsed index state is discarded. This is useful when an owner has
+    /// completed validation and wants to retain the original reader without
+    /// copying it.
+    pub fn into_inner(self) -> R {
+        self.reader
+    }
+
+    /// Copy the complete validated source artifact to a sequential sink.
+    ///
+    /// The parsed CFB view retains ownership of its original reader.  This
+    /// method publishes that source byte-for-byte, including directory
+    /// metadata, sector slack, and streams unknown to a higher-level format
+    /// owner.  The reader position is restored after the copy succeeds or
+    /// fails, so publication does not change subsequent stream reads.
+    ///
+    /// The caller must keep the reader content stable. Extent checks detect
+    /// growth and truncation, but a generic `Read + Seek` reader cannot expose
+    /// a revision token for same-length external changes.
+    pub fn copy_source_to<W: Write>(&mut self, mut writer: W) -> Result<(), OleError> {
+        let position = self.reader.stream_position()?;
+        let observed_size = match self.reader.seek(SeekFrom::End(0)) {
+            Ok(size) => size,
+            Err(error) => {
+                let _ = self.reader.seek(SeekFrom::Start(position));
+                return Err(error.into());
+            },
+        };
+        if observed_size != self.file_size {
+            let _ = self.reader.seek(SeekFrom::Start(position));
+            return Err(OleError::InvalidData(format!(
+                "CFB source length changed from {} to {observed_size}",
+                self.file_size
+            )));
+        }
+        if let Err(error) = self.reader.seek(SeekFrom::Start(0)) {
+            let _ = self.reader.seek(SeekFrom::Start(position));
+            return Err(error.into());
+        }
+
+        let mut remaining = self.file_size;
+        let mut buffer = [0u8; 64 * 1024];
+        let result = (|| {
+            while remaining != 0 {
+                let count = usize::try_from(remaining)
+                    .unwrap_or(buffer.len())
+                    .min(buffer.len());
+                self.reader.read_exact(&mut buffer[..count])?;
+                writer.write_all(&buffer[..count])?;
+                remaining -= count as u64;
+            }
+            Ok::<(), io::Error>(())
+        })();
+
+        let observed_after = self.reader.seek(SeekFrom::End(0));
+        let restore = self.reader.seek(SeekFrom::Start(position));
+        match result {
+            Err(error) => {
+                let _ = restore;
+                Err(error.into())
+            },
+            Ok(()) => {
+                let observed_after = observed_after?;
+                restore?;
+                if observed_after != self.file_size {
+                    return Err(OleError::InvalidData(format!(
+                        "CFB source length changed from {} to {observed_after}",
+                        self.file_size
+                    )));
+                }
+                Ok(())
+            },
+        }
+    }
+
+    /// Publish the complete validated source artifact through a sibling
+    /// temporary file and atomic replacement.
+    ///
+    /// This preserves the source bytes exactly, including opaque CFB content
+    /// unknown to a higher-level format owner, while sharing the CFB writer's
+    /// platform-aware replacement, cleanup, and durability behavior.
+    pub fn save_source_with_durability<P: AsRef<Path>>(
+        &mut self,
+        path: P,
+        durability: Durability,
+    ) -> Result<(), OleError> {
+        let mut steps = SystemSteps;
+        publish_staged(
+            path.as_ref(),
+            durability,
+            TemporaryIdentity::Unchecked,
+            &mut steps,
+            |staging| self.copy_source_to(staging),
+            |_staged_file, ()| Ok(()),
+        )
+        .map_err(|failure| match failure {
+            PublishFailure::Create(error) | PublishFailure::Caller(error) => error,
+            PublishFailure::Flush { source, .. }
+            | PublishFailure::SyncFile { source, .. }
+            | PublishFailure::Identity { source, .. }
+            | PublishFailure::Replace { source, .. } => OleError::Io(source),
+            PublishFailure::Committed { source, .. } => OleError::Committed { source },
+        })
+    }
+
+    /// Discard the cursor and validation-only state, retaining the parsed CFB
+    /// index for the crate's immutable positional reader.
+    pub(crate) fn into_parsed_index(self) -> ParsedOleIndex {
+        self.into_reader_and_parsed_index().1
+    }
+
+    /// Splits this parsed view into its reader and the cursor-independent
+    /// index, discarding only validation and read scratch state.
+    pub(crate) fn into_reader_and_parsed_index(self) -> (R, ParsedOleIndex) {
+        let index = ParsedOleIndex {
+            file_size: self.file_size,
+            sector_size: self.sector_size,
+            mini_sector_size: self.mini_sector_size,
+            fat: self.fat,
+            minifat: self.minifat,
+            root_chain: self.root_chain,
+            first_dir_sector: self.first_dir_sector,
+            root: self.root,
+            dir_entries: self.dir_entries,
+            dir_name_data: self.dir_name_data,
+            tolerance: self.tolerance,
+            misordered_siblings: self.misordered_siblings,
+        };
+        (self.reader, index)
+    }
+
+    /// Open and parse an OLE file from a reader under explicit finite limits.
     ///
     /// # Arguments
     /// * `reader` - A reader that implements Read + Seek
+    /// * `limits` - Finite physical CFB bounds selected by the caller
     ///
     /// # Returns
     /// * `Result<OleFile<R>, OleError>` - The parsed OLE file or an error
-    pub fn open(mut reader: R) -> Result<Self, OleError> {
+    ///
+    /// # Errors
+    /// Returns an `OleError` if the reader fails, or if the data is not a
+    /// valid OLE compound file (bad magic, truncated header, corrupt FAT).
+    /// The source length is checked immediately after the reader reports it,
+    /// before any CFB metadata can cause an allocation or index traversal.
+    pub fn open(mut reader: R, limits: OleFileLimits) -> Result<Self, OleError> {
         // Get file size
         let file_size = reader.seek(SeekFrom::End(0))?;
+        if file_size > limits.max_input_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "input bytes",
+                observed: file_size,
+                maximum: limits.max_input_bytes(),
+            });
+        }
         reader.seek(SeekFrom::Start(0))?;
 
         // Check minimum size
@@ -183,50 +1071,163 @@ impl<R: Read + Seek> OleFile<R> {
         }
 
         // Parse header fields (little-endian)
-        let dll_version = U16::<LE>::read_from_bytes(&header[0x1A..0x1C])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let byte_order = U16::<LE>::read_from_bytes(&header[0x1C..0x1E])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let sector_shift = U16::<LE>::read_from_bytes(&header[0x1E..0x20])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let mini_sector_shift = U16::<LE>::read_from_bytes(&header[0x20..0x22])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let first_dir_sector = U32::<LE>::read_from_bytes(&header[0x30..0x34])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let mini_stream_cutoff = U32::<LE>::read_from_bytes(&header[0x38..0x3C])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let first_minifat_sector = U32::<LE>::read_from_bytes(&header[0x3C..0x40])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let num_minifat_sectors = U32::<LE>::read_from_bytes(&header[0x40..0x44])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let first_difat_sector = U32::<LE>::read_from_bytes(&header[0x44..0x48])
-            .map(|v| v.get())
-            .unwrap_or(0);
-        let num_difat_sectors = U32::<LE>::read_from_bytes(&header[0x48..0x4C])
-            .map(|v| v.get())
-            .unwrap_or(0);
+        let dll_version = read_u16_le(&header[0x1A..0x1C], "DLL version")?;
+        let byte_order = read_u16_le(&header[0x1C..0x1E], "byte order")?;
+        let sector_shift = read_u16_le(&header[0x1E..0x20], "sector shift")?;
+        let mini_sector_shift = read_u16_le(&header[0x20..0x22], "mini sector shift")?;
+        let num_dir_sectors = read_u32_le(&header[0x28..0x2C], "directory sector count")?;
+        let first_dir_sector = read_u32_le(&header[0x30..0x34], "directory start sector")?;
+        let num_fat_sectors = read_u32_le(&header[0x2C..0x30], "FAT sector count")?;
+        let mini_stream_cutoff = read_u32_le(&header[0x38..0x3C], "mini-stream cutoff")?;
+        let first_minifat_sector = read_u32_le(&header[0x3C..0x40], "MiniFAT start sector")?;
+        let num_minifat_sectors = read_u32_le(&header[0x40..0x44], "MiniFAT sector count")?;
+        let first_difat_sector = read_u32_le(&header[0x44..0x48], "DIFAT start sector")?;
+        let num_difat_sectors = read_u32_le(&header[0x48..0x4C], "DIFAT sector count")?;
 
         // Validate byte order (must be little-endian)
         if byte_order != 0xFFFE {
             return Err(OleError::InvalidFormat("Invalid byte order".to_string()));
         }
+        // MS-CFB 2.2 asks producers to zero these six bytes; they carry no
+        // semantics and POI, LibreOffice, and ole32 never read them. Ignore
+        // and record.
+        let reserved_header_bytes = header[0x22..0x28] != [0; 6];
 
-        // Calculate sector sizes
+        // Validate shifts before using them. Untrusted shift counts must never reach `<<`.
+        let expected_sector_shift = match dll_version {
+            3 => 9,
+            4 => 12,
+            _ => {
+                return Err(OleError::InvalidFormat(format!(
+                    "Unsupported CFB major version {dll_version}"
+                )));
+            },
+        };
+        // A larger caller budget admits v4 sources, but cannot relax the
+        // version-3 compatibility limit in MS-CFB 2.9. Check before indexing.
+        if dll_version == 3 && file_size > TWO_GIB_BYTES {
+            return Err(OleError::InvalidFormat(
+                "Version 3 CFB input cannot exceed 2 GiB".to_string(),
+            ));
+        }
+        if sector_shift != expected_sector_shift {
+            return Err(OleError::InvalidFormat(format!(
+                "Invalid sector shift {sector_shift} for CFB version {dll_version}"
+            )));
+        }
+        if (dll_version == 3 && num_dir_sectors != 0) || (dll_version == 4 && num_dir_sectors == 0)
+        {
+            return Err(OleError::InvalidFormat(format!(
+                "Invalid directory-sector count {num_dir_sectors} for CFB version {dll_version}"
+            )));
+        }
+        if mini_sector_shift != 6 {
+            return Err(OleError::InvalidFormat(format!(
+                "Invalid mini sector shift {mini_sector_shift}"
+            )));
+        }
+        if mini_stream_cutoff != 4096 {
+            return Err(OleError::InvalidFormat(format!(
+                "Invalid mini stream cutoff {mini_stream_cutoff}"
+            )));
+        }
         let sector_size = 1usize << sector_shift;
         let mini_sector_size = 1usize << mini_sector_shift;
-
-        // Validate sector size matches DLL version
-        if (dll_version == 3 && sector_size != 512) || (dll_version == 4 && sector_size != 4096) {
-            return Err(OleError::InvalidFormat("Sector size mismatch".to_string()));
+        if file_size < sector_size as u64 {
+            return Err(OleError::InvalidFormat(
+                "File is smaller than its CFB header sector".to_string(),
+            ));
         }
+        // MS-CFB does not require the file length to be a whole number of
+        // sectors, and real documents are routinely stored truncated at the end
+        // of their last used sector. A short final sector is therefore accepted
+        // and reads as zeroes past the end of the file; a sector that starts at
+        // or beyond the end is still rejected.
+        // MS-CFB 2.2 defines each table's start sector and count separately.
+        // The count is authoritative: with a zero count
+        // the start is ignored, as POI (`HeaderBlock`) never reads it and
+        // zero-initializing writers store 0 there; a MiniFAT with a nonzero
+        // count but a special start marker (ENDOFCHAIN or FREESECT, which
+        // LibreOffice accepts as known specials) is read as absent. Both are
+        // recorded below. A DIFAT with a nonzero count and no start sector
+        // still fails: its FAT sector locations would be missing.
+        let mut header_repairs: SmallVec<[(HeaderDefect, u32); 2]> = SmallVec::new();
+        let (first_minifat_sector, num_minifat_sectors) = if num_minifat_sectors == 0 {
+            if first_minifat_sector != ENDOFCHAIN {
+                header_repairs.push((HeaderDefect::MiniFatStartCount, first_minifat_sector));
+            }
+            (ENDOFCHAIN, 0)
+        } else if matches!(first_minifat_sector, ENDOFCHAIN | FREESECT) {
+            header_repairs.push((HeaderDefect::MiniFatStartCount, first_minifat_sector));
+            (ENDOFCHAIN, 0)
+        } else {
+            (first_minifat_sector, num_minifat_sectors)
+        };
+        let first_difat_sector = if num_difat_sectors == 0 && first_difat_sector != ENDOFCHAIN {
+            header_repairs.push((HeaderDefect::DifatStartCount, first_difat_sector));
+            ENDOFCHAIN
+        } else {
+            first_difat_sector
+        };
+        if num_difat_sectors != 0 && first_difat_sector == ENDOFCHAIN {
+            return Err(OleError::InvalidFormat(
+                "DIFAT start sector and sector count disagree".to_string(),
+            ));
+        }
+        if first_dir_sector >= MAXREGSECT {
+            return Err(OleError::InvalidFormat(
+                "Directory starts at an invalid sector".to_string(),
+            ));
+        }
+        // Every sector that starts before the end of the file is physical,
+        // including a short final one; see the file-length note above.
+        let physical_sector_count = usize::try_from((file_size - 1) / sector_size as u64)
+            .map_err(|_err| OleError::InvalidFormat("Too many physical sectors".to_string()))?;
+
+        // Validate all count metadata that can otherwise size an allocation or
+        // traversal before installing the physical-sector index. The checks
+        // remain duplicated in the table loaders as defense in depth for
+        // crate-private future callers.
+        let physical_sector_count_u64 = u64::try_from(physical_sector_count)
+            .map_err(|_err| OleError::InvalidFormat("Too many physical sectors".to_string()))?;
+        if u64::from(num_fat_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared FAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        if u64::from(num_difat_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared DIFAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        if u64::from(num_minifat_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared MiniFAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        if dll_version == 4 && u64::from(num_dir_sectors) > physical_sector_count_u64 {
+            return Err(OleError::CorruptedFile(
+                "Declared directory sector count exceeds the physical file".to_string(),
+            ));
+        }
+        let allocation_table_bytes = checked_allocation_table_bytes(
+            sector_size,
+            num_fat_sectors,
+            num_difat_sectors,
+            num_minifat_sectors,
+        )?;
+        if allocation_table_bytes > limits.max_allocation_table_bytes() {
+            return Err(OleError::LimitExceeded {
+                resource: "allocation table bytes",
+                observed: allocation_table_bytes,
+                maximum: limits.max_allocation_table_bytes(),
+            });
+        }
+        let sector_roles = try_filled_vec(
+            physical_sector_count,
+            PhysicalSectorRole::Unclaimed,
+            "physical sector roles",
+        )?;
 
         let mut ole = OleFile {
             reader,
@@ -236,28 +1237,84 @@ impl<R: Read + Seek> OleFile<R> {
             mini_stream_cutoff,
             fat: Vec::new(),
             minifat: Vec::new(),
+            root_chain: Vec::new(),
             first_dir_sector,
             root: None,
             dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
             ministream: None,
+            sector_roles,
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
         };
+        if reserved_header_bytes {
+            ole.tolerance.record(HeaderDefect::ReservedBytes, 0);
+        }
+        for (defect, start) in header_repairs {
+            ole.tolerance.record(defect, start);
+        }
 
         // Load FAT (File Allocation Table)
-        ole.load_fat(&header, first_difat_sector, num_difat_sectors)?;
+        ole.load_fat(
+            &header,
+            num_fat_sectors,
+            first_difat_sector,
+            num_difat_sectors,
+        )?;
+        ole.validate_range_lock_sector(first_dir_sector, first_minifat_sector, first_difat_sector)?;
 
         // Load directory
-        ole.load_directory()?;
+        ole.load_directory(
+            (dll_version == 4).then_some(num_dir_sectors),
+            limits.max_directory_bytes(),
+        )?;
 
         // Load MiniFAT if needed
         if num_minifat_sectors > 0 {
-            ole.load_minifat(first_minifat_sector)?;
+            ole.load_minifat(first_minifat_sector, num_minifat_sectors)?;
         }
+        ole.validate_stream_allocations()?;
+        ole.validate_physical_sector_layout()?;
 
         Ok(ole)
     }
 
     pub fn file_size(&self) -> u64 {
         self.file_size
+    }
+
+    /// Refuses a file whose open needed any repair.
+    ///
+    /// Writers use this on their own output: a structure the crate generated
+    /// must be conformant, so a default read repair there is a writer defect
+    /// rather than a producer quirk to tolerate.
+    pub(crate) fn require_conformant(&self) -> Result<(), OleError> {
+        match self.tolerance.defects().first() {
+            None if self.tolerance.is_clean() => Ok(()),
+            first => Err(OleError::CorruptedFile(format!(
+                "CFB output is not conformant: {} repair(s) needed{}",
+                self.tolerance.total(),
+                first.map_or_else(String::new, |tolerated| format!(
+                    ", first {:?} at {}",
+                    tolerated.defect, tolerated.context
+                )),
+            ))),
+        }
+    }
+
+    /// Every reference-compatible repair applied while opening this file.
+    ///
+    /// The report is empty for a conformant file. See [`crate::leniency`]
+    /// for the repairs it can list and how format crates merge it.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Sector size used by this compound file.
+    pub fn sector_size(&self) -> usize {
+        self.sector_size
     }
 
     /// Load the File Allocation Table (FAT)
@@ -268,142 +1325,970 @@ impl<R: Read + Seek> OleFile<R> {
     fn load_fat(
         &mut self,
         header: &[u8; 512],
+        num_fat_sectors: u32,
         first_difat_sector: u32,
         num_difat_sectors: u32,
     ) -> Result<(), OleError> {
-        // First 109 FAT sector indexes are in header at offset 0x4C
-        let mut fat_sectors = Vec::new();
-        for i in 0..109 {
-            let offset = 0x4C + i * 4;
-            if offset + 4 > 512 {
-                break;
-            }
-            let sector = U32::<LE>::read_from_bytes(&header[offset..offset + 4])
-                .map(|v| v.get())
-                .unwrap_or(0);
-            if sector == FREESECT || sector == ENDOFCHAIN {
-                break;
-            }
-            fat_sectors.push(sector);
+        let physical_sector_count = u64::try_from(self.sector_roles.len())
+            .map_err(|_err| OleError::CorruptedFile("Too many physical sectors".to_string()))?;
+        if u64::from(num_fat_sectors) > physical_sector_count {
+            return Err(OleError::CorruptedFile(
+                "Declared FAT sector count exceeds the physical file".to_string(),
+            ));
         }
+        if u64::from(num_difat_sectors) > physical_sector_count {
+            return Err(OleError::CorruptedFile(
+                "Declared DIFAT sector count exceeds the physical file".to_string(),
+            ));
+        }
+        let expected_fat_sectors = usize::try_from(num_fat_sectors)
+            .map_err(|_err| OleError::CorruptedFile("FAT sector count is too large".to_string()))?;
+        let expected_difat_sectors = usize::try_from(num_difat_sectors).map_err(|_err| {
+            OleError::CorruptedFile("DIFAT sector count is too large".to_string())
+        })?;
 
-        // Load additional FAT sectors from DIFAT if needed
-        if num_difat_sectors > 0 {
-            let mut difat_sector = first_difat_sector;
-            let entries_per_sector = (self.sector_size / 4) - 1; // -1 for next DIFAT pointer
+        // First 109 FAT sector indexes are in header at offset 0x4C
+        let mut fat_sectors = try_vec_with_capacity(expected_fat_sectors, "FAT sector locations")?;
+        let mut difat_sectors =
+            try_vec_with_capacity(expected_difat_sectors, "DIFAT sector locations")?;
+        let header_fat_count = HEADER_DIFAT_ENTRIES.min(expected_fat_sectors);
+        for i in 0..header_fat_count {
+            let offset = HEADER_DIFAT_OFFSET + i * 4;
+            let sector = read_u32_le(&header[offset..offset + 4], "header DIFAT entry")?;
+            if sector == FREESECT || sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "FAT sector list ends before its declared count".to_string(),
+                ));
+            }
+            self.claim_sector(sector, PhysicalSectorRole::Fat)?;
+            try_push(&mut fat_sectors, sector, "FAT sector locations")?;
+        }
+        // Entries past the declared FAT sector count are not part of the FAT
+        // sector list. MS-CFB 2.2 describes the header DIFAT only as holding
+        // "the first 109 FAT sector locations" and never constrains the unused
+        // tail, so writers leave zeroes or stale values there. The count field
+        // already says where the list ends, and the FAT chain validation below
+        // catches a count that disagrees with the file, so the tail is ignored.
 
-            for _ in 0..num_difat_sectors {
-                let sector_data = self.read_sector(difat_sector)?;
+        // CFB sector sizes are fixed to 512 or 4096 bytes. Reuse one bounded
+        // stack buffer while decoding metadata, rather than allocating a new
+        // `Vec` for each DIFAT/FAT sector.
+        let mut sector_data = [0u8; SECTOR_SIZE_V4];
+        let sector_data = &mut sector_data[..self.sector_size];
 
-                // Read FAT sector indexes from DIFAT sector
-                for i in 0..entries_per_sector {
-                    let offset = i * 4;
-                    let sector = U32::<LE>::read_from_bytes(&sector_data[offset..offset + 4])
-                        .map(|v| v.get())
-                        .unwrap_or(0);
-                    if sector == FREESECT || sector == ENDOFCHAIN {
-                        break;
+        let mut difat_sector = first_difat_sector;
+        let entries_per_sector = (self.sector_size / 4) - 1;
+        for difat_index in 0..expected_difat_sectors {
+            self.claim_sector(difat_sector, PhysicalSectorRole::Difat)?;
+            try_push(&mut difat_sectors, difat_sector, "DIFAT sector locations")?;
+            self.read_sector_into(difat_sector, sector_data)?;
+
+            for i in 0..entries_per_sector {
+                let offset = i * 4;
+                let sector = read_u32_le(&sector_data[offset..offset + 4], "DIFAT entry")?;
+                if fat_sectors.len() < expected_fat_sectors {
+                    if sector >= MAXREGSECT {
+                        return Err(OleError::CorruptedFile(
+                            "DIFAT sector list ends before the declared FAT count".to_string(),
+                        ));
                     }
-                    fat_sectors.push(sector);
-                }
-
-                // Get next DIFAT sector
-                let next_offset = entries_per_sector * 4;
-                difat_sector =
-                    U32::<LE>::read_from_bytes(&sector_data[next_offset..next_offset + 4])
-                        .map(|v| v.get())
-                        .unwrap_or(0);
-
-                if difat_sector == ENDOFCHAIN || difat_sector == FREESECT {
-                    break;
+                    self.claim_sector(sector, PhysicalSectorRole::Fat)?;
+                    try_push(&mut fat_sectors, sector, "FAT sector locations")?;
+                } else if sector != FREESECT {
+                    return Err(OleError::CorruptedFile(
+                        "Unused DIFAT entries must be FREESECT".to_string(),
+                    ));
                 }
             }
+
+            let next_offset = entries_per_sector * 4;
+            let next = read_u32_le(
+                &sector_data[next_offset..next_offset + 4],
+                "DIFAT continuation entry",
+            )?;
+            if difat_index + 1 == expected_difat_sectors {
+                // The declared count already ends the chain; a FREESECT link
+                // there is never followed (olefile accepts it too).
+                if next == FREESECT {
+                    self.tolerance
+                        .record(AllocationDefect::DifatChainEnd, difat_sector);
+                } else if next != ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "DIFAT chain exceeds its declared length".to_string(),
+                    ));
+                }
+            } else if next >= MAXREGSECT {
+                return Err(OleError::CorruptedFile(
+                    "DIFAT chain ends before its declared length".to_string(),
+                ));
+            }
+            difat_sector = next;
+        }
+        if fat_sectors.len() != expected_fat_sectors {
+            return Err(OleError::CorruptedFile(format!(
+                "Expected {expected_fat_sectors} FAT sectors, found {}",
+                fat_sectors.len()
+            )));
         }
 
         // Now read all FAT sectors and build the FAT table
-        let entries_per_sector = self.sector_size / 4;
+        let fat_entries_per_sector = self.sector_size / 4;
 
         // Pre-allocate with exact capacity needed (optimization)
-        self.fat = Vec::with_capacity(fat_sectors.len() * entries_per_sector);
+        let fat_entry_count = fat_sectors
+            .len()
+            .checked_mul(fat_entries_per_sector)
+            .ok_or_else(|| OleError::CorruptedFile("FAT entry count overflow".to_string()))?;
+        let mut fat = try_vec_with_capacity(fat_entry_count, "FAT entries")?;
 
-        for &sector_id in &fat_sectors {
-            let sector_data = self.read_sector(sector_id)?;
+        // Read the FAT one physically contiguous run at a time, through a
+        // scratch buffer bounded by `SECTOR_BATCH_SCRATCH_BYTES`. FAT sectors
+        // are named by the DIFAT rather than chained, so a run's whole extent
+        // is known before it is read and needs only one seek and one read. The
+        // entries are parsed straight out of the scratch into the final table,
+        // so no aggregate byte buffer the size of the FAT is ever held.
+        let mut scratch = self.sector_batch_scratch(&fat_sectors, "FAT sector batch buffer")?;
+        let mut pending = fat_sectors.as_slice();
+        while !pending.is_empty() {
+            let run_sectors = self.read_sector_run_into(pending, &mut scratch)?;
+            let span = run_sectors.get() * self.sector_size;
 
-            // Parse sector as array of u32 (little-endian) - use chunks for efficiency
-            for chunk in sector_data.chunks_exact(4) {
-                let entry = U32::<LE>::read_from_bytes(chunk)
-                    .map(|v| v.get())
-                    .unwrap_or(0);
-                self.fat.push(entry);
+            // Every chunk is a complete entry, and the exact fallible
+            // reservation covers this run's entire extension.
+            fat.extend(
+                scratch[..span]
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .copied()
+                    .map(u32::from_le_bytes),
+            );
+            pending = pending.get(run_sectors.get()..).unwrap_or_default();
+        }
+
+        for sector in fat_sectors {
+            let sector_index = usize::try_from(sector).map_err(|_err| {
+                OleError::CorruptedFile("FAT sector index does not fit usize".to_string())
+            })?;
+            if fat.get(sector_index) != Some(&FATSECT) {
+                return Err(OleError::CorruptedFile(format!(
+                    "FAT sector {sector} is not marked FATSECT"
+                )));
             }
         }
+        for sector in difat_sectors {
+            let sector_index = usize::try_from(sector).map_err(|_err| {
+                OleError::CorruptedFile("DIFAT sector index does not fit usize".to_string())
+            })?;
+            if fat.get(sector_index) != Some(&DIFSECT) {
+                return Err(OleError::CorruptedFile(format!(
+                    "DIFAT sector {sector} is not marked DIFSECT"
+                )));
+            }
+        }
+
+        self.fat = fat;
 
         Ok(())
     }
 
-    /// Load the Mini FAT (for small streams)
-    fn load_minifat(&mut self, first_minifat_sector: u32) -> Result<(), OleError> {
-        // Read the MiniFAT stream using the FAT
-        let minifat_data = self.read_stream_from_fat(first_minifat_sector)?;
-
-        // Parse as array of u32 (little-endian) - use chunks for efficiency
-        let entries_count = minifat_data.len() / 4;
-        self.minifat = Vec::with_capacity(entries_count);
-
-        for chunk in minifat_data.chunks_exact(4) {
-            let entry = U32::<LE>::read_from_bytes(chunk)
-                .map_err(|_| OleError::InvalidFormat("Failed to read u32".to_string()))?;
-            self.minifat.push(entry.get());
+    /// Validate the fixed version-4 range-lock sector before any directory
+    /// or stream chain is traversed.  Reserving its physical role up front
+    /// prevents a later chain loader from silently treating the lock bytes as
+    /// user data.
+    fn validate_range_lock_sector(
+        &mut self,
+        first_dir_sector: u32,
+        first_minifat_sector: u32,
+        first_difat_sector: u32,
+    ) -> Result<(), OleError> {
+        if self.sector_size != SECTOR_SIZE_V4 {
+            return Ok(());
         }
+        let lock = RANGE_LOCK_SECTOR_V4;
+        let lock_index = usize::try_from(lock).map_err(|_err| {
+            OleError::CorruptedFile("range-lock sector index is too large".to_string())
+        })?;
+        if lock_index >= self.sector_roles.len() {
+            // A v4 file below the lock offset has no physical range-lock
+            // sector.  A file beyond 2 GiB cannot take this branch because
+            // its physical sector count necessarily includes the fixed ID.
+            if self.file_size > TWO_GIB_BYTES {
+                return Err(OleError::CorruptedFile(
+                    "CFB file beyond 2 GiB is missing its range-lock sector".to_string(),
+                ));
+            }
+            return Ok(());
+        }
+        let marker = *self.fat.get(lock_index).ok_or_else(|| {
+            OleError::CorruptedFile("FAT is missing the range-lock sector entry".to_string())
+        })?;
+        if self.file_size > TWO_GIB_BYTES {
+            if marker != ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "range-lock sector must be marked ENDOFCHAIN beyond 2 GiB".to_string(),
+                ));
+            }
+        } else if !matches!(marker, FREESECT | ENDOFCHAIN) {
+            return Err(OleError::CorruptedFile(
+                "range-lock sector has a non-terminal FAT marker".to_string(),
+            ));
+        }
+        if first_dir_sector == lock || first_minifat_sector == lock || first_difat_sector == lock {
+            return Err(OleError::CorruptedFile(
+                "CFB metadata chain points to the range-lock sector".to_string(),
+            ));
+        }
+        for (sector, &next) in self.fat.iter().take(self.sector_roles.len()).enumerate() {
+            if next == lock {
+                return Err(OleError::CorruptedFile(format!(
+                    "FAT chain at sector {sector} points to the range-lock sector"
+                )));
+            }
+        }
+        self.claim_sector(lock, PhysicalSectorRole::RangeLock)
+    }
+
+    /// Load the Mini FAT (for small streams)
+    fn load_minifat(
+        &mut self,
+        first_minifat_sector: u32,
+        sector_count: u32,
+    ) -> Result<(), OleError> {
+        let sectors = collect_sector_chain_exact(
+            &self.fat,
+            first_minifat_sector,
+            usize::try_from(sector_count).map_err(|_err| {
+                OleError::CorruptedFile("MiniFAT sector count does not fit usize".to_string())
+            })?,
+            "MiniFAT",
+        )?;
+        self.claim_chain(&sectors, PhysicalSectorRole::MiniFat)?;
+        let data_len = sectors
+            .len()
+            .checked_mul(self.sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("MiniFAT data size overflow".to_string()))?;
+        let entries_count = data_len / 4;
+        // Preserve the historical allocation resource label: this reservation
+        // has the same byte size and occurs at the same point as the removed
+        // aggregate MiniFAT byte-buffer reservation.
+        let mut minifat = try_vec_with_capacity(entries_count, "MiniFAT data")?;
+        let mut scratch = self.sector_batch_scratch(&sectors, "MiniFAT sector batch buffer")?;
+
+        // Read one physically contiguous run at a time and parse each run's
+        // entries directly into the final table. Keeping the scratch bounded
+        // avoids allocating and copying an aggregate byte buffer the same size
+        // as the complete MiniFAT.
+        let mut pending = sectors.as_slice();
+        while !pending.is_empty() {
+            let run_sectors = self.read_sector_run_into(pending, &mut scratch)?;
+            let span = run_sectors.get() * self.sector_size;
+            for chunk in scratch[..span].as_chunks::<4>().0.iter() {
+                let entry = read_u32_le(chunk, "MiniFAT entry")?;
+                try_push(&mut minifat, entry, "MiniFAT entries")?;
+            }
+            pending = pending.get(run_sectors.get()..).unwrap_or_default();
+        }
+        self.minifat = minifat;
 
         Ok(())
     }
 
     /// Load directory entries with optimized iterative parsing
-    fn load_directory(&mut self) -> Result<(), OleError> {
-        // Read the entire directory stream
-        let dir_data = self.read_stream_from_fat(self.first_dir_sector)?;
+    fn load_directory(
+        &mut self,
+        declared_sector_count: Option<u32>,
+        max_directory_bytes: u64,
+    ) -> Result<(), OleError> {
+        let sectors = match declared_sector_count {
+            Some(count) => {
+                let count = usize::try_from(count).map_err(|_err| {
+                    OleError::CorruptedFile("directory sector count does not fit usize".to_string())
+                })?;
+                let data_len = checked_directory_data_len(count, self.sector_size)?;
+                enforce_directory_limit(data_len, max_directory_bytes)?;
+                collect_sector_chain_exact(&self.fat, self.first_dir_sector, count, "directory")?
+            },
+            None => collect_directory_sector_chain(
+                &self.fat,
+                self.first_dir_sector,
+                self.sector_size,
+                max_directory_bytes,
+            )?,
+        };
+        let data_len = checked_directory_data_len(sectors.len(), self.sector_size)?;
+        enforce_directory_limit(data_len, max_directory_bytes)?;
+        self.claim_chain(&sectors, PhysicalSectorRole::Directory)?;
+        // Initialize the final buffer up front so each sector can be read into
+        // its permanent location. This also leaves the unread tail of a short
+        // final sector zero-filled, matching `read_sector`.
+        let mut dir_data = try_filled_vec(data_len, 0u8, "directory data")?;
+        self.read_sectors_batched(&sectors, &mut dir_data)?;
+
+        let mut tolerance = ToleranceReport::default();
+        let (validated_entries, misordered_siblings) =
+            Self::validated_directory_entries(&dir_data, self.sector_size, &mut tolerance)?;
 
         // Each directory entry is 128 bytes
         let num_entries = dir_data.len() / DIRENTRY_SIZE;
-        self.dir_entries = vec![None; num_entries];
-
-        // Parse root entry first (always at index 0)
-        if num_entries > 0 {
-            let root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
-            let root_child_sid = root.sid_child;
-            self.root = Some(root);
-
-            // Build storage tree using iterative approach (avoids recursion overhead)
-            self.build_storage_tree_iterative(root_child_sid, &dir_data)?;
+        let mut dir_entries = try_filled_vec(num_entries, None, "directory entries")?;
+        if validated_entries.len() != num_entries {
+            return Err(OleError::CorruptedFile(
+                "validated directory cache has the wrong length".to_string(),
+            ));
         }
 
+        // Parse root entry first (always at index 0)
+        let mut root_entry = None;
+        if num_entries > 0 {
+            let mut root = self.parse_directory_entry(&dir_data[0..DIRENTRY_SIZE], 0)?;
+            // The root has no siblings; validation recorded any stale
+            // links.
+            root.sid_left = NOSTREAM;
+            root.sid_right = NOSTREAM;
+            let root_child_sid = root.sid_child;
+            dir_entries[0] = Some(root.clone());
+
+            // Build storage tree using iterative approach (avoids recursion overhead)
+            self.build_storage_tree_iterative(root_child_sid, &dir_data, &mut dir_entries)?;
+            root_entry = Some(root);
+        }
+
+        let mut dir_name_data =
+            try_filled_vec(num_entries, None, "directory name comparison data")?;
+        for ((name_data, entry), validated_entry) in dir_name_data
+            .iter_mut()
+            .zip(&dir_entries)
+            .zip(validated_entries)
+        {
+            match (entry, validated_entry) {
+                (None, None) => {},
+                (Some(entry), Some(validated_entry))
+                    if entry.sid == validated_entry.sid
+                        // Validation canonicalizes the explicitly supported
+                        // classic-Mac root encoding to `Root Entry`, while the
+                        // public entry parser retains its historical decoding.
+                        && (entry.sid == 0 || entry.name == validated_entry.name) =>
+                {
+                    *name_data = Some(validated_entry.name_data);
+                },
+                _ => {
+                    return Err(OleError::CorruptedFile(
+                        "directory entries and validated name cache disagree".to_string(),
+                    ));
+                },
+            }
+        }
+
+        // Install the validated graph only after every directory entry has
+        // been traversed successfully. A malformed tree therefore cannot
+        // leave a partially populated object behind for a caller that uses
+        // this loader in a staged open path.
+        self.root = root_entry;
+        self.dir_entries = dir_entries;
+        self.dir_name_data = dir_name_data;
+        self.misordered_siblings = misordered_siblings;
+        self.tolerance.append(&tolerance);
+
         Ok(())
+    }
+
+    #[inline]
+    fn claim_sector(&mut self, sector: u32, role: PhysicalSectorRole) -> Result<(), OleError> {
+        let slot = self
+            .sector_roles
+            .get_mut(
+                usize::try_from(sector).map_err(|_err| claim_sector_index_error(sector, role))?,
+            )
+            .ok_or_else(|| claim_sector_bounds_error(sector, role))?;
+        if *slot != PhysicalSectorRole::Unclaimed {
+            return Err(claim_sector_conflict_error(sector, *slot, role));
+        }
+        *slot = role;
+        Ok(())
+    }
+
+    fn claim_chain(&mut self, sectors: &[u32], role: PhysicalSectorRole) -> Result<(), OleError> {
+        for &sector in sectors {
+            self.claim_sector(sector, role)?;
+        }
+        Ok(())
+    }
+
+    /// Treats a zero-length stream whose start sector is not `ENDOFCHAIN`
+    /// as empty.
+    ///
+    /// MS-CFB prescribes no start value for an empty stream and a zero-byte
+    /// read never consults it; POI and LibreOffice return an empty stream
+    /// whatever it holds. The in-memory entry is set to `ENDOFCHAIN` so no
+    /// reader follows the stale sector, and the repair is recorded. `None`
+    /// repairs the root entry, whose mini stream is then absent.
+    fn repair_empty_stream_start(&mut self, sid_index: Option<usize>) {
+        let entry = match sid_index {
+            None => self.root.as_mut(),
+            Some(index) => self.dir_entries.get_mut(index).and_then(Option::as_mut),
+        };
+        let Some(entry) = entry else {
+            return;
+        };
+        if entry.size != 0 || entry.start_sector == ENDOFCHAIN {
+            return;
+        }
+        entry.start_sector = ENDOFCHAIN;
+        let sid = entry.sid;
+        // The root entry is held twice; keep both copies repaired.
+        if sid == 0 {
+            if let Some(root) = self.root.as_mut() {
+                root.start_sector = ENDOFCHAIN;
+            }
+            if let Some(Some(root)) = self.dir_entries.get_mut(0) {
+                root.start_sector = ENDOFCHAIN;
+            }
+        }
+        self.tolerance
+            .record(AllocationDefect::EmptyStreamStartSector, sid);
+    }
+
+    fn validate_stream_allocations(&mut self) -> Result<(), OleError> {
+        self.repair_empty_stream_start(None);
+        let root = self
+            .root
+            .as_ref()
+            .ok_or_else(|| OleError::CorruptedFile("Missing root directory entry".to_string()))?;
+        let root_start = root.start_sector;
+        let root_size = root.size;
+        if self.sector_size == SECTOR_SIZE_V4 && root_start == RANGE_LOCK_SECTOR_V4 {
+            return Err(OleError::CorruptedFile(
+                "root mini stream points to the range-lock sector".to_string(),
+            ));
+        }
+        let root_sector_count = usize::try_from(root_size.div_ceil(self.sector_size as u64))
+            .map_err(|_err| OleError::CorruptedFile("Root mini stream is too large".to_string()))?;
+        let (root_chain, root_end) = collect_sector_chain_bounded(
+            &self.fat,
+            root_start,
+            root_sector_count,
+            "root mini stream",
+        )?;
+        if root_end == ChainEnd::Surplus {
+            Self::terminate_chain(&mut self.fat, &root_chain);
+            self.tolerance
+                .record(AllocationDefect::ChainLongerThanSize, 0);
+        }
+        self.claim_chain(&root_chain, PhysicalSectorRole::MiniStream)?;
+        self.root_chain = root_chain;
+
+        let mini_sector_capacity =
+            usize::try_from(root_size.div_ceil(self.mini_sector_size as u64)).map_err(|_err| {
+                OleError::CorruptedFile("Root mini stream is too large".to_string())
+            })?;
+        let mini_end = MiniStreamEnd::new(root_size, self.mini_sector_size)?;
+        let mut claimed_mini_sectors =
+            CheckedBitSet::try_with_capacity(mini_sector_capacity, "mini-sector ownership map")?;
+        // MiniFAT and FAT normally have different table lengths. Separate
+        // scratch instances avoid retaining the larger map in the smaller
+        // table's validation path while still eliminating per-stream
+        // allocations within each table.
+        let mut mini_scratch = SectorChainScratch::default();
+        let mut regular_scratch = SectorChainScratch::default();
+
+        for index in 0..self.dir_entries.len() {
+            let Some(entry) = self.dir_entries[index].as_ref() else {
+                continue;
+            };
+            if entry.entry_type != STGTY_STREAM {
+                continue;
+            }
+            self.repair_empty_stream_start(Some(index));
+            let Some(entry) = self.dir_entries[index].as_ref() else {
+                continue;
+            };
+            let (sid, is_minifat, start_sector, size) =
+                (entry.sid, entry.is_minifat, entry.start_sector, entry.size);
+            if self.sector_size == SECTOR_SIZE_V4
+                && !is_minifat
+                && start_sector == RANGE_LOCK_SECTOR_V4
+            {
+                return Err(OleError::CorruptedFile(
+                    "regular stream points to the range-lock sector".to_string(),
+                ));
+            }
+            if is_minifat {
+                let sector_count = usize::try_from(size.div_ceil(self.mini_sector_size as u64))
+                    .map_err(|_err| {
+                        OleError::CorruptedFile("Mini stream is too large".to_string())
+                    })?;
+                let end = mini_scratch.collect_bounded(
+                    &self.minifat,
+                    start_sector,
+                    sector_count,
+                    "mini stream",
+                )?;
+                if end == ChainEnd::Surplus {
+                    Self::terminate_chain(&mut self.minifat, mini_scratch.sectors());
+                    self.tolerance
+                        .record(AllocationDefect::ChainLongerThanSize, sid);
+                }
+                for &sector in mini_scratch.sectors() {
+                    let sector_index = usize::try_from(sector).map_err(|_err| {
+                        OleError::CorruptedFile(
+                            "mini stream sector index does not fit usize".to_string(),
+                        )
+                    })?;
+                    if sector_index >= mini_sector_capacity {
+                        return Err(OleError::CorruptedFile(
+                            "Mini stream references storage outside the root mini stream"
+                                .to_string(),
+                        ));
+                    }
+                    if claimed_mini_sectors.contains(sector_index) {
+                        return Err(OleError::CorruptedFile(format!(
+                            "Mini sector {sector} is claimed by multiple streams"
+                        )));
+                    }
+                    claimed_mini_sectors.insert(sector_index)?;
+                }
+                // Every byte the stream takes from its mini sectors must lie
+                // inside the root mini stream, as every reader requires. The
+                // capacity above counts a partial last mini sector whole;
+                // only the end of a stream may lie there, and only as far as
+                // the root size reaches (see `MiniStreamEnd`). Checked once
+                // per stream, and only for a root size that is not a whole
+                // number of mini sectors, so the loop above is unchanged.
+                if mini_end.has_partial_sector()
+                    && !mini_end.admits_chain_end(mini_scratch.sectors(), size)
+                {
+                    return Err(OleError::CorruptedFile(
+                        "Mini stream references storage outside the root mini stream".to_string(),
+                    ));
+                }
+            } else {
+                let sector_count = usize::try_from(size.div_ceil(self.sector_size as u64))
+                    .map_err(|_err| {
+                        OleError::CorruptedFile("Regular stream is too large".to_string())
+                    })?;
+                let end = regular_scratch.collect_bounded(
+                    &self.fat,
+                    start_sector,
+                    sector_count,
+                    "regular stream",
+                )?;
+                if end == ChainEnd::Surplus {
+                    Self::terminate_chain(&mut self.fat, regular_scratch.sectors());
+                    self.tolerance
+                        .record(AllocationDefect::ChainLongerThanSize, sid);
+                }
+                self.claim_chain(regular_scratch.sectors(), PhysicalSectorRole::RegularStream)?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Ends a chain whose FAT or MiniFAT entries continue past its declared
+    /// length at its last declared sector.
+    ///
+    /// Only the in-memory table changes: every reader then stops exactly
+    /// where the declared size does, as POI's and LibreOffice's
+    /// size-bounded readers do, and never follows the surplus link. The
+    /// source bytes are not modified.
+    fn terminate_chain(allocation_table: &mut [u32], chain: &[u32]) {
+        if let Some(entry) = chain
+            .last()
+            .and_then(|&last| usize::try_from(last).ok())
+            .and_then(|last| allocation_table.get_mut(last))
+        {
+            *entry = ENDOFCHAIN;
+        }
+    }
+
+    /// Ensure the physical file is reconciled with the FAT after all chains
+    /// have been claimed. FAT sectors contain padding entries for their full
+    /// sector width, but only entries addressing physical sectors may carry
+    /// allocation markers.
+    ///
+    /// Entries beyond the physical file are tolerated with any marker: MS-CFB
+    /// 2.3 requires past-end-of-file entries to be FREESECT, but real-world
+    /// producers (including Word and Apache POI) routinely fill the padding
+    /// with ENDOFCHAIN instead. Those entries address no physical bytes and
+    /// every chain walk is bounds-checked against the physical file, so the
+    /// markers are inert; rejecting them would refuse files that Word itself
+    /// opens.
+    ///
+    /// An unclaimed physical sector that still carries an allocation marker
+    /// is what surplus chain links and interrupted saves leave behind. No
+    /// validated chain reaches it and no reader reads it, so it is recorded
+    /// as [`AllocationDefect::UnclaimedAllocatedSector`] rather than
+    /// rejected.
+    fn validate_physical_sector_layout(&mut self) -> Result<(), OleError> {
+        for (sector, role) in self.sector_roles.iter().enumerate() {
+            let entry = self.fat.get(sector).copied().ok_or_else(|| {
+                OleError::CorruptedFile(format!(
+                    "FAT does not contain an entry for physical sector {sector}"
+                ))
+            })?;
+            if *role == PhysicalSectorRole::Unclaimed && entry != FREESECT {
+                let sector = u32::try_from(sector).map_err(|_err| {
+                    OleError::CorruptedFile(format!(
+                        "unclaimed physical sector {sector} does not fit a sector index"
+                    ))
+                })?;
+                self.tolerance
+                    .record(AllocationDefect::UnclaimedAllocatedSector, sector);
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(test)]
+    pub(crate) fn validate_directory(
+        dir_data: &[u8],
+        sector_size: usize,
+    ) -> Result<ToleranceReport, OleError> {
+        let mut tolerance = ToleranceReport::default();
+        Self::validated_directory_entries(dir_data, sector_size, &mut tolerance)?;
+        Ok(tolerance)
+    }
+
+    /// Validates every directory entry and the storage tree.
+    ///
+    /// Returns the validated entries and whether any sibling tree violates
+    /// the MS-CFB 2.6.4 name ordering; each violation is recorded in
+    /// `tolerance`.
+    fn validated_directory_entries(
+        dir_data: &[u8],
+        sector_size: usize,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<(Vec<Option<ValidatedDirectoryEntry>>, bool), OleError> {
+        let mut misordered = false;
+        if dir_data.is_empty() || !dir_data.len().is_multiple_of(DIRENTRY_SIZE) {
+            return Err(OleError::CorruptedFile(
+                "CFB directory stream must contain complete 128-byte entries".to_string(),
+            ));
+        }
+
+        let mut entries = try_vec_with_capacity(
+            dir_data.len() / DIRENTRY_SIZE,
+            "validated directory entries",
+        )?;
+        for (sid, data) in dir_data.as_chunks::<DIRENTRY_SIZE>().0.iter().enumerate() {
+            let entry_sid = u32::try_from(sid).map_err(|_err| {
+                OleError::CorruptedFile("CFB directory contains too many entries".to_string())
+            })?;
+            try_push(
+                &mut entries,
+                Self::parse_validated_directory_entry(data, entry_sid, sector_size, tolerance)?,
+                "validated directory entries",
+            )?;
+        }
+
+        let root = entries
+            .first()
+            .and_then(Option::as_ref)
+            .ok_or_else(|| OleError::CorruptedFile("CFB root entry is missing".to_string()))?;
+        if root.entry_type != STGTY_ROOT {
+            return Err(OleError::CorruptedFile(
+                "invalid CFB root directory entry".to_string(),
+            ));
+        }
+        // LibreOffice takes SID 0 as the root by position without checking
+        // its name (`StgDirStrm::SetupEntry`), and the root has no siblings:
+        // traversal starts at its child. Record and ignore.
+        if root.name != "Root Entry" || root.sid_left != NOSTREAM || root.sid_right != NOSTREAM {
+            tolerance.record(DirectoryDefect::RootEntryFields, 0);
+        }
+
+        let mut owned = CheckedBitSet::try_with_capacity(entries.len(), "directory ownership map")?;
+        owned.insert(0)?;
+        let mut pending_trees = try_vec_with_capacity(1, "directory traversal stack")?;
+        try_push(
+            &mut pending_trees,
+            root.sid_child,
+            "directory traversal stack",
+        )?;
+        while let Some(tree_root) = pending_trees.pop() {
+            if tree_root == NOSTREAM {
+                continue;
+            }
+            let mut stack = try_vec_with_capacity(1, "directory traversal stack")?;
+            try_push(
+                &mut stack,
+                (tree_root, None, None, 0usize),
+                "directory traversal stack",
+            )?;
+            while let Some((sid, lower, upper, black_depth)) = stack.pop() {
+                if sid == NOSTREAM {
+                    // Some widely deployed Office producers wrote unbalanced
+                    // color metadata. Bounds, ordering, acyclicity, and unique
+                    // ownership are sufficient for safe deterministic traversal.
+                    continue;
+                }
+
+                let entry = Self::validated_entry(&entries, sid)?;
+                let sid_index = usize::try_from(sid).map_err(|_err| {
+                    OleError::CorruptedFile("directory SID does not fit usize".to_string())
+                })?;
+                if owned.contains(sid_index) {
+                    return Err(OleError::CorruptedFile(format!(
+                        "CFB directory tree contains repeated SID {sid} or cross-storage ownership"
+                    )));
+                }
+                owned.insert(sid_index)?;
+
+                let violates_lower = if let Some(bound) = lower {
+                    Self::compare_validated(Self::validated_entry(&entries, bound)?, entry)
+                        != Ordering::Less
+                } else {
+                    false
+                };
+                let violates_upper = if let Some(bound) = upper {
+                    Self::compare_validated(entry, Self::validated_entry(&entries, bound)?)
+                        != Ordering::Less
+                } else {
+                    false
+                };
+                if violates_lower || violates_upper {
+                    // MS-CFB 2.6.4 constrains writers only; LibreOffice never
+                    // checks the order and POI looks names up linearly.
+                    // Bounds, acyclicity, and unique ownership above stay
+                    // enforced; lookups switch to a scan.
+                    tolerance.record(DirectoryDefect::SiblingNameOrder, sid);
+                    misordered = true;
+                }
+
+                if entry.entry_type == STGTY_STORAGE && entry.sid_child != NOSTREAM {
+                    try_push(
+                        &mut pending_trees,
+                        entry.sid_child,
+                        "directory traversal stack",
+                    )?;
+                }
+                let child_black_depth =
+                    black_depth + usize::from(entry.node_color == DirectoryNodeColor::Black);
+                try_push(
+                    &mut stack,
+                    (entry.sid_right, Some(sid), upper, child_black_depth),
+                    "directory traversal stack",
+                )?;
+                try_push(
+                    &mut stack,
+                    (entry.sid_left, lower, Some(sid), child_black_depth),
+                    "directory traversal stack",
+                )?;
+            }
+        }
+
+        // MS-CFB never requires every entry to be reachable, and POI and
+        // LibreOffice materialize only what the root reaches; orphans are
+        // the residue of interrupted saves. An unreachable entry is treated
+        // as unused and recorded. Its sectors stay
+        // unclaimed, so no reader can reach them either.
+        for (sid, slot) in entries.iter_mut().enumerate() {
+            if slot.is_some() && !owned.contains(sid) {
+                let sid = u32::try_from(sid).map_err(|_err| {
+                    OleError::CorruptedFile("CFB directory contains too many entries".to_string())
+                })?;
+                *slot = None;
+                tolerance.record(DirectoryDefect::UnreachableEntry, sid);
+            }
+        }
+        Ok((entries, misordered))
+    }
+
+    /// Validates one directory entry.
+    ///
+    /// MS-CFB 2.6 states its per-entry field rules as producer "MUST"s with
+    /// no reader behavior. The fields that carry no meaning for reading are
+    /// repaired and recorded, as LibreOffice
+    /// (`StgEntry::Load`) and POI do: an undefined node color, a storage's
+    /// start sector and size, a stream's child link, leftover bytes in an
+    /// unused entry, and forbidden name characters. Entry type, name length,
+    /// termination, and encoding stay fatal.
+    fn parse_validated_directory_entry(
+        data: &[u8],
+        sid: u32,
+        sector_size: usize,
+        tolerance: &mut ToleranceReport,
+    ) -> Result<Option<ValidatedDirectoryEntry>, OleError> {
+        let raw = RawDirectoryEntry::read_from_bytes(data).map_err(|_err| {
+            OleError::InvalidFormat("Failed to parse directory entry".to_string())
+        })?;
+        if raw.entry_type == STGTY_EMPTY {
+            // LibreOffice treats an unused entry as empty whatever else it
+            // holds (tdf#112399); its other fields are never read.
+            if raw.name_len.get() != 0 {
+                tolerance.record(DirectoryDefect::EmptyEntryResidue, sid);
+            }
+            return Ok(None);
+        }
+        if !matches!(raw.entry_type, STGTY_STORAGE | STGTY_STREAM | STGTY_ROOT) {
+            return Err(OleError::CorruptedFile(format!(
+                "invalid CFB directory entry type {} at SID {sid}",
+                raw.entry_type
+            )));
+        }
+
+        let name_len = usize::from(raw.name_len.get());
+        if !(2..=64).contains(&name_len) || name_len % 2 != 0 {
+            return Err(OleError::CorruptedFile(format!(
+                "invalid CFB directory name length {name_len} at SID {sid}"
+            )));
+        }
+        let mut name_utf16 = SmallVec::<[u16; 32]>::with_capacity(name_len / 2);
+        for pair in raw.name[..name_len].as_chunks::<2>().0.iter() {
+            name_utf16.push(u16::from_le_bytes([pair[0], pair[1]]));
+        }
+        // Some classic Mac Excel writers store SID 0 as the two-byte sequence
+        // `00 52` (an abbreviated, byte-swapped "R") instead of a terminated
+        // UTF-16LE "Root Entry". Accept only that exact root-entry encoding and
+        // canonicalize it; all other directory names remain strictly validated.
+        let legacy_mac_root = sid == 0
+            && raw.entry_type == STGTY_ROOT
+            && name_len == 2
+            && raw.name[0] == 0
+            && raw.name[1] == b'R'
+            && raw.name[2..].iter().all(|&byte| byte == 0);
+        if legacy_mac_root {
+            name_utf16.clear();
+            name_utf16.extend("Root Entry".encode_utf16());
+        } else if name_utf16.pop() != Some(0) || name_utf16.contains(&0) {
+            // SID 0 is the root by position and its name is never looked up
+            // (LibreOffice `StgDirStrm::SetupEntry`); classic Mac writers
+            // also store it as an unterminated "R".
+            if sid != 0 || raw.entry_type != STGTY_ROOT {
+                return Err(OleError::CorruptedFile(format!(
+                    "CFB directory name at SID {sid} is not correctly NUL-terminated"
+                )));
+            }
+            tolerance.record(DirectoryDefect::RootEntryFields, 0);
+            name_utf16.clear();
+            name_utf16.extend("Root Entry".encode_utf16());
+        }
+        let name = String::from_utf16(&name_utf16).map_err(|_err| {
+            OleError::CorruptedFile(format!("invalid UTF-16 CFB directory name at SID {sid}"))
+        })?;
+        let name_data = directory_name_data_allowing_forbidden(&name)
+            .map_err(|error| OleError::CorruptedFile(error.to_string()))?;
+        if has_forbidden_character(&name) {
+            // POI enforces no character rules on read; the name stays an
+            // opaque lookup key.
+            tolerance.record(DirectoryDefect::NameCharacters, sid);
+        }
+        if name_data.utf16.as_slice() != name_utf16.as_slice() {
+            return Err(OleError::CorruptedFile(format!(
+                "CFB directory name encoding mismatch at SID {sid}"
+            )));
+        }
+
+        // The color only balances the tree; LibreOffice ignores the byte
+        // ("0 or 1 (tree balance?)") and lookup never reads it.
+        let node_color = DirectoryNodeColor::try_from(raw.node_color).unwrap_or_else(|_| {
+            tolerance.record(DirectoryDefect::NodeColor, sid);
+            DirectoryNodeColor::Black
+        });
+        let sid_left = raw.sid_left.get();
+        let sid_right = raw.sid_right.get();
+        let mut sid_child = raw.sid_child.get();
+        // MS-CFB 2.6.1: a version 3 file's stream size must fit in 32 bits, but
+        // older writers left the high word uninitialized. The spec explicitly
+        // recommends that parsers ignore those bits and treat them as zero
+        // rather than reject the file, so mask instead of failing — matching
+        // what `DirectoryEntry` reading already does.
+        let stream_size = mask_v3_stream_size(raw.stream_size.get(), sector_size);
+
+        // Keep the raw state and FILETIME words available to source-preserving
+        // callers. New writers emit zeroes for stream timestamps, but rejecting
+        // legacy entries here would make an otherwise readable Office file
+        // impossible to round-trip without normalization.
+
+        match raw.entry_type {
+            STGTY_ROOT if sid != 0 => {
+                return Err(OleError::CorruptedFile(
+                    "CFB root entry must have SID 0".to_string(),
+                ));
+            },
+            STGTY_STORAGE | STGTY_STREAM if sid == 0 => {
+                return Err(OleError::CorruptedFile(format!(
+                    "invalid CFB {} fields at SID {sid}",
+                    if raw.entry_type == STGTY_STORAGE {
+                        "storage"
+                    } else {
+                        "stream"
+                    }
+                )));
+            },
+            // A storage has no allocation; its start and size are never read.
+            STGTY_STORAGE
+                if !matches!(raw.start_sector.get(), 0 | ENDOFCHAIN) || stream_size != 0 =>
+            {
+                tolerance.record(DirectoryDefect::StorageAllocationFields, sid);
+            },
+            // A stream has no children; the link is never followed.
+            STGTY_STREAM if sid_child != NOSTREAM => {
+                tolerance.record(DirectoryDefect::StreamChildLink, sid);
+                sid_child = NOSTREAM;
+            },
+            _ => {},
+        }
+
+        Ok(Some(ValidatedDirectoryEntry {
+            sid,
+            name,
+            name_data,
+            entry_type: raw.entry_type,
+            node_color,
+            sid_left,
+            sid_right,
+            sid_child,
+        }))
+    }
+
+    fn validated_entry(
+        entries: &[Option<ValidatedDirectoryEntry>],
+        sid: u32,
+    ) -> Result<&ValidatedDirectoryEntry, OleError> {
+        let sid_index = usize::try_from(sid).map_err(|_err| {
+            OleError::CorruptedFile("directory SID does not fit usize".to_string())
+        })?;
+        entries
+            .get(sid_index)
+            .and_then(Option::as_ref)
+            .ok_or_else(|| {
+                OleError::CorruptedFile(format!("invalid or empty CFB directory SID {sid}"))
+            })
+    }
+
+    fn compare_validated(
+        left: &ValidatedDirectoryEntry,
+        right: &ValidatedDirectoryEntry,
+    ) -> Ordering {
+        left.name_data.compare(&right.name_data)
     }
 
     /// Parse a single directory entry from 128 bytes
     fn parse_directory_entry(&self, data: &[u8], sid: u32) -> Result<DirectoryEntry, OleError> {
         // Parse the raw directory entry
-        let raw = RawDirectoryEntry::read_from_bytes(data)
-            .map_err(|_| OleError::InvalidFormat("Failed to parse directory entry".to_string()))?;
+        let raw = RawDirectoryEntry::read_from_bytes(data).map_err(|_err| {
+            OleError::InvalidFormat("Failed to parse directory entry".to_string())
+        })?;
 
         // Decode name from UTF-16LE
-        let name_len = raw.name_len.get() as usize;
-        let name_bytes = &raw.name[0..name_len.saturating_sub(2).min(64)];
-        let name = decode_utf16le(name_bytes);
+        let name_len = usize::from(raw.name_len.get());
+        if !(2..=64).contains(&name_len) || !name_len.is_multiple_of(2) {
+            return Err(OleError::CorruptedFile(format!(
+                "invalid CFB directory name length {name_len} at SID {sid}"
+            )));
+        }
+        let name = decode_utf16le(&raw.name[..name_len - 2])?;
 
         // Format CLSID
         let clsid = format_clsid(&raw.clsid);
 
-        // Handle size based on sector size (512-byte sectors only use low 32 bits)
-        let size = if self.sector_size == 512 {
-            raw.stream_size.get() & 0xFFFFFFFF
-        } else {
-            raw.stream_size.get()
-        };
+        // Version 3 sizes only use the low 32 bits; see `mask_v3_stream_size`.
+        let size = mask_v3_stream_size(raw.stream_size.get(), self.sector_size);
 
         // Determine if stream should use MiniFAT
-        let is_minifat = size < self.mini_stream_cutoff as u64 && raw.entry_type == STGTY_STREAM;
+        let is_minifat =
+            size < u64::from(self.mini_stream_cutoff) && raw.entry_type == STGTY_STREAM;
 
         Ok(DirectoryEntry {
             sid,
@@ -413,6 +2298,9 @@ impl<R: Read + Seek> OleFile<R> {
             sid_right: raw.sid_right.get(),
             sid_child: raw.sid_child.get(),
             clsid,
+            state_bits: raw.state_bits.get(),
+            creation_time: raw.creation_time.get(),
+            modified_time: raw.modified_time.get(),
             start_sector: raw.start_sector.get(),
             size,
             is_minifat,
@@ -424,11 +2312,12 @@ impl<R: Read + Seek> OleFile<R> {
     ///
     /// This replaces the recursive `build_storage_tree` with an iterative
     /// traversal using a work queue, eliminating function call overhead.
-    /// Uses FixedBitSet for better cache locality and memory efficiency.
+    /// Uses a compact checked bit set for cache locality and memory efficiency.
     fn build_storage_tree_iterative(
         &mut self,
         root_sid: u32,
         dir_data: &[u8],
+        dir_entries: &mut [Option<DirectoryEntry>],
     ) -> Result<(), OleError> {
         if root_sid == NOSTREAM {
             return Ok(());
@@ -437,19 +2326,21 @@ impl<R: Read + Seek> OleFile<R> {
         let max_entries = dir_data.len() / DIRENTRY_SIZE;
 
         // Use a work queue for iterative traversal (pre-allocate for common case)
-        let mut queue = Vec::with_capacity(64);
-        queue.push(root_sid);
+        let mut queue = try_vec_with_capacity(64, "directory build queue")?;
+        try_push(&mut queue, root_sid, "directory build queue")?;
 
-        // Track visited SIDs using FixedBitSet for better cache locality
+        // Track visited SIDs using a compact checked bit set for cache locality
         // Uses ~8x less memory than Vec<bool> (1 bit vs 1 byte per entry)
-        let mut visited = FixedBitSet::with_capacity(max_entries);
+        let mut visited = CheckedBitSet::try_with_capacity(max_entries, "directory traversal map")?;
 
         while let Some(sid) = queue.pop() {
             if sid == NOSTREAM {
                 continue;
             }
 
-            let sid_usize = sid as usize;
+            let sid_usize = usize::try_from(sid).map_err(|_err| {
+                OleError::CorruptedFile("directory SID does not fit usize".to_string())
+            })?;
 
             // Validate SID
             if sid_usize >= max_entries {
@@ -458,34 +2349,45 @@ impl<R: Read + Seek> OleFile<R> {
                 ));
             }
 
-            // Skip if already visited (cycle detection)
+            // Every directory SID can occur only once in the storage tree.
             if visited.contains(sid_usize) {
-                continue;
+                return Err(OleError::CorruptedFile(format!(
+                    "Directory tree contains a cycle or repeated SID {sid}"
+                )));
             }
-            visited.insert(sid_usize);
+            visited.insert(sid_usize)?;
 
             // Parse entry if not already parsed
-            if self.dir_entries[sid_usize].is_none() {
-                let offset = sid_usize * DIRENTRY_SIZE;
-                let entry =
-                    self.parse_directory_entry(&dir_data[offset..offset + DIRENTRY_SIZE], sid)?;
+            if dir_entries[sid_usize].is_none() {
+                let offset = sid_usize.checked_mul(DIRENTRY_SIZE).ok_or_else(|| {
+                    OleError::CorruptedFile("directory entry offset overflow".to_string())
+                })?;
+                let end = offset.checked_add(DIRENTRY_SIZE).ok_or_else(|| {
+                    OleError::CorruptedFile("directory entry end offset overflow".to_string())
+                })?;
+                let mut entry = self.parse_directory_entry(&dir_data[offset..end], sid)?;
+                // A stream's child link is never followed; validation
+                // recorded any stale value.
+                if entry.entry_type == STGTY_STREAM {
+                    entry.sid_child = NOSTREAM;
+                }
 
                 // Extract child SIDs before moving entry
                 let left_sid = entry.sid_left;
                 let right_sid = entry.sid_right;
                 let child_sid = entry.sid_child;
 
-                self.dir_entries[sid_usize] = Some(entry);
+                dir_entries[sid_usize] = Some(entry);
 
                 // Add children to queue (in reverse order for depth-first-like traversal)
                 if child_sid != NOSTREAM {
-                    queue.push(child_sid);
+                    try_push(&mut queue, child_sid, "directory build queue")?;
                 }
                 if right_sid != NOSTREAM {
-                    queue.push(right_sid);
+                    try_push(&mut queue, right_sid, "directory build queue")?;
                 }
                 if left_sid != NOSTREAM {
-                    queue.push(left_sid);
+                    try_push(&mut queue, left_sid, "directory build queue")?;
                 }
             }
         }
@@ -494,45 +2396,549 @@ impl<R: Read + Seek> OleFile<R> {
     }
 
     /// Read a single sector from the file
+    #[allow(
+        dead_code,
+        reason = "kept as the allocating sector-read API and covered by its unit tests"
+    )]
     fn read_sector(&mut self, sector_id: u32) -> Result<Vec<u8>, OleError> {
-        // Sector position in file: (sector_id + 1) * sector_size
-        let position = ((sector_id as u64) + 1) * (self.sector_size as u64);
+        // Preserve the original error ordering for this allocating API: reject
+        // an invalid sector (and perform its seek) before reserving the result.
+        let position = self.sector_position(sector_id)?;
+        self.reader.seek(SeekFrom::Start(position))?;
+        let present = self.present_sector_bytes(position, self.sector_size);
+        let mut buffer = try_filled_vec(self.sector_size, 0u8, "sector buffer")?;
+        self.reader.read_exact(&mut buffer[..present])?;
+        Ok(buffer)
+    }
+
+    /// Read one sector into a caller-provided, sector-sized buffer.
+    ///
+    /// The destination is cleared before the on-disk prefix is read, so short
+    /// final sectors retain the CFB reader's zero-filled tail semantics.
+    fn read_sector_into(&mut self, sector_id: u32, buffer: &mut [u8]) -> Result<(), OleError> {
+        let position = self.sector_position(sector_id)?;
+        if buffer.len() != self.sector_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector read destination has length {}, expected {}",
+                buffer.len(),
+                self.sector_size
+            )));
+        }
         self.reader.seek(SeekFrom::Start(position))?;
 
-        let mut buffer = vec![0u8; self.sector_size];
-        self.reader.read_exact(&mut buffer)?;
-        Ok(buffer)
+        // Keep whatever a truncated final sector actually contains; the tail
+        // stays zero. See the file-length note in the header parser.
+        let present = self.present_sector_bytes(position, self.sector_size);
+        buffer.fill(0);
+        self.reader.read_exact(&mut buffer[..present])?;
+        Ok(())
+    }
+
+    /// Allocate the bounded scratch buffer used to batch contiguous reads of
+    /// the sector list `sectors`.
+    ///
+    /// The buffer holds a whole number of sectors: the longest physically
+    /// contiguous run the list actually contains, capped at
+    /// [`SECTOR_BATCH_SCRATCH_BYTES`]. A table whose sectors are all isolated
+    /// therefore keeps exactly the one-sector footprint the sector-at-a-time
+    /// loaders had, and only a table with long runs pays for them.
+    fn sector_batch_scratch(
+        &self,
+        sectors: &[u32],
+        resource: &'static str,
+    ) -> Result<Vec<u8>, OleError> {
+        // The successor test is the one `read_sector_run_into` uses. If the two
+        // ever disagreed the reader would only split a run into more bounded
+        // pieces, so this sizing pass cannot affect what is read.
+        let mut longest = 1usize;
+        let mut current = 1usize;
+        for pair in sectors.windows(2) {
+            if Some(pair[1]) == pair[0].checked_add(1) {
+                current += 1;
+                longest = longest.max(current);
+            } else {
+                current = 1;
+            }
+        }
+        // `sector_size` is 512 or 4096 for any file that reaches a loader, so
+        // the division is well defined; the clamp still holds the buffer at one
+        // sector for a hypothetical sector larger than the bound.
+        let batch_sectors = (SECTOR_BATCH_SCRATCH_BYTES / self.sector_size).clamp(1, longest);
+        // The product is either at most `SECTOR_BATCH_SCRATCH_BYTES` rounded
+        // down to a whole sector, or exactly one sector, so it cannot overflow.
+        try_filled_vec(batch_sectors * self.sector_size, 0u8, resource)
+    }
+
+    /// Read the longest physically contiguous prefix of `sectors` that fits in
+    /// `scratch`, and report how many sectors it covered.
+    ///
+    /// `scratch` is zero-filled across the run before the read, so a truncated
+    /// final sector keeps the zero tail [`Self::read_sector_into`] gives it:
+    /// the run is contiguous, so the per-sector present-byte counts tile the
+    /// run's byte range exactly and one clamped read reproduces them.
+    ///
+    /// Every sector of the prefix is position-checked individually, in list
+    /// order. The run stops at the first sector whose position does not
+    /// validate rather than reporting it here, so the sectors before it are
+    /// still read first and the next call reports that sector's error at the
+    /// point the sector-at-a-time loop reported it.
+    fn read_sector_run_into(
+        &mut self,
+        sectors: &[u32],
+        scratch: &mut [u8],
+    ) -> Result<NonZeroUsize, OleError> {
+        let Some(&first_sector) = sectors.first() else {
+            return Err(OleError::CorruptedFile(
+                "Batched sector read needs at least one sector".to_string(),
+            ));
+        };
+        let capacity_sectors = scratch.len() / self.sector_size;
+        if capacity_sectors == 0 {
+            return Err(OleError::CorruptedFile(format!(
+                "Batched sector read destination has length {}, expected at least {}",
+                scratch.len(),
+                self.sector_size
+            )));
+        }
+
+        // The first sector's position is the one error this call must report:
+        // without it the caller cannot make progress through the list.
+        let position = self.sector_position(first_sector)?;
+
+        // Extend the run only across strict physical successors. Real files do
+        // hold descending FAT sector lists, so nothing here may assume the list
+        // ascends; a non-successor simply ends the run.
+        let mut count = NonZeroUsize::MIN;
+        while count.get() < capacity_sectors && count.get() < sectors.len() {
+            let Some(successor) = sectors[count.get() - 1].checked_add(1) else {
+                break;
+            };
+            if sectors[count.get()] != successor
+                || self.sector_position(sectors[count.get()]).is_err()
+            {
+                break;
+            }
+            count = count.saturating_add(1);
+        }
+
+        // `count <= scratch.len() / sector_size`, so the run's span fits.
+        let span = count.get() * self.sector_size;
+        self.reader.seek(SeekFrom::Start(position))?;
+        let present = self.present_sector_bytes(position, span);
+        let run = &mut scratch[..span];
+        run.fill(0);
+        self.reader.read_exact(&mut run[..present])?;
+
+        Ok(count)
+    }
+
+    fn sector_position(&self, sector_id: u32) -> Result<u64, OleError> {
+        // Sector position in file: (sector_id + 1) * sector_size
+        let position = (u64::from(sector_id) + 1)
+            .checked_mul(self.sector_size as u64)
+            .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
+        position
+            .checked_add(self.sector_size as u64)
+            .ok_or_else(|| OleError::CorruptedFile("Sector end overflow".to_string()))?;
+        if position >= self.file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector {sector_id} is outside the file"
+            )));
+        }
+        Ok(position)
+    }
+
+    /// How many of the `wanted` bytes starting at `position` are present in the
+    /// file, for files whose length is not a whole number of sectors.
+    #[inline]
+    fn present_sector_bytes(&self, position: u64, wanted: usize) -> usize {
+        present_bytes(self.file_size, position, wanted)
+    }
+
+    fn read_physical_range(&mut self, physical: u64, output: &mut [u8]) -> Result<(), OleError> {
+        if output.is_empty() {
+            return Ok(());
+        }
+        let output_len = u64::try_from(output.len())
+            .map_err(|_error| OleError::CorruptedFile("physical read is too large".to_string()))?;
+        physical
+            .checked_add(output_len)
+            .ok_or_else(|| OleError::CorruptedFile("physical read end overflow".to_string()))?;
+        if physical >= self.file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "physical offset {physical} is outside the file"
+            )));
+        }
+
+        let present = self.present_sector_bytes(physical, output.len());
+        self.reader.seek(SeekFrom::Start(physical))?;
+        self.reader.read_exact(&mut output[..present])?;
+        output[present..].fill(0);
+        Ok(())
+    }
+
+    fn read_stream_range_from_fat(
+        &mut self,
+        start_sector: u32,
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let sector_size = self.sector_size;
+        let sector_size_u64 = u64::try_from(sector_size)
+            .map_err(|_error| OleError::CorruptedFile("sector size is too large".to_string()))?;
+        if sector_size == 0 {
+            return Err(OleError::CorruptedFile("sector size is zero".to_string()));
+        }
+        if start_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "FAT range starts with an invalid sector marker".to_string(),
+            ));
+        }
+        let first_ordinal = usize::try_from(offset / sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("FAT range sector does not fit usize".to_string())
+        })?;
+        let within = usize::try_from(offset % sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("FAT range offset does not fit usize".to_string())
+        })?;
+        let logical_span = within
+            .checked_add(output.len())
+            .ok_or_else(|| OleError::InvalidData("FAT range span overflows usize".to_string()))?;
+        let required_sectors = logical_span.div_ceil(sector_size);
+        let touched = first_ordinal.checked_add(required_sectors).ok_or_else(|| {
+            OleError::CorruptedFile("FAT range traversal length overflow".to_string())
+        })?;
+        if touched > self.fat.len() {
+            return Err(OleError::CorruptedFile(
+                "FAT range exceeds its allocation table".to_string(),
+            ));
+        }
+
+        let mut sector = start_sector;
+        for _ in 0..first_ordinal {
+            sector = next_chain_sector(&self.fat, sector, "FAT")?;
+            if sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "FAT chain ends before stream range".to_string(),
+                ));
+            }
+        }
+        let mut within = within;
+        let mut written = 0_usize;
+        while written < output.len() {
+            let run_start = sector;
+            let run_within = within;
+            let mut run_bytes = (sector_size - run_within).min(output.len() - written);
+            let mut remaining = output.len() - written - run_bytes;
+            let mut next_run = None;
+            let mut last_sector = sector;
+
+            while remaining > 0 {
+                let next = next_chain_sector(&self.fat, last_sector, "FAT")?;
+                if next == last_sector {
+                    return Err(OleError::CorruptedFile(format!(
+                        "cycle detected in FAT range at sector {last_sector}"
+                    )));
+                }
+                if next == ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(
+                        "FAT chain ends within stream range".to_string(),
+                    ));
+                }
+                let contiguous = last_sector.checked_add(1).ok_or_else(|| {
+                    OleError::CorruptedFile("FAT sector index overflow".to_string())
+                })?;
+                if next != contiguous {
+                    next_run = Some(next);
+                    break;
+                }
+                last_sector = next;
+                let count = sector_size.min(remaining);
+                run_bytes = run_bytes.checked_add(count).ok_or_else(|| {
+                    OleError::CorruptedFile("FAT range run size overflow".to_string())
+                })?;
+                remaining -= count;
+            }
+
+            let physical = (u64::from(run_start) + 1)
+                .checked_mul(sector_size_u64)
+                .and_then(|value| value.checked_add(u64::try_from(run_within).ok()?))
+                .ok_or_else(|| {
+                    OleError::CorruptedFile("FAT range physical offset overflow".to_string())
+                })?;
+            let run_end = written.checked_add(run_bytes).ok_or_else(|| {
+                OleError::CorruptedFile("FAT range output offset overflow".to_string())
+            })?;
+            self.read_physical_range(physical, &mut output[written..run_end])?;
+            written = run_end;
+            if let Some(next) = next_run {
+                sector = next;
+                within = 0;
+            }
+        }
+        Ok(())
+    }
+
+    fn read_stream_range_from_minifat(
+        &mut self,
+        start_sector: u32,
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let root_size =
+            self.root.as_ref().map(|root| root.size).ok_or_else(|| {
+                OleError::CorruptedFile("mini stream has no root entry".to_string())
+            })?;
+        let mini_sector_size = self.mini_sector_size;
+        let mini_sector_size_u64 = u64::try_from(mini_sector_size).map_err(|_error| {
+            OleError::CorruptedFile("mini sector size is too large".to_string())
+        })?;
+        if mini_sector_size == 0 {
+            return Err(OleError::CorruptedFile(
+                "mini sector size is zero".to_string(),
+            ));
+        }
+        if start_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT range starts with an invalid sector marker".to_string(),
+            ));
+        }
+        let first_ordinal = usize::try_from(offset / mini_sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("MiniFAT range sector does not fit usize".to_string())
+        })?;
+        let within = usize::try_from(offset % mini_sector_size_u64).map_err(|_error| {
+            OleError::InvalidData("MiniFAT range offset does not fit usize".to_string())
+        })?;
+        let logical_span = within.checked_add(output.len()).ok_or_else(|| {
+            OleError::InvalidData("MiniFAT range span overflows usize".to_string())
+        })?;
+        let required_sectors = logical_span.div_ceil(mini_sector_size);
+        let touched = first_ordinal.checked_add(required_sectors).ok_or_else(|| {
+            OleError::CorruptedFile("MiniFAT range traversal length overflow".to_string())
+        })?;
+        if touched > self.minifat.len() {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT range exceeds its allocation table".to_string(),
+            ));
+        }
+
+        let mut mini_sector = start_sector;
+        for _ in 0..first_ordinal {
+            mini_sector = next_chain_sector(&self.minifat, mini_sector, "MiniFAT")?;
+            if mini_sector == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(
+                    "MiniFAT chain ends before stream range".to_string(),
+                ));
+            }
+        }
+        let mut within = within;
+        let mut written = 0_usize;
+        let mut pending = None;
+        while written < output.len() {
+            let count = (mini_sector_size - within).min(output.len() - written);
+            let current =
+                match self.minifat_physical_range(root_size, mini_sector, within, count, written) {
+                    Ok(current) => current,
+                    Err(error) => {
+                        self.flush_pending_range(&mut pending, output)?;
+                        return Err(error);
+                    },
+                };
+
+            if let Some(previous) = pending {
+                let previous_physical_end = previous
+                    .physical
+                    .checked_add(u64::try_from(previous.length).map_err(|_error| {
+                        OleError::CorruptedFile("MiniFAT physical run is too large".to_string())
+                    })?)
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT physical run end overflow".to_string())
+                    })?;
+                let previous_output_end = previous
+                    .output_start
+                    .checked_add(previous.length)
+                    .ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT output range end overflow".to_string())
+                    })?;
+                if current.physical == previous_physical_end
+                    && current.output_start == previous_output_end
+                {
+                    let length = previous.length.checked_add(current.length).ok_or_else(|| {
+                        OleError::CorruptedFile("MiniFAT physical run size overflow".to_string())
+                    })?;
+                    pending = Some(PendingPhysicalRange {
+                        physical: previous.physical,
+                        output_start: previous.output_start,
+                        length,
+                        sector: previous.sector,
+                    });
+                } else {
+                    self.flush_pending_range(&mut pending, output)?;
+                    pending = Some(current);
+                }
+            } else {
+                pending = Some(current);
+            }
+
+            written = written.checked_add(count).ok_or_else(|| {
+                OleError::CorruptedFile("MiniFAT output offset overflow".to_string())
+            })?;
+            within = 0;
+            if written < output.len() {
+                let next = match next_chain_sector(&self.minifat, mini_sector, "MiniFAT") {
+                    Ok(next) => next,
+                    Err(error) => {
+                        self.flush_pending_range(&mut pending, output)?;
+                        return Err(error);
+                    },
+                };
+                if next == mini_sector {
+                    self.flush_pending_range(&mut pending, output)?;
+                    return Err(OleError::CorruptedFile(format!(
+                        "cycle detected in MiniFAT range at sector {mini_sector}"
+                    )));
+                }
+                if next == ENDOFCHAIN {
+                    self.flush_pending_range(&mut pending, output)?;
+                    return Err(OleError::CorruptedFile(
+                        "MiniFAT chain ends within stream range".to_string(),
+                    ));
+                }
+                mini_sector = next;
+            }
+        }
+        self.flush_pending_range(&mut pending, output)
+    }
+
+    fn minifat_physical_range(
+        &self,
+        root_size: u64,
+        mini_sector: u32,
+        within: usize,
+        count: usize,
+        output_start: usize,
+    ) -> Result<PendingPhysicalRange, OleError> {
+        if mini_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT range contains an invalid sector marker".to_string(),
+            ));
+        }
+        let mini_sector_size = u64::try_from(self.mini_sector_size).map_err(|_error| {
+            OleError::CorruptedFile("mini sector size is too large".to_string())
+        })?;
+        let mini_offset = u64::from(mini_sector)
+            .checked_mul(mini_sector_size)
+            .and_then(|value| value.checked_add(u64::try_from(within).ok()?))
+            .ok_or_else(|| OleError::CorruptedFile("mini-sector offset overflow".to_string()))?;
+        let mini_end = mini_offset
+            .checked_add(u64::try_from(count).map_err(|_error| {
+                OleError::CorruptedFile("mini-sector range is too large".to_string())
+            })?)
+            .ok_or_else(|| OleError::CorruptedFile("mini-sector range end overflow".to_string()))?;
+        if mini_end > root_size {
+            return Err(OleError::CorruptedFile(
+                "mini-sector range exceeds root mini stream".to_string(),
+            ));
+        }
+        let sector_size = u64::try_from(self.sector_size)
+            .map_err(|_error| OleError::CorruptedFile("sector size is too large".to_string()))?;
+        if sector_size == 0 {
+            return Err(OleError::CorruptedFile("sector size is zero".to_string()));
+        }
+        let root_ordinal = usize::try_from(mini_offset / sector_size).map_err(|_error| {
+            OleError::CorruptedFile("root mini-stream sector does not fit usize".to_string())
+        })?;
+        let root_within = usize::try_from(mini_offset % sector_size).map_err(|_error| {
+            OleError::CorruptedFile("root mini-stream offset does not fit usize".to_string())
+        })?;
+        let root_sector = *self.root_chain.get(root_ordinal).ok_or_else(|| {
+            OleError::CorruptedFile("mini-sector is outside the root FAT chain".to_string())
+        })?;
+        if root_sector >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(
+                "root mini-stream contains an invalid sector marker".to_string(),
+            ));
+        }
+        let physical = (u64::from(root_sector) + 1)
+            .checked_mul(sector_size)
+            .and_then(|value| value.checked_add(u64::try_from(root_within).ok()?))
+            .ok_or_else(|| {
+                OleError::CorruptedFile("mini-stream physical offset overflow".to_string())
+            })?;
+        Ok(PendingPhysicalRange {
+            physical,
+            output_start,
+            length: count,
+            sector: root_sector,
+        })
+    }
+
+    fn flush_pending_range(
+        &mut self,
+        pending: &mut Option<PendingPhysicalRange>,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let Some(range) = pending.take() else {
+            return Ok(());
+        };
+        let output_end = range
+            .output_start
+            .checked_add(range.length)
+            .ok_or_else(|| OleError::CorruptedFile("physical output range overflow".to_string()))?;
+        if output_end > output.len() {
+            return Err(OleError::CorruptedFile(
+                "physical output range exceeds destination".to_string(),
+            ));
+        }
+        self.read_physical_range(range.physical, &mut output[range.output_start..output_end])
     }
 
     /// Read a stream by following the FAT chain with optimized batching
     ///
     /// This implementation batches contiguous sector reads to minimize
     /// system calls (lseek + read), which is a major performance bottleneck.
-    fn read_stream_from_fat(&mut self, start_sector: u32) -> Result<Vec<u8>, OleError> {
-        if start_sector == ENDOFCHAIN {
-            return Ok(Vec::new());
+    fn read_stream_from_fat(
+        &mut self,
+        start_sector: u32,
+        declared_size: u64,
+    ) -> Result<Vec<u8>, OleError> {
+        // The chain buffers are moved out while the batched read borrows the
+        // reader, and put back whatever the outcome: `collect` leaves every
+        // visited bit clear on success and on error alike. Until they are put
+        // back, the reader holds an empty scratch, so a panic in between
+        // leaves it an all-clear one.
+        let mut chain = std::mem::take(&mut self.stream_chain);
+        let result = self.read_fat_chain(&mut chain, start_sector, declared_size);
+        chain.release_oversized();
+        self.stream_chain = chain;
+        result
+    }
+
+    /// [`Self::read_stream_from_fat`] with the chain collected into `chain`,
+    /// with the checks and errors of `collect_sector_chain`.
+    fn read_fat_chain(
+        &mut self,
+        chain: &mut EndChainScratch,
+        start_sector: u32,
+        declared_size: u64,
+    ) -> Result<Vec<u8>, OleError> {
+        chain.collect(&self.fat, start_sector, "FAT")?;
+        let sectors = chain.sectors();
+        let size = usize::try_from(declared_size)
+            .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
+        let required_sectors = size.div_ceil(self.sector_size);
+        if sectors.len() < required_sectors {
+            return Err(OleError::CorruptedFile(
+                "FAT chain is shorter than the declared stream size".to_string(),
+            ));
         }
 
-        // Build list of sectors in the chain
-        let mut sectors = Vec::new();
-        let mut sector = start_sector;
-
-        while sector != ENDOFCHAIN {
-            if sector >= self.fat.len() as u32 {
-                return Err(OleError::CorruptedFile(
-                    "Invalid sector index in FAT".to_string(),
-                ));
-            }
-
-            sectors.push(sector);
-            sector = self.fat[sector as usize];
-        }
-
-        // Pre-allocate result buffer
-        let mut data = vec![0u8; sectors.len() * self.sector_size];
+        // Allocate only the declared stream size. A valid chain may contain
+        // unused sectors after the logical end, and a corrupt file must not
+        // turn those into an avoidable allocation.
+        let mut data = try_filled_vec(size, 0u8, "FAT stream data")?;
 
         // Batch read contiguous sectors
-        self.read_sectors_batched(&sectors, &mut data)?;
+        self.read_sectors_batched(&sectors[..required_sectors], &mut data)?;
 
         Ok(data)
     }
@@ -540,38 +2946,32 @@ impl<R: Read + Seek> OleFile<R> {
     /// Read multiple sectors with batching optimization
     ///
     /// Groups contiguous sectors and reads them in a single I/O operation
-    /// to minimize the number of lseek + read system calls.
+    /// to minimize the number of lseek + read system calls. The run
+    /// segmentation and its checks are [`visit_sector_runs`], which the
+    /// in-place stream comparison shares.
     fn read_sectors_batched(&mut self, sectors: &[u32], buffer: &mut [u8]) -> Result<(), OleError> {
-        if sectors.is_empty() {
-            return Ok(());
-        }
-
-        let mut i = 0;
-        while i < sectors.len() {
-            // Find run of contiguous sectors
-            let start_sector = sectors[i];
-            let mut count = 1;
-
-            while i + count < sectors.len() && sectors[i + count] == sectors[i + count - 1] + 1 {
-                count += 1;
-            }
-
-            // Read the entire contiguous run in one I/O operation
-            let position = ((start_sector as u64) + 1) * (self.sector_size as u64);
-            let read_size = count * self.sector_size;
-            let buffer_offset = i * self.sector_size;
-
-            self.reader.seek(SeekFrom::Start(position))?;
-            self.reader
-                .read_exact(&mut buffer[buffer_offset..buffer_offset + read_size])?;
-
-            i += count;
-        }
-
-        Ok(())
+        let sector_size = self.sector_size;
+        let file_size = self.file_size;
+        let buffer_len = buffer.len();
+        let reader = &mut self.reader;
+        visit_sector_runs(
+            sectors,
+            sector_size,
+            file_size,
+            buffer_len,
+            |position, buffer_offset, requested| {
+                // The buffer arrives zero-filled, so a truncated final sector
+                // keeps its real bytes and reads as zeroes beyond the end of
+                // the file.
+                let present = present_bytes(file_size, position, requested);
+                reader.seek(SeekFrom::Start(position))?;
+                reader.read_exact(&mut buffer[buffer_offset..buffer_offset + present])?;
+                Ok(())
+            },
+        )
     }
 
-    /// Read a stream by following the MiniFAT chain with optimized copying
+    /// Read a stream by following the `MiniFAT` chain with optimized copying
     ///
     /// This implementation pre-allocates and copies data more efficiently
     /// than the naive sector-by-sector approach.
@@ -582,59 +2982,183 @@ impl<R: Read + Seek> OleFile<R> {
     ) -> Result<Vec<u8>, OleError> {
         // Ensure ministream is loaded
         if self.ministream.is_none() {
-            if let Some(ref root) = self.root {
-                let ministream_data = self.read_stream_from_fat(root.start_sector)?;
-                self.ministream = Some(ministream_data);
-            } else {
-                return Err(OleError::CorruptedFile("No root entry".to_string()));
-            }
-        }
-
-        let ministream = self.ministream.as_ref().unwrap();
-
-        // Build list of mini sectors in the chain
-        let mut sectors = Vec::new();
-        let mut sector = start_sector;
-
-        while sector != ENDOFCHAIN {
-            if sector >= self.minifat.len() as u32 {
+            let (ministream_start, ministream_size) = self
+                .root
+                .as_ref()
+                .map(|root| (root.start_sector, root.size))
+                .ok_or_else(|| OleError::CorruptedFile("No root entry".to_string()))?;
+            let mut ministream_data =
+                self.read_stream_from_fat(ministream_start, ministream_size)?;
+            let ministream_len = usize::try_from(ministream_size)
+                .map_err(|_err| OleError::CorruptedFile("Mini stream is too large".to_string()))?;
+            if ministream_data.len() < ministream_len {
                 return Err(OleError::CorruptedFile(
-                    "Invalid sector index in MiniFAT".to_string(),
+                    "Mini stream chain is shorter than its declared size".to_string(),
                 ));
             }
+            ministream_data.truncate(ministream_len);
+            self.ministream = Some(ministream_data);
+        }
 
-            sectors.push(sector);
-            sector = self.minifat[sector as usize];
+        // The chain buffers are moved out for the collection and the copy,
+        // and put back whatever the outcome, as `read_stream_from_fat` does.
+        // The load above has already put back the buffers it used.
+        let mut chain = std::mem::take(&mut self.stream_chain);
+        let result = self.read_minifat_chain(&mut chain, start_sector, size);
+        chain.release_oversized();
+        self.stream_chain = chain;
+        result
+    }
+
+    /// [`Self::read_stream_from_minifat`] after the root mini stream's load,
+    /// with the chain collected into `chain`.
+    fn read_minifat_chain(
+        &self,
+        chain: &mut EndChainScratch,
+        start_sector: u32,
+        size: u64,
+    ) -> Result<Vec<u8>, OleError> {
+        let ministream = self
+            .ministream
+            .as_ref()
+            .ok_or_else(|| OleError::CorruptedFile("No mini stream".to_string()))?;
+        // The same checks and errors as `collect_sector_chain`, into the
+        // retained buffers.
+        chain.collect(&self.minifat, start_sector, "MiniFAT")?;
+        let sectors = chain.sectors();
+        let stream_len = usize::try_from(size)
+            .map_err(|_err| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
+        let chain_capacity = sectors
+            .len()
+            .checked_mul(self.mini_sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("MiniFAT stream size overflow".to_string()))?;
+        if chain_capacity < stream_len {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT chain is shorter than the declared stream size".to_string(),
+            ));
         }
 
         // Pre-allocate result buffer with exact size needed
-        let mut data = Vec::with_capacity(size as usize);
+        let mut data = try_vec_with_capacity(stream_len, "MiniFAT stream data")?;
 
-        // Copy all mini sectors
-        for &sector in &sectors {
-            let position = (sector as usize) * self.mini_sector_size;
-            if position + self.mini_sector_size > ministream.len() {
-                return Err(OleError::CorruptedFile(
-                    "Mini sector out of bounds".to_string(),
-                ));
+        // Copy the stream's bytes from each mini sector in chain order. Only
+        // those bytes must lie inside the loaded mini stream, which holds
+        // exactly the root size: the unused tail of the stream's last sector
+        // may extend past it, as open-time validation admits (see
+        // `MiniStreamEnd`). Sectors after the stream's last byte are not read.
+        for &sector in sectors {
+            let copy_len = self
+                .mini_sector_size
+                .min(stream_len.saturating_sub(data.len()));
+            if copy_len == 0 {
+                break;
             }
-
-            data.extend_from_slice(&ministream[position..position + self.mini_sector_size]);
+            let position = usize::try_from(sector)
+                .ok()
+                .and_then(|sector_id| sector_id.checked_mul(self.mini_sector_size))
+                .ok_or_else(|| {
+                    OleError::CorruptedFile("Mini sector offset overflow".to_string())
+                })?;
+            let end = position
+                .checked_add(copy_len)
+                .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
+            let bytes = ministream
+                .get(position..end)
+                .ok_or_else(|| OleError::CorruptedFile("Mini sector out of bounds".to_string()))?;
+            data.extend_from_slice(bytes);
         }
 
         // Truncate to actual size
-        data.truncate(size as usize);
+        data.truncate(stream_len);
         Ok(data)
     }
 
     /// List all streams in the OLE file
     ///
-    /// Returns a list of stream paths (as vectors of storage/stream names)
+    /// Returns a list of stream paths (as vectors of storage/stream names).
+    ///
+    /// The directory graph is supplied by untrusted input, so traversal uses
+    /// an explicit work stack rather than consuming the call stack.
     pub fn list_streams(&self) -> Vec<Vec<String>> {
-        let mut streams = Vec::new();
-        if let Some(ref root) = self.root {
-            self.collect_streams(root, &mut Vec::new(), &mut streams);
+        enum Work {
+            Tree { sid: u32, path_len: usize },
+            Entry { sid: u32, path_len: usize },
+            Restore { path_len: usize },
         }
+
+        let mut streams = Vec::new();
+        let Some(root) = self.root.as_ref() else {
+            return streams;
+        };
+
+        let mut pending = Vec::new();
+        if root.sid_child != NOSTREAM {
+            pending.push(Work::Tree {
+                sid: root.sid_child,
+                path_len: 0,
+            });
+        }
+        let mut path = Vec::new();
+
+        while let Some(work) = pending.pop() {
+            match work {
+                Work::Tree { sid, path_len } => {
+                    let Some(sid_index) = usize::try_from(sid).ok() else {
+                        continue;
+                    };
+                    if sid == NOSTREAM || sid_index >= self.dir_entries.len() {
+                        continue;
+                    }
+                    let Some(entry) = self.dir_entries.get(sid_index).and_then(Option::as_ref)
+                    else {
+                        continue;
+                    };
+
+                    // Push in reverse in-order so the left subtree is visited
+                    // first without recursion.
+                    pending.push(Work::Tree {
+                        sid: entry.sid_right,
+                        path_len,
+                    });
+                    pending.push(Work::Entry { sid, path_len });
+                    pending.push(Work::Tree {
+                        sid: entry.sid_left,
+                        path_len,
+                    });
+                },
+                Work::Entry { sid, path_len } => {
+                    let Some(sid_index) = usize::try_from(sid).ok() else {
+                        continue;
+                    };
+                    let Some(entry) = self.dir_entries.get(sid_index).and_then(Option::as_ref)
+                    else {
+                        continue;
+                    };
+                    path.truncate(path_len);
+                    if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
+                        path.push(entry.name.clone());
+                    }
+
+                    match entry.entry_type {
+                        STGTY_STREAM => {
+                            streams.push(path.clone());
+                            path.truncate(path_len);
+                        },
+                        STGTY_STORAGE | STGTY_ROOT if entry.sid_child != NOSTREAM => {
+                            let child_path_len = path.len();
+                            pending.push(Work::Restore { path_len });
+                            pending.push(Work::Tree {
+                                sid: entry.sid_child,
+                                path_len: child_path_len,
+                            });
+                        },
+                        _ => path.truncate(path_len),
+                    }
+                },
+                Work::Restore { path_len } => path.truncate(path_len),
+            }
+        }
+
         streams
     }
 
@@ -645,6 +3169,10 @@ impl<R: Read + Seek> OleFile<R> {
     ///
     /// # Returns
     /// * `Result<Vec<&DirectoryEntry>, OleError>` - List of directory entry references (zero-copy)
+    ///
+    /// # Errors
+    /// Returns `OleError::StreamNotFound` if no entry exists at `path`, or
+    /// `OleError::InvalidFormat` if the entry at `path` is not a directory.
     pub fn list_directory_entries(&self, path: &[&str]) -> Result<Vec<&DirectoryEntry>, OleError> {
         let mut entries = Vec::new();
 
@@ -668,25 +3196,275 @@ impl<R: Read + Seek> OleFile<R> {
         Ok(entries)
     }
 
-    /// Recursively collect all children from a directory (as references - zero-copy)
-    fn collect_directory_children<'a>(&'a self, sid: u32, entries: &mut Vec<&'a DirectoryEntry>) {
-        if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
-            return;
-        }
-
-        if let Some(entry) = self.dir_entries[sid as usize].as_ref() {
-            // Traverse left
-            if entry.sid_left != NOSTREAM {
-                self.collect_directory_children(entry.sid_left, entries);
+    /// Visit the direct children of one storage without first materializing a
+    /// sibling vector.
+    ///
+    /// The callback receives the parsed file and the child SID.  It may read
+    /// the entry through [`Self::directory_entry_by_sid`] and may open a
+    /// stream before returning.  The visitor is deliberately mutable because
+    /// cursor-backed stream reads need exclusive access to the CFB reader.
+    ///
+    /// `max_entries` bounds the number of callbacks and the number of
+    /// directory SIDs discovered. Each SID is charged before the traversal
+    /// stack reserves space, so an unbalanced ordered tree cannot force a
+    /// full left-spine allocation before the caller's budget is applied.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same path and CFB validation errors as
+    /// [`Self::list_directory_entries`], or [`OleError::LimitExceeded`] when
+    /// the selected directory has more than `max_entries` children.
+    pub fn visit_directory_entries<F, E>(
+        &mut self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&mut Self, u32) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != STGTY_STORAGE && directory.entry_type != STGTY_ROOT {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
             }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let right = self
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?
+                .sid_right;
+            visit(self, sid)?;
+            current = right;
+        }
+        Ok(())
+    }
+
+    /// Visit the direct children of one storage without first materializing a
+    /// sibling vector when the callback only needs directory metadata.
+    ///
+    /// This read-only form is used by path resolution and host-owned CFB
+    /// admission code that must retain an immutable borrow of the parsed
+    /// file. The discovered-SID and pending-stack bounds are identical to
+    /// [`Self::visit_directory_entries`].
+    pub fn visit_directory_entry_refs<F, E>(
+        &self,
+        path: &[&str],
+        max_entries: usize,
+        mut visit: F,
+    ) -> Result<(), E>
+    where
+        E: From<OleError>,
+        F: FnMut(&DirectoryEntry) -> Result<(), E>,
+    {
+        let first_child = {
+            let directory = if path.is_empty() {
+                self.root
+                    .as_ref()
+                    .ok_or(OleError::StreamNotFound)
+                    .map_err(E::from)?
+            } else {
+                self.find_entry(path).map_err(E::from)?
+            };
+            if directory.entry_type != STGTY_STORAGE && directory.entry_type != STGTY_ROOT {
+                return Err(E::from(OleError::InvalidFormat(
+                    "Not a directory".to_string(),
+                )));
+            }
+            directory.sid_child
+        };
+
+        let mut pending = Vec::new();
+        let mut current = first_child;
+        let mut discovered = 0usize;
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                if discovered >= max_entries {
+                    return Err(E::from(OleError::LimitExceeded {
+                        resource: "directory entries",
+                        observed: u64::try_from(discovered)
+                            .unwrap_or(u64::MAX)
+                            .saturating_add(1),
+                        maximum: u64::try_from(max_entries).unwrap_or(u64::MAX),
+                    }));
+                }
+                let current_index = usize::try_from(current).map_err(|_error| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID does not fit usize".to_string(),
+                    ))
+                })?;
+                let entry = self
+                    .dir_entries
+                    .get(current_index)
+                    .and_then(Option::as_ref)
+                    .ok_or_else(|| {
+                        E::from(OleError::CorruptedFile(
+                            "directory SID has no entry".to_string(),
+                        ))
+                    })?;
+                let left = entry.sid_left;
+                discovered = discovered.checked_add(1).ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory entry count overflow".to_string(),
+                    ))
+                })?;
+                pending.try_reserve_exact(1).map_err(|source| {
+                    E::from(OleError::allocation("directory traversal stack", source))
+                })?;
+                pending.push(current);
+                current = left;
+            }
+
+            let sid = pending.pop().ok_or_else(|| {
+                E::from(OleError::CorruptedFile(
+                    "directory traversal stack underflow".to_string(),
+                ))
+            })?;
+            let sid_index = usize::try_from(sid).map_err(|_error| {
+                E::from(OleError::CorruptedFile(
+                    "directory SID does not fit usize".to_string(),
+                ))
+            })?;
+            let entry = self
+                .dir_entries
+                .get(sid_index)
+                .and_then(Option::as_ref)
+                .ok_or_else(|| {
+                    E::from(OleError::CorruptedFile(
+                        "directory SID has no entry".to_string(),
+                    ))
+                })?;
+            let right = entry.sid_right;
+            visit(entry)?;
+            current = right;
+        }
+        Ok(())
+    }
+
+    /// Return one validated directory entry by its SID.
+    ///
+    /// SIDs are supplied by [`Self::visit_directory_entries`].  Returning an
+    /// option keeps this accessor defensive for callers that retain a SID
+    /// beyond the visitor callback.
+    #[must_use]
+    pub fn directory_entry_by_sid(&self, sid: u32) -> Option<&DirectoryEntry> {
+        let index = usize::try_from(sid).ok()?;
+        self.dir_entries.get(index).and_then(Option::as_ref)
+    }
+
+    /// Returns the number of validated directory slots retained by this
+    /// parsed CFB view.  This is a finite upper bound for bounded metadata
+    /// visitors that do not have a format-owner resource budget.
+    #[must_use]
+    pub fn directory_entry_count(&self) -> usize {
+        self.dir_entries.len()
+    }
+
+    /// Collect all children from a directory (as references - zero-copy).
+    ///
+    /// The sibling tree is untrusted input, so this uses an explicit stack
+    /// instead of recursive calls.
+    fn collect_directory_children<'a>(&'a self, sid: u32, entries: &mut Vec<&'a DirectoryEntry>) {
+        let mut pending = Vec::new();
+        let mut current = sid;
+
+        while current != NOSTREAM || !pending.is_empty() {
+            while current != NOSTREAM {
+                let Some(current_index) = usize::try_from(current).ok() else {
+                    break;
+                };
+                if current_index >= self.dir_entries.len() {
+                    break;
+                }
+                let Some(entry) = self.dir_entries.get(current_index).and_then(Option::as_ref)
+                else {
+                    break;
+                };
+                pending.push(current);
+                current = entry.sid_left;
+            }
+
+            let Some(current_sid) = pending.pop() else {
+                break;
+            };
+            let Some(current_index) = usize::try_from(current_sid).ok() else {
+                continue;
+            };
+            let Some(entry) = self.dir_entries.get(current_index).and_then(Option::as_ref) else {
+                continue;
+            };
 
             // Add reference instead of clone - zero-copy!
             entries.push(entry);
-
-            // Traverse right
-            if entry.sid_right != NOSTREAM {
-                self.collect_directory_children(entry.sid_right, entries);
-            }
+            current = entry.sid_right;
         }
     }
 
@@ -704,60 +3482,6 @@ impl<R: Read + Seek> OleFile<R> {
         }
     }
 
-    /// Recursively collect streams from directory tree
-    fn collect_streams(
-        &self,
-        entry: &DirectoryEntry,
-        path: &mut Vec<String>,
-        streams: &mut Vec<Vec<String>>,
-    ) {
-        // Add current entry to path
-        let path_len_before = path.len();
-        if !entry.name.is_empty() && entry.entry_type != STGTY_ROOT {
-            path.push(entry.name.clone()); // Clone needed as we're building the path
-        }
-
-        // If this is a stream, add it to the list
-        if entry.entry_type == STGTY_STREAM {
-            streams.push(path.clone()); // Clone needed to save the path
-            path.truncate(path_len_before); // Restore path
-            return;
-        }
-
-        // If this is a storage, recurse into children
-        if entry.entry_type == STGTY_STORAGE || entry.entry_type == STGTY_ROOT {
-            // Process children by traversing the red-black tree
-            if entry.sid_child != NOSTREAM {
-                self.traverse_children(entry.sid_child, path, streams);
-            }
-        }
-
-        // Restore path to original state
-        path.truncate(path_len_before);
-    }
-
-    /// Traverse children in red-black tree
-    fn traverse_children(&self, sid: u32, path: &mut Vec<String>, streams: &mut Vec<Vec<String>>) {
-        if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
-            return;
-        }
-
-        if let Some(ref entry) = self.dir_entries[sid as usize] {
-            // Traverse left
-            if entry.sid_left != NOSTREAM {
-                self.traverse_children(entry.sid_left, path, streams);
-            }
-
-            // Process current (path is modified in-place and restored)
-            self.collect_streams(entry, path, streams);
-
-            // Traverse right
-            if entry.sid_right != NOSTREAM {
-                self.traverse_children(entry.sid_right, path, streams);
-            }
-        }
-    }
-
     /// Open a stream by path and return its contents
     ///
     /// # Arguments
@@ -765,6 +3489,10 @@ impl<R: Read + Seek> OleFile<R> {
     ///
     /// # Returns
     /// * `Result<Vec<u8>, OleError>` - Stream contents or error
+    ///
+    /// # Errors
+    /// Returns `OleError::StreamNotFound` if `path` does not name a stream,
+    /// or an `OleError` if reading the underlying sectors fails.
     pub fn open_stream(&mut self, path: &[&str]) -> Result<Vec<u8>, OleError> {
         // Find the entry and extract needed values to avoid borrow conflicts
         let (is_minifat, start_sector, size) = {
@@ -782,10 +3510,78 @@ impl<R: Read + Seek> OleFile<R> {
         if is_minifat {
             self.read_stream_from_minifat(start_sector, size)
         } else {
-            let mut data = self.read_stream_from_fat(start_sector)?;
-            data.truncate(size as usize);
-            Ok(data)
+            self.read_stream_from_fat(start_sector, size)
         }
+    }
+
+    /// Read one bounded logical stream range into caller-owned storage.
+    ///
+    /// The requested range must be contained in the stream's declared
+    /// length. The reader follows only the FAT or MiniFAT entries needed for
+    /// that range, writes directly into `output`, and never materializes a
+    /// complete stream or the root MiniStream. An eligible truncated final
+    /// physical sector retains the existing CFB zero-fill behavior; bytes
+    /// beyond this file's captured `file_size` are never read.
+    ///
+    /// The operation uses the reader's absolute seek position, so its result
+    /// does not depend on the cursor position before the call. A failure
+    /// after payload I/O may leave a partially written destination; callers
+    /// must discard `output` after any error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OleError::StreamNotFound`] when `path` does not identify an
+    /// entry, an invalid-format error when it identifies a storage, an
+    /// invalid-data error when the checked range is outside the stream, or a
+    /// typed I/O/corruption error when the selected allocation cannot be read
+    /// safely. Empty ranges still perform path and bounds validation but no
+    /// payload I/O.
+    pub fn read_stream_range(
+        &mut self,
+        path: &[&str],
+        offset: u64,
+        output: &mut [u8],
+    ) -> Result<(), OleError> {
+        let (is_minifat, start_sector, size) = {
+            let entry = self.find_entry(path)?;
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
+        let output_len = u64::try_from(output.len())
+            .map_err(|_error| OleError::InvalidData("stream range is too large".to_string()))?;
+        let end = offset
+            .checked_add(output_len)
+            .ok_or_else(|| OleError::InvalidData("stream range end overflow".to_string()))?;
+        if end > size {
+            return Err(OleError::InvalidData(format!(
+                "stream range {offset}..{end} exceeds length {size}"
+            )));
+        }
+        if output.is_empty() {
+            return Ok(());
+        }
+
+        if is_minifat {
+            self.read_stream_range_from_minifat(start_sector, offset, output)
+        } else {
+            self.read_stream_range_from_fat(start_sector, offset, output)
+        }
+    }
+
+    /// Return a stream's declared length without materializing its contents.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the stream is not found or the path points to a
+    /// non-stream entry.
+    pub fn stream_len(&self, path: &[&str]) -> Result<u64, OleError> {
+        let entry = self.find_entry(path)?;
+        if entry.entry_type != STGTY_STREAM {
+            return Err(OleError::InvalidFormat("Not a stream".to_string()));
+        }
+        Ok(entry.size)
     }
 
     /// Find a directory entry by path
@@ -814,55 +3610,49 @@ impl<R: Read + Seek> OleFile<R> {
         Err(OleError::StreamNotFound)
     }
 
-    /// Find a child entry by name in a red-black tree (iterative, optimized)
+    /// Find a child entry by name in the validated sibling tree.
     ///
-    /// OLE directory entries are organized in a red-black tree, though not all
-    /// implementations guarantee perfect ordering. This uses an iterative traversal
-    /// with zero-allocation string comparison.
-    ///
-    /// Optimizations:
-    /// - Iterative instead of recursive (eliminates function call overhead)
-    /// - Zero-allocation case-insensitive comparison using eq_ignore_ascii_case
-    /// - Full tree traversal using work queue (handles all tree structures)
+    /// Directory validation establishes strict MS-CFB name ordering, so lookup
+    /// can descend through one branch at each node. Limit the number of visited
+    /// nodes as a final defense against a malformed in-memory graph.
     fn find_child_by_name(&self, sid: u32, name: &str) -> Result<&DirectoryEntry, OleError> {
-        if sid == NOSTREAM || sid as usize >= self.dir_entries.len() {
-            return Err(OleError::StreamNotFound);
+        match ascii_lookup_key(name) {
+            Ok(Some(target_name)) => {
+                return self
+                    .find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name));
+            },
+            Ok(None) | Err(DirectoryNameError::ForbiddenCharacter(_)) => {},
+            Err(_) => return Err(OleError::StreamNotFound),
         }
+        // A stored name may carry a character MS-CFB forbids writers to use;
+        // such a query can only match such an entry.
+        let target_name = directory_name_data_allowing_forbidden(name)
+            .map_err(|_error| OleError::StreamNotFound)?;
+        self.find_child_by_name_with(sid, |entry_name| target_name.compare(entry_name))
+    }
 
-        // Use iterative in-order traversal with a work queue (pre-allocated for efficiency)
-        // This handles all tree structures correctly, including improperly ordered trees
-        let mut queue = smallvec::SmallVec::<[u32; 32]>::new();
-        queue.push(sid);
-
-        while let Some(current_sid) = queue.pop() {
-            if current_sid == NOSTREAM || current_sid as usize >= self.dir_entries.len() {
-                continue;
-            }
-
-            let entry = self.dir_entries[current_sid as usize]
-                .as_ref()
-                .ok_or(OleError::StreamNotFound)?;
-
-            // Fast zero-allocation case-insensitive comparison (ASCII-optimized)
-            if entry.name.eq_ignore_ascii_case(name) {
-                return Ok(entry);
-            }
-
-            // Add children to queue (right first for depth-first-like order)
-            if entry.sid_right != NOSTREAM {
-                queue.push(entry.sid_right);
-            }
-            if entry.sid_left != NOSTREAM {
-                queue.push(entry.sid_left);
-            }
-        }
-
-        Err(OleError::StreamNotFound)
+    #[inline]
+    fn find_child_by_name_with<C>(&self, sid: u32, compare: C) -> Result<&DirectoryEntry, OleError>
+    where
+        C: Fn(&DirectoryNameData) -> Ordering,
+    {
+        find_sibling_by_name(
+            &self.dir_entries,
+            &self.dir_name_data,
+            sid,
+            self.misordered_siblings,
+            compare,
+        )
     }
 
     /// Get the root entry name
     pub fn get_root_name(&self) -> Option<&str> {
         self.root.as_ref().map(|r| r.name.as_str())
+    }
+
+    /// Root directory entry, including its CLSID.
+    pub fn root_entry(&self) -> Option<&DirectoryEntry> {
+        self.root.as_ref()
     }
 
     /// Check if a stream exists
@@ -871,31 +3661,1153 @@ impl<R: Read + Seek> OleFile<R> {
     }
 }
 
+/// The bytes of a composed candidate artifact, examined where they lie.
+///
+/// A writer that validates a composed candidate before publication used to
+/// read every stream back through [`OleFile::open_stream`] — copying each
+/// physical range into a fresh buffer — and compare the result with the bytes
+/// it meant to publish. [`StreamComparer`] asks this trait instead, about the
+/// ranges `open_stream` would read.
+pub(crate) trait CandidateBytes {
+    /// Whether the candidate holds `expected` at absolute `offset`.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error a read of those bytes would raise.
+    fn equals_at(&self, offset: u64, expected: &[u8]) -> Result<bool, OleError>;
+
+    /// Checks that `len` bytes at absolute `offset` can be read, without
+    /// examining them.
+    ///
+    /// # Errors
+    ///
+    /// Returns the error a read of those bytes would raise.
+    fn check_readable(&self, offset: u64, len: usize) -> Result<(), OleError>;
+}
+
+/// In-place stream comparison between one parsed reader and one candidate.
+///
+/// [`Self::stream_equals`] reaches `open_stream`'s verdict on a stream
+/// without materializing it. It performs `open_stream`'s traversal — the
+/// entry lookup, the stream-type check, the chain collection with its index,
+/// cycle and marker checks, the declared-length and chain-capacity checks,
+/// the root mini-stream load with its checks, the mini-sector bounds, the run
+/// segmentation and the physical bounds checks — in the same order and with
+/// the same errors. Every physical range `open_stream` reads is handed to the
+/// candidate: compared with the corresponding bytes of `expected` while the
+/// stream still matches, and checked for readability once it no longer does,
+/// so a read error `open_stream` would raise is still raised. The bytes a
+/// short final sector zero-fills are compared with zero.
+///
+/// Like `open_stream`, which loads the root mini stream once per reader and
+/// keeps it, a comparer performs the root mini stream's load — its chain
+/// collection and the readability of every range it covers — once, when the
+/// first mini or empty stream needs it, and keeps the result only after the
+/// load succeeded. The comparer borrows its reader and candidate, so that
+/// result cannot outlive them or be applied to others. Chain buffers are
+/// reused and cleared in proportion to the chains they held, so comparing
+/// every stream of a file costs time proportional to the file's streams, not
+/// to their count times the size of a table.
+pub(crate) struct StreamComparer<'a, R: Read + Seek, C: CandidateBytes> {
+    file: &'a OleFile<R>,
+    candidate: &'a C,
+    /// The chain of the stream being compared (FAT or MiniFAT).
+    chain: EndChainScratch,
+    /// The root mini-stream chain, kept once its load has succeeded.
+    root: EndChainScratch,
+    /// Whether the root mini stream's load has succeeded.
+    root_loaded: bool,
+}
+
+impl<R: Read + Seek> OleFile<R> {
+    /// A comparer of this reader's streams with `candidate`, which must
+    /// describe the source this reader parsed.
+    pub(crate) fn stream_comparer<'a, C: CandidateBytes>(
+        &'a self,
+        candidate: &'a C,
+    ) -> StreamComparer<'a, R, C> {
+        StreamComparer {
+            file: self,
+            candidate,
+            chain: EndChainScratch::default(),
+            root: EndChainScratch::default(),
+            root_loaded: false,
+        }
+    }
+}
+
+impl<R: Read + Seek, C: CandidateBytes> StreamComparer<'_, R, C> {
+    /// Whether the stream at `path` holds exactly `expected`.
+    ///
+    /// The candidate is only asked about ranges inside the file. This returns
+    /// `Ok(true)` exactly when `open_stream(path)` on the reader would return
+    /// `Ok(data)` with `data == expected`, `Ok(false)` exactly when it would
+    /// return `Ok(data)` with `data != expected`, and an error exactly when
+    /// `open_stream` would fail, for every sequence of calls — with two
+    /// exceptions: an allocation failure of a buffer this comparer does not
+    /// allocate cannot occur, and a read error is the one the candidate
+    /// reports rather than the reader's.
+    ///
+    /// # Errors
+    ///
+    /// Returns the lookup, allocation-structure and bounds errors of
+    /// [`OleFile::open_stream`], and any error the candidate returns.
+    pub(crate) fn stream_equals(
+        &mut self,
+        path: &[&str],
+        expected: &[u8],
+    ) -> Result<bool, OleError> {
+        let (is_minifat, start_sector, size) = {
+            let entry = self.file.find_entry(path)?;
+            if entry.entry_type != STGTY_STREAM {
+                return Err(OleError::InvalidFormat("Not a stream".to_string()));
+            }
+            (entry.is_minifat, entry.start_sector, entry.size)
+        };
+        if is_minifat {
+            self.minifat_stream_equals(start_sector, size, expected)
+        } else {
+            self.fat_stream_equals(start_sector, size, expected)
+        }
+    }
+
+    /// [`OleFile::read_stream_from_fat`] with its copy replaced by the
+    /// candidate.
+    fn fat_stream_equals(
+        &mut self,
+        start_sector: u32,
+        declared_size: u64,
+        expected: &[u8],
+    ) -> Result<bool, OleError> {
+        let file = self.file;
+        let candidate = self.candidate;
+        self.chain.collect(&file.fat, start_sector, "FAT")?;
+        let size = usize::try_from(declared_size)
+            .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
+        let required_sectors = size.div_ceil(file.sector_size);
+        let sectors = self.chain.sectors();
+        if sectors.len() < required_sectors {
+            return Err(OleError::CorruptedFile(
+                "FAT chain is shorter than the declared stream size".to_string(),
+            ));
+        }
+        // `open_stream` returns exactly `size` bytes, so a different expected
+        // length can never compare equal; every run is still read.
+        let mut equal = size == expected.len();
+        visit_sector_runs(
+            &sectors[..required_sectors],
+            file.sector_size,
+            file.file_size,
+            size,
+            |position, buffer_offset, requested| {
+                let present = file.present_sector_bytes(position, requested);
+                if equal {
+                    // `equal` implies `expected.len() == size`, and the batched
+                    // read never requests bytes beyond `size`.
+                    let wanted = expected
+                        .get(buffer_offset..buffer_offset + requested)
+                        .ok_or_else(|| {
+                            OleError::CorruptedFile(
+                                "stream comparison range exceeds its stream".to_string(),
+                            )
+                        })?;
+                    equal = read_bytes_equal(position, present, wanted, candidate)?;
+                } else if present > 0 {
+                    candidate.check_readable(position, present)?;
+                }
+                Ok(())
+            },
+        )?;
+        Ok(equal)
+    }
+
+    /// The root mini stream's load, as [`OleFile::read_stream_from_minifat`]
+    /// performs it through `read_stream_from_fat(root.start, root.size)`:
+    /// the chain collection, the declared-length check and the readability of
+    /// every range the batched read covers. It runs once per comparer; a
+    /// failed load is kept for no later call, which repeats it and fails the
+    /// same way, as `open_stream` does.
+    fn load_root(&mut self) -> Result<(), OleError> {
+        if self.root_loaded {
+            return Ok(());
+        }
+        let file = self.file;
+        let candidate = self.candidate;
+        let (ministream_start, ministream_size) = file
+            .root
+            .as_ref()
+            .map(|root| (root.start_sector, root.size))
+            .ok_or_else(|| OleError::CorruptedFile("No root entry".to_string()))?;
+        self.root.collect(&file.fat, ministream_start, "FAT")?;
+        let root_len = usize::try_from(ministream_size)
+            .map_err(|_err| OleError::CorruptedFile("FAT stream is too large".to_string()))?;
+        let root_required = root_len.div_ceil(file.sector_size);
+        let root_sectors = self.root.sectors();
+        if root_sectors.len() < root_required {
+            return Err(OleError::CorruptedFile(
+                "FAT chain is shorter than the declared stream size".to_string(),
+            ));
+        }
+        visit_sector_runs(
+            &root_sectors[..root_required],
+            file.sector_size,
+            file.file_size,
+            root_len,
+            |position, _buffer_offset, requested| {
+                let present = file.present_sector_bytes(position, requested);
+                if present > 0 {
+                    candidate.check_readable(position, present)?;
+                }
+                Ok(())
+            },
+        )?;
+        self.root_loaded = true;
+        Ok(())
+    }
+
+    /// [`OleFile::read_stream_from_minifat`] with its copies replaced by the
+    /// candidate. The root mini stream is not materialized: its load is
+    /// [`Self::load_root`], and each mini sector's bytes are then compared
+    /// where the root chain places them. Mini sectors whose bytes follow one
+    /// another in the file are compared as one range.
+    fn minifat_stream_equals(
+        &mut self,
+        start_sector: u32,
+        size: u64,
+        expected: &[u8],
+    ) -> Result<bool, OleError> {
+        self.load_root()?;
+        let file = self.file;
+        let candidate = self.candidate;
+        let ministream_size = file
+            .root
+            .as_ref()
+            .map(|root| root.size)
+            .ok_or_else(|| OleError::CorruptedFile("No root entry".to_string()))?;
+        let ministream_len = usize::try_from(ministream_size)
+            .map_err(|_err| OleError::CorruptedFile("Mini stream is too large".to_string()))?;
+        // The loaded mini stream has exactly `ministream_len` bytes: its
+        // "shorter than declared" check cannot fire and its truncation keeps
+        // every byte.
+        let root_required = ministream_len.div_ceil(file.sector_size);
+        let root_sectors = self.root.sectors().get(..root_required).ok_or_else(|| {
+            OleError::CorruptedFile("mini-sector is outside the root FAT chain".to_string())
+        })?;
+
+        self.chain.collect(&file.minifat, start_sector, "MiniFAT")?;
+        let stream_len = usize::try_from(size)
+            .map_err(|_err| OleError::CorruptedFile("MiniFAT stream is too large".to_string()))?;
+        let chain_capacity = self
+            .chain
+            .sectors()
+            .len()
+            .checked_mul(file.mini_sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("MiniFAT stream size overflow".to_string()))?;
+        if chain_capacity < stream_len {
+            return Err(OleError::CorruptedFile(
+                "MiniFAT chain is shorter than the declared stream size".to_string(),
+            ));
+        }
+
+        // Copying from the loaded mini stream cannot fail a read: every byte
+        // it holds was read by the load. Only the bounds checks remain, and
+        // they run for every sector `open_stream` copies from, matched or
+        // not, over the bytes it copies.
+        let mut equal = stream_len == expected.len();
+        let mut copied = 0usize;
+        // Bytes still to compare: a physically contiguous file range and the
+        // range of `expected` it must hold.
+        let mut pending: Option<(u64, Range<usize>)> = None;
+        for &sector in self.chain.sectors() {
+            let copy_len = file.mini_sector_size.min(stream_len.saturating_sub(copied));
+            if copy_len == 0 {
+                break;
+            }
+            let position = usize::try_from(sector)
+                .ok()
+                .and_then(|sector_id| sector_id.checked_mul(file.mini_sector_size))
+                .ok_or_else(|| {
+                    OleError::CorruptedFile("Mini sector offset overflow".to_string())
+                })?;
+            let end = position
+                .checked_add(copy_len)
+                .ok_or_else(|| OleError::CorruptedFile("Mini sector end overflow".to_string()))?;
+            if end > ministream_len {
+                return Err(OleError::CorruptedFile(
+                    "Mini sector out of bounds".to_string(),
+                ));
+            }
+            if equal {
+                let physical = file.ministream_physical_offset(root_sectors, position)?;
+                let bytes = copied..copied + copy_len;
+                pending = match pending.take() {
+                    Some((start, run))
+                        if run.end == bytes.start
+                            && u64::try_from(run.len())
+                                .ok()
+                                .and_then(|length| start.checked_add(length))
+                                == Some(physical) =>
+                    {
+                        Some((start, run.start..bytes.end))
+                    },
+                    Some((start, run)) => {
+                        equal = file.file_bytes_equal(start, expected, run, candidate)?;
+                        equal.then_some((physical, bytes))
+                    },
+                    None => Some((physical, bytes)),
+                };
+            }
+            copied += copy_len;
+        }
+        if equal && let Some((start, run)) = pending {
+            equal = file.file_bytes_equal(start, expected, run, candidate)?;
+        }
+        Ok(equal)
+    }
+}
+
+impl<R: Read + Seek> OleFile<R> {
+    /// The absolute file offset of the loaded mini stream's byte `offset`.
+    ///
+    /// The mini stream holds the root chain's sectors in chain order, as the
+    /// batched read of that chain placed them. A mini sector never crosses a
+    /// regular sector boundary, because the sector size is a multiple of the
+    /// mini sector size, so its bytes lie in one root sector.
+    fn ministream_physical_offset(
+        &self,
+        root_sectors: &[u32],
+        offset: usize,
+    ) -> Result<u64, OleError> {
+        let root_sector = *root_sectors.get(offset / self.sector_size).ok_or_else(|| {
+            OleError::CorruptedFile("mini-sector is outside the root FAT chain".to_string())
+        })?;
+        let within = u64::try_from(offset % self.sector_size).map_err(|_err| {
+            OleError::CorruptedFile("root mini-stream offset does not fit u64".to_string())
+        })?;
+        (u64::from(root_sector) + 1)
+            .checked_mul(self.sector_size as u64)
+            .and_then(|value| value.checked_add(within))
+            .ok_or_else(|| {
+                OleError::CorruptedFile("mini-stream physical offset overflow".to_string())
+            })
+    }
+
+    /// Compares what a read of `expected[bytes]` at absolute `position`
+    /// produces, including the zero fill of a short final sector, with those
+    /// bytes. A range `expected` does not hold is an error, never a match.
+    fn file_bytes_equal<C: CandidateBytes>(
+        &self,
+        position: u64,
+        expected: &[u8],
+        bytes: Range<usize>,
+        candidate: &C,
+    ) -> Result<bool, OleError> {
+        let wanted = expected.get(bytes).ok_or_else(|| {
+            OleError::CorruptedFile("mini stream comparison range exceeds its stream".to_string())
+        })?;
+        let present = self.present_sector_bytes(position, wanted.len());
+        read_bytes_equal(position, present, wanted, candidate)
+    }
+}
+
+/// Compares what a read of `wanted.len()` bytes at `position` produces with
+/// `wanted`: the `present` bytes the file holds, through `candidate`,
+/// followed by the zero fill a short final sector reads as.
+fn read_bytes_equal<C: CandidateBytes>(
+    position: u64,
+    present: usize,
+    wanted: &[u8],
+    candidate: &C,
+) -> Result<bool, OleError> {
+    let (in_file, beyond) = wanted.split_at(present.min(wanted.len()));
+    if !in_file.is_empty() && !candidate.equals_at(position, in_file)? {
+        return Ok(false);
+    }
+    Ok(beyond.iter().all(|&byte| byte == 0))
+}
+
+/// How many of the `wanted` bytes starting at `position` are present in a
+/// file of `file_size` bytes, for files whose length is not a whole number
+/// of sectors.
+#[inline]
+fn present_bytes(file_size: u64, position: u64, wanted: usize) -> usize {
+    let remaining = file_size.saturating_sub(position);
+    usize::try_from(remaining.min(wanted as u64)).unwrap_or(wanted)
+}
+
+fn try_vec_with_capacity<T>(capacity: usize, resource: &'static str) -> Result<Vec<T>, OleError> {
+    let mut values = Vec::new();
+    values
+        .try_reserve_exact(capacity)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    Ok(values)
+}
+
+fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> Result<(), OleError> {
+    values
+        .try_reserve(1)
+        .map_err(|source| OleError::allocation(resource, source))?;
+    values.push(value);
+    Ok(())
+}
+
+fn try_filled_vec<T: Clone>(
+    len: usize,
+    value: T,
+    resource: &'static str,
+) -> Result<Vec<T>, OleError> {
+    let mut values = try_vec_with_capacity(len, resource)?;
+    values.resize(len, value);
+    Ok(values)
+}
+
+fn checked_directory_data_len(sector_count: usize, sector_size: usize) -> Result<usize, OleError> {
+    sector_count
+        .checked_mul(sector_size)
+        .ok_or_else(|| OleError::CorruptedFile("directory data size overflow".to_string()))
+}
+
+/// Computes the combined bytes charged for the decoded FAT/DIFAT/MiniFAT
+/// sectors and the `u32` vectors that retain their sector locations.
+///
+/// DIFAT sectors are decoded through one reusable sector buffer rather than an
+/// aggregate byte allocation, but their declared sector bytes are charged as
+/// part of this conservative metadata budget. The charge is intentionally
+/// independent of total process memory.
+fn checked_allocation_table_bytes(
+    sector_size: usize,
+    num_fat_sectors: u32,
+    num_difat_sectors: u32,
+    num_minifat_sectors: u32,
+) -> Result<u64, OleError> {
+    let sector_size = u64::try_from(sector_size)
+        .map_err(|_err| OleError::CorruptedFile("sector size does not fit u64".to_string()))?;
+    let sector_count = u64::from(num_fat_sectors)
+        .checked_add(u64::from(num_difat_sectors))
+        .and_then(|value| value.checked_add(u64::from(num_minifat_sectors)))
+        .ok_or_else(|| {
+            OleError::CorruptedFile("allocation table sector count overflow".to_string())
+        })?;
+    let decoded_bytes = sector_count.checked_mul(sector_size).ok_or_else(|| {
+        OleError::CorruptedFile("allocation table byte count overflow".to_string())
+    })?;
+    let location_bytes = sector_count.checked_mul(4).ok_or_else(|| {
+        OleError::CorruptedFile("allocation table location count overflow".to_string())
+    })?;
+    decoded_bytes
+        .checked_add(location_bytes)
+        .ok_or_else(|| OleError::CorruptedFile("allocation table byte count overflow".to_string()))
+}
+
+fn enforce_directory_limit(data_len: usize, maximum: u64) -> Result<(), OleError> {
+    let observed = u64::try_from(data_len).map_err(|_err| {
+        OleError::CorruptedFile("directory data size does not fit u64".to_string())
+    })?;
+    if observed > maximum {
+        return Err(OleError::LimitExceeded {
+            resource: "directory bytes",
+            observed,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
+fn read_u16_le(bytes: &[u8], description: &str) -> Result<u16, OleError> {
+    let value: [u8; 2] = bytes
+        .try_into()
+        .map_err(|_err| OleError::InvalidFormat(format!("{description} is truncated")))?;
+    Ok(u16::from_le_bytes(value))
+}
+
+fn read_u32_le(bytes: &[u8], description: &str) -> Result<u32, OleError> {
+    let value: [u8; 4] = bytes
+        .try_into()
+        .map_err(|_err| OleError::InvalidFormat(format!("{description} is truncated")))?;
+    Ok(u32::from_le_bytes(value))
+}
+
+/// Finds the entry `compare` reports equal in the sibling tree rooted at
+/// `tree_root`.
+///
+/// A validated, ordered tree is searched by descent. When open-time
+/// validation recorded a name-ordering violation the
+/// descent could miss an entry, so every node of the tree is scanned in
+/// order instead, as POI's linear name lookup does, and the first match
+/// wins. Both forms visit at most one node per directory entry, a final
+/// defense against a malformed in-memory graph.
+pub(crate) fn find_sibling_by_name<'a, C>(
+    dir_entries: &'a [Option<DirectoryEntry>],
+    dir_name_data: &[Option<DirectoryNameData>],
+    tree_root: u32,
+    misordered: bool,
+    compare: C,
+) -> Result<&'a DirectoryEntry, OleError>
+where
+    C: Fn(&DirectoryNameData) -> Ordering,
+{
+    let node = |sid: u32| -> Option<(&'a DirectoryEntry, &DirectoryNameData)> {
+        let index = usize::try_from(sid).ok()?;
+        let entry = dir_entries.get(index)?.as_ref()?;
+        let name = dir_name_data.get(index)?.as_ref()?;
+        Some((entry, name))
+    };
+
+    if !misordered {
+        let mut current_sid = tree_root;
+        for _ in 0..dir_entries.len() {
+            if current_sid == NOSTREAM {
+                return Err(OleError::StreamNotFound);
+            }
+            let (entry, entry_name) = node(current_sid).ok_or(OleError::StreamNotFound)?;
+            current_sid = match compare(entry_name) {
+                Ordering::Less => entry.sid_left,
+                Ordering::Equal => return Ok(entry),
+                Ordering::Greater => entry.sid_right,
+            };
+        }
+        return Err(OleError::StreamNotFound);
+    }
+
+    // In-order scan with an explicit stack: the tree is untrusted input.
+    let mut pending = Vec::new();
+    let mut current_sid = tree_root;
+    let mut budget = dir_entries.len();
+    loop {
+        while current_sid != NOSTREAM {
+            let Some((entry, _)) = node(current_sid) else {
+                break;
+            };
+            if budget == 0 {
+                return Err(OleError::StreamNotFound);
+            }
+            budget -= 1;
+            pending
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("sibling scan stack", source))?;
+            pending.push(current_sid);
+            current_sid = entry.sid_left;
+        }
+        let Some(sid) = pending.pop() else {
+            return Err(OleError::StreamNotFound);
+        };
+        let Some((entry, entry_name)) = node(sid) else {
+            return Err(OleError::StreamNotFound);
+        };
+        if compare(entry_name) == Ordering::Equal {
+            return Ok(entry);
+        }
+        current_sid = entry.sid_right;
+    }
+}
+
+fn next_chain_sector(
+    allocation_table: &[u32],
+    sector: u32,
+    table_name: &str,
+) -> Result<u32, OleError> {
+    if sector >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "invalid sector marker 0x{sector:08X} in {table_name} chain"
+        )));
+    }
+    let index = usize::try_from(sector).map_err(|_error| {
+        OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
+    })?;
+    let next = *allocation_table.get(index).ok_or_else(|| {
+        OleError::CorruptedFile(format!("invalid sector index {sector} in {table_name}"))
+    })?;
+    if next != ENDOFCHAIN && next >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "invalid sector marker 0x{next:08X} in {table_name} chain"
+        )));
+    }
+    Ok(next)
+}
+
+fn collect_directory_sector_chain(
+    allocation_table: &[u32],
+    start_sector: u32,
+    sector_size: usize,
+    max_directory_bytes: u64,
+) -> Result<Vec<u32>, OleError> {
+    if start_sector == ENDOFCHAIN {
+        return Ok(Vec::new());
+    }
+
+    let mut sectors = Vec::new();
+    let mut visited = CheckedBitSet::try_with_capacity(allocation_table.len(), "sector-chain map")?;
+    let mut sector = start_sector;
+    while sector != ENDOFCHAIN {
+        let index = usize::try_from(sector).map_err(|_err| {
+            OleError::CorruptedFile("Invalid sector index in directory".to_string())
+        })?;
+        if index >= allocation_table.len() {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector index {sector} in directory"
+            )));
+        }
+        if visited.contains(index) {
+            return Err(OleError::CorruptedFile(format!(
+                "Cycle detected in directory chain at sector {sector}"
+            )));
+        }
+
+        let sector_count = sectors.len().checked_add(1).ok_or_else(|| {
+            OleError::CorruptedFile("directory sector count overflow".to_string())
+        })?;
+        let data_len = checked_directory_data_len(sector_count, sector_size)?;
+        enforce_directory_limit(data_len, max_directory_bytes)?;
+
+        visited.insert(index)?;
+        try_push(&mut sectors, sector, "sector-chain entries")?;
+        let next = *allocation_table.get(index).ok_or_else(|| {
+            OleError::CorruptedFile(format!("Invalid sector index {sector} in directory"))
+        })?;
+        if next != ENDOFCHAIN && next >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector marker 0x{next:08X} in directory chain"
+            )));
+        }
+        sector = next;
+    }
+    Ok(sectors)
+}
+
+/// Collects the chain starting at `start_sector` up to its `ENDOFCHAIN`
+/// terminator into a fresh vector, with a fresh visited map the size of the
+/// table.
+///
+/// This allocating form was `open_stream`'s chain collection. The reader now
+/// collects into its retained [`EndChainScratch`], which runs the same walker;
+/// this form stays as the oracle the tests hold that scratch to.
+#[cfg(test)]
+fn collect_sector_chain(
+    allocation_table: &[u32],
+    start_sector: u32,
+    table_name: &str,
+) -> Result<Vec<u32>, OleError> {
+    if start_sector == ENDOFCHAIN {
+        return Ok(Vec::new());
+    }
+
+    let mut sectors = Vec::new();
+    let mut visited = CheckedBitSet::try_with_capacity(allocation_table.len(), "sector-chain map")?;
+    walk_chain_to_end(
+        allocation_table,
+        start_sector,
+        table_name,
+        &mut visited,
+        &mut sectors,
+    )?;
+    Ok(sectors)
+}
+
+/// Walks the chain starting at `start_sector` up to its `ENDOFCHAIN`
+/// terminator, recording each sector in `sectors` and marking it in
+/// `visited`, which must cover `allocation_table` with every bit clear.
+///
+/// This is the one implementation of the checks `collect_sector_chain` and
+/// [`EndChainScratch::collect`] perform: every index must lie inside
+/// `allocation_table`, be visited once, and lead to `ENDOFCHAIN` or a regular
+/// sector. On success, the bits it set are exactly those of the sectors it
+/// recorded.
+///
+/// Always inlined, so that each caller keeps its chain and map in locals as
+/// the loop did before it was shared.
+#[inline(always)]
+fn walk_chain_to_end(
+    allocation_table: &[u32],
+    start_sector: u32,
+    table_name: &str,
+    visited: &mut CheckedBitSet,
+    sectors: &mut Vec<u32>,
+) -> Result<(), OleError> {
+    let mut sector = start_sector;
+    while sector != ENDOFCHAIN {
+        let index = usize::try_from(sector).map_err(|_err| {
+            OleError::CorruptedFile(format!("Invalid sector index in {table_name}"))
+        })?;
+        if index >= allocation_table.len() {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector index {sector} in {table_name}"
+            )));
+        }
+        if visited.contains(index) {
+            return Err(OleError::CorruptedFile(format!(
+                "Cycle detected in {table_name} chain at sector {sector}"
+            )));
+        }
+        visited.insert(index)?;
+        try_push(sectors, sector, "sector-chain entries")?;
+        let next = *allocation_table.get(index).ok_or_else(|| {
+            OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
+        })?;
+        if next != ENDOFCHAIN && next >= MAXREGSECT {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector marker 0x{next:08X} in {table_name} chain"
+            )));
+        }
+        sector = next;
+    }
+    Ok(())
+}
+
+/// How a chain walked to its declared length ended.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ChainEnd {
+    /// The last sector the declared length needs links to `ENDOFCHAIN`.
+    Terminated,
+    /// The last sector the declared length needs links onward (or to any
+    /// other marker). The surplus link was not followed.
+    Surplus,
+}
+
+fn chain_exceeds_declared_length(table_name: &str) -> OleError {
+    OleError::CorruptedFile(format!("{table_name} chain exceeds its declared length"))
+}
+
+fn collect_sector_chain_exact(
+    allocation_table: &[u32],
+    start_sector: u32,
+    expected_count: usize,
+    table_name: &str,
+) -> Result<Vec<u32>, OleError> {
+    match collect_sector_chain_bounded(allocation_table, start_sector, expected_count, table_name)?
+    {
+        (sectors, ChainEnd::Terminated) => Ok(sectors),
+        (_, ChainEnd::Surplus) => Err(chain_exceeds_declared_length(table_name)),
+    }
+}
+
+/// Collects exactly the `expected_count` sectors a declared length needs,
+/// with every check of [`collect_sector_chain_exact`] except the terminator
+/// after the last one, which is reported instead of enforced.
+fn collect_sector_chain_bounded(
+    allocation_table: &[u32],
+    start_sector: u32,
+    expected_count: usize,
+    table_name: &str,
+) -> Result<(Vec<u32>, ChainEnd), OleError> {
+    if expected_count == 0 {
+        if start_sector != ENDOFCHAIN {
+            return Err(OleError::CorruptedFile(format!(
+                "Empty {table_name} chain must start with ENDOFCHAIN"
+            )));
+        }
+        return Ok((Vec::new(), ChainEnd::Terminated));
+    }
+    if start_sector >= MAXREGSECT {
+        return Err(OleError::CorruptedFile(format!(
+            "Invalid start marker for {table_name} chain"
+        )));
+    }
+    if expected_count > allocation_table.len() {
+        return Err(OleError::CorruptedFile(format!(
+            "{table_name} chain length exceeds its allocation table"
+        )));
+    }
+
+    let mut end = ChainEnd::Terminated;
+    let mut sectors = try_vec_with_capacity(expected_count, "sector-chain entries")?;
+    let mut visited = CheckedBitSet::try_with_capacity(allocation_table.len(), "sector-chain map")?;
+    let mut sector = start_sector;
+    for index in 0..expected_count {
+        let slot = usize::try_from(sector).map_err(|_err| {
+            OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
+        })?;
+        if slot >= allocation_table.len() {
+            return Err(OleError::CorruptedFile(format!(
+                "Invalid sector index {sector} in {table_name}"
+            )));
+        }
+        if visited.contains(slot) {
+            return Err(OleError::CorruptedFile(format!(
+                "Cycle detected in {table_name} chain at sector {sector}"
+            )));
+        }
+        visited.insert(slot)?;
+        try_push(&mut sectors, sector, "sector-chain entries")?;
+        let next = *allocation_table.get(slot).ok_or_else(|| {
+            OleError::CorruptedFile(format!("Invalid sector index {sector} in {table_name}"))
+        })?;
+        if index + 1 == expected_count {
+            if next != ENDOFCHAIN {
+                end = ChainEnd::Surplus;
+            }
+        } else {
+            if next == ENDOFCHAIN {
+                return Err(OleError::CorruptedFile(format!(
+                    "{table_name} chain ends before its declared length"
+                )));
+            }
+            if next >= MAXREGSECT {
+                return Err(OleError::CorruptedFile(format!(
+                    "Invalid sector marker 0x{next:08X} in {table_name} chain"
+                )));
+            }
+            sector = next;
+        }
+    }
+    Ok((sectors, end))
+}
+
+/// Reusable fallible buffers for exact chain validation.
+///
+/// `collect_sector_chain_exact` remains the general-purpose helper for
+/// callers that need an owned result. Stream-allocation validation walks many
+/// chains against the same FAT or MiniFAT, so retaining these buffers removes
+/// the two transient allocations that would otherwise occur for every
+/// stream. The buffers are deliberately private to that validation path.
+///
+/// The visited map keeps every bit clear between collections. A collection
+/// marks exactly the sectors it records, so it is restored by zeroing the
+/// words of those sectors when the chain is short against the table, and by
+/// clearing the table's words otherwise (see `CheckedBitSet::clear_walk`); a
+/// failed collection clears the table's words. Validating every stream
+/// against one table therefore costs time proportional to the chains, where
+/// clearing a table-sized map for each stream cost the stream count times
+/// the table.
+#[derive(Debug, Default)]
+struct SectorChainScratch {
+    sectors: Vec<u32>,
+    /// Every bit is clear between calls to [`Self::collect_exact`].
+    visited: CheckedBitSet,
+}
+
+impl SectorChainScratch {
+    fn sectors(&self) -> &[u32] {
+        &self.sectors
+    }
+
+    fn reset_visited(&mut self) {
+        self.visited.bit_len = 0;
+    }
+
+    fn reset(&mut self) {
+        self.sectors.clear();
+        self.reset_visited();
+    }
+
+    /// Covers a table of `bit_len` entries. Nothing is cleared: every bit is
+    /// already clear, so the map reads as a fresh one of that length.
+    fn prepare_visited(&mut self, bit_len: usize) -> Result<(), OleError> {
+        self.visited.cover(bit_len, "sector-chain map")
+    }
+
+    /// The strict form: a chain that continues past its declared length is
+    /// an error. Open-time validation uses [`Self::collect_bounded`]; this
+    /// form stays as the oracle tests hold the strict checks to.
+    #[cfg(test)]
+    fn collect_exact(
+        &mut self,
+        allocation_table: &[u32],
+        start_sector: u32,
+        expected_count: usize,
+        table_name: &str,
+    ) -> Result<(), OleError> {
+        match self.collect_bounded(allocation_table, start_sector, expected_count, table_name)? {
+            ChainEnd::Terminated => Ok(()),
+            ChainEnd::Surplus => {
+                // A strict caller treats the surplus as a failed walk, which
+                // leaves no recorded chain behind.
+                self.reset();
+                Err(chain_exceeds_declared_length(table_name))
+            },
+        }
+    }
+
+    /// [`Self::collect_exact`] without enforcing the terminator after the
+    /// last declared sector; see [`collect_sector_chain_bounded`]. On
+    /// success the recorded chain is exactly the declared sectors.
+    fn collect_bounded(
+        &mut self,
+        allocation_table: &[u32],
+        start_sector: u32,
+        expected_count: usize,
+        table_name: &str,
+    ) -> Result<ChainEnd, OleError> {
+        debug_assert!(
+            self.visited.is_clear(),
+            "a reusable chain map must be all-clear when a walk starts"
+        );
+        self.reset();
+        let result = (|| {
+            if expected_count == 0 {
+                if start_sector != ENDOFCHAIN {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Empty {table_name} chain must start with ENDOFCHAIN"
+                    )));
+                }
+                return Ok(ChainEnd::Terminated);
+            }
+            if start_sector >= MAXREGSECT {
+                return Err(OleError::CorruptedFile(format!(
+                    "Invalid start marker for {table_name} chain"
+                )));
+            }
+            if expected_count > allocation_table.len() {
+                return Err(OleError::CorruptedFile(format!(
+                    "{table_name} chain length exceeds its allocation table"
+                )));
+            }
+
+            // Preserve the original allocation order: the chain vector is
+            // reserved before the visited map, with the same resource labels
+            // as the owned-result helper.
+            if self.sectors.capacity() < expected_count {
+                self.sectors
+                    .try_reserve_exact(expected_count)
+                    .map_err(|source| OleError::allocation("sector-chain entries", source))?;
+            }
+            self.prepare_visited(allocation_table.len())?;
+            let mut end = ChainEnd::Terminated;
+            let mut sector = start_sector;
+            for index in 0..expected_count {
+                let slot = usize::try_from(sector).map_err(|_err| {
+                    OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    ))
+                })?;
+                if slot >= allocation_table.len() {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    )));
+                }
+                if self.visited.contains(slot) {
+                    return Err(OleError::CorruptedFile(format!(
+                        "Cycle detected in {table_name} chain at sector {sector}"
+                    )));
+                }
+                self.visited.insert(slot)?;
+                // The fallible exact reservation above covers this loop's
+                // exactly `expected_count` pushes; keep allocation failure at
+                // that established boundary.
+                self.sectors.push(sector);
+                let next = *allocation_table.get(slot).ok_or_else(|| {
+                    OleError::CorruptedFile(format!(
+                        "Invalid sector index {sector} in {table_name}"
+                    ))
+                })?;
+                if index + 1 == expected_count {
+                    if next != ENDOFCHAIN {
+                        end = ChainEnd::Surplus;
+                    }
+                } else {
+                    if next == ENDOFCHAIN {
+                        return Err(OleError::CorruptedFile(format!(
+                            "{table_name} chain ends before its declared length"
+                        )));
+                    }
+                    if next >= MAXREGSECT {
+                        return Err(OleError::CorruptedFile(format!(
+                            "Invalid sector marker 0x{next:08X} in {table_name} chain"
+                        )));
+                    }
+                    sector = next;
+                }
+            }
+            Ok(end)
+        })();
+        // Restore the all-clear map. Each `insert` above is immediately
+        // followed by the infallible `push` of its sector, so a successful
+        // walk set exactly the bits of the chain it recorded.
+        if result.is_ok() {
+            self.visited
+                .clear_walk(&self.sectors, allocation_table.len());
+        } else {
+            self.visited.clear_table(allocation_table.len());
+            self.reset();
+        }
+        result
+    }
+}
+
+/// Reusable buffers for collecting chains up to their `ENDOFCHAIN`
+/// terminator, with exactly the checks and errors of `collect_sector_chain`
+/// (both run [`walk_chain_to_end`]).
+///
+/// The visited map keeps every bit clear between collections. A successful
+/// walk marks exactly the sectors it records, so the map is restored by
+/// zeroing the words of those sectors when the chain is short against the
+/// table, and by clearing the table's words otherwise (see
+/// `CheckedBitSet::clear_walk`); a failed walk clears the table's words.
+/// Collecting chains against one table therefore costs time proportional to
+/// the chains, where `collect_sector_chain` allocates and clears a
+/// table-sized map for each.
+#[derive(Debug, Default)]
+struct EndChainScratch {
+    sectors: Vec<u32>,
+    /// Every bit is clear between calls to [`Self::collect`].
+    visited: CheckedBitSet,
+}
+
+impl EndChainScratch {
+    fn sectors(&self) -> &[u32] {
+        &self.sectors
+    }
+
+    /// Collects the chain starting at `start_sector`. On error the recorded
+    /// chain is empty, as `collect_sector_chain` returns none.
+    fn collect(
+        &mut self,
+        allocation_table: &[u32],
+        start_sector: u32,
+        table_name: &str,
+    ) -> Result<(), OleError> {
+        debug_assert!(
+            self.visited.is_clear(),
+            "a reusable chain map must be all-clear when a walk starts"
+        );
+        self.sectors.clear();
+        if start_sector == ENDOFCHAIN {
+            return Ok(());
+        }
+        // Cover this table: new words are clear, and every existing word is
+        // clear by the invariant.
+        self.visited
+            .cover(allocation_table.len(), "sector-chain map")?;
+        let result = walk_chain_to_end(
+            allocation_table,
+            start_sector,
+            table_name,
+            &mut self.visited,
+            &mut self.sectors,
+        );
+        // Only the table's words can hold bits this walk set. A successful
+        // walk set exactly the bits of the chain it recorded; a failed one
+        // may have marked a sector it could not record.
+        if result.is_ok() {
+            self.visited
+                .clear_walk(&self.sectors, allocation_table.len());
+        } else {
+            self.visited.clear_table(allocation_table.len());
+            self.sectors.clear();
+        }
+        result
+    }
+
+    /// Frees the chain buffer when its capacity exceeds
+    /// [`RETAINED_CHAIN_SCRATCH_BYTES`]; a reader calls this after each read
+    /// it collected a chain for. The recorded chain is then empty, as it is
+    /// after a failed collection, and the next collection allocates again.
+    /// The visited map is kept (see the constant).
+    fn release_oversized(&mut self) {
+        if self.sectors.capacity() > RETAINED_CHAIN_SCRATCH_BYTES / size_of::<u32>() {
+            self.sectors = Vec::new();
+        }
+    }
+}
+
+/// Visits `sectors` in the physically contiguous runs
+/// [`OleFile::read_sectors_batched`] reads them in, with that method's run
+/// segmentation, its checks in their order and its errors.
+///
+/// `visit` receives each run's absolute file offset, its offset into the
+/// `buffer_len`-byte destination the batched read fills, and the number of
+/// destination bytes the read requests; like the batched read, a run that
+/// requests no bytes is skipped.
+///
+/// Always inlined into each caller, so that sharing the segmentation costs
+/// the batched read nothing.
+#[inline(always)]
+fn visit_sector_runs<V>(
+    sectors: &[u32],
+    sector_size: usize,
+    file_size: u64,
+    buffer_len: usize,
+    mut visit: V,
+) -> Result<(), OleError>
+where
+    V: FnMut(u64, usize, usize) -> Result<(), OleError>,
+{
+    let mut i = 0;
+    while i < sectors.len() {
+        let start_sector = sectors[i];
+        let mut count = 1;
+        while let Some(next_index) = i.checked_add(count) {
+            if next_index >= sectors.len()
+                || sectors[next_index]
+                    != sectors[next_index - 1].checked_add(1).ok_or_else(|| {
+                        OleError::CorruptedFile("contiguous sector index overflow".to_string())
+                    })?
+            {
+                break;
+            }
+            count += 1;
+        }
+        let position = (u64::from(start_sector) + 1)
+            .checked_mul(sector_size as u64)
+            .ok_or_else(|| OleError::CorruptedFile("Sector offset overflow".to_string()))?;
+        if position >= file_size {
+            return Err(OleError::CorruptedFile(format!(
+                "Sector {start_sector} is outside the file"
+            )));
+        }
+        let read_size = count
+            .checked_mul(sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("batched read size overflow".to_string()))?;
+        let buffer_offset = i
+            .checked_mul(sector_size)
+            .ok_or_else(|| OleError::CorruptedFile("batched buffer offset overflow".to_string()))?;
+        let buffer_remaining = buffer_len.checked_sub(buffer_offset).ok_or_else(|| {
+            OleError::CorruptedFile("batched read buffer offset overflow".to_string())
+        })?;
+        let requested = read_size.min(buffer_remaining);
+        if requested > 0 {
+            visit(position, buffer_offset, requested)?;
+        }
+        i += count;
+    }
+    Ok(())
+}
+
+/// Drop the high stream-size word that version 3 compound files do not use.
+///
+/// MS-CFB 2.6.1 requires a version 3 stream size to be at most 2 GB, so the
+/// most significant 32 bits must be zero. Some older writers never initialized
+/// those bits, and the specification recommends that parsers ignore them and
+/// treat them as zero rather than reject an otherwise valid file. Version 4
+/// files use the full 64-bit value unchanged.
+#[inline]
+fn mask_v3_stream_size(stream_size: u64, sector_size: usize) -> u64 {
+    if sector_size == SECTOR_SIZE_V3 {
+        stream_size & u64::from(u32::MAX)
+    } else {
+        stream_size
+    }
+}
+
 /// Decode UTF-16LE bytes to String (optimized version)
 ///
 /// Pre-allocates the UTF-16 buffer with exact capacity to avoid reallocations.
-fn decode_utf16le(bytes: &[u8]) -> String {
-    // Pre-allocate with exact capacity needed
-    let capacity = bytes.len() / 2;
-    let mut utf16_chars = Vec::with_capacity(capacity);
-
-    for chunk in bytes.chunks_exact(2) {
-        let code_unit = U16::<LE>::read_from_bytes(chunk)
-            .map(|v| v.get())
-            .unwrap_or(0);
-        utf16_chars.push(code_unit);
+fn decode_utf16le(bytes: &[u8]) -> Result<String, OleError> {
+    if !bytes.len().is_multiple_of(2) {
+        return Err(OleError::InvalidFormat(
+            "UTF-16LE directory name has an odd byte length".to_string(),
+        ));
     }
-
-    // Decode UTF-16 to String, replacing invalid sequences
-    // Note: trim_end_matches returns a &str, so we only allocate once
-    let decoded = String::from_utf16_lossy(&utf16_chars);
-
-    // Check if trimming is needed to avoid unnecessary allocation
-    if decoded.ends_with('\0') {
-        decoded.trim_end_matches('\0').to_string()
-    } else {
-        decoded
+    let unit_count = bytes.len() / 2;
+    let capacity = unit_count.checked_mul(4).ok_or_else(|| {
+        OleError::InvalidFormat("UTF-16LE directory name is too large".to_string())
+    })?;
+    let mut decoded = String::new();
+    decoded
+        .try_reserve(capacity)
+        .map_err(|source| OleError::allocation("decoded CFB directory name", source))?;
+    for value in std::char::decode_utf16(
+        bytes
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .map(|chunk| u16::from_le_bytes([chunk[0], chunk[1]])),
+    ) {
+        decoded.push(value.unwrap_or('\u{FFFD}'));
     }
+    while decoded.ends_with('\0') {
+        decoded.pop();
+    }
+    Ok(decoded)
 }
 
 /// Format CLSID as a human-readable string (SIMD-optimized version)
@@ -966,6 +4878,2089 @@ fn format_clsid(bytes: &[u8]) -> String {
 }
 
 /// Check if a file/data is an OLE file by checking magic bytes
+#[must_use]
 pub fn is_ole_file(data: &[u8]) -> bool {
     data.len() >= MINIMAL_OLEFILE_SIZE && &data[0..8] == MAGIC
+}
+
+#[cfg(test)]
+#[path = "chain_work_tests.rs"]
+mod chain_work_tests;
+
+#[cfg(test)]
+#[path = "mini_stream_end_tests.rs"]
+mod mini_stream_end_tests;
+
+#[cfg(test)]
+mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
+    use super::*;
+    use crate::writer::OleWriter;
+    use std::io::{self, Cursor, Read, Seek, SeekFrom, Write};
+
+    fn sample_file() -> Vec<u8> {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Data"], b"payload").unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn copy_source_to_preserves_extent_and_reader_position() {
+        let mut expected = sample_file();
+        expected.extend_from_slice(b"trailing bytes outside the CFB layout");
+        let mut file =
+            OleFile::open(Cursor::new(expected.clone()), OleFileLimits::default()).unwrap();
+        file.reader.seek(SeekFrom::Start(17)).unwrap();
+
+        let mut output = Vec::new();
+        file.copy_source_to(&mut output).unwrap();
+
+        assert_eq!(output, expected);
+        assert_eq!(file.reader.stream_position().unwrap(), 17);
+    }
+
+    #[test]
+    fn copy_source_to_restores_reader_position_after_sink_failure() {
+        struct FailingSink;
+
+        impl Write for FailingSink {
+            fn write(&mut self, _buffer: &[u8]) -> io::Result<usize> {
+                Err(io::Error::other("sink failed"))
+            }
+
+            fn flush(&mut self) -> io::Result<()> {
+                Ok(())
+            }
+        }
+
+        let mut file = OleFile::open(Cursor::new(sample_file()), OleFileLimits::default()).unwrap();
+        file.reader.seek(SeekFrom::Start(23)).unwrap();
+        let error = file.copy_source_to(FailingSink).unwrap_err();
+
+        assert!(matches!(error, OleError::Io(_)));
+        assert_eq!(file.reader.stream_position().unwrap(), 23);
+    }
+
+    #[test]
+    fn preserves_nonzero_stream_directory_timestamps_from_legacy_sources() {
+        let mut data = sample_file();
+        let name = [b'D', 0, b'a', 0, b't', 0, b'a', 0];
+        let entry_name = data
+            .windows(name.len())
+            .position(|window| window == name)
+            .expect("stream name should be present in directory");
+        let creation_time = entry_name + 100;
+        data[creation_time..creation_time + 8].copy_from_slice(&1_u64.to_le_bytes());
+        let file = OleFile::open(Cursor::new(data), OleFileLimits::default())
+            .expect("legacy stream metadata is readable");
+        let stream = file
+            .list_streams()
+            .into_iter()
+            .find(|path| path == &["Data".to_string()])
+            .expect("sample stream should remain reachable");
+        let entry = file
+            .list_directory_entries(&[])
+            .expect("root directory entries")
+            .into_iter()
+            .find(|entry| entry.name == stream[0])
+            .expect("sample stream directory entry");
+        assert_eq!(entry.creation_time, 1);
+    }
+
+    fn file_with_streams<I, S>(names: I) -> OleFile<Cursor<Vec<u8>>>
+    where
+        I: IntoIterator<Item = S>,
+        S: AsRef<str>,
+    {
+        let mut writer = OleWriter::new();
+        for name in names {
+            writer.create_stream(&[name.as_ref()], b"").unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        OleFile::open(Cursor::new(output.into_inner()), OleFileLimits::default()).unwrap()
+    }
+
+    #[test]
+    fn finds_exact_names_in_a_wide_sibling_tree() {
+        let names: Vec<_> = (0..257).map(|index| format!("Entry {index:03}")).collect();
+        let file = file_with_streams(&names);
+
+        for name in &names {
+            assert_eq!(file.stream_len(&[name]).unwrap(), 0);
+        }
+    }
+
+    #[test]
+    fn bounded_directory_visitor_stops_before_collecting_wide_siblings() {
+        let names: Vec<_> = (0..257).map(|index| format!("Entry {index:03}")).collect();
+        let mut file = file_with_streams(&names);
+        let mut visited = Vec::new();
+        let error = file.visit_directory_entries(&[], 3, |file, sid| {
+            visited.push(
+                file.directory_entry_by_sid(sid)
+                    .expect("visitor SID should resolve")
+                    .name
+                    .clone(),
+            );
+            Ok(())
+        });
+        assert!(matches!(
+            error,
+            Err(OleError::LimitExceeded {
+                resource: "directory entries",
+                ..
+            })
+        ));
+        assert!(visited.len() <= 3);
+    }
+
+    #[test]
+    fn bounded_directory_visitor_charges_zero_budget_before_reserving() {
+        let mut file = file_with_streams(["Left", "Right"]);
+        let mut callbacks = 0;
+        let error = file.visit_directory_entries(&[], 0, |_file, _sid| {
+            callbacks += 1;
+            Ok::<(), OleError>(())
+        });
+        assert!(matches!(
+            error,
+            Err(OleError::LimitExceeded {
+                resource: "directory entries",
+                maximum: 0,
+                ..
+            })
+        ));
+        assert_eq!(callbacks, 0);
+    }
+
+    #[test]
+    fn read_only_directory_visitor_resolves_without_sibling_materialization() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+        let mut names = Vec::new();
+        file.visit_directory_entry_refs(&[], 3, |entry| {
+            names.push(entry.name.clone());
+            Ok::<(), OleError>(())
+        })
+        .expect("bounded read-only visit should succeed");
+        assert_eq!(names.len(), 3);
+    }
+
+    #[test]
+    fn parsed_name_cache_is_sid_aligned_with_directory_entries() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+
+        assert_eq!(file.dir_name_data.len(), file.dir_entries.len());
+        for (sid, (entry, cached_name)) in
+            file.dir_entries.iter().zip(&file.dir_name_data).enumerate()
+        {
+            assert_eq!(entry.is_some(), cached_name.is_some());
+            if let (Some(entry), Some(cached_name)) = (entry, cached_name) {
+                assert_eq!(entry.sid as usize, sid);
+                assert_eq!(*cached_name, directory_name_data(&entry.name).unwrap());
+            }
+        }
+    }
+
+    #[test]
+    fn lookup_refuses_a_missing_validated_name_cache_entry() {
+        let mut file = file_with_streams(["Alpha"]);
+        let child_sid = file.root.as_ref().unwrap().sid_child as usize;
+        file.dir_name_data[child_sid] = None;
+
+        assert!(matches!(
+            file.stream_len(&["Alpha"]),
+            Err(OleError::StreamNotFound)
+        ));
+    }
+
+    #[test]
+    fn returns_not_found_for_missing_and_invalid_caller_names() {
+        let file = file_with_streams(["Alpha", "Bravo", "Charlie"]);
+        let too_long = "x".repeat(crate::directory_name::MAX_DIRECTORY_NAME_CODE_UNITS + 1);
+
+        for name in ["Delta", "", "bad/name", "nul\0name", &too_long] {
+            assert!(matches!(
+                file.stream_len(&[name]),
+                Err(OleError::StreamNotFound)
+            ));
+        }
+    }
+
+    #[test]
+    fn lookup_uses_ascii_case_equivalence() {
+        let file = file_with_streams(["Quarterly Report"]);
+
+        assert_eq!(file.stream_len(&["qUaRtErLy rEpOrT"]).unwrap(), 0);
+    }
+
+    #[test]
+    fn lookup_uses_cfb_simple_uppercase_comparison() {
+        assert!(!"ſtream".eq_ignore_ascii_case("Stream"));
+        let file = file_with_streams(["ſtream", "élan", "straße"]);
+
+        assert_eq!(file.stream_len(&["Stream"]).unwrap(), 0);
+        assert_eq!(file.stream_len(&["ÉLAN"]).unwrap(), 0);
+        assert!(matches!(
+            file.stream_len(&["STRASSE"]),
+            Err(OleError::StreamNotFound)
+        ));
+    }
+
+    #[test]
+    fn rejects_invalid_header_shifts_and_versions_without_panicking() {
+        for (offset, value) in [(0x1A, 5u16), (0x1E, 63), (0x20, 63)] {
+            let mut data = sample_file();
+            data[offset..offset + 2].copy_from_slice(&value.to_le_bytes());
+            assert!(matches!(
+                OleFile::open(Cursor::new(data), OleFileLimits::default()),
+                Err(OleError::InvalidFormat(_))
+            ));
+        }
+
+        let mut data = sample_file();
+        data[0x38..0x3C].copy_from_slice(&2048u32.to_le_bytes());
+        assert!(matches!(
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
+            Err(OleError::InvalidFormat(_))
+        ));
+    }
+
+    #[test]
+    fn directory_name_decoder_checks_utf16_extents_without_panicking() {
+        assert_eq!(decode_utf16le(b"A\0\0\0").unwrap(), "A");
+        assert_eq!(decode_utf16le(&[0x00, 0xD8]).unwrap(), "\u{FFFD}");
+        assert!(matches!(
+            decode_utf16le(&[0x41]),
+            Err(OleError::InvalidFormat(message)) if message.contains("odd byte length")
+        ));
+    }
+
+    #[test]
+    fn rejects_chain_lengths_before_reserving_chain_storage() {
+        let result = collect_sector_chain_exact(&[ENDOFCHAIN], 0, 2, "FAT");
+        assert!(matches!(
+            result,
+            Err(OleError::CorruptedFile(message))
+                if message.contains("exceeds its allocation table")
+        ));
+    }
+
+    #[test]
+    fn reusable_chain_scratch_reuses_buffers_for_different_lengths() {
+        let mut scratch = SectorChainScratch::default();
+        let long_table = [
+            1, 2, 3, ENDOFCHAIN, ENDOFCHAIN, ENDOFCHAIN, ENDOFCHAIN, ENDOFCHAIN,
+        ];
+        scratch
+            .collect_exact(&long_table, 0, 4, "regular stream")
+            .unwrap();
+        let sectors_ptr = scratch.sectors.as_ptr();
+        let sectors_capacity = scratch.sectors.capacity();
+        let visited_ptr = scratch.visited.words.as_ptr();
+        let visited_words = scratch.visited.words.len();
+        assert_eq!(scratch.sectors(), &[0, 1, 2, 3]);
+
+        scratch.reset();
+        scratch
+            .collect_exact(&[ENDOFCHAIN], 0, 1, "mini stream")
+            .unwrap();
+
+        assert_eq!(scratch.sectors(), &[0]);
+        assert_eq!(scratch.sectors.as_ptr(), sectors_ptr);
+        assert_eq!(scratch.sectors.capacity(), sectors_capacity);
+        assert_eq!(scratch.visited.words.as_ptr(), visited_ptr);
+        assert_eq!(scratch.visited.words.len(), visited_words);
+        assert_eq!(scratch.visited.bit_len, 1);
+    }
+
+    #[test]
+    fn reusable_chain_scratch_reserves_growth_before_walking() {
+        let mut scratch = SectorChainScratch::default();
+        scratch
+            .collect_exact(&[ENDOFCHAIN], 0, 1, "mini stream")
+            .unwrap();
+
+        let early = scratch.collect_exact(&[ENDOFCHAIN; 8], 0, 8, "mini stream");
+        assert!(matches!(
+            early,
+            Err(OleError::CorruptedFile(message))
+                if message == "mini stream chain ends before its declared length"
+        ));
+        assert!(scratch.sectors.capacity() >= 8);
+        assert!(scratch.sectors.is_empty());
+    }
+
+    #[test]
+    fn reusable_chain_scratch_resets_after_success_and_empty_chain() {
+        let mut scratch = SectorChainScratch::default();
+        scratch
+            .collect_exact(&[1, ENDOFCHAIN], 0, 2, "regular stream")
+            .unwrap();
+        assert!(!scratch.sectors.is_empty());
+
+        scratch.reset();
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+
+        scratch
+            .collect_exact(&[], ENDOFCHAIN, 0, "empty stream")
+            .unwrap();
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+    }
+
+    #[test]
+    fn reusable_chain_scratch_resets_after_cycle_and_reuses_after_error() {
+        let mut scratch = SectorChainScratch::default();
+        let result = scratch.collect_exact(&[1, 0, ENDOFCHAIN], 0, 3, "regular stream");
+        assert!(matches!(
+            result,
+            Err(OleError::CorruptedFile(message))
+                if message == "Cycle detected in regular stream chain at sector 0"
+        ));
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+
+        scratch
+            .collect_exact(&[ENDOFCHAIN], 0, 1, "regular stream")
+            .unwrap();
+        assert_eq!(scratch.sectors(), &[0]);
+    }
+
+    #[test]
+    fn reusable_chain_scratch_preserves_early_and_late_end_errors() {
+        let mut scratch = SectorChainScratch::default();
+
+        let early = scratch.collect_exact(&[ENDOFCHAIN, ENDOFCHAIN], 0, 2, "mini stream");
+        assert!(matches!(
+            early,
+            Err(OleError::CorruptedFile(message))
+                if message == "mini stream chain ends before its declared length"
+        ));
+        assert!(scratch.sectors.is_empty());
+
+        let late = scratch.collect_exact(&[1, ENDOFCHAIN], 0, 1, "mini stream");
+        assert!(matches!(
+            late,
+            Err(OleError::CorruptedFile(message))
+                if message == "mini stream chain exceeds its declared length"
+        ));
+        assert!(scratch.sectors.is_empty());
+        assert_eq!(scratch.visited.bit_len, 0);
+    }
+
+    #[test]
+    fn scratch_differential_matches_owned_chain_helper_and_resets() {
+        let cases = [
+            ("valid", vec![2, 3, 1, ENDOFCHAIN], 0, 4usize),
+            ("empty", vec![], ENDOFCHAIN, 0),
+            ("cycle", vec![1, 0, ENDOFCHAIN], 0, 3),
+            ("invalid-start", vec![ENDOFCHAIN], MAXREGSECT, 1),
+            ("invalid-index", vec![2, ENDOFCHAIN], 0, 2),
+            ("early-end-marker", vec![ENDOFCHAIN, ENDOFCHAIN], 0, 2),
+            ("late-end-marker", vec![1, ENDOFCHAIN], 0, 1),
+            ("invalid-marker", vec![MAXREGSECT, ENDOFCHAIN], 0, 2),
+            ("table-too-short", vec![ENDOFCHAIN], 0, 2),
+            ("empty-non-end", vec![ENDOFCHAIN], 0, 0),
+        ];
+        let mut scratch = SectorChainScratch::default();
+        let mut reusable_layout = None;
+
+        for pass in 0..2 {
+            for (name, allocation_table, start_sector, expected_count) in &cases {
+                let expected = collect_sector_chain_exact(
+                    allocation_table.as_slice(),
+                    *start_sector,
+                    *expected_count,
+                    name,
+                )
+                .map_err(|error| error.to_string());
+                let actual_result = scratch.collect_exact(
+                    allocation_table.as_slice(),
+                    *start_sector,
+                    *expected_count,
+                    name,
+                );
+                let actual = match actual_result {
+                    Ok(()) => Ok(scratch.sectors().to_vec()),
+                    Err(error) => Err(error.to_string()),
+                };
+
+                assert_eq!(actual, expected, "pass {pass}, case {name}");
+                match &expected {
+                    Ok(sectors) => {
+                        assert_eq!(scratch.sectors(), sectors.as_slice());
+                        assert_eq!(scratch.visited.bit_len, allocation_table.len());
+                        if pass == 0 && *name == "valid" {
+                            reusable_layout = Some((
+                                scratch.sectors.as_ptr(),
+                                scratch.sectors.capacity(),
+                                scratch.visited.words.as_ptr(),
+                                scratch.visited.words.len(),
+                            ));
+                        } else if pass == 1 && *name == "valid" {
+                            assert_eq!(
+                                reusable_layout,
+                                Some((
+                                    scratch.sectors.as_ptr(),
+                                    scratch.sectors.capacity(),
+                                    scratch.visited.words.as_ptr(),
+                                    scratch.visited.words.len(),
+                                )),
+                                "successful collections must reuse the retained buffers",
+                            );
+                        }
+                    },
+                    Err(_) => {
+                        assert!(scratch.sectors.is_empty());
+                        assert_eq!(scratch.visited.bit_len, 0);
+                    },
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn scratch_to_end_matches_the_owned_chain_helper_and_resets() {
+        let cases = [
+            ("valid", vec![2, 3, 1, ENDOFCHAIN], 0),
+            (
+                "valid-with-free-tail",
+                vec![1, ENDOFCHAIN, FREESECT, FREESECT],
+                0,
+            ),
+            ("empty", vec![], ENDOFCHAIN),
+            ("end-start-in-table", vec![ENDOFCHAIN], ENDOFCHAIN),
+            ("cycle", vec![1, 0, ENDOFCHAIN], 0),
+            ("self-cycle", vec![0], 0),
+            ("free-start", vec![ENDOFCHAIN], FREESECT),
+            ("marker-start", vec![ENDOFCHAIN], MAXREGSECT),
+            ("start-outside-table", vec![ENDOFCHAIN], 1),
+            ("index-outside-table", vec![2, ENDOFCHAIN], 0),
+            ("free-marker", vec![FREESECT, ENDOFCHAIN], 0),
+            ("fat-marker", vec![FATSECT, ENDOFCHAIN], 0),
+            ("difat-marker", vec![DIFSECT, ENDOFCHAIN], 0),
+            ("empty-table", vec![], 0),
+        ];
+        let mut scratch = EndChainScratch::default();
+        for pass in 0..2 {
+            for (name, allocation_table, start_sector) in &cases {
+                let expected =
+                    collect_sector_chain(allocation_table.as_slice(), *start_sector, name)
+                        .map_err(|error| error.to_string());
+                let actual = scratch
+                    .collect(allocation_table.as_slice(), *start_sector, name)
+                    .map(|()| scratch.sectors().to_vec())
+                    .map_err(|error| error.to_string());
+                assert_eq!(actual, expected, "pass {pass}, case {name}");
+                if expected.is_err() {
+                    assert!(scratch.sectors.is_empty(), "case {name} keeps no chain");
+                }
+                // The invariant that lets the next collection skip clearing
+                // a table-sized map: every bit is clear after every call.
+                assert!(
+                    scratch.visited.words.iter().all(|&word| word == 0),
+                    "pass {pass}, case {name} leaves visited bits behind"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn scratch_to_end_clears_only_what_it_set_and_reuses_its_buffers() {
+        // A long chain through a large table, then short chains through the
+        // same table: every collection agrees with the owned helper, and the
+        // map stays clear without being reallocated.
+        let size = 10_000u32;
+        let mut table: Vec<u32> = (1..=size).collect();
+        table[usize::try_from(size - 1).unwrap()] = ENDOFCHAIN;
+        let mut scratch = EndChainScratch::default();
+        scratch.collect(&table, 0, "long").unwrap();
+        assert_eq!(scratch.sectors().len(), 10_000);
+        let words = scratch.visited.words.as_ptr();
+        let capacity = scratch.sectors.capacity();
+        for start in [9_990u32, 5_000, 17, 9_999] {
+            let expected = collect_sector_chain(&table, start, "short").unwrap();
+            scratch.collect(&table, start, "short").unwrap();
+            assert_eq!(scratch.sectors(), expected.as_slice(), "start {start}");
+            assert!(scratch.visited.words.iter().all(|&word| word == 0));
+        }
+        assert_eq!(scratch.visited.words.as_ptr(), words, "the map is reused");
+        assert_eq!(scratch.sectors.capacity(), capacity, "the chain is reused");
+        // A failure in the middle of a table clears the map too.
+        table[20] = 3;
+        let error = scratch.collect(&table, 0, "cyclic").unwrap_err();
+        assert_eq!(
+            error.to_string(),
+            collect_sector_chain(&table, 0, "cyclic")
+                .unwrap_err()
+                .to_string()
+        );
+        assert!(scratch.sectors.is_empty());
+        assert!(scratch.visited.words.iter().all(|&word| word == 0));
+    }
+
+    #[test]
+    fn malformed_large_declarations_do_not_unwind() {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            let mut data = sample_file();
+            data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
+            OleFile::open(Cursor::new(data), OleFileLimits::default())
+        }));
+
+        assert!(result.is_ok(), "malformed CFB input must not panic");
+        assert!(result.as_ref().is_ok_and(Result::is_err));
+    }
+
+    fn synthetic_v4_range_lock_file(file_size: u64, marker: u32) -> OleFile<Cursor<Vec<u8>>> {
+        let physical_count =
+            usize::try_from(file_size / u64::try_from(SECTOR_SIZE_V4).unwrap() - 1).unwrap();
+        let lock = usize::try_from(RANGE_LOCK_SECTOR_V4).unwrap();
+        let mut fat = vec![FREESECT; physical_count];
+        fat[lock] = marker;
+        OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size,
+            sector_size: SECTOR_SIZE_V4,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: 0,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_count],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        }
+    }
+
+    #[test]
+    fn validates_v4_range_lock_marker_and_rejects_chain_pointers() {
+        let exact_two_gib =
+            (u64::from(RANGE_LOCK_SECTOR_V4) + 2) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let mut below = synthetic_v4_range_lock_file(exact_two_gib, FREESECT);
+        below
+            .validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN)
+            .unwrap();
+        assert_eq!(
+            below.sector_roles[usize::try_from(RANGE_LOCK_SECTOR_V4).unwrap()],
+            PhysicalSectorRole::RangeLock
+        );
+
+        let beyond_two_gib =
+            (u64::from(RANGE_LOCK_SECTOR_V4) + 3) * u64::try_from(SECTOR_SIZE_V4).unwrap();
+        let mut malformed = synthetic_v4_range_lock_file(beyond_two_gib, FREESECT);
+        assert!(matches!(
+            malformed.validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("must be marked ENDOFCHAIN")
+        ));
+
+        let mut pointed = synthetic_v4_range_lock_file(beyond_two_gib, ENDOFCHAIN);
+        pointed.fat[1] = RANGE_LOCK_SECTOR_V4;
+        assert!(matches!(
+            pointed.validate_range_lock_sector(0, ENDOFCHAIN, ENDOFCHAIN),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("points to the range-lock sector")
+        ));
+    }
+
+    #[test]
+    fn fat_stream_reads_only_the_declared_logical_size() {
+        let mut bytes = vec![0u8; 3 * 512];
+        bytes[512..515].copy_from_slice(b"abc");
+        let mut file = OleFile {
+            reader: Cursor::new(bytes),
+            file_size: (3 * 512) as u64,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: vec![1, ENDOFCHAIN],
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+
+        assert_eq!(file.read_stream_from_fat(0, 3).unwrap(), b"abc");
+    }
+
+    fn synthetic_fat_file(fat: Vec<u32>, bytes: Vec<u8>) -> OleFile<Cursor<Vec<u8>>> {
+        OleFile {
+            reader: Cursor::new(bytes.clone()),
+            file_size: bytes.len() as u64,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        }
+    }
+
+    const CLAIM_ROLES: [(PhysicalSectorRole, &str); 7] = [
+        (PhysicalSectorRole::Unclaimed, "unclaimed"),
+        (PhysicalSectorRole::Fat, "FAT"),
+        (PhysicalSectorRole::Difat, "DIFAT"),
+        (PhysicalSectorRole::Directory, "directory"),
+        (PhysicalSectorRole::MiniFat, "MiniFAT"),
+        (PhysicalSectorRole::MiniStream, "mini stream"),
+        (PhysicalSectorRole::RegularStream, "regular stream"),
+    ];
+
+    fn assert_claim_error(result: Result<(), OleError>, expected: &str) {
+        match result {
+            Err(OleError::CorruptedFile(message)) => assert_eq!(message, expected),
+            other => panic!("expected CorruptedFile({expected:?}), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn claim_sector_repeated_claims_preserve_exact_owner_and_error() {
+        for (first, first_label) in CLAIM_ROLES {
+            for (second, second_label) in CLAIM_ROLES {
+                let mut file = synthetic_fat_file(Vec::new(), Vec::new());
+                file.sector_roles = vec![PhysicalSectorRole::Unclaimed; 2];
+                file.claim_sector(1, first).unwrap();
+                assert_eq!(file.sector_roles, [PhysicalSectorRole::Unclaimed, first]);
+
+                let result = file.claim_sector(1, second);
+                if first == PhysicalSectorRole::Unclaimed {
+                    result.unwrap();
+                    assert_eq!(file.sector_roles, [PhysicalSectorRole::Unclaimed, second]);
+                } else {
+                    assert_claim_error(
+                        result,
+                        &format!("Sector 1 is claimed by both {first_label} and {second_label}"),
+                    );
+                    assert_eq!(file.sector_roles, [PhysicalSectorRole::Unclaimed, first]);
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[cfg(any(target_pointer_width = "32", target_pointer_width = "64"))]
+    fn claim_sector_checks_physical_boundaries_without_failure_mutation() {
+        // Every u32 fits usize on these targets. Conversion-error behavior
+        // remains a source-review obligation, not a simulated host test.
+        let cases = [
+            (0, 0, None),
+            (0, u32::MAX, None),
+            (1, 0, Some(0)),
+            (1, 1, None),
+            (3, 0, Some(0)),
+            (3, 2, Some(2)),
+            (3, 3, None),
+            (3, u32::MAX, None),
+        ];
+        for (length, sector, valid_index) in cases {
+            for (role, label) in CLAIM_ROLES {
+                let mut file = synthetic_fat_file(Vec::new(), Vec::new());
+                let mut expected = vec![PhysicalSectorRole::Unclaimed; length];
+                file.sector_roles = expected.clone();
+                let result = file.claim_sector(sector, role);
+                if let Some(index) = valid_index {
+                    result.unwrap();
+                    expected[index] = role;
+                } else {
+                    assert_claim_error(
+                        result,
+                        &format!("{label} sector {sector} is outside the file"),
+                    );
+                }
+                assert_eq!(file.sector_roles, expected, "sector {sector}, role {label}");
+            }
+        }
+    }
+
+    #[test]
+    fn physical_layout_checks_every_role_and_fat_marker() {
+        let markers: [(u32, &str); 6] = [
+            (FREESECT, "FREESECT"),
+            (ENDOFCHAIN, "ENDOFCHAIN"),
+            (FATSECT, "FATSECT"),
+            (DIFSECT, "DIFSECT"),
+            (MAXREGSECT, "MAXREGSECT"),
+            (7, "ordinary"),
+        ];
+
+        for &(role, role_label) in &CLAIM_ROLES {
+            for &(marker, marker_label) in &markers {
+                let mut file = synthetic_fat_file(vec![marker], Vec::new());
+                file.sector_roles = vec![role];
+                let roles_before = file.sector_roles.clone();
+                let fat_before = file.fat.clone();
+                let result = file.validate_physical_sector_layout();
+                let case = format!("{role_label}/{marker_label}");
+
+                assert!(result.is_ok(), "{case}: {result:?}");
+                // An allocated sector no chain claims is recorded, not
+                // rejected.
+                if role == PhysicalSectorRole::Unclaimed && marker != FREESECT {
+                    assert_eq!(
+                        file.tolerance.defects(),
+                        [crate::ToleratedDefect {
+                            defect: AllocationDefect::UnclaimedAllocatedSector.into(),
+                            context: 0,
+                        }],
+                        "{case}"
+                    );
+                } else {
+                    assert!(file.tolerance.is_clean(), "{case}");
+                }
+                assert_eq!(file.sector_roles, roles_before, "{case}");
+                assert_eq!(file.fat, fat_before, "{case}");
+            }
+        }
+    }
+
+    #[test]
+    fn physical_layout_preserves_prefix_order_and_padding_contract() {
+        let cases: [(&str, Vec<PhysicalSectorRole>, Vec<u32>, Option<&str>); 8] = [
+            ("empty", vec![], vec![], None),
+            (
+                "equal",
+                vec![
+                    PhysicalSectorRole::Unclaimed,
+                    PhysicalSectorRole::Fat,
+                    PhysicalSectorRole::Difat,
+                    PhysicalSectorRole::Directory,
+                    PhysicalSectorRole::MiniFat,
+                    PhysicalSectorRole::MiniStream,
+                    PhysicalSectorRole::RegularStream,
+                ],
+                vec![FREESECT, ENDOFCHAIN, FATSECT, DIFSECT, MAXREGSECT, 7, 9],
+                None,
+            ),
+            (
+                "short at zero",
+                vec![PhysicalSectorRole::Fat],
+                vec![],
+                Some("FAT does not contain an entry for physical sector 0"),
+            ),
+            (
+                "short after prefix",
+                vec![
+                    PhysicalSectorRole::Fat,
+                    PhysicalSectorRole::Directory,
+                    PhysicalSectorRole::RegularStream,
+                ],
+                vec![FATSECT],
+                Some("FAT does not contain an entry for physical sector 1"),
+            ),
+            (
+                "first missing before later role",
+                vec![
+                    PhysicalSectorRole::Directory,
+                    PhysicalSectorRole::RegularStream,
+                ],
+                vec![],
+                Some("FAT does not contain an entry for physical sector 0"),
+            ),
+            (
+                "recorded prefix marker before later missing",
+                vec![PhysicalSectorRole::Unclaimed, PhysicalSectorRole::Fat],
+                vec![ENDOFCHAIN],
+                Some("FAT does not contain an entry for physical sector 1"),
+            ),
+            (
+                "long padding",
+                vec![PhysicalSectorRole::Fat, PhysicalSectorRole::Unclaimed],
+                vec![
+                    FATSECT, FREESECT, ENDOFCHAIN, FATSECT, DIFSECT, MAXREGSECT, 7,
+                ],
+                None,
+            ),
+            (
+                "empty roles with long padding",
+                vec![],
+                vec![ENDOFCHAIN, MAXREGSECT, 7],
+                None,
+            ),
+        ];
+
+        for (case, roles, fat, expected_error) in cases {
+            let mut file = synthetic_fat_file(fat, Vec::new());
+            file.sector_roles = roles;
+            let roles_before = file.sector_roles.clone();
+            let fat_before = file.fat.clone();
+            let result = file.validate_physical_sector_layout();
+
+            if let Some(expected_error) = expected_error {
+                assert_claim_error(result, expected_error);
+            } else {
+                assert!(result.is_ok(), "{case}: {result:?}");
+            }
+            assert_eq!(file.sector_roles, roles_before, "{case}");
+            assert_eq!(file.fat, fat_before, "{case}");
+        }
+    }
+
+    fn synthetic_minifat_file(minifat: Vec<u32>, ministream: Vec<u8>) -> OleFile<Cursor<Vec<u8>>> {
+        OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat,
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: Some(ministream),
+            sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        }
+    }
+
+    fn synthetic_range_file(
+        bytes: Vec<u8>,
+        fat: Vec<u32>,
+        minifat: Vec<u32>,
+        root_chain: Vec<u32>,
+        root_size: u64,
+        stream_name: &str,
+        start_sector: u32,
+        stream_size: u64,
+        is_minifat: bool,
+    ) -> OleFile<Cursor<Vec<u8>>> {
+        let root = DirectoryEntry {
+            sid: 0,
+            name: "Root Entry".to_string(),
+            entry_type: STGTY_ROOT,
+            sid_left: NOSTREAM,
+            sid_right: NOSTREAM,
+            sid_child: 1,
+            clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+            start_sector: ENDOFCHAIN,
+            size: root_size,
+            is_minifat: false,
+            children: Vec::new(),
+        };
+        let stream = DirectoryEntry {
+            sid: 1,
+            name: stream_name.to_string(),
+            entry_type: STGTY_STREAM,
+            sid_left: NOSTREAM,
+            sid_right: NOSTREAM,
+            sid_child: NOSTREAM,
+            clsid: String::new(),
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+            start_sector,
+            size: stream_size,
+            is_minifat,
+            children: Vec::new(),
+        };
+        OleFile {
+            reader: Cursor::new(bytes.clone()),
+            file_size: bytes.len() as u64,
+            sector_size: SECTOR_SIZE_V3,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat,
+            minifat,
+            root_chain,
+            first_dir_sector: ENDOFCHAIN,
+            root: Some(root.clone()),
+            dir_entries: vec![Some(root), Some(stream)],
+            dir_name_data: vec![
+                Some(directory_name_data("Root Entry").unwrap()),
+                Some(directory_name_data(stream_name).unwrap()),
+            ],
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; bytes.len() / SECTOR_SIZE_V3],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        }
+    }
+
+    #[derive(Debug)]
+    struct TrackingReader {
+        inner: Cursor<Vec<u8>>,
+        reads: Vec<(u64, usize)>,
+        interrupt_reads: usize,
+        fail_reads: bool,
+        fail_seeks: bool,
+    }
+
+    impl TrackingReader {
+        fn new(bytes: Vec<u8>) -> Self {
+            Self {
+                inner: Cursor::new(bytes),
+                reads: Vec::new(),
+                interrupt_reads: 0,
+                fail_reads: false,
+                fail_seeks: false,
+            }
+        }
+    }
+
+    impl Read for TrackingReader {
+        fn read(&mut self, output: &mut [u8]) -> io::Result<usize> {
+            if self.interrupt_reads > 0 {
+                self.interrupt_reads -= 1;
+                return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
+            }
+            if self.fail_reads {
+                return Err(io::Error::other("injected read failure"));
+            }
+            let position = self.inner.position();
+            let read = self.inner.read(output)?;
+            if read > 0 {
+                self.reads.push((position, read));
+            }
+            Ok(read)
+        }
+    }
+
+    impl Seek for TrackingReader {
+        fn seek(&mut self, position: SeekFrom) -> io::Result<u64> {
+            if self.fail_seeks {
+                return Err(io::Error::other("injected seek failure"));
+            }
+            self.inner.seek(position)
+        }
+    }
+
+    #[test]
+    fn fat_stream_replays_fragmented_chain_in_order_at_exact_size() {
+        let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        bytes[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 3].copy_from_slice(b"one");
+        bytes[3 * SECTOR_SIZE_V3..3 * SECTOR_SIZE_V3 + 3].copy_from_slice(b"two");
+        let mut file = synthetic_fat_file(vec![2, ENDOFCHAIN, ENDOFCHAIN], bytes);
+
+        let data = file.read_stream_from_fat(0, 512 + 3).unwrap();
+        assert_eq!(&data[..3], b"one");
+        assert!(data[3..512].iter().all(|&byte| byte == 0));
+        assert_eq!(&data[512..], b"two");
+    }
+
+    #[test]
+    fn fat_stream_chain_errors_remain_typed_and_ordered() {
+        let bytes = vec![0u8; 3 * SECTOR_SIZE_V3];
+
+        let mut short = synthetic_fat_file(vec![ENDOFCHAIN], bytes.clone());
+        assert!(matches!(
+            short.read_stream_from_fat(0, 513),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT chain is shorter than the declared stream size"
+        ));
+
+        let mut excess = synthetic_fat_file(vec![1, ENDOFCHAIN], bytes.clone());
+        assert_eq!(excess.read_stream_from_fat(0, 1).unwrap(), vec![0]);
+
+        let mut invalid = synthetic_fat_file(vec![2], bytes.clone());
+        assert!(matches!(
+            invalid.read_stream_from_fat(0, 513),
+            Err(OleError::CorruptedFile(message))
+                if message == "Invalid sector index 2 in FAT"
+        ));
+
+        let mut invalid_marker = synthetic_fat_file(vec![MAXREGSECT], bytes);
+        assert!(matches!(
+            invalid_marker.read_stream_from_fat(0, 513),
+            Err(OleError::CorruptedFile(message))
+                if message == format!("Invalid sector marker 0x{MAXREGSECT:08X} in FAT chain")
+        ));
+    }
+
+    #[test]
+    fn fat_stream_read_zero_fills_a_truncated_final_sector() {
+        let mut bytes = vec![0u8; SECTOR_SIZE_V3 + 3];
+        bytes[SECTOR_SIZE_V3..].copy_from_slice(b"CFB");
+        let mut file = synthetic_fat_file(vec![ENDOFCHAIN], bytes);
+
+        let data = file.read_stream_from_fat(0, SECTOR_SIZE_V3 as u64).unwrap();
+
+        assert_eq!(&data[..3], b"CFB");
+        assert!(data[3..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn minifat_stream_replays_fragmented_chain_in_order_at_exact_size() {
+        let mut ministream = vec![0u8; 3 * 64];
+        ministream[..3].copy_from_slice(b"one");
+        ministream[2 * 64..2 * 64 + 3].copy_from_slice(b"two");
+        let mut file = synthetic_minifat_file(vec![2, ENDOFCHAIN, ENDOFCHAIN], ministream);
+
+        let data = file.read_stream_from_minifat(0, 64 + 3).unwrap();
+        assert_eq!(&data[..3], b"one");
+        assert!(data[3..64].iter().all(|&byte| byte == 0));
+        assert_eq!(&data[64..], b"two");
+    }
+
+    #[test]
+    fn minifat_stream_chain_errors_remain_typed_and_ordered() {
+        let ministream = vec![0u8; 2 * 64];
+
+        let mut short = synthetic_minifat_file(vec![ENDOFCHAIN], ministream.clone());
+        assert!(matches!(
+            short.read_stream_from_minifat(0, 65),
+            Err(OleError::CorruptedFile(message))
+                if message == "MiniFAT chain is shorter than the declared stream size"
+        ));
+
+        let mut excess = synthetic_minifat_file(vec![1, ENDOFCHAIN], ministream.clone());
+        assert_eq!(excess.read_stream_from_minifat(0, 1).unwrap(), vec![0]);
+
+        let mut invalid = synthetic_minifat_file(vec![2], ministream.clone());
+        assert!(matches!(
+            invalid.read_stream_from_minifat(0, 65),
+            Err(OleError::CorruptedFile(message))
+                if message == "Invalid sector index 2 in MiniFAT"
+        ));
+
+        let mut invalid_marker = synthetic_minifat_file(vec![MAXREGSECT], ministream.clone());
+        assert!(matches!(
+            invalid_marker.read_stream_from_minifat(0, 65),
+            Err(OleError::CorruptedFile(message))
+                if message
+                    == format!("Invalid sector marker 0x{MAXREGSECT:08X} in MiniFAT chain")
+        ));
+
+        let mut out_of_bounds = synthetic_minifat_file(vec![1, ENDOFCHAIN], vec![0; 64]);
+        assert!(matches!(
+            out_of_bounds.read_stream_from_minifat(1, 1),
+            Err(OleError::CorruptedFile(message)) if message == "Mini sector out of bounds"
+        ));
+    }
+
+    #[test]
+    fn direct_ranges_follow_fragmented_fat_and_minifat_chains() {
+        let mut fat_bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        fat_bytes[SECTOR_SIZE_V3..2 * SECTOR_SIZE_V3].fill(0x11);
+        fat_bytes[3 * SECTOR_SIZE_V3..4 * SECTOR_SIZE_V3].fill(0x22);
+        let mut fat_file = synthetic_range_file(
+            fat_bytes,
+            vec![2, ENDOFCHAIN, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Fat",
+            0,
+            2 * SECTOR_SIZE_V3 as u64,
+            false,
+        );
+        let mut fat_output = vec![0u8; 2 * SECTOR_SIZE_V3];
+        fat_file
+            .read_stream_range(&["Fat"], 0, &mut fat_output)
+            .unwrap();
+        assert!(
+            fat_output[..SECTOR_SIZE_V3]
+                .iter()
+                .all(|&byte| byte == 0x11)
+        );
+        assert!(
+            fat_output[SECTOR_SIZE_V3..]
+                .iter()
+                .all(|&byte| byte == 0x22)
+        );
+
+        let mut mini_bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        mini_bytes[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 64].fill(0x33);
+        mini_bytes[3 * SECTOR_SIZE_V3..3 * SECTOR_SIZE_V3 + 64].fill(0x44);
+        let mut mini_table = vec![ENDOFCHAIN; 9];
+        mini_table[8] = 0;
+        let mut mini_file = synthetic_range_file(
+            mini_bytes,
+            Vec::new(),
+            mini_table,
+            vec![0, 2],
+            1024,
+            "Mini",
+            8,
+            128,
+            true,
+        );
+        let mut mini_output = vec![0u8; 128];
+        mini_file
+            .read_stream_range(&["Mini"], 0, &mut mini_output)
+            .unwrap();
+        assert!(mini_output[..64].iter().all(|&byte| byte == 0x44));
+        assert!(mini_output[64..].iter().all(|&byte| byte == 0x33));
+        assert!(mini_file.ministream.is_none());
+    }
+
+    #[test]
+    fn direct_ranges_cover_boundaries_and_preserve_truncated_sector_zero_fill() {
+        let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        bytes[SECTOR_SIZE_V3 + SECTOR_SIZE_V3 - 2..2 * SECTOR_SIZE_V3].fill(0x51);
+        bytes[2 * SECTOR_SIZE_V3..2 * SECTOR_SIZE_V3 + 2].fill(0x62);
+        let mut file = synthetic_range_file(
+            bytes,
+            vec![1, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Boundary",
+            0,
+            (SECTOR_SIZE_V3 + 2) as u64,
+            false,
+        );
+        let mut boundary = [0u8; 4];
+        file.read_stream_range(&["Boundary"], 510, &mut boundary)
+            .unwrap();
+        assert_eq!(boundary, [0x51, 0x51, 0x62, 0x62]);
+
+        let mut truncated = vec![0u8; SECTOR_SIZE_V3 + 3];
+        truncated[SECTOR_SIZE_V3..].copy_from_slice(b"CFB");
+        let mut truncated_file = synthetic_range_file(
+            truncated,
+            vec![ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Tail",
+            0,
+            SECTOR_SIZE_V3 as u64,
+            false,
+        );
+        let mut tail = [0xFFu8; SECTOR_SIZE_V3];
+        truncated_file
+            .read_stream_range(&["Tail"], 0, &mut tail)
+            .unwrap();
+        assert_eq!(&tail[..3], b"CFB");
+        assert!(tail[3..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn direct_ranges_reject_bad_metadata_without_unbounded_traversal() {
+        let bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+
+        let mut short = synthetic_range_file(
+            bytes.clone(),
+            vec![ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Short",
+            0,
+            513,
+            false,
+        );
+        let mut one = [0u8; 1];
+        assert!(matches!(
+            short.read_stream_range(&["Short"], 512, &mut one),
+            Err(OleError::CorruptedFile(_))
+        ));
+
+        let mut invalid = synthetic_range_file(
+            bytes.clone(),
+            vec![MAXREGSECT, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Invalid",
+            0,
+            513,
+            false,
+        );
+        let mut invalid_output = [0u8; 513];
+        assert!(matches!(
+            invalid.read_stream_range(&["Invalid"], 0, &mut invalid_output),
+            Err(OleError::CorruptedFile(_))
+        ));
+
+        let mut cycle = synthetic_range_file(
+            bytes,
+            vec![0, ENDOFCHAIN],
+            Vec::new(),
+            Vec::new(),
+            0,
+            "Cycle",
+            0,
+            1024,
+            false,
+        );
+        let mut cycle_output = [0u8; 1024];
+        assert!(matches!(
+            cycle.read_stream_range(&["Cycle"], 0, &mut cycle_output),
+            Err(OleError::CorruptedFile(_))
+        ));
+
+        let mut mini_short = synthetic_range_file(
+            vec![0u8; 2 * SECTOR_SIZE_V3],
+            Vec::new(),
+            vec![ENDOFCHAIN, ENDOFCHAIN],
+            vec![0],
+            64,
+            "MiniShort",
+            0,
+            128,
+            true,
+        );
+        let mut mini_output = [0u8; 1];
+        assert!(matches!(
+            mini_short.read_stream_range(&["MiniShort"], 64, &mut mini_output),
+            Err(OleError::CorruptedFile(_))
+        ));
+    }
+
+    #[test]
+    fn direct_ranges_validate_bounds_before_payload_io_and_allow_exact_eof() {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Data"], b"payload").unwrap();
+        writer.create_storage(&["Folder"]).unwrap();
+        let mut serialized = Cursor::new(Vec::new());
+        writer.write_to(&mut serialized).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
+        file.reader.reads.clear();
+
+        let mut byte = [0u8; 1];
+        assert!(matches!(
+            file.read_stream_range(&["Data"], 7, &mut byte),
+            Err(OleError::InvalidData(_))
+        ));
+        assert!(matches!(
+            file.read_stream_range(&["Data"], u64::MAX, &mut byte),
+            Err(OleError::InvalidData(_))
+        ));
+        assert!(matches!(
+            file.read_stream_range(&["Missing"], 0, &mut byte),
+            Err(OleError::StreamNotFound)
+        ));
+        assert!(matches!(
+            file.read_stream_range(&["Folder"], 0, &mut byte),
+            Err(OleError::InvalidFormat(_))
+        ));
+        assert!(matches!(
+            file.read_stream_range(&[], 0, &mut byte),
+            Err(OleError::InvalidFormat(_))
+        ));
+        let mut empty = [];
+        file.read_stream_range(&["Data"], 7, &mut empty).unwrap();
+        assert!(matches!(
+            file.read_stream_range(&["Data"], 8, &mut empty),
+            Err(OleError::InvalidData(_))
+        ));
+        assert!(file.reader.reads.is_empty());
+    }
+
+    #[test]
+    fn direct_ranges_are_cursor_independent_local_and_retry_interrupted_reads() {
+        let mut writer = OleWriter::new();
+        let payload = vec![0xA5; 4096];
+        writer.create_stream(&["Large"], &payload).unwrap();
+        let mut serialized = Cursor::new(Vec::new());
+        writer.write_to(&mut serialized).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
+        let start_sector = file.find_entry(&["Large"]).unwrap().start_sector;
+        let physical = (u64::from(start_sector) + 1) * file.sector_size as u64 + 510;
+        file.reader.reads.clear();
+        file.reader.seek(SeekFrom::End(0)).unwrap();
+        file.reader.interrupt_reads = 1;
+        let mut output = [0u8; 4];
+        file.read_stream_range(&["Large"], 510, &mut output)
+            .unwrap();
+        assert_eq!(output, [0xA5; 4]);
+        assert_eq!(file.reader.reads, vec![(physical, 4)]);
+
+        file.reader.reads.clear();
+        file.reader.seek(SeekFrom::Start(0)).unwrap();
+        file.read_stream_range(&["Large"], 510, &mut output)
+            .unwrap();
+        assert_eq!(output, [0xA5; 4]);
+        assert_eq!(file.reader.reads, vec![(physical, 4)]);
+    }
+
+    #[test]
+    fn direct_ranges_propagate_seek_and_read_failures_and_match_open_stream() {
+        let mut writer = OleWriter::new();
+        let payload = vec![0x37; 4096];
+        writer.create_stream(&["Large"], &payload).unwrap();
+        let mut serialized = Cursor::new(Vec::new());
+        writer.write_to(&mut serialized).unwrap();
+        let mut file = OleFile::open(
+            TrackingReader::new(serialized.into_inner()),
+            OleFileLimits::default(),
+        )
+        .unwrap();
+        file.reader.fail_seeks = true;
+        let mut output = [0u8; 4];
+        assert!(matches!(
+            file.read_stream_range(&["Large"], 0, &mut output),
+            Err(OleError::Io(_))
+        ));
+        file.reader.fail_seeks = false;
+        file.reader.fail_reads = true;
+        assert!(matches!(
+            file.read_stream_range(&["Large"], 0, &mut output),
+            Err(OleError::Io(_))
+        ));
+        file.reader.fail_reads = false;
+        let full = file.open_stream(&["Large"]).unwrap();
+        let mut range = vec![0u8; full.len()];
+        file.read_stream_range(&["Large"], 0, &mut range).unwrap();
+        assert_eq!(range, full);
+    }
+
+    /// Build a compound-file image whose FAT occupies exactly `fat_sectors`,
+    /// together with the 512-byte header whose DIFAT array names them.
+    ///
+    /// The FAT marks its own sectors FATSECT and leaves every other entry
+    /// FREESECT, which is all `load_fat` validates about FAT contents.
+    fn fat_image(fat_sectors: &[u32], sector_size: usize) -> (Vec<u8>, [u8; 512]) {
+        assert!(
+            fat_sectors.len() <= HEADER_DIFAT_ENTRIES,
+            "this builder writes the FAT sector list into the header DIFAT only"
+        );
+        let entries_per_sector = sector_size / 4;
+        let fat_entry_count = fat_sectors.len() * entries_per_sector;
+        let highest = fat_sectors.iter().copied().max().unwrap_or(0) as usize;
+        assert!(
+            highest < fat_entry_count,
+            "a FAT sector has to be describable by the FAT it belongs to"
+        );
+        let physical_sectors = (highest + 1).max(fat_sectors.len());
+        let mut image = vec![0u8; (physical_sectors + 1) * sector_size];
+
+        let mut fat = vec![FREESECT; fat_entry_count];
+        for &sector in fat_sectors {
+            fat[sector as usize] = FATSECT;
+        }
+        for (index, entry) in fat.iter().enumerate() {
+            let holder = fat_sectors[index / entries_per_sector] as usize;
+            let offset = (holder + 1) * sector_size + (index % entries_per_sector) * 4;
+            image[offset..offset + 4].copy_from_slice(&entry.to_le_bytes());
+        }
+
+        let mut header = [0u8; 512];
+        for (index, sector) in fat_sectors.iter().enumerate() {
+            let offset = HEADER_DIFAT_OFFSET + index * 4;
+            header[offset..offset + 4].copy_from_slice(&sector.to_le_bytes());
+        }
+        (image, header)
+    }
+
+    fn table_loader(
+        image: Vec<u8>,
+        sector_size: usize,
+        physical_sectors: usize,
+    ) -> OleFile<TrackingReader> {
+        let file_size = image.len() as u64;
+        OleFile {
+            reader: TrackingReader::new(image),
+            file_size,
+            sector_size,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; physical_sectors],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        }
+    }
+
+    /// Load a FAT laid out in `fat_sectors`, keeping the reads it issued.
+    fn loaded_fat(fat_sectors: &[u32], sector_size: usize) -> OleFile<TrackingReader> {
+        let (image, header) = fat_image(fat_sectors, sector_size);
+        let physical_sectors = image.len() / sector_size - 1;
+        let mut file = table_loader(image, sector_size, physical_sectors);
+        file.reader.reads.clear();
+        file.load_fat(&header, fat_sectors.len() as u32, ENDOFCHAIN, 0)
+            .unwrap();
+        for &sector in fat_sectors {
+            assert_eq!(file.fat[sector as usize], FATSECT);
+        }
+        file
+    }
+
+    /// Physical read offsets and lengths for reading `fat_sectors` one sector
+    /// at a time, which is what `load_fat` issued before run batching.
+    fn unbatched_reads(sectors: &[u32], sector_size: usize) -> Vec<(u64, usize)> {
+        sectors
+            .iter()
+            .map(|&sector| ((sector as u64 + 1) * sector_size as u64, sector_size))
+            .collect()
+    }
+
+    #[test]
+    fn contiguous_fat_sectors_are_read_one_run_at_a_time() {
+        // `test-data/ole/doc/picture.doc`: 23 FAT sectors in 3 physically
+        // contiguous runs of 1, 21 and 1.
+        let picture: Vec<u32> = std::iter::once(0)
+            .chain(128..=148)
+            .chain(std::iter::once(2816))
+            .collect();
+        assert_eq!(picture.len(), 23);
+        let file = loaded_fat(&picture, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            vec![(512, 512), (129 * 512, 21 * 512), (2817 * 512, 512),],
+            "23 FAT sectors in 3 runs must cost 3 reads"
+        );
+        assert_eq!(unbatched_reads(&picture, SECTOR_SIZE_V3).len(), 23);
+
+        // `test-data/ole/doc/testPictures.doc`: 5 FAT sectors in one run.
+        let test_pictures: Vec<u32> = (607..=611).collect();
+        let file = loaded_fat(&test_pictures, SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(608 * 512, 5 * 512)]);
+        assert_eq!(unbatched_reads(&test_pictures, SECTOR_SIZE_V3).len(), 5);
+
+        // `test-data/ole/doc/FloatingPictures.doc`: 6 FAT sectors in 3 runs,
+        // and its last two sectors descend (650 then 649), so the run walk
+        // must not assume the list ascends.
+        let floating = [573, 574, 575, 576, 650, 649];
+        let file = loaded_fat(&floating, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            vec![(574 * 512, 4 * 512), (651 * 512, 512), (650 * 512, 512)],
+            "a descending pair stays two reads, replayed in list order"
+        );
+        assert_eq!(unbatched_reads(&floating, SECTOR_SIZE_V3).len(), 6);
+    }
+
+    #[test]
+    fn isolated_fat_sectors_still_cost_one_read_each() {
+        // Every FAT sector isolated: batching must be exactly neutral, down to
+        // the offset and length of each read.
+        for layout in [vec![1u32, 3, 5], (0..22).map(|index| index * 2).collect()] {
+            let file = loaded_fat(&layout, SECTOR_SIZE_V3);
+            assert_eq!(
+                file.reader.reads,
+                unbatched_reads(&layout, SECTOR_SIZE_V3),
+                "isolated FAT sectors must read exactly as they did before"
+            );
+        }
+
+        // A single FAT sector, the shape of most files in the corpus.
+        let file = loaded_fat(&[0], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(512, 512)]);
+        let file = loaded_fat(&[7], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(8 * 512, 512)]);
+    }
+
+    #[test]
+    fn a_fat_run_longer_than_the_scratch_is_read_in_bounded_pieces() {
+        // 4096-byte sectors put the 64 KiB scratch bound at 16 sectors, so a
+        // 17-sector run has to split into a full piece and a remainder.
+        let sectors: Vec<u32> = (0..17).collect();
+        let file = loaded_fat(&sectors, SECTOR_SIZE_V4);
+        assert_eq!(
+            file.reader.reads,
+            vec![
+                (SECTOR_SIZE_V4 as u64, SECTOR_BATCH_SCRATCH_BYTES),
+                (
+                    SECTOR_SIZE_V4 as u64 + SECTOR_BATCH_SCRATCH_BYTES as u64,
+                    SECTOR_SIZE_V4
+                ),
+            ]
+        );
+        let total: usize = file.reader.reads.iter().map(|&(_, len)| len).sum();
+        assert_eq!(total, 17 * SECTOR_SIZE_V4);
+
+        // The table is identical to the one the sector-at-a-time loop built.
+        assert_eq!(file.fat.len(), 17 * (SECTOR_SIZE_V4 / 4));
+        for (index, &entry) in file.fat.iter().enumerate() {
+            let expected = if index < 17 { FATSECT } else { FREESECT };
+            assert_eq!(entry, expected, "FAT entry {index}");
+        }
+    }
+
+    #[test]
+    fn batched_fat_reads_zero_fill_a_truncated_final_sector() {
+        // The image stops three bytes into its second FAT sector.
+        let (image, header) = fat_image(&[1, 2], SECTOR_SIZE_V3);
+        let truncated = 3 * SECTOR_SIZE_V3 + 3;
+        let mut file = table_loader(image[..truncated].to_vec(), SECTOR_SIZE_V3, 3);
+        file.reader.reads.clear();
+        file.load_fat(&header, 2, ENDOFCHAIN, 0).unwrap();
+
+        assert_eq!(
+            file.reader.reads,
+            vec![(2 * 512, 512 + 3)],
+            "the run is read once, clamped to the bytes the file actually has"
+        );
+        assert_eq!(file.fat.len(), 256);
+        assert_eq!(file.fat[0], FREESECT);
+        assert_eq!(file.fat[1], FATSECT);
+        assert_eq!(file.fat[2], FATSECT);
+        // Only three bytes of entry 128 are on disk; the tail reads as zero.
+        assert_eq!(file.fat[128], 0x00FF_FFFF);
+        assert!(file.fat[129..].iter().all(|&entry| entry == 0));
+    }
+
+    #[test]
+    fn batched_fat_reads_keep_typed_errors_and_their_order() {
+        // A FAT sector that starts at or past the end of the file keeps its
+        // own error, and the sectors before it are still read first.
+        let (image, header) = fat_image(&[1, 2], SECTOR_SIZE_V3);
+        let mut file = table_loader(image[..3 * SECTOR_SIZE_V3].to_vec(), SECTOR_SIZE_V3, 4);
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_fat(&header, 2, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "Sector 2 is outside the file"
+        ));
+        assert_eq!(
+            file.reader.reads,
+            vec![(2 * 512, 512)],
+            "the readable sector before the bad one is still read, in order"
+        );
+
+        // A FAT that does not mark one of its own sectors FATSECT.
+        let (mut image, header) = fat_image(&[1, 2, 3], SECTOR_SIZE_V3);
+        let entry_two = 2 * SECTOR_SIZE_V3 + 2 * 4;
+        image[entry_two..entry_two + 4].copy_from_slice(&FREESECT.to_le_bytes());
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 4);
+        assert!(matches!(
+            file.load_fat(&header, 3, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT sector 2 is not marked FATSECT"
+        ));
+
+        // A header DIFAT whose list ends before the declared FAT count.
+        let (image, mut header) = fat_image(&[1, 2, 3], SECTOR_SIZE_V3);
+        let third = HEADER_DIFAT_OFFSET + 2 * 4;
+        header[third..third + 4].copy_from_slice(&FREESECT.to_le_bytes());
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 4);
+        assert!(matches!(
+            file.load_fat(&header, 3, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "FAT sector list ends before its declared count"
+        ));
+
+        // A declared FAT sector count larger than the physical file.
+        let (image, header) = fat_image(&[1], SECTOR_SIZE_V3);
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 1);
+        assert!(matches!(
+            file.load_fat(&header, 2, ENDOFCHAIN, 0),
+            Err(OleError::CorruptedFile(message))
+                if message == "Declared FAT sector count exceeds the physical file"
+        ));
+    }
+
+    /// Load a MiniFAT stored in `chain`, keeping the reads it issued.
+    fn loaded_minifat(chain: &[u32], sector_size: usize) -> OleFile<TrackingReader> {
+        let highest = chain.iter().copied().max().unwrap_or(0) as usize;
+        let physical_sectors = highest + 1;
+        let image = vec![0u8; (physical_sectors + 1) * sector_size];
+        let mut fat = vec![FREESECT; physical_sectors];
+        for pair in chain.windows(2) {
+            fat[pair[0] as usize] = pair[1];
+        }
+        if let Some(&last) = chain.last() {
+            fat[last as usize] = ENDOFCHAIN;
+        }
+
+        let mut file = table_loader(image, sector_size, physical_sectors);
+        file.fat = fat;
+        file.reader.reads.clear();
+        file.load_minifat(chain[0], chain.len() as u32).unwrap();
+        file
+    }
+
+    #[test]
+    fn contiguous_minifat_sectors_are_read_one_run_at_a_time() {
+        // Contiguous chain: one read instead of four.
+        let file = loaded_minifat(&[1, 2, 3, 4], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(2 * 512, 4 * 512)]);
+        assert_eq!(file.minifat.len(), 4 * (SECTOR_SIZE_V3 / 4));
+
+        // Fragmented chain: unchanged, one read per isolated sector. This is
+        // every MiniFAT in the surveyed corpus, which has no file with more
+        // than one MiniFAT sector.
+        let fragmented = [1, 3, 5];
+        let file = loaded_minifat(&fragmented, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            unbatched_reads(&fragmented, SECTOR_SIZE_V3)
+        );
+        let file = loaded_minifat(&[2], SECTOR_SIZE_V3);
+        assert_eq!(file.reader.reads, vec![(3 * 512, 512)]);
+    }
+
+    #[test]
+    fn a_minifat_run_longer_than_the_scratch_is_read_in_bounded_pieces() {
+        // 512-byte sectors put the bound at 128 sectors, so a 129-sector run
+        // splits. The MiniFAT chain has no 109-entry header limit, so this
+        // exercises the multi-piece path at the other sector size.
+        let chain: Vec<u32> = (0..129).collect();
+        let file = loaded_minifat(&chain, SECTOR_SIZE_V3);
+        assert_eq!(
+            file.reader.reads,
+            vec![
+                (512, SECTOR_BATCH_SCRATCH_BYTES),
+                (512 + SECTOR_BATCH_SCRATCH_BYTES as u64, 512),
+            ]
+        );
+        assert_eq!(file.minifat.len(), 129 * (SECTOR_SIZE_V3 / 4));
+        assert!(file.minifat.iter().all(|&entry| entry == 0));
+    }
+
+    #[test]
+    fn batched_minifat_reads_keep_typed_errors_and_their_order() {
+        // A MiniFAT sector past the end of the file keeps its own error, after
+        // the readable sector ahead of it has been read.
+        let image = vec![0u8; 3 * SECTOR_SIZE_V3];
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 4);
+        file.fat = vec![FREESECT, 2, ENDOFCHAIN, FREESECT];
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_minifat(1, 2),
+            Err(OleError::CorruptedFile(message))
+                if message == "Sector 2 is outside the file"
+        ));
+        assert_eq!(file.reader.reads, vec![(2 * 512, 512)]);
+
+        // A chain shorter than its declared sector count still fails in
+        // `collect_sector_chain_exact`, before any sector is read.
+        let image = vec![0u8; 4 * SECTOR_SIZE_V3];
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 3);
+        file.fat = vec![FREESECT, ENDOFCHAIN, FREESECT];
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_minifat(1, 2),
+            Err(OleError::CorruptedFile(_))
+        ));
+        assert!(file.reader.reads.is_empty());
+
+        // A chain that revisits a sector is rejected before any read, so the
+        // batching walk never sees a repeated sector.
+        let image = vec![0u8; 4 * SECTOR_SIZE_V3];
+        let mut file = table_loader(image, SECTOR_SIZE_V3, 3);
+        file.fat = vec![FREESECT, 2, 1];
+        file.reader.reads.clear();
+        assert!(matches!(
+            file.load_minifat(1, 3),
+            Err(OleError::CorruptedFile(_))
+        ));
+        assert!(file.reader.reads.is_empty());
+    }
+
+    #[test]
+    fn the_sector_batch_scratch_is_bounded_by_the_longest_run_it_will_hold() {
+        let file = table_loader(vec![0u8; 2 * SECTOR_SIZE_V3], SECTOR_SIZE_V3, 1);
+        let scratch =
+            |sectors: &[u32]| file.sector_batch_scratch(sectors, "scratch").unwrap().len();
+
+        // An empty or single-sector table, and a table whose sectors are all
+        // isolated, keep the one-sector footprint of the unbatched loaders.
+        assert_eq!(scratch(&[]), 512);
+        assert_eq!(scratch(&[7]), 512);
+        assert_eq!(scratch(&[1, 3, 5]), 512);
+        assert_eq!(
+            scratch(&(0..22).map(|index| index * 2).collect::<Vec<u32>>()),
+            512
+        );
+        // A descending pair is not a run.
+        assert_eq!(scratch(&[650, 649]), 512);
+
+        // Only the longest run is paid for, not the whole table. This is
+        // `picture.doc`: 23 FAT sectors whose longest run is 21.
+        let picture: Vec<u32> = std::iter::once(0)
+            .chain(128..=148)
+            .chain(std::iter::once(2816))
+            .collect();
+        assert_eq!(scratch(&picture), 21 * 512);
+
+        // A run longer than the bound stops at the bound.
+        assert_eq!(
+            scratch(&(0..1_000).collect::<Vec<u32>>()),
+            SECTOR_BATCH_SCRATCH_BYTES
+        );
+
+        // The bound holds at the other sector size too.
+        let file = table_loader(vec![0u8; 2 * SECTOR_SIZE_V4], SECTOR_SIZE_V4, 1);
+        let scratch =
+            |sectors: &[u32]| file.sector_batch_scratch(sectors, "scratch").unwrap().len();
+        assert_eq!(scratch(&[3]), SECTOR_SIZE_V4);
+        assert_eq!(
+            scratch(&(0..1_000).collect::<Vec<u32>>()),
+            SECTOR_BATCH_SCRATCH_BYTES
+        );
+    }
+
+    #[test]
+    fn batched_sector_reads_place_noncontiguous_sectors_in_order() {
+        let mut bytes = vec![0u8; 4 * SECTOR_SIZE_V3];
+        bytes[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 3].copy_from_slice(b"one");
+        bytes[3 * SECTOR_SIZE_V3..3 * SECTOR_SIZE_V3 + 3].copy_from_slice(b"two");
+        let mut file = OleFile {
+            reader: Cursor::new(bytes),
+            file_size: (4 * SECTOR_SIZE_V3) as u64,
+            sector_size: SECTOR_SIZE_V3,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; 3],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+        let mut data = vec![0xFF; 2 * SECTOR_SIZE_V3];
+
+        file.read_sectors_batched(&[0, 2], &mut data).unwrap();
+
+        assert_eq!(&data[..3], b"one");
+        assert_eq!(&data[SECTOR_SIZE_V3..SECTOR_SIZE_V3 + 3], b"two");
+        assert!(data[3..SECTOR_SIZE_V3].iter().all(|&byte| byte == 0));
+        assert!(data[SECTOR_SIZE_V3 + 3..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn detects_cycles_in_allocation_chains() {
+        assert_eq!(
+            collect_sector_chain(&[1, ENDOFCHAIN], 0, "FAT").unwrap(),
+            [0, 1]
+        );
+        assert!(matches!(
+            collect_sector_chain(&[1, 0], 0, "FAT"),
+            Err(OleError::CorruptedFile(message)) if message.contains("Cycle detected")
+        ));
+        assert!(matches!(
+            collect_sector_chain(&[0], 0, "MiniFAT"),
+            Err(OleError::CorruptedFile(message)) if message.contains("Cycle detected")
+        ));
+    }
+
+    #[test]
+    fn rejects_self_referential_difat_chains() {
+        let mut bytes = vec![0u8; 114 * 512];
+        let mut header = [0u8; 512];
+        for sector in 0..109u32 {
+            let offset = 0x4C + sector as usize * 4;
+            header[offset..offset + 4].copy_from_slice(&sector.to_le_bytes());
+        }
+        let difat_offset = (109 + 1) * 512;
+        bytes[difat_offset..difat_offset + 4].copy_from_slice(&110u32.to_le_bytes());
+        bytes[difat_offset + 4..difat_offset + 8].copy_from_slice(&111u32.to_le_bytes());
+        for offset in (difat_offset + 8..difat_offset + 508).step_by(4) {
+            bytes[offset..offset + 4].copy_from_slice(&FREESECT.to_le_bytes());
+        }
+        bytes[difat_offset + 508..difat_offset + 512].copy_from_slice(&109u32.to_le_bytes());
+
+        let mut file = OleFile {
+            reader: Cursor::new(bytes),
+            file_size: (114 * 512) as u64,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; 113],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+        assert!(matches!(
+            file.load_fat(&header, 111, 109, 2),
+            Err(OleError::CorruptedFile(message)) if message.contains("claimed by both")
+        ));
+    }
+
+    #[test]
+    fn rejects_difat_counts_beyond_the_physical_file_before_reserving() {
+        let mut data = sample_file();
+        data[0x44..0x48].copy_from_slice(&0u32.to_le_bytes());
+        data[0x48..0x4C].copy_from_slice(&u32::MAX.to_le_bytes());
+
+        assert!(matches!(
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("DIFAT sector count exceeds the physical file")
+        ));
+    }
+
+    #[test]
+    fn rejects_minifat_buffer_size_overflow_before_reading_a_sector() {
+        let mut file = OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: usize::MAX,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: vec![1, ENDOFCHAIN],
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed; 2],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+
+        assert!(matches!(
+            file.load_minifat(0, 2),
+            Err(OleError::CorruptedFile(message))
+                if message.contains("MiniFAT data size overflow")
+        ));
+    }
+
+    #[test]
+    fn reports_minifat_allocation_failure_without_panicking() {
+        let mut file = OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: usize::MAX,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: vec![ENDOFCHAIN],
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: vec![PhysicalSectorRole::Unclaimed],
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+
+        assert!(matches!(
+            file.load_minifat(0, 1),
+            Err(OleError::Allocation {
+                resource: "MiniFAT data",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn rejects_cyclic_directory_trees() {
+        let mut data = sample_file();
+        let directory_sector = u32::from_le_bytes(data[0x30..0x34].try_into().unwrap());
+        let directory_offset = (directory_sector as usize + 1) * 512;
+        data[directory_offset + 76..directory_offset + 80].copy_from_slice(&0u32.to_le_bytes());
+
+        assert!(matches!(
+            OleFile::open(Cursor::new(data), OleFileLimits::default()),
+            Err(OleError::CorruptedFile(message)) if message.contains("repeated SID")
+        ));
+    }
+
+    #[test]
+    fn rejects_sector_reads_past_the_physical_file() {
+        let mut file = OleFile {
+            reader: Cursor::new(vec![0; 512]),
+            file_size: 512,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+        assert!(matches!(
+            file.read_sector(0),
+            Err(OleError::CorruptedFile(message)) if message.contains("outside the file")
+        ));
+    }
+
+    #[test]
+    fn read_sector_into_zero_fills_a_truncated_final_sector() {
+        let mut bytes = vec![0u8; SECTOR_SIZE_V3 + 3];
+        bytes[SECTOR_SIZE_V3..].copy_from_slice(b"CFB");
+        let mut file = OleFile {
+            reader: Cursor::new(bytes),
+            file_size: (SECTOR_SIZE_V3 + 3) as u64,
+            sector_size: SECTOR_SIZE_V3,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: None,
+            dir_entries: Vec::new(),
+            dir_name_data: Vec::new(),
+            ministream: None,
+            sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+        let mut destination = [0xFF; SECTOR_SIZE_V3];
+
+        file.read_sector_into(0, &mut destination).unwrap();
+
+        assert_eq!(&destination[..3], b"CFB");
+        assert!(destination[3..].iter().all(|&byte| byte == 0));
+    }
+
+    #[test]
+    fn tolerates_nonfree_fat_padding_beyond_the_physical_file() {
+        // MS-CFB 2.3 requires past-end-of-file FAT entries to be FREESECT,
+        // but real producers (Word, Apache POI) fill the padding with
+        // ENDOFCHAIN; the markers address no physical bytes and are inert.
+        let mut data = sample_file();
+        let physical_sector_count = data.len() / 512 - 1;
+        let fat_sector = u32::from_le_bytes(data[0x4c..0x50].try_into().unwrap());
+        let fat_offset = (usize::try_from(fat_sector).unwrap() + 1) * 512;
+        let padding_offset = fat_offset + physical_sector_count * 4;
+        assert_eq!(
+            &data[padding_offset..padding_offset + 4],
+            &FREESECT.to_le_bytes()
+        );
+        data[padding_offset..padding_offset + 4].copy_from_slice(&ENDOFCHAIN.to_le_bytes());
+
+        assert!(OleFile::open(Cursor::new(data), OleFileLimits::default()).is_ok());
+    }
+
+    #[test]
+    fn lists_deep_directory_trees_without_call_stack_growth() {
+        const DEPTH: usize = 16_384;
+
+        let mut dir_entries = vec![None; DEPTH + 1];
+        let mut dir_name_data = vec![None; DEPTH + 1];
+        for index in (0..DEPTH).rev() {
+            let sid = u32::try_from(index + 1).unwrap();
+            let right = if index + 1 < DEPTH {
+                u32::try_from(index + 2).unwrap()
+            } else {
+                NOSTREAM
+            };
+            let name = format!("Stream {index:05}");
+            dir_name_data[sid as usize] = Some(directory_name_data(&name).unwrap());
+            dir_entries[sid as usize] = Some(DirectoryEntry {
+                sid,
+                name,
+                entry_type: STGTY_STREAM,
+                sid_left: NOSTREAM,
+                sid_right: right,
+                sid_child: NOSTREAM,
+                clsid: String::new(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
+                start_sector: ENDOFCHAIN,
+                size: 0,
+                is_minifat: false,
+                children: Vec::new(),
+            });
+        }
+
+        let file = OleFile {
+            reader: Cursor::new(Vec::new()),
+            file_size: 0,
+            sector_size: 512,
+            mini_sector_size: 64,
+            mini_stream_cutoff: 4096,
+            fat: Vec::new(),
+            minifat: Vec::new(),
+            root_chain: Vec::new(),
+            first_dir_sector: ENDOFCHAIN,
+            root: Some(DirectoryEntry {
+                sid: 0,
+                name: "Root Entry".to_string(),
+                entry_type: STGTY_ROOT,
+                sid_left: NOSTREAM,
+                sid_right: NOSTREAM,
+                sid_child: 1,
+                clsid: String::new(),
+                state_bits: 0,
+                creation_time: 0,
+                modified_time: 0,
+                start_sector: ENDOFCHAIN,
+                size: 0,
+                is_minifat: false,
+                children: Vec::new(),
+            }),
+            dir_entries,
+            dir_name_data,
+            ministream: None,
+            sector_roles: Vec::new(),
+            stream_chain: EndChainScratch::default(),
+            tolerance: ToleranceReport::default(),
+            misordered_siblings: false,
+        };
+
+        let streams = file.list_streams();
+        assert_eq!(streams.len(), DEPTH);
+        assert_eq!(streams[0], vec!["Stream 00000"]);
+        let last_name = format!("Stream {:05}", DEPTH - 1);
+        assert_eq!(streams[DEPTH - 1], vec![last_name]);
+
+        let entries = file.list_directory_entries(&[]).unwrap();
+        assert_eq!(entries.len(), DEPTH);
+        assert_eq!(entries.first().map(|entry| entry.sid), Some(1));
+        assert_eq!(
+            entries.last().map(|entry| entry.sid),
+            Some(u32::try_from(DEPTH).unwrap())
+        );
+    }
 }

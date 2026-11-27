@@ -1,0 +1,309 @@
+//! OPC relationship and part lifecycle for presentation properties.
+
+use super::codec::Limits;
+use super::model::Properties;
+use super::{CONTENT_TYPE, REL, STRICT_REL};
+use crate::leniency::ToleranceReport;
+use crate::package::signature::{refuse_signed_change, settle_unsigned_change};
+use crate::{Error, Result};
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::part::BlobPart;
+use litchi_opc::{OpcPackage, PackURI, Part};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+
+/// Load the presentation-properties part through its relationship, reading
+/// it with the repairs of [`Properties::parse`].
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn load_from_package(package: &OpcPackage, limits: Limits) -> Result<Option<Properties>> {
+    load_from_package_with_tolerance(package, &mut ToleranceReport::default(), limits)
+}
+
+/// [`load_from_package`], appending the read's repairs to `tolerance`,
+/// stamped with the presentation-properties part name.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn load_from_package_with_tolerance(
+    package: &OpcPackage,
+    tolerance: &mut ToleranceReport,
+    limits: Limits,
+) -> Result<Option<Properties>> {
+    load(package, Some(tolerance), limits)
+}
+
+/// Load for an edit transaction: a part whose read would need a repair is
+/// refused, so a rewrite never drops what the repair skipped.
+fn load_strict(package: &OpcPackage, limits: Limits) -> Result<Option<Properties>> {
+    load(package, None, limits)
+}
+
+fn load(
+    package: &OpcPackage,
+    tolerance: Option<&mut ToleranceReport>,
+    limits: Limits,
+) -> Result<Option<Properties>> {
+    let Some(uri) = find_properties_part(package)? else {
+        return Ok(None);
+    };
+    let part = package.get_part(&uri)?;
+    let mut value = match tolerance {
+        Some(tolerance) => {
+            let mut repairs = ToleranceReport::default();
+            let value = Properties::parse_with_tolerance(part.blob(), &mut repairs, limits)?;
+            repairs.locate_in_part(uri.as_str());
+            tolerance.append(&repairs);
+            value
+        },
+        None => Properties::parse_strict(part.blob(), limits)?,
+    };
+    hydrate_html_target(part, &mut value)?;
+    Ok(Some(value))
+}
+
+/// Read only the typed document-level math defaults.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub fn load_math_from_package(
+    package: &OpcPackage,
+    limits: Limits,
+) -> Result<Option<crate::presentation_properties::math::Properties>> {
+    Ok(load_from_package(package, limits)?.and_then(|value| value.math().cloned()))
+}
+
+/// Validate one presentation-properties payload changed by a typed patch
+/// under the recipient's selected policy. The replay engine already checks
+/// the exact before image and relationship graph; only the changed XML part
+/// is physically scanned and parsed here.
+pub(crate) fn validate_replay_part(
+    part: &dyn Part,
+    limits: Limits,
+    source_limits: litchi_opc::SourceLimits,
+) -> Result<()> {
+    if part.content_type() == CONTENT_TYPE {
+        // `Limits` carries the presentation-properties semantic ceilings, but
+        // the retained source profile's event budget is physical: it counts
+        // every XML parser event, including the extension branch that a
+        // typed edit may add. Keep this scan before the vocabulary parser so
+        // MCE or opaque extension content cannot hide that charge.
+        crate::source_limits::validate_xml_limits(part.blob(), source_limits)?;
+        Properties::parse_strict(part.blob(), limits).map(drop)
+    } else {
+        Ok(())
+    }
+}
+
+/// Replace the typed document-level math defaults as one package transaction.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
+/// # Errors
+///
+/// Returns an error if the operation fails.
+pub(crate) fn put_math_to_package(
+    package: &mut OpcPackage,
+    value: crate::presentation_properties::math::Properties,
+    limits: Limits,
+) -> Result<Option<crate::presentation_properties::math::Properties>> {
+    value.validate()?;
+    let previous = load_math_from_package(package, limits)?;
+    if previous.as_ref() == Some(&value) {
+        return Ok(previous);
+    }
+    refuse_signed_change(package)?;
+
+    let mut staged = package.clone();
+    let properties = find_properties_part(&staged)?;
+    let mut snapshot = if properties.is_some() {
+        load_strict(&staged, limits)?.ok_or_else(|| {
+            invalid("presentation-properties relationship disappeared during staging")
+        })?
+    } else {
+        Properties::default()
+    };
+    snapshot.replace_math(value.clone());
+    let strict = properties
+        .as_ref()
+        .map(|uri| is_strict_root(staged.get_part(uri)?.blob()))
+        .transpose()?
+        .unwrap_or(false);
+    let blob = snapshot.to_xml(strict, limits)?;
+    let parsed = Properties::parse(&blob, limits)?;
+    if parsed.math() != Some(&value) {
+        return Err(invalid("staged presentation math did not round-trip"));
+    }
+
+    if let Some(uri) = properties {
+        staged.get_part_mut(&uri)?.set_blob(blob);
+    } else {
+        let uri = staged.next_partname("/ppt/presProps%d.xml")?;
+        let presentation = staged.main_document_part()?.partname().clone();
+        staged.try_add_part(Box::new(BlobPart::new(
+            uri.clone(),
+            ct::PML_PRES_PROPS.to_owned(),
+            blob,
+        )))?;
+        let target = uri.relative_ref(presentation.base_uri());
+        staged
+            .get_part_mut(&presentation)?
+            .relate_to(&target, rt::PRES_PROPS);
+    }
+    settle_unsigned_change(&mut staged)?;
+    if load_math_from_package(&staged, limits)?.as_ref() != Some(&value) {
+        return Err(invalid("published presentation math did not validate"));
+    }
+    *package = staged;
+    Ok(previous)
+}
+
+/// Remove the typed document-level math defaults as one package transaction.
+///
+/// A change to a signed package is refused with
+/// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+/// (ADR 0006) before anything is mutated: remove the signature explicitly
+/// first, with [`Package::unsign`](crate::Package::unsign) or, on a raw
+/// package, [`OpcPackage::unsign`](litchi_opc::OpcPackage::unsign). An exact
+/// no-op keeps the signature.
+///
+/// # Errors
+///
+/// Returns an error if the input cannot be read or is malformed.
+pub(crate) fn remove_math_from_package(
+    package: &mut OpcPackage,
+    limits: Limits,
+) -> Result<Option<crate::presentation_properties::math::Properties>> {
+    let previous = load_math_from_package(package, limits)?;
+    let Some(previous_value) = previous.clone() else {
+        return Ok(None);
+    };
+    refuse_signed_change(package)?;
+
+    let mut staged = package.clone();
+    let uri = find_properties_part(&staged)?.ok_or_else(|| {
+        invalid("presentation-properties relationship disappeared during staging")
+    })?;
+    let mut snapshot = load_strict(&staged, limits)?.ok_or_else(|| {
+        invalid("presentation-properties relationship disappeared during staging")
+    })?;
+    let removed = snapshot.remove_math();
+    if removed.as_ref() != Some(&previous_value) {
+        return Err(invalid("presentation math snapshot changed during staging"));
+    }
+    let strict = is_strict_root(staged.get_part(&uri)?.blob())?;
+    let blob = snapshot.to_xml(strict, limits)?;
+    if Properties::parse(&blob, limits)?.math().is_some() {
+        return Err(invalid(
+            "staged presentation math removal did not round-trip",
+        ));
+    }
+    staged.get_part_mut(&uri)?.set_blob(blob);
+    settle_unsigned_change(&mut staged)?;
+    if load_math_from_package(&staged, limits)?.is_some() {
+        return Err(invalid(
+            "published presentation math removal did not validate",
+        ));
+    }
+    *package = staged;
+    Ok(Some(previous_value))
+}
+
+fn find_properties_part(package: &OpcPackage) -> Result<Option<PackURI>> {
+    let presentation = package.main_document_part()?;
+    let mut found = presentation
+        .rels()
+        .iter()
+        .filter(|relationship| matches!(relationship.reltype(), REL | STRICT_REL));
+    let Some(relationship) = found.next() else {
+        return Ok(None);
+    };
+    if found.next().is_some() {
+        return Err(invalid(
+            "presentation has multiple presentation-properties relationships",
+        ));
+    }
+    if relationship.is_external() {
+        return Err(invalid(
+            "presentation-properties relationship cannot be external",
+        ));
+    }
+    let uri = relationship.target_partname()?;
+    let part = package.get_part(&uri)?;
+    if part.content_type() != CONTENT_TYPE {
+        return Err(invalid(format!(
+            "presentation-properties part '{uri}' has invalid content type '{}'",
+            part.content_type()
+        )));
+    }
+    Ok(Some(uri))
+}
+
+fn hydrate_html_target(part: &dyn Part, value: &mut Properties) -> Result<()> {
+    if let Some(html) = value.html_publish.as_mut() {
+        let target = part
+            .rels()
+            .get(&html.target.relationship_id)
+            .ok_or_else(|| {
+                invalid(format!(
+                    "missing HTML publish relationship '{}'",
+                    html.target.relationship_id
+                ))
+            })?;
+        html.target.target = Some(target.target_ref().to_string());
+        html.target.relationship_type = Some(target.reltype().to_string());
+        html.target.external = Some(target.is_external());
+    }
+    Ok(())
+}
+
+fn is_strict_root(xml: &[u8]) -> Result<bool> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader.read_resolved_event().map_err(|error| {
+            Error::Xml(format!("invalid presentation-properties root: {error}"))
+        })?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if element.local_name().as_ref() != b"presentationPr" {
+                    return Err(invalid(
+                        "presentation-properties root is not presentationPr",
+                    ));
+                }
+                return match namespace {
+                    ResolveResult::Bound(Namespace(value))
+                        if value == super::P_STRICT.as_bytes() =>
+                    {
+                        Ok(true)
+                    },
+                    ResolveResult::Bound(Namespace(value)) if value == super::P_NS.as_bytes() => {
+                        Ok(false)
+                    },
+                    _ => Err(invalid(
+                        "unsupported presentation-properties root namespace",
+                    )),
+                };
+            },
+            Event::Decl(_) | Event::Comment(_) | Event::Text(_) => {},
+            Event::CData(_) | Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
+                return Err(invalid("unsupported presentation-properties prologue"));
+            },
+            Event::End(_) => return Err(invalid("presentation-properties root is missing")),
+            Event::Eof => return Err(invalid("presentation-properties root is missing")),
+        }
+    }
+}

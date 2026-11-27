@@ -1,0 +1,157 @@
+//! Typed `PowerPoint` Open XML documents.
+//!
+//! The crate is being extracted one semantic capability at a time. The
+//! backgrounds module owns package-independent slide-background values and
+//! its XML fill codec. The transition module owns slide-transition values and
+//! its bounded codec. The
+//! laser module owns inert laser-trace values and their bounded codec. The
+//! font module owns embedded-font values and atomic package CRUD. The tag
+//! module owns inert programmable tag lists and package CRUD. The notes module
+//! owns bounded speaker-notes graphs, text encoding, and transactional package
+//! mutation.
+//! [`table::style`] owns typed table-style catalogs and their package graph.
+
+#![forbid(unsafe_code)]
+// quick-xml's checked attribute iteration is quadratic on hostile tags; read
+// attributes through `BytesStartExt` (workspace `clippy.toml`).
+#![cfg_attr(not(test), deny(clippy::disallowed_methods))]
+#![allow(
+    clippy::ptr_arg,
+    reason = "patch APIs use nested and referenced options to distinguish omission, removal, and replacement without changing their established signatures"
+)]
+
+pub mod actions;
+pub mod animations;
+pub mod backgrounds;
+pub mod builder;
+pub mod change_tracking;
+pub mod chart;
+pub mod comments;
+pub mod cross_slide_copy;
+pub mod custom;
+pub mod diagnostics;
+mod error;
+pub mod font;
+pub mod format;
+pub mod hyperlinks;
+pub mod laser;
+pub mod leniency;
+pub(crate) mod markup;
+pub mod media_parts;
+pub mod model3d;
+pub mod modern_comments;
+
+pub mod master_layout;
+pub mod metadata;
+pub(crate) mod namespace;
+pub mod notes;
+pub mod opc;
+pub(crate) mod open_options;
+pub mod opened;
+pub mod package;
+pub(crate) mod part_edit;
+pub mod parts;
+pub mod presentation;
+pub mod presentation_properties;
+pub mod shape;
+pub mod slide;
+pub mod slide_copy;
+pub mod slide_removal;
+mod source_limits;
+pub mod table;
+pub mod tag;
+pub mod time;
+pub mod transition;
+/// Bounded, content-free semantic validation of PresentationML packages.
+pub mod validation;
+pub mod view_properties;
+/// Inert Office Add-in and persisted task-pane metadata.
+///
+/// This module exposes the bounded MS-OWEXML value model used by
+/// [`Package::task_panes`]. Add-ins are retained as document data only:
+/// external references, bindings, and snapshots are never contacted or
+/// executed.
+pub mod web;
+pub mod writer;
+
+pub(crate) mod resources;
+
+pub use actions::{Jump, Kind, Setting, Target, Trigger};
+pub use animations::*;
+pub use backgrounds::{GradientStop, GradientType, PatternType, PictureStyle, SlideBackground};
+pub use chart::{Chart, Info as ChartInfo, Series as ChartSeries, Type as ChartType};
+pub use comments::collaboration::{
+    AuthorPresenceSnapshot, CommentThreadingSnapshot, ParentComment, PresenceInfo, ThreadingInfo,
+    load_presence, load_presence_snapshot, load_threading, load_threading_snapshot,
+};
+pub use comments::{
+    Author, Comment, Comments, Conformance, List, find_presentation_comment,
+    find_presentation_comment_author, load_presentation_comments,
+    load_presentation_comments_strict, load_presentation_comments_with_tolerance,
+    parse_comment_authors, parse_slide_comments, parse_slide_comments_strict,
+    parse_slide_comments_with_tolerance, write_comment_authors, write_slide_comments,
+};
+pub use error::{
+    CodecLimitKind, DurablePatchFormat, Error, LimitKind, Result, ShapeTransferRefusal,
+    SlideCopyRefusal, SlideOrderRefusal, SlideRemovalRefusal,
+};
+pub use format::{ImageFormat, TextFormat};
+pub use hyperlinks::Hyperlink;
+pub use leniency::{
+    ChartDefect, CommentDefect, Defect, Leniency, MarkupDefect, PresentationDefect, ShapeDefect,
+    TimingDefect, ToleranceReport, ToleratedDefect, TransitionDefect, ViewDefect,
+};
+#[cfg(feature = "encryption")]
+pub use litchi_crypto::ooxml as encryption;
+#[cfg(feature = "encryption")]
+pub use litchi_crypto::ooxml::{
+    Limits as EncryptionLimits, Mode as EncryptionMode, Password as EncryptionPassword,
+};
+#[cfg(feature = "encryption")]
+pub use litchi_ooxml_common::package_encryption::{
+    PackageEncryption, PolicyError as EncryptionPolicyError,
+};
+/// Resource policy for package ingestion through [`Package`].
+pub use litchi_opc::{SourceLimitKind, SourceLimits};
+pub use master_layout::{
+    AuthoredSlideLayout, AuthoredSlideMaster, MIN_MASTER_OR_LAYOUT_ID,
+    PLACEHOLDER_TYPE_EXTENSION_URI, PlaceholderKind, PlaceholderSpec, PlaceholderTypeExtension,
+    SlideLayoutKind,
+};
+pub use media_parts::{
+    Bookmark, Data, ExtensionList, Fade, Picture, Poster, Resource, Transform, Trim,
+};
+pub use modern_comments::*;
+pub use open_options::{OpenOptions, OpenPolicy};
+pub use opened::{
+    MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement,
+    ShapeTextReplacement,
+};
+pub use package::Package;
+pub use presentation::embedded::ink_actions;
+pub use presentation::{
+    MAX_SOURCE_BACKED_SLIDE_BATCH, Presentation, SourceBackedPresentation, SourceImage,
+    SourceImageDescriptor, SourceImageTarget, SourceSlide, SourceSvgDescriptor, SourceSvgImage,
+};
+pub use presentation_properties::{
+    BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
+    PrintColorMode, PrintOutput, Properties, Show, ShowExtension, ShowMode, SlideSelection, Web,
+    WebColor, WebScreenSize, load_from_package as load_presentation_properties,
+    load_from_package_with_tolerance as load_presentation_properties_with_tolerance,
+};
+pub use slide::{Slide, SlideLayout, SlideMaster};
+pub use view_properties::{
+    CommonSlideView, CommonView, GridSpacing, Guide, GuideOrientation, NormalView, OutlineSlide,
+    OutlineView, Point, Ratio, RestoredPane, SimpleView, SlideLikeView, SorterView, SplitterState,
+    ViewKind, ViewProperties, load_from_package as load_view_properties,
+    load_from_package_with_tolerance as load_view_properties_with_tolerance,
+};
+pub use writer::{
+    StreamingPresentationLimits, StreamingPresentationOptions, StreamingPresentationScratchLimits,
+    StreamingPresentationWriter, StreamingSlideWriter, TextBoxSpec,
+};
+
+#[cfg(test)]
+pub(crate) use presentation::source::SourceBackedPresentationEditor;
+/// Immutable source-backed PPTX package ownership and primary editing.
+pub use presentation::source::primary as source;

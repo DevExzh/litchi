@@ -1,0 +1,1128 @@
+use super::{
+    BodyEvent, ControlWord, Cow, Destination, FontCharset, FontRef, MAX_REVISIONS,
+    MAX_TEXT_INTERMEDIATE_BYTES, ParsedBodyStoryEvent, Parser, RtfEncoding, SmallVec, State,
+    StyleBlock, Token, append_transport_bytes, control_symbol_text, parser_classification_error,
+    require_parameterless,
+};
+
+impl<'a> Parser<'a> {
+    /// Handle a control word encountered while parsing generic group content.
+    ///
+    /// Split out of [`Parser::parse_content`] and marked `#[inline(never)]` for
+    /// the same reason as [`Parser::dispatch_group_destination`]: the dispatch
+    /// table is large, and leaving it inline would charge its stack frame to
+    /// every level of group nesting on the recursive path.
+    #[inline(never)]
+    pub(super) fn dispatch_content_control(
+        &mut self,
+        control: &ControlWord<'a>,
+        text_buffer: &mut SmallVec<[u8; 256]>,
+    ) -> crate::Result<()> {
+        if matches!(control, ControlWord::Unknown(_, _)) {
+            if !text_buffer.is_empty() {
+                self.flush_text_buffer(text_buffer)?;
+            }
+            let token = self.pos;
+            self.pos += 1;
+            self.preserve_unknown_control(token)?;
+            return Ok(());
+        }
+        if matches!(control, ControlWord::HtmlRtf(_)) {
+            if !text_buffer.is_empty() {
+                self.flush_text_buffer(text_buffer)?;
+            }
+            let token = self.pos;
+            self.pos += 1;
+            self.preserve_unknown_control(token)?;
+            return Ok(());
+        }
+        match control {
+            ControlWord::HtmlTag(_) => {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF htmltag destination must be starred".to_string(),
+                ));
+            },
+            ControlWord::Par | ControlWord::Line => {
+                let structural_table_boundary =
+                    self.finalize_table_before_non_table_body_content(true)?;
+                self.pos += 1;
+                // Paragraph break - flush current text
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                if !structural_table_boundary {
+                    let table_level = self.current_state().ok().and_then(|state| {
+                        (state.in_table || state.table_nesting_level >= 2)
+                            .then_some(state.table_nesting_level)
+                    });
+                    if self.current_state().is_ok_and(|state| {
+                        state.destination == Destination::DocumentBody
+                            && !state.in_table
+                            && state.table_nesting_level < 2
+                            && state.revision_type
+                                != Some(super::super::super::annotation::RevisionType::Deletion)
+                    }) {
+                        crate::error::try_reserve_one(
+                            &mut self.body_boundaries,
+                            "body text boundaries",
+                        )?;
+                        let kind = if matches!(control, ControlWord::Par) {
+                            crate::text::Break::Paragraph
+                        } else {
+                            crate::text::Break::Line
+                        };
+                        self.body_boundaries
+                            .push(crate::story::Boundary::new(self.body_text_len, kind));
+                        if kind == crate::text::Break::Paragraph {
+                            self.body_paragraph_breaks =
+                                self.body_paragraph_breaks.checked_add(1).ok_or_else(|| {
+                                    crate::Error::MalformedDocument(
+                                        "RTF body paragraph count overflow".to_string(),
+                                    )
+                                })?;
+                            self.body_after_last_paragraph_break =
+                                self.body_text_len.checked_add(1).ok_or_else(|| {
+                                    crate::Error::MalformedDocument(
+                                        "RTF body paragraph position overflow".to_string(),
+                                    )
+                                })?;
+                        }
+                    }
+                    if let Some(table_level) = table_level {
+                        if self.current_state()?.revision_type
+                            != Some(super::super::super::annotation::RevisionType::Deletion)
+                        {
+                            if matches!(control, ControlWord::Par) {
+                                self.record_table_paragraph_break(table_level)?;
+                            }
+                            self.append_table_text(b"\n", table_level)?;
+                        }
+                    } else {
+                        text_buffer.push(b'\n');
+                    }
+                }
+                if matches!(control, ControlWord::Par) {
+                    let state = self.current_state_mut()?;
+                    state.paragraph_content_started = false;
+                    state.paragraph_numbering_declared = false;
+                }
+            },
+            ControlWord::Page(param) => {
+                require_parameterless(*param, "page")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_body_page_break()?;
+                self.pos += 1;
+            },
+            ControlWord::Column(param) => {
+                require_parameterless(*param, "column")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_body_column_break()?;
+                self.pos += 1;
+            },
+            ControlWord::EditableRegionStart(param) => {
+                require_parameterless(*param, "ebcstart")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_editable_region_boundary(true)?;
+                self.pos += 1;
+            },
+            ControlWord::EditableRegionEnd(param) => {
+                require_parameterless(*param, "ebcend")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_editable_region_boundary(false)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftPageBreak(param) => {
+                require_parameterless(*param, "softpage")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_soft_break(crate::SoftBreakKind::Page)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftColumnBreak(param) => {
+                require_parameterless(*param, "softcol")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_soft_break(crate::SoftBreakKind::Column)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftLineBreak(param) => {
+                require_parameterless(*param, "softline")?;
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.record_soft_break(crate::SoftBreakKind::Line)?;
+                self.pos += 1;
+            },
+            ControlWord::SoftLineHeight(param) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                let height = param.ok_or_else(|| {
+                    crate::Error::MalformedDocument(
+                        "RTF softlheight requires a numeric parameter".to_string(),
+                    )
+                })?;
+                if !(-32768..=32767).contains(&height) {
+                    return Err(crate::Error::MalformedDocument(
+                        "RTF softlheight is outside -32768..=32767 twips".to_string(),
+                    ));
+                }
+                self.record_soft_break(crate::SoftBreakKind::LineHeight(height))?;
+                self.pos += 1;
+            },
+            ControlWord::Section
+            | ControlWord::Ansi
+            | ControlWord::AnsiCodePage(_)
+            | ControlWord::Mac
+            | ControlWord::Pc
+            | ControlWord::Pca
+            | ControlWord::FontNumber(_)
+            | ControlWord::Plain
+            | ControlWord::FormProtection(_)
+            | ControlWord::AnnotationProtection(_)
+            | ControlWord::RevisionProtection(_)
+            | ControlWord::ReadOnlyProtection(_)
+            | ControlWord::AllProtection(_)
+            | ControlWord::EnforceProtection(_)
+            | ControlWord::ProtectionLevel(_)
+            | ControlWord::ColorBackground(_) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.pos += 1;
+                self.apply_control_word(control)?;
+            },
+            ControlWord::LegacyParagraphNumbering(_) => {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF pn control must be the first control in its own destination group"
+                        .to_string(),
+                ));
+            },
+            ControlWord::Tab => {
+                self.finalize_table_before_non_table_body_content(true)?;
+                self.pos += 1;
+                let table_level = self.current_state().ok().and_then(|state| {
+                    (state.destination == Destination::DocumentBody
+                        && (state.in_table || state.table_nesting_level >= 2))
+                        .then_some(state.table_nesting_level)
+                });
+                if let Some(table_level) = table_level {
+                    // A tab inside a cell belongs to the cell story, not to
+                    // the main body text.
+                    if !text_buffer.is_empty() {
+                        self.flush_text_buffer(text_buffer)?;
+                    }
+                    self.append_table_text(b"\t", table_level)?;
+                } else {
+                    text_buffer.push(b'\t');
+                }
+            },
+            ControlWord::Unicode(code) => {
+                self.finalize_table_before_non_table_body_content(true)?;
+                // Handle Unicode character with potential fallback
+                if self
+                    .states
+                    .last()
+                    .is_some_and(|state| state.destination == Destination::DocumentBody)
+                {
+                    self.on_body_event(BodyEvent::UnicodeChar);
+                }
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.parse_unicode_sequence(*code)?;
+            },
+            ControlWord::NonBreakingSpace
+            | ControlWord::OptionalHyphen
+            | ControlWord::NonBreakingHyphen
+            | ControlWord::EmDash
+            | ControlWord::EnDash
+            | ControlWord::EmSpace
+            | ControlWord::EnSpace
+            | ControlWord::QuarterEmSpace
+            | ControlWord::Bullet
+            | ControlWord::LeftSingleQuote
+            | ControlWord::RightSingleQuote
+            | ControlWord::LeftDoubleQuote
+            | ControlWord::RightDoubleQuote
+            | ControlWord::LeftToRightMark
+            | ControlWord::RightToLeftMark
+            | ControlWord::ZeroWidthJoiner
+            | ControlWord::ZeroWidthNonJoiner
+            | ControlWord::ZeroWidthBreakOpportunity
+            | ControlWord::ZeroWidthNoBreakOpportunity => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                let text = control_symbol_text(control).ok_or_else(|| {
+                    crate::Error::MalformedDocument("missing RTF control-symbol text".to_string())
+                })?;
+                self.pos += 1;
+                self.append_semantic_text(text)?;
+            },
+            ControlWord::CurrentDate
+            | ControlWord::CurrentDateLong
+            | ControlWord::CurrentDateAbbreviated
+            | ControlWord::CurrentTime => {
+                // These stamps expand to the current date or time when a
+                // renderer lays out the document. The parser has no clock or
+                // calendar facility, so they contribute no extracted text.
+                self.pos += 1;
+            },
+            ControlWord::AnnotationMark => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                if self.pending_annotation.mark {
+                    return Err(crate::Error::MalformedDocument(
+                        "duplicate pending RTF annotation marker".to_string(),
+                    ));
+                }
+                self.pending_annotation.mark = true;
+                self.pos += 1;
+            },
+            ControlWord::Revised(_)
+            | ControlWord::Deleted(_)
+            | ControlWord::RevisionAuthor(_)
+            | ControlWord::DeletedRevisionAuthor(_)
+            | ControlWord::RevisionDate(_)
+            | ControlWord::DeletedRevisionDate(_) => {
+                if !text_buffer.is_empty() {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                let starting = match control {
+                    ControlWord::Revised(true) => {
+                        Some(super::super::super::annotation::RevisionType::Insertion)
+                    },
+                    ControlWord::Deleted(true) => {
+                        Some(super::super::super::annotation::RevisionType::Deletion)
+                    },
+                    _ => None,
+                };
+                if matches!(control, ControlWord::Revised(false))
+                    && let Some(id) = self.current_state()?.revision_event_id
+                {
+                    self.record_revision_end(id)?;
+                }
+                let in_table = self.current_state()?.in_table
+                    || self.current_state()?.table_nesting_level >= 2;
+                let event_id = if let Some(kind) = starting {
+                    let id = self.revision_event_indices.len();
+                    self.revision_event_indices.push(None);
+                    if !in_table {
+                        let event = match kind {
+                            super::super::super::annotation::RevisionType::Insertion => {
+                                ParsedBodyStoryEvent::RevisionStart(id)
+                            },
+                            super::super::super::annotation::RevisionType::Deletion => {
+                                ParsedBodyStoryEvent::RevisionDeletion(id)
+                            },
+                            super::super::super::annotation::RevisionType::FormatChange
+                            | super::super::super::annotation::RevisionType::MovedFrom
+                            | super::super::super::annotation::RevisionType::MovedTo => {
+                                return Err(parser_classification_error());
+                            },
+                        };
+                        self.body_story_events.push(event);
+                    }
+                    Some(id)
+                } else {
+                    None
+                };
+                self.pos += 1;
+                self.apply_control_word(control)?;
+                if let Some(id) = event_id {
+                    self.current_state_mut()?.revision_event_id = Some(id);
+                }
+            },
+            _ => {
+                // Formatting takes effect at its lexical position. Alignment,
+                // character, and paragraph-property changes must flush pending
+                // text before changing the state attached to that preceding
+                // text. Keep this list scoped to controls that alter retained
+                // block properties: flushing on every control would multiply
+                // dense plain-text blocks without improving the paragraph
+                // model.
+                if matches!(
+                    control,
+                    ControlWord::LeftAlign
+                        | ControlWord::RightAlign
+                        | ControlWord::Center
+                        | ControlWord::Justify
+                        | ControlWord::Pard
+                        | ControlWord::SpaceBefore(_)
+                        | ControlWord::SpaceAfter(_)
+                        | ControlWord::SpaceBetween(_)
+                        | ControlWord::LineMultiple(_)
+                        | ControlWord::SpaceBeforeAuto(_)
+                        | ControlWord::SpaceAfterAuto(_)
+                        | ControlWord::ListSpaceBefore(_)
+                        | ControlWord::ListSpaceAfter(_)
+                        | ControlWord::NoSnapLineGrid(_)
+                        | ControlWord::ContextualSpacing(_)
+                        | ControlWord::LeftIndent(_)
+                        | ControlWord::RightIndent(_)
+                        | ControlWord::FirstLineIndent(_)
+                        | ControlWord::LogicalLeftIndent(_)
+                        | ControlWord::LogicalRightIndent(_)
+                        | ControlWord::CharacterFirstLineIndent(_)
+                        | ControlWord::CharacterLeftIndent(_)
+                        | ControlWord::CharacterRightIndent(_)
+                        | ControlWord::MirrorIndents(_)
+                        | ControlWord::KeepTogether
+                        | ControlWord::KeepNext
+                        | ControlWord::SideBySide(_)
+                        | ControlWord::PageBreakBefore
+                        | ControlWord::WidowControl
+                        | ControlWord::Bold(_)
+                        | ControlWord::Italic(_)
+                        | ControlWord::FontSize(_)
+                        | ControlWord::ColorForeground(_)
+                        | ControlWord::Underline(_)
+                        | ControlWord::UnderlineNone
+                        | ControlWord::UnderlineDouble
+                        | ControlWord::UnderlineDotted
+                        | ControlWord::UnderlineDashed
+                        | ControlWord::UnderlineDashDot
+                        | ControlWord::UnderlineDashDotDot
+                        | ControlWord::UnderlineWords
+                        | ControlWord::UnderlineThick
+                        | ControlWord::UnderlineWave
+                        | ControlWord::UnderlineHairline
+                        | ControlWord::UnderlineThickDotted
+                        | ControlWord::UnderlineThickDashed
+                        | ControlWord::UnderlineThickDashDot
+                        | ControlWord::UnderlineThickDashDotDot
+                        | ControlWord::UnderlineThickLongDash
+                        | ControlWord::UnderlineLongDash
+                        | ControlWord::UnderlineHeavyWave
+                        | ControlWord::UnderlineDoubleWave
+                        | ControlWord::Strike(_)
+                        | ControlWord::DoubleStrike(_)
+                        | ControlWord::Hidden(_)
+                        | ControlWord::AllCaps(_)
+                        | ControlWord::SmallCaps(_)
+                        | ControlWord::Superscript(_)
+                        | ControlWord::Subscript(_)
+                        | ControlWord::NoSuperSub(_)
+                        | ControlWord::BaselineUp(_)
+                        | ControlWord::BaselineDown(_)
+                        | ControlWord::AssociatedBaselineUp(_)
+                        | ControlWord::AssociatedBaselineDown(_)
+                        | ControlWord::Outline(_)
+                ) && !text_buffer.is_empty()
+                {
+                    self.flush_text_buffer(text_buffer)?;
+                }
+                self.pos += 1;
+                // Apply formatting changes
+                self.apply_control_word(control)?;
+            },
+        }
+
+        Ok(())
+    }
+
+    /// Parse group content (text and control words).
+    pub(super) fn parse_content(&mut self) -> crate::Result<()> {
+        let mut text_buffer = SmallVec::<[u8; 256]>::new();
+
+        while let Some(token) = self.tokens.get(self.pos) {
+            self.text_origin = self.pos;
+            match token {
+                Token::CloseBrace => {
+                    // Flush any buffered text
+                    if !text_buffer.is_empty() {
+                        self.flush_text_buffer(&mut text_buffer)?;
+                    }
+                    self.pos += 1;
+                    return Ok(());
+                },
+                Token::OpenBrace => {
+                    // Flush text before entering nested group
+                    if !text_buffer.is_empty() {
+                        self.flush_text_buffer(&mut text_buffer)?;
+                    }
+                    self.current_state_mut()?.character_border_active = false;
+                    self.parse_group()?;
+                },
+                Token::Control(control) => {
+                    self.dispatch_content_control(control, &mut text_buffer)?;
+                },
+                Token::Text(text) => {
+                    self.pos += 1;
+                    self.current_state_mut()?.character_border_active = false;
+                    // Skip empty text tokens
+                    if text.is_empty() {
+                        continue;
+                    }
+                    self.finalize_table_before_non_table_body_content(!text.trim().is_empty())?;
+                    if self
+                        .states
+                        .last()
+                        .is_some_and(|state| state.destination == Destination::DocumentBody)
+                        && !text.trim().is_empty()
+                    {
+                        self.on_body_event(BodyEvent::Text);
+                    }
+                    // Check if we're in a table
+                    if self.current_state().is_ok_and(|s| {
+                        s.destination == Destination::DocumentBody
+                            && (s.in_table || s.table_nesting_level >= 2)
+                    }) {
+                        let (font_ref, fallback_encoding, table_level) = {
+                            let state = self.current_state()?;
+                            (
+                                state.formatting.font_ref,
+                                state.encoding,
+                                state.table_nesting_level,
+                            )
+                        };
+                        let encoding =
+                            self.effective_text_encoding_for(font_ref, fallback_encoding)?;
+                        let mut bytes = SmallVec::<[u8; 64]>::new();
+                        append_transport_bytes(&mut bytes, text)?;
+                        self.append_table_text(encoding.decode(&bytes).as_bytes(), table_level)?;
+                    } else if self
+                        .current_state()
+                        .is_ok_and(|s| s.destination == Destination::DocumentBody)
+                    {
+                        append_transport_bytes(&mut text_buffer, text)?;
+                    }
+                },
+                Token::Binary(_) => {
+                    if self.current_state()?.revision_type.is_some() {
+                        return Err(crate::Error::MalformedDocument(
+                            "RTF revision text cannot contain binary data".to_string(),
+                        ));
+                    }
+                    self.pos += 1;
+                },
+            }
+        }
+
+        Err(crate::Error::UnexpectedEof)
+    }
+
+    /// Flush text buffer to a style block.
+    pub(super) fn flush_text_buffer(
+        &mut self,
+        buffer: &mut SmallVec<[u8; 256]>,
+    ) -> crate::Result<()> {
+        if buffer.is_empty() {
+            return Ok(());
+        }
+
+        // Only create blocks for text in the document body
+        // Skip text from font tables, color tables, stylesheets, etc.
+        let (encoding, formatting, paragraph, revision_state) = {
+            let state = self.current_state()?;
+            if state.destination != Destination::DocumentBody {
+                buffer.clear();
+                return Ok(());
+            }
+            (
+                self.effective_text_encoding(state)?,
+                state.formatting,
+                state.paragraph,
+                state.revision_type.map(|_kind| state.clone()),
+            )
+        };
+        let decoded_str = encoding.decode(buffer);
+
+        // Allocate in arena and create block
+        let text = self.arena.alloc_str(&decoded_str);
+        let start = self.body_text_len;
+        if let Some(state) = revision_state.as_ref()
+            && state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion)
+        {
+            self.append_revision_text(state, text, start, start)?;
+            buffer.clear();
+            return Ok(());
+        }
+        let block = StyleBlock::new(Cow::Borrowed(text), formatting, paragraph);
+        self.body_text_len = self.body_text_len.checked_add(text.len()).ok_or_else(|| {
+            crate::Error::MalformedDocument("RTF body text length overflow".to_string())
+        })?;
+        self.prepare_body_block_push()?;
+        self.push_body_block(block);
+        if !decoded_str.trim().is_empty() {
+            self.current_state_mut()?.paragraph_content_started = true;
+        }
+        if let Some(state) = revision_state.as_ref() {
+            self.append_revision_text(state, text, start, self.body_text_len)?;
+        }
+
+        buffer.clear();
+        Ok(())
+    }
+
+    pub(super) fn effective_text_encoding(&self, state: &State) -> crate::Result<RtfEncoding> {
+        self.effective_text_encoding_for(state.formatting.font_ref, state.encoding)
+    }
+
+    fn effective_text_encoding_for(
+        &self,
+        font_ref: FontRef,
+        fallback_encoding: RtfEncoding,
+    ) -> crate::Result<RtfEncoding> {
+        let fonts = self.font_table.borrow();
+        let Some(font) = fonts.get(font_ref) else {
+            return Ok(fallback_encoding);
+        };
+        if let Some(page) = font.code_page {
+            return Ok(RtfEncoding::from_font_page(page));
+        }
+        let Some(charset) = font.charset else {
+            return Ok(fallback_encoding);
+        };
+        if charset == FontCharset::Default {
+            return Ok(fallback_encoding);
+        }
+        if let Some(page) = charset.page() {
+            return Ok(RtfEncoding::from_font_page(page));
+        }
+        // LibreOffice gives a font whose charset has no encoding row the
+        // document code page; note the first use so it is recorded.
+        if let Some(&offset) = self.unmapped_charset_fonts.get(&font_ref) {
+            let mut uses = self.unmapped_charset_uses.borrow_mut();
+            if !uses.iter().any(|(used, _)| *used == font_ref) {
+                uses.push((font_ref, offset));
+            }
+        }
+        Ok(fallback_encoding)
+    }
+
+    /// Decode a byte-preserving transport slice without allowing the decoder
+    /// to create an unbounded UTF-8 temporary.  A single source byte can
+    /// expand to at most four UTF-8 bytes, so reject a non-ASCII input whose
+    /// worst-case decoded size is already over the intermediate budget before
+    /// calling any code-page decoder.  ASCII remains borrowed by the decoder
+    /// and therefore retains the full budget without a needless 4x penalty.
+    pub(super) fn decode_transport_bytes_bounded<'b>(
+        &self,
+        bytes: &'b [u8],
+        resource: &'static str,
+    ) -> crate::Result<Cow<'b, str>> {
+        let encoding = self.current_state()?.encoding;
+        self.decode_transport_bytes_bounded_with_encoding(bytes, encoding, resource)
+    }
+
+    pub(super) fn decode_transport_bytes_bounded_with_encoding<'b>(
+        &self,
+        bytes: &'b [u8],
+        encoding: RtfEncoding,
+        resource: &'static str,
+    ) -> crate::Result<Cow<'b, str>> {
+        let worst_case = if bytes.is_ascii() {
+            bytes.len()
+        } else {
+            bytes.len().saturating_mul(4)
+        };
+        if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(crate::Error::LimitExceeded {
+                resource,
+                observed: worst_case,
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        let decoded = encoding.decode(bytes);
+        if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(crate::Error::LimitExceeded {
+                resource,
+                observed: decoded.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        Ok(decoded)
+    }
+
+    pub(super) fn decode_transport_text(&self, text: &str) -> crate::Result<String> {
+        let encoding = self.current_state()?.encoding;
+        self.decode_transport_text_with_encoding(text, encoding)
+    }
+
+    pub(super) fn decode_transport_text_for_current_font(
+        &self,
+        text: &str,
+    ) -> crate::Result<String> {
+        let encoding = {
+            let state = self.current_state()?;
+            self.effective_text_encoding(state)?
+        };
+        self.decode_transport_text_strict_with_encoding(text, encoding)
+    }
+
+    pub(super) fn decode_transport_text_with_encoding(
+        &self,
+        text: &str,
+        encoding: RtfEncoding,
+    ) -> crate::Result<String> {
+        self.decode_transport_text_with_encoding_mode(text, encoding, false)
+    }
+
+    pub(super) fn decode_transport_text_strict_with_encoding(
+        &self,
+        text: &str,
+        encoding: RtfEncoding,
+    ) -> crate::Result<String> {
+        self.decode_transport_text_with_encoding_mode(text, encoding, true)
+    }
+
+    fn decode_transport_text_with_encoding_mode(
+        &self,
+        text: &str,
+        encoding: RtfEncoding,
+        strict: bool,
+    ) -> crate::Result<String> {
+        if text.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(crate::Error::LimitExceeded {
+                resource: "RTF transport text",
+                observed: text.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        let mut bytes = SmallVec::<[u8; 64]>::new();
+        bytes
+            .try_reserve_exact(text.len())
+            .map_err(|_error| crate::Error::AllocationFailed {
+                resource: "RTF transport text",
+                requested: text.len(),
+            })?;
+        append_transport_bytes(&mut bytes, text)?;
+        let decoded = if strict {
+            let worst_case = if bytes.is_ascii() {
+                bytes.len()
+            } else {
+                bytes.len().saturating_mul(4)
+            };
+            if worst_case > MAX_TEXT_INTERMEDIATE_BYTES {
+                return Err(crate::Error::LimitExceeded {
+                    resource: "RTF decoded transport text",
+                    observed: worst_case,
+                    limit: MAX_TEXT_INTERMEDIATE_BYTES,
+                });
+            }
+            encoding.decode_strict(&bytes, "transport text")?
+        } else {
+            self.decode_transport_bytes_bounded_with_encoding(
+                &bytes,
+                encoding,
+                "RTF decoded transport text",
+            )?
+        };
+        if decoded.len() > MAX_TEXT_INTERMEDIATE_BYTES {
+            return Err(crate::Error::LimitExceeded {
+                resource: "RTF decoded transport text",
+                observed: decoded.len(),
+                limit: MAX_TEXT_INTERMEDIATE_BYTES,
+            });
+        }
+        match decoded {
+            Cow::Borrowed(value) => {
+                let mut owned = String::new();
+                owned.try_reserve_exact(value.len()).map_err(|_error| {
+                    crate::Error::AllocationFailed {
+                        resource: "RTF decoded transport text",
+                        requested: value.len(),
+                    }
+                })?;
+                owned.push_str(value);
+                Ok(owned)
+            },
+            Cow::Owned(value) => Ok(value),
+        }
+    }
+
+    pub(super) fn append_semantic_text(&mut self, text: &str) -> crate::Result<()> {
+        self.finalize_table_before_non_table_body_content(!text.is_empty())?;
+        let state = self.prepare_revision_event()?;
+        if state.destination != Destination::DocumentBody {
+            return Ok(());
+        }
+        if state.in_table || state.table_nesting_level >= 2 {
+            self.append_table_text(text.as_bytes(), state.table_nesting_level)?;
+            return Ok(());
+        }
+        let arena_text = self.arena.alloc_str(text);
+        let start = self.body_text_len;
+        if state.revision_type == Some(super::super::super::annotation::RevisionType::Deletion) {
+            return self.append_revision_text(&state, arena_text, start, start);
+        }
+        self.body_text_len = self
+            .body_text_len
+            .checked_add(arena_text.len())
+            .ok_or_else(|| {
+                crate::Error::MalformedDocument("RTF body text length overflow".to_string())
+            })?;
+        self.prepare_body_block_push()?;
+        self.push_body_block(StyleBlock::new(
+            Cow::Borrowed(arena_text),
+            state.formatting,
+            state.paragraph,
+        ));
+        self.current_state_mut()?.paragraph_content_started = true;
+        self.append_revision_text(&state, arena_text, start, self.body_text_len)
+    }
+
+    #[inline]
+    pub(super) fn prepare_body_block_push(&mut self) -> crate::Result<()> {
+        if self.blocks.is_empty() {
+            let hint = std::mem::take(&mut self.body_block_capacity_hint);
+            if hint != 0
+                && crate::codec::error::try_reserve_additional(
+                    &mut self.blocks,
+                    hint,
+                    "body style blocks",
+                )
+                .is_err()
+            {
+                crate::codec::error::try_reserve_one(&mut self.blocks, "body style blocks")?;
+            }
+        }
+        Ok(())
+    }
+
+    /// Append a flushed body block, the only way `blocks` grows, and note
+    /// whether flushed body text is now non-blank.
+    #[inline]
+    pub(super) fn push_body_block(&mut self, block: StyleBlock<'a>) {
+        if !self.flushed_body_text && !block.text.trim().is_empty() {
+            self.flushed_body_text = true;
+        }
+        self.blocks.push(block);
+    }
+
+    /// Record a nonrequired (soft) break marker in the body story.
+    pub(super) fn record_soft_break(&mut self, kind: crate::SoftBreakKind) -> crate::Result<()> {
+        let state = self.current_state()?;
+        if state.destination != Destination::DocumentBody || state.in_table {
+            return Err(crate::Error::MalformedDocument(
+                "RTF soft-break controls are supported only in the main body story".to_string(),
+            ));
+        }
+        self.on_body_event(BodyEvent::SoftBreak);
+        self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+            crate::BodyStoryEvent::SoftBreak(crate::SoftBreak::new(kind, self.body_text_len)),
+        ));
+        Ok(())
+    }
+
+    pub(super) fn record_body_page_break(&mut self) -> crate::Result<()> {
+        let (destination, table_nesting_level, in_table) = {
+            let state = self.current_state()?;
+            (state.destination, state.table_nesting_level, state.in_table)
+        };
+        if destination != Destination::DocumentBody {
+            return Err(crate::Error::MalformedDocument(
+                "RTF page is not permitted in this destination".to_string(),
+            ));
+        }
+        if table_nesting_level >= 2 {
+            let builder = self.ensure_nested_builder(table_nesting_level)?;
+            builder
+                .cell_story_events
+                .push(crate::CellStoryEvent::PageBreak(crate::PageBreak::new(
+                    builder.cell_text.len(),
+                )));
+        } else if in_table {
+            self.current_cell_story_events
+                .push(crate::CellStoryEvent::PageBreak(crate::PageBreak::new(
+                    self.current_cell_text.len(),
+                )));
+        } else {
+            self.on_body_event(BodyEvent::PageBreak);
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::PageBreak(crate::PageBreak::new(self.body_text_len)),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn record_body_column_break(&mut self) -> crate::Result<()> {
+        let (destination, table_nesting_level, in_table) = {
+            let state = self.current_state()?;
+            (state.destination, state.table_nesting_level, state.in_table)
+        };
+        if destination != Destination::DocumentBody {
+            return Err(crate::Error::MalformedDocument(
+                "RTF column is not permitted in this destination".to_string(),
+            ));
+        }
+        if table_nesting_level >= 2 {
+            let builder = self.ensure_nested_builder(table_nesting_level)?;
+            builder
+                .cell_story_events
+                .push(crate::CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+                    builder.cell_text.len(),
+                )));
+        } else if in_table {
+            self.current_cell_story_events
+                .push(crate::CellStoryEvent::ColumnBreak(crate::ColumnBreak::new(
+                    self.current_cell_text.len(),
+                )));
+        } else {
+            self.on_body_event(BodyEvent::ColumnBreak);
+            self.body_story_events.push(ParsedBodyStoryEvent::Resolved(
+                crate::BodyStoryEvent::ColumnBreak(crate::ColumnBreak::new(self.body_text_len)),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn append_revision_text(
+        &mut self,
+        state: &State,
+        text: &str,
+        start: usize,
+        end: usize,
+    ) -> crate::Result<()> {
+        let Some(revision_type) = state.revision_type else {
+            return Ok(());
+        };
+        let id = state.revision_author_id.ok_or_else(|| {
+            crate::Error::MalformedDocument(
+                "RTF revision text is missing an author index".to_string(),
+            )
+        })?;
+        let index = usize::try_from(id).map_err(|_err| {
+            crate::Error::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            )
+        })?;
+        let author = self.revision_authors.get(index).ok_or_else(|| {
+            crate::Error::MalformedDocument(
+                "RTF revision author index is outside revtbl".to_string(),
+            )
+        })?;
+        let author_name = author.name.clone();
+        let date = state
+            .revision_date
+            .map(|value| Cow::Owned(value.to_string()));
+
+        self.revision_text_bytes = self
+            .revision_text_bytes
+            .checked_add(text.len())
+            .ok_or_else(|| {
+                crate::Error::MalformedDocument(
+                    "RTF aggregate revision text size overflow".to_string(),
+                )
+            })?;
+        if self.revision_text_bytes > super::super::super::annotation::MAX_REVISION_TEXT_TOTAL_BYTES
+        {
+            return Err(crate::Error::MalformedDocument(
+                "RTF aggregate revision text exceeds the safety limit".to_string(),
+            ));
+        }
+
+        let previous_event_revision = state
+            .revision_event_id
+            .and_then(|event_id| self.revision_event_indices.get(event_id).copied().flatten());
+        let event_continues_previous = previous_event_revision
+            .is_some_and(|last_index| Some(last_index) == self.revisions.len().checked_sub(1));
+        if event_continues_previous
+            && let Some(previous) = self.revisions.last_mut()
+            && previous.revision_type == revision_type
+            && previous.id == id
+            && previous.author == author_name
+            && previous.date == date
+            && previous.range_end == start
+            && (revision_type != super::super::super::annotation::RevisionType::Deletion
+                || previous.position == start)
+        {
+            if previous.content.len().saturating_add(text.len())
+                > super::super::super::annotation::MAX_REVISION_TEXT_BYTES
+            {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF revision text exceeds the safety limit".to_string(),
+                ));
+            }
+            previous.content.to_mut().push_str(text);
+            previous.range_end = end;
+            if let Some(event_id) = state.revision_event_id {
+                *self
+                    .revision_event_indices
+                    .get_mut(event_id)
+                    .ok_or_else(|| {
+                        crate::Error::ParserError(
+                            "RTF revision event state references a missing slot".to_string(),
+                        )
+                    })? = Some(self.revisions.len() - 1);
+            }
+            return Ok(());
+        }
+        if self.revisions.len() >= MAX_REVISIONS {
+            return Err(crate::Error::MalformedDocument(
+                "RTF revision count exceeds the safety limit".to_string(),
+            ));
+        }
+        let revision = super::super::super::annotation::Revision {
+            revision_type,
+            author: author_name,
+            date,
+            id,
+            content: Cow::Owned(text.to_string()),
+            position: start,
+            range_end: end,
+        };
+        revision.validate()?;
+        self.revisions.push(revision);
+        if let Some(event_id) = state.revision_event_id {
+            *self
+                .revision_event_indices
+                .get_mut(event_id)
+                .ok_or_else(|| {
+                    crate::Error::ParserError(
+                        "RTF revision event state references a missing slot".to_string(),
+                    )
+                })? = Some(self.revisions.len() - 1);
+        }
+        if (state.in_table || state.table_nesting_level >= 2) && previous_event_revision.is_none() {
+            let revision_index = self.revisions.len() - 1;
+            let event = match revision_type {
+                super::super::super::annotation::RevisionType::Insertion => {
+                    crate::CellStoryEvent::RevisionStart(crate::CellStoryReference {
+                        index: revision_index,
+                        position: start,
+                    })
+                },
+                super::super::super::annotation::RevisionType::Deletion => {
+                    crate::CellStoryEvent::RevisionDeletion(crate::CellStoryReference {
+                        index: revision_index,
+                        position: start,
+                    })
+                },
+                super::super::super::annotation::RevisionType::FormatChange
+                | super::super::super::annotation::RevisionType::MovedFrom
+                | super::super::super::annotation::RevisionType::MovedTo => {
+                    return Err(parser_classification_error());
+                },
+            };
+            self.push_cell_story_event(state.table_nesting_level, event)?;
+        }
+        Ok(())
+    }
+
+    pub(super) fn prepare_revision_event(&mut self) -> crate::Result<State> {
+        let mut state = self.current_state()?.clone();
+        if let Some(kind) = state.revision_type
+            && state.revision_event_id.is_none()
+        {
+            let id = self.revision_event_indices.len();
+            self.revision_event_indices.push(None);
+            if !state.in_table && state.table_nesting_level < 2 {
+                self.body_story_events.push(match kind {
+                    super::super::super::annotation::RevisionType::Insertion => {
+                        ParsedBodyStoryEvent::RevisionStart(id)
+                    },
+                    super::super::super::annotation::RevisionType::Deletion => {
+                        ParsedBodyStoryEvent::RevisionDeletion(id)
+                    },
+                    super::super::super::annotation::RevisionType::FormatChange
+                    | super::super::super::annotation::RevisionType::MovedFrom
+                    | super::super::super::annotation::RevisionType::MovedTo => {
+                        return Err(parser_classification_error());
+                    },
+                });
+            }
+            state.revision_event_id = Some(id);
+            self.current_state_mut()?.revision_event_id = Some(id);
+        }
+        Ok(state)
+    }
+
+    pub(super) fn current_story_position(&mut self) -> crate::Result<usize> {
+        let (table_nesting_level, in_table) = {
+            let state = self.current_state()?;
+            (state.table_nesting_level, state.in_table)
+        };
+        if table_nesting_level >= 2 {
+            Ok(self
+                .ensure_nested_builder(table_nesting_level)?
+                .cell_text
+                .len())
+        } else if in_table {
+            Ok(self.current_cell_text.len())
+        } else {
+            Ok(self.body_text_len)
+        }
+    }
+
+    pub(super) fn push_cell_story_event(
+        &mut self,
+        raw_level: u8,
+        event: crate::CellStoryEvent,
+    ) -> crate::Result<()> {
+        if raw_level >= 2 {
+            self.ensure_nested_builder(raw_level)?
+                .cell_story_events
+                .push(event);
+        } else {
+            self.current_cell_story_events.push(event);
+        }
+        Ok(())
+    }
+
+    pub(super) fn record_revision_end(&mut self, id: usize) -> crate::Result<()> {
+        let (in_table, table_nesting_level) = {
+            let state = self.current_state()?;
+            (state.in_table, state.table_nesting_level)
+        };
+        if in_table || table_nesting_level >= 2 {
+            let index = self
+                .revision_event_indices
+                .get(id)
+                .copied()
+                .flatten()
+                .ok_or_else(|| {
+                    crate::Error::MalformedDocument(
+                        "RTF revision event has no tracked text".to_string(),
+                    )
+                })?;
+            let position = self.current_story_position()?;
+            self.push_cell_story_event(
+                table_nesting_level,
+                crate::CellStoryEvent::RevisionEnd(crate::CellStoryReference { index, position }),
+            )
+        } else {
+            self.body_story_events
+                .push(ParsedBodyStoryEvent::RevisionEnd(id));
+            Ok(())
+        }
+    }
+
+    pub(super) fn close_revision_at_cell_boundary(&mut self, level: u8) -> crate::Result<()> {
+        let (revision_type, revision_event_id, in_table, table_nesting_level) = {
+            let state = self.current_state()?;
+            (
+                state.revision_type,
+                state.revision_event_id,
+                state.in_table,
+                state.table_nesting_level,
+            )
+        };
+        if revision_type == Some(super::super::super::annotation::RevisionType::Insertion)
+            && let Some(id) = revision_event_id
+            && self
+                .revision_event_indices
+                .get(id)
+                .is_some_and(Option::is_some)
+        {
+            self.record_revision_end(id)?;
+        }
+        if (in_table || table_nesting_level >= level) && revision_type.is_some() {
+            self.current_state_mut()?.revision_event_id = None;
+        }
+        Ok(())
+    }
+}

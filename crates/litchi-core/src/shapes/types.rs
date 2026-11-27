@@ -27,7 +27,7 @@ pub enum ShapeType {
     Connector,
     /// Table shape
     Table,
-    /// Graphic frame (chart, SmartArt, etc.)
+    /// Graphic frame (chart, `SmartArt`, etc.)
     GraphicFrame,
     /// Unknown or unsupported shape type
     Unknown,

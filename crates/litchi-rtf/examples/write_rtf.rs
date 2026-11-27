@@ -1,9 +1,9 @@
-//! Build a small RTF document using the public `RtfWriter` API and write it to disk.
+//! Build a small RTF document using the public `write::Writer` API and write it to disk.
 //!
 //! This example demonstrates direct streaming of RTF control words through
-//! `RtfWriter` plus the higher-level helpers (`write_hyperlink`, `write_note`,
+//! `write::Writer` plus the higher-level helpers (`write_hyperlink`, `write_note`,
 //! `write_revision`). The resulting file is also re-parsed with
-//! `RtfDocument::parse` to round-trip the bytes through the parser.
+//! `Package::parse` to round-trip the bytes through the parser.
 //!
 //! Run from the workspace root:
 //!
@@ -11,25 +11,25 @@
 //! cargo run -p litchi-rtf --example write_rtf
 //! ```
 
-use litchi_rtf::{
-    Field, FieldType, Formatting, Note, Revision, RtfDocument, RtfWriter, WriterOptions,
-};
+use litchi_rtf::Package;
+use litchi_rtf::field::{Field, FieldType};
+use litchi_rtf::review::{Note, Revision};
+use litchi_rtf::write::{Charset, Format, Options, TabWidth, Writer};
 use std::borrow::Cow;
 use std::num::NonZeroU16;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut output: Vec<u8> = Vec::new();
 
-    // Use explicit options instead of `RtfWriter::new` to demonstrate the
+    // Use explicit options instead of `Writer::new` to demonstrate the
     // configuration surface (code page, default font, etc.).
-    let options = WriterOptions {
-        use_ansi: true,
-        code_page: 1252,
+    let options = Options {
+        charset: Charset::ansi(1252)?,
         indent: false,
         default_font: 0,
-        default_tab_width: 720,
+        default_tab_width: TabWidth::Override(720),
     };
-    let mut writer = RtfWriter::with_options(&mut output, options);
+    let mut writer = Writer::with_options(&mut output, options);
 
     // RTF preamble: \rtf1, charset, default font, font/color tables, ...
     writer.write_document_header()?;
@@ -66,12 +66,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     writer.write_field(&page_field)?;
     writer.write_str(" of document.\\par}\\par")?;
 
-    // A short emphasised paragraph using an explicit `Formatting` value to
+    // A short emphasised paragraph using an explicit `write::Format` value to
     // show that the model types are usable from this crate as a library.
-    let emphasis = Formatting {
+    let emphasis = Format {
         bold: true,
         italic: true,
-        font_size: NonZeroU16::new(28).expect("non-zero"),
+        font_size: NonZeroU16::new(28).ok_or("font size is non-zero")?,
         ..Default::default()
     };
     writer.write_str("{")?;
@@ -82,7 +82,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         writer.write_str("\\i")?;
     }
     writer.write_str(&format!(
-        "\\fs{} Bold + italic line via Formatting.\\par",
+        "\\fs{} Bold + italic line via write::Format.\\par",
         emphasis.font_size.get()
     ))?;
     writer.write_str("}\\par")?;
@@ -98,10 +98,10 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Round-trip: parse the output back so the example also exercises the reader.
     let rtf_text = std::str::from_utf8(&output)?;
-    let parsed = RtfDocument::parse(rtf_text)?;
+    let parsed = Package::parse(rtf_text)?;
     println!("Round-trip text length    : {}", parsed.text().len());
     println!("Round-trip paragraph count: {}", parsed.paragraph_count());
-    println!("Round-trip footnote count : {}", parsed.footnotes().len());
+    println!("Round-trip note count     : {}", parsed.notes().len());
     println!("Round-trip field count    : {}", parsed.fields().len());
 
     Ok(())

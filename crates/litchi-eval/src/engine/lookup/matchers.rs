@@ -4,7 +4,7 @@ use litchi_core::sheet::{CellValue, Result};
 use super::super::{EvalCtx, evaluate_expression, flatten_range_expr, to_number};
 use super::helpers::{find_exact_match_index, is_1d};
 
-pub(crate) async fn eval_match(
+pub(crate) fn eval_match(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -15,8 +15,8 @@ pub(crate) async fn eval_match(
         ));
     }
 
-    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let lookup_array = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let lookup_array = flatten_range_expr(ctx, current_sheet, &args[1])?;
 
     if !is_1d(&lookup_array) {
         return Ok(CellValue::Error(
@@ -25,7 +25,7 @@ pub(crate) async fn eval_match(
     }
 
     let match_type = if args.len() == 3 {
-        let mt_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let mt_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_number(&mt_val) {
             Some(0.0) => 0,
             _ => {
@@ -51,7 +51,7 @@ pub(crate) async fn eval_match(
     }
 }
 
-pub(crate) async fn eval_xmatch(
+pub(crate) fn eval_xmatch(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -63,8 +63,8 @@ pub(crate) async fn eval_xmatch(
         ));
     }
 
-    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let lookup_array = flatten_range_expr(ctx, current_sheet, &args[1]).await?;
+    let lookup_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let lookup_array = flatten_range_expr(ctx, current_sheet, &args[1])?;
 
     if !is_1d(&lookup_array) {
         return Ok(CellValue::Error(
@@ -73,7 +73,7 @@ pub(crate) async fn eval_xmatch(
     }
 
     if args.len() >= 3 {
-        let mm_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let mm_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_number(&mm_val) {
             Some(0.0) => {},
             _ => {
@@ -126,8 +126,8 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_eval_match_basic() {
+    #[test]
+    fn test_eval_match_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -143,12 +143,12 @@ mod tests {
 
         // MATCH(30, Sheet1!A1:E1) should return 3
         let args = vec![num_expr(30.0), range_expr("Sheet1", 1, 1, 1, 5)];
-        let result = eval_match(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_match(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(3));
     }
 
-    #[tokio::test]
-    async fn test_eval_match_string() {
+    #[test]
+    fn test_eval_match_string() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -161,12 +161,12 @@ mod tests {
 
         // MATCH("banana", Sheet1!A1:C1) should return 2
         let args = vec![str_expr("banana"), range_expr("Sheet1", 1, 1, 1, 3)];
-        let result = eval_match(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_match(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(2));
     }
 
-    #[tokio::test]
-    async fn test_eval_match_not_found() {
+    #[test]
+    fn test_eval_match_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -174,28 +174,28 @@ mod tests {
         engine.add_range("Sheet1", 1, 1, 1, 3, values);
 
         let args = vec![num_expr(99.0), range_expr("Sheet1", 1, 1, 1, 3)];
-        let result = eval_match(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_match(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("not found")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_match_wrong_args() {
+    #[test]
+    fn test_eval_match_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args = vec![num_expr(1.0)];
-        let result = eval_match(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_match(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 or 3")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_xmatch_basic() {
+    #[test]
+    fn test_eval_xmatch_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -208,12 +208,12 @@ mod tests {
 
         // XMATCH(200, Sheet1!A1:C1) should return 2
         let args = vec![num_expr(200.0), range_expr("Sheet1", 1, 1, 1, 3)];
-        let result = eval_xmatch(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xmatch(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(2));
     }
 
-    #[tokio::test]
-    async fn test_eval_xmatch_not_found() {
+    #[test]
+    fn test_eval_xmatch_not_found() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -221,20 +221,20 @@ mod tests {
         engine.add_range("Sheet1", 1, 1, 1, 2, values);
 
         let args = vec![num_expr(999.0), range_expr("Sheet1", 1, 1, 1, 2)];
-        let result = eval_xmatch(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xmatch(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("not found")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_xmatch_wrong_args() {
+    #[test]
+    fn test_eval_xmatch_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args = vec![num_expr(1.0)];
-        let result = eval_xmatch(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_xmatch(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 to 4")),
             _ => panic!("Expected Error"),

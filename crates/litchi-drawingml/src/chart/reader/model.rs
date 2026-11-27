@@ -1,0 +1,792 @@
+//! Internal chart-reader state and namespace-preserving XML stream adapter.
+//!
+//! The adapter keeps the semantic parser focused on chart elements while
+//! retaining self-contained `DrawingML` fragments and skipping unknown content
+//! without changing the public chart model.
+
+use crate::chart::Limits;
+use crate::chart::limits::decoded_attribute_value_bytes;
+use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::{SeenNames, first_wins};
+use litchi_ooxml_common::xml::{is_drawingml_chart_name, is_drawingml_name};
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesEnd, BytesStart, BytesText, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::{Config, NsReader};
+use quick_xml::writer::Writer;
+use std::io::BufRead;
+
+pub(super) const IGNORED_NAMESPACE_ELEMENT: &str = "ignoredNamespaceElement";
+pub(super) const INVALID_COLOR_MAPPING_ELEMENT: &str = "invalidColorMappingElement";
+
+/// Where the chart event reader is relative to `c:chartSpace`. Nesting
+/// inside the root is not part of it: the depth counter holds that. The
+/// phase is kept when a read returns an error, so a caller that reads on
+/// continues from it.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, DOCTYPE, comment or PI-> unchanged
+/// ```
+///
+/// Those events are passed through wherever they stand, as is whitespace
+/// outside the root. Refused: an empty-element root; a top-level element
+/// that is not `c:chartSpace`, or a second one; text other than whitespace,
+/// CDATA and entity references outside the root; and the end of input
+/// before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
+/// Namespace-aware streaming adapter for the chart model parser.
+///
+/// Core chart elements are exposed unchanged. `DrawingML` text and color-map choice
+/// elements are also kept so their typed models can be decoded, while all other
+/// namespaces are skipped as extension content. Rewriting the remaining `DrawingML`
+/// container names prevents them from being mistaken for same-local-name chart
+/// elements by the focused parsers below.
+pub(super) struct ChartXmlReader<R: BufRead> {
+    inner: NsReader<R>,
+    limits: Limits,
+    nodes: usize,
+    depth: usize,
+    skipped_depth: usize,
+    phase: RootPhase,
+    series: usize,
+    points_in_series: usize,
+    total_points: usize,
+    categories: usize,
+    root_namespace_attributes: Vec<(Vec<u8>, Vec<u8>)>,
+}
+
+impl<R: BufRead> ChartXmlReader<R> {
+    pub(super) fn from_reader(reader: R, limits: Limits) -> Self {
+        Self {
+            inner: NsReader::from_reader(reader),
+            limits,
+            nodes: 0,
+            depth: 0,
+            skipped_depth: 0,
+            phase: RootPhase::Prolog,
+            series: 0,
+            points_in_series: 0,
+            total_points: 0,
+            categories: 0,
+            root_namespace_attributes: Vec::new(),
+        }
+    }
+
+    pub(super) fn config_mut(&mut self) -> &mut Config {
+        self.inner.config_mut()
+    }
+
+    pub(super) fn decoder(&self) -> Decoder {
+        self.inner.decoder()
+    }
+
+    pub(super) fn max_text_bytes(&self) -> usize {
+        self.limits.max_text_bytes
+    }
+
+    pub(super) fn max_points(&self) -> usize {
+        self.limits.max_points
+    }
+
+    /// Append decoded semantic text without allowing a caller-selected text
+    /// field to grow past its bound.  XML text may arrive as several events
+    /// (or as entity references), so checking only the final model would make
+    /// the temporary `String` larger than the active policy first.
+    pub(super) fn append_text(&self, target: &mut String, text: &str) -> Result<()> {
+        let observed = target.len().checked_add(text.len()).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartTextBytes,
+                usize::MAX,
+                self.limits.max_text_bytes,
+            )
+        })?;
+        if observed > self.limits.max_text_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::ChartTextBytes,
+                observed,
+                self.limits.max_text_bytes,
+            ));
+        }
+        target.push_str(text);
+        Ok(())
+    }
+
+    /// Admit one semantic series before its parser allocates the projection.
+    pub(super) fn begin_series(&mut self) -> Result<()> {
+        self.series = self.series.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartSeries,
+                usize::MAX,
+                self.limits.max_series,
+            )
+        })?;
+        if self.series > self.limits.max_series {
+            return Err(Error::limit(
+                crate::LimitKind::ChartSeries,
+                self.series,
+                self.limits.max_series,
+            ));
+        }
+        self.points_in_series = 0;
+        // Category caches are retained once per series in the classic chart
+        // model.  A repeated category dimension therefore starts a fresh
+        // per-series budget, just as `validate_chart` does below.
+        self.categories = 0;
+        Ok(())
+    }
+
+    /// Admit one category point before its decoded string is retained.
+    pub(super) fn admit_category_point(&mut self) -> Result<()> {
+        self.categories = self.categories.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartCategories,
+                usize::MAX,
+                self.limits.max_categories,
+            )
+        })?;
+        if self.categories > self.limits.max_categories {
+            return Err(Error::limit(
+                crate::LimitKind::ChartCategories,
+                self.categories,
+                self.limits.max_categories,
+            ));
+        }
+        Ok(())
+    }
+
+    /// Admit one numeric point before its decoded value is retained.
+    pub(super) fn admit_numeric_point(&mut self) -> Result<()> {
+        self.points_in_series = self.points_in_series.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartPoints,
+                usize::MAX,
+                self.limits.max_points,
+            )
+        })?;
+        if self.points_in_series > self.limits.max_points {
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                self.points_in_series,
+                self.limits.max_points,
+            ));
+        }
+        self.total_points = self.total_points.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::ChartPoints,
+                usize::MAX,
+                self.limits.max_total_points,
+            )
+        })?;
+        if self.total_points > self.limits.max_total_points {
+            return Err(Error::limit(
+                crate::LimitKind::ChartPoints,
+                self.total_points,
+                self.limits.max_total_points,
+            ));
+        }
+        Ok(())
+    }
+
+    pub(super) fn relationship_attribute_value(
+        &self,
+        element: &BytesStart<'_>,
+        name: &[u8],
+    ) -> Result<Option<String>> {
+        const RELATIONSHIPS_NAMESPACE: &[u8] =
+            b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+        const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+            b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+        let mut value = None;
+        for attribute in element.checked_attributes() {
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+            if attribute.key.local_name().as_ref() != name {
+                continue;
+            }
+            let (namespace, _) = self.inner.resolver().resolve_attribute(attribute.key);
+            let is_relationship = matches!(
+                namespace,
+                ResolveResult::Bound(Namespace(value))
+                    if value == RELATIONSHIPS_NAMESPACE
+                        || value == STRICT_RELATIONSHIPS_NAMESPACE
+            ) || matches!(namespace, ResolveResult::Unknown(prefix) if prefix.as_slice() == b"r");
+            if !is_relationship {
+                continue;
+            }
+            if value.is_some() {
+                return Err(Error::Invalid(
+                    "chart element contains duplicate relationship IDs".into(),
+                ));
+            }
+            value = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Explicit1_0, self.decoder())
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .into_owned(),
+            );
+        }
+        Ok(value)
+    }
+
+    pub(super) fn make_fragment_root_self_contained(
+        &self,
+        element: &BytesStart<'_>,
+    ) -> BytesStart<'static> {
+        let mut root = element.to_owned();
+        // The first occurrence of each name counts and later duplicates are
+        // skipped, at a cost of O(n log n) however the tag repeats its names.
+        let mut existing_names = SeenNames::new();
+        for attribute in first_wins(element).flatten() {
+            existing_names.insert(attribute.key.into_inner());
+        }
+        for (name, value) in &self.root_namespace_attributes {
+            if !existing_names.contains(&name.as_slice()) {
+                root.push_attribute((name.as_slice(), value.as_slice()));
+            }
+        }
+        root
+    }
+
+    pub(super) fn capture_empty_fragment(&self, element: &BytesStart<'_>) -> Result<Vec<u8>> {
+        let mut writer = Writer::new(Vec::new());
+        writer
+            .write_event(Event::Empty(
+                self.make_fragment_root_self_contained(element),
+            ))
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        Ok(writer.into_inner())
+    }
+
+    pub(super) fn capture_fragment(
+        &mut self,
+        element: &BytesStart<'_>,
+        description: &str,
+    ) -> Result<Vec<u8>> {
+        let mut writer = Writer::new(Vec::new());
+        writer
+            .write_event(Event::Start(
+                self.make_fragment_root_self_contained(element),
+            ))
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let fragment_depth = self.depth;
+        let mut buffer = Vec::new();
+        loop {
+            let (_, event) = self
+                .inner
+                .read_resolved_event_into(&mut buffer)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            match event {
+                Event::Start(ref element) => {
+                    validate_attributes(element, self.limits, self.decoder())?;
+                    let limits = self.limits;
+                    count_node_values(&mut self.nodes, limits)?;
+                    self.depth = self.depth.checked_add(1).ok_or_else(|| {
+                        Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            usize::MAX,
+                            self.limits.max_xml_depth,
+                        )
+                    })?;
+                    if self.depth > self.limits.max_xml_depth {
+                        return Err(Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            self.depth,
+                            self.limits.max_xml_depth,
+                        ));
+                    }
+                },
+                Event::End(_) => {
+                    self.depth = self.depth.checked_sub(1).ok_or_else(|| {
+                        Error::Invalid(format!("{description} has an unmatched closing element"))
+                    })?;
+                },
+                Event::Eof => {
+                    return Err(Error::Invalid(format!("unterminated {description}")));
+                },
+                Event::Empty(ref element) => {
+                    validate_attributes(element, self.limits, self.decoder())?;
+                    let limits = self.limits;
+                    count_node_values(&mut self.nodes, limits)?;
+                    let depth = self.depth.checked_add(1).ok_or_else(|| {
+                        Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            usize::MAX,
+                            self.limits.max_xml_depth,
+                        )
+                    })?;
+                    if depth > self.limits.max_xml_depth {
+                        return Err(Error::limit(
+                            crate::LimitKind::XmlDepth,
+                            depth,
+                            self.limits.max_xml_depth,
+                        ));
+                    }
+                },
+                Event::DocType(_) => {
+                    return Err(Error::Invalid(format!(
+                        "{description} cannot contain a document type"
+                    )));
+                },
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::GeneralRef(_) => {},
+            }
+            let finished = matches!(event, Event::End(_)) && self.depth < fragment_depth;
+            writer
+                .write_event(event.into_owned())
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            buffer.clear();
+            if finished {
+                break;
+            }
+        }
+        Ok(writer.into_inner())
+    }
+
+    pub(super) fn read_event_into<'buffer>(
+        &mut self,
+        buffer: &'buffer mut Vec<u8>,
+    ) -> Result<Event<'buffer>> {
+        let limits = self.limits;
+        let decoder = self.inner.decoder();
+        let (namespace, event) = self
+            .inner
+            .read_resolved_event_into(buffer)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+
+        match event {
+            Event::Start(mut element) => {
+                validate_attributes(&element, limits, decoder)?;
+                count_node_values(&mut self.nodes, limits)?;
+                let is_chart = is_chart_namespace(&namespace, &element);
+                let is_drawing = is_drawing_namespace(&namespace, &element);
+
+                if self.depth == 0 {
+                    if self.phase != RootPhase::Prolog
+                        || !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace")
+                    {
+                        return Err(Error::Invalid(
+                            "chart XML must have one DrawingML chartSpace root".to_string(),
+                        ));
+                    }
+                    self.phase = RootPhase::Open;
+                    self.root_namespace_attributes.clear();
+                    for attribute in element.checked_attributes() {
+                        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                        let name = attribute.key.as_ref();
+                        if name == b"xmlns" || name.starts_with(b"xmlns:") {
+                            self.root_namespace_attributes
+                                .push((name.to_vec(), attribute.value.into_owned()));
+                        }
+                    }
+                    for (name, value) in [
+                        (
+                            b"xmlns:c".as_slice(),
+                            b"http://schemas.openxmlformats.org/drawingml/2006/chart".as_slice(),
+                        ),
+                        (
+                            b"xmlns:a".as_slice(),
+                            b"http://schemas.openxmlformats.org/drawingml/2006/main".as_slice(),
+                        ),
+                        (
+                            b"xmlns:r".as_slice(),
+                            b"http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                                .as_slice(),
+                        ),
+                    ] {
+                        if !self
+                            .root_namespace_attributes
+                            .iter()
+                            .any(|(existing, _)| existing == name)
+                        {
+                            self.root_namespace_attributes
+                                .push((name.to_vec(), value.to_vec()));
+                        }
+                    }
+                }
+                self.depth = self.depth.checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        usize::MAX,
+                        self.limits.max_xml_depth,
+                    )
+                })?;
+                if self.depth > self.limits.max_xml_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        self.depth,
+                        self.limits.max_xml_depth,
+                    ));
+                }
+
+                if self.skipped_depth > 0 {
+                    self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("chart XML nesting is too deep".to_string())
+                    })?;
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                } else if is_chart && is_drawing_color_map_choice(element.local_name().as_ref()) {
+                    element.set_name(INVALID_COLOR_MAPPING_ELEMENT.as_bytes());
+                } else if !is_chart && !is_drawing {
+                    self.skipped_depth = self.skipped_depth.checked_add(1).ok_or_else(|| {
+                        Error::Invalid("chart XML nesting is too deep".to_string())
+                    })?;
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                } else if is_drawing && !is_preserved_drawing_element(element.local_name().as_ref())
+                {
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                }
+                Ok(Event::Start(element))
+            },
+            Event::Empty(mut element) => {
+                validate_attributes(&element, limits, decoder)?;
+                count_node_values(&mut self.nodes, limits)?;
+                if self.depth == 0 {
+                    return Err(Error::Invalid(
+                        "chart XML must have one non-empty DrawingML chartSpace root".to_string(),
+                    ));
+                }
+                let depth = self.depth.checked_add(1).ok_or_else(|| {
+                    Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        usize::MAX,
+                        self.limits.max_xml_depth,
+                    )
+                })?;
+                if depth > self.limits.max_xml_depth {
+                    return Err(Error::limit(
+                        crate::LimitKind::XmlDepth,
+                        depth,
+                        self.limits.max_xml_depth,
+                    ));
+                }
+                let is_chart = is_chart_namespace(&namespace, &element);
+                let is_drawing = is_drawing_namespace(&namespace, &element);
+                if self.skipped_depth > 0 {
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                } else if is_chart && is_drawing_color_map_choice(element.local_name().as_ref()) {
+                    element.set_name(INVALID_COLOR_MAPPING_ELEMENT.as_bytes());
+                } else if !is_chart
+                    && (!is_drawing || !is_preserved_drawing_element(element.local_name().as_ref()))
+                {
+                    element.set_name(IGNORED_NAMESPACE_ELEMENT.as_bytes());
+                }
+                Ok(Event::Empty(element))
+            },
+            Event::End(element) => {
+                if self.depth == 0 {
+                    return Err(Error::Invalid(
+                        "chart XML has an unmatched closing element".to_string(),
+                    ));
+                }
+                self.depth -= 1;
+                if self.skipped_depth > 0 {
+                    self.skipped_depth -= 1;
+                    return Ok(Event::End(BytesEnd::new(IGNORED_NAMESPACE_ELEMENT)));
+                }
+
+                let is_chart = is_drawingml_chart_name(
+                    &namespace,
+                    element.name(),
+                    element.local_name().as_ref(),
+                );
+                let is_drawing =
+                    is_drawingml_name(&namespace, element.name(), element.local_name().as_ref());
+                if self.depth == 0 {
+                    if !is_drawingml_chart_name(&namespace, element.name(), b"chartSpace") {
+                        return Err(Error::Invalid(
+                            "chart XML has an invalid root closing element".to_string(),
+                        ));
+                    }
+                    self.phase = RootPhase::Closed;
+                }
+                if is_drawing && !is_preserved_drawing_element(element.local_name().as_ref()) {
+                    return Ok(Event::End(BytesEnd::new(IGNORED_NAMESPACE_ELEMENT)));
+                }
+                if is_chart || is_drawing {
+                    return Ok(Event::End(element));
+                }
+                Err(Error::Invalid(
+                    "chart XML namespace state is inconsistent".to_string(),
+                ))
+            },
+            _ if self.skipped_depth > 0 => Ok(Event::Comment(BytesText::new(""))),
+            Event::Text(ref text) if self.depth == 0 => {
+                if !text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(Error::Invalid(
+                        "chart XML contains text outside its root".to_string(),
+                    ));
+                }
+                Ok(event)
+            },
+            Event::CData(_) | Event::GeneralRef(_) if self.depth == 0 => Err(Error::Invalid(
+                "chart XML contains data outside its root".to_string(),
+            )),
+            Event::Eof => match self.phase {
+                RootPhase::Closed => Ok(Event::Eof),
+                RootPhase::Prolog | RootPhase::Open => Err(Error::Invalid(
+                    "chart XML has no complete chartSpace root".to_string(),
+                )),
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => Ok(event),
+        }
+    }
+}
+
+fn count_node_values(nodes: &mut usize, limits: Limits) -> Result<()> {
+    *nodes = nodes.checked_add(1).ok_or_else(|| {
+        Error::limit(crate::LimitKind::XmlNodes, usize::MAX, limits.max_xml_nodes)
+    })?;
+    if *nodes > limits.max_xml_nodes {
+        return Err(Error::limit(
+            crate::LimitKind::XmlNodes,
+            *nodes,
+            limits.max_xml_nodes,
+        ));
+    }
+    Ok(())
+}
+
+fn validate_attributes(element: &BytesStart<'_>, limits: Limits, decoder: Decoder) -> Result<()> {
+    // The chart reader intentionally keeps the legacy first-wins behavior for
+    // duplicate attributes.  The checked iterator rejects those duplicates,
+    // so use the raw iterator here and only enforce resource budgets.
+    let mut count = 0usize;
+    for attribute in element.unchecked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        count = count.checked_add(1).ok_or_else(|| {
+            Error::limit(
+                crate::LimitKind::XmlAttributes,
+                usize::MAX,
+                limits.max_xml_attributes,
+            )
+        })?;
+        if count > limits.max_xml_attributes {
+            return Err(Error::limit(
+                crate::LimitKind::XmlAttributes,
+                count,
+                limits.max_xml_attributes,
+            ));
+        }
+        let value_length =
+            decoded_attribute_value_bytes(attribute.value.as_ref(), decoder).map_err(Error::Xml)?;
+        if value_length > limits.max_attribute_value_bytes {
+            return Err(Error::limit(
+                crate::LimitKind::AttributeValueBytes,
+                value_length,
+                limits.max_attribute_value_bytes,
+            ));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn is_chart_namespace(namespace: &ResolveResult<'_>, element: &BytesStart<'_>) -> bool {
+    is_drawingml_chart_name(namespace, element.name(), element.local_name().as_ref())
+}
+
+pub(super) fn is_drawing_namespace(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+) -> bool {
+    is_drawingml_name(namespace, element.name(), element.local_name().as_ref())
+}
+
+pub(super) fn is_preserved_drawing_element(local_name: &[u8]) -> bool {
+    local_name == b"t" || is_drawing_color_map_choice(local_name)
+}
+
+pub(super) fn is_drawing_color_map_choice(local_name: &[u8]) -> bool {
+    matches!(local_name, b"masterClrMapping" | b"overrideClrMapping")
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the chart event reader accepts before, around and after `c:chartSpace`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    /// The chart event reader, read to the end of input; after an error it is read again, up to three errors, since a caller may keep reading.
+    #[test]
+    fn chart_event_reader_envelope() {
+        let root = Root {
+            open: r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
+            body: r"<c:chart/>",
+            close: r"</c:chartSpace>",
+            empty: r#"<c:chartSpace xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "whitespace only: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "declaration only: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "empty-element root: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "start and end root: Ok(2)",
+                "root then whitespace: Ok(4)",
+                "root then comment: Ok(4)",
+                "root then PI: Ok(4)",
+                "root then text: Invalid(\"chart XML contains text outside its root\") then Ok(3)",
+                "root then second root: Invalid(\"chart XML must have one DrawingML chartSpace root\") then Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Invalid(\"chart XML has an unmatched closing element\")",
+                "root then foreign start: Invalid(\"chart XML must have one DrawingML chartSpace root\") then Invalid(\"chart XML has an unmatched closing element\") then Ok(3)",
+                "root then foreign empty: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Ok(3)",
+                "declaration after root: Ok(4)",
+                "two declarations: Ok(5)",
+                "comment before declaration: Ok(5)",
+                "text before root: Invalid(\"chart XML contains text outside its root\") then Ok(3)",
+                "unterminated root: Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\") then Ok(3)",
+                "DOCTYPE: Ok(4)",
+                "top-level CDATA: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "declaration then root: Ok(4)",
+                "whitespace before declaration: Ok(5)",
+                "PI before declaration: Ok(5)",
+                "comment then root: Ok(4)",
+                "PI then root: Ok(4)",
+                "root then text then second root: Invalid(\"chart XML contains text outside its root\") then Invalid(\"chart XML must have one DrawingML chartSpace root\") then Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\")",
+                "empty-element root then root: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Ok(3)",
+                "declaration after empty-element root: Invalid(\"chart XML must have one non-empty DrawingML chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\") then Invalid(\"chart XML has no complete chartSpace root\")",
+                "reference before root: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "reference after root: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "CDATA after root: Invalid(\"chart XML contains data outside its root\") then Ok(3)",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\") then Ok(3)",
+                "declaration inside root: Ok(4)",
+                "text, CDATA and reference inside root: Ok(6)",
+            ],
+            |xml| {
+                let mut reader =
+                    super::ChartXmlReader::from_reader(xml.as_bytes(), super::Limits::DEFAULT);
+                let mut buffer = Vec::new();
+                let mut results = Vec::new();
+                let mut events = 0_usize;
+                for _ in 0..64 {
+                    buffer.clear();
+                    match reader.read_event_into(&mut buffer) {
+                        Ok(super::Event::Eof) => {
+                            results.push(format!("Ok({events})"));
+                            break;
+                        },
+                        Ok(_) => events += 1,
+                        Err(error) => {
+                            results.push(format!("{error:?}"));
+                            if results.len() == 3 {
+                                break;
+                            }
+                        },
+                    }
+                }
+                results.join(" then ")
+            },
+        );
+    }
+}

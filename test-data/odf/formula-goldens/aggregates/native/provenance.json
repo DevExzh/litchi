@@ -1,0 +1,48 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/mathematical/fods/sum.fods": "64d9c423812fa082f226e0b7ef9e5ca71d87e15614fd070c27d3aa1c275ee572",
+    "sc/qa/unit/data/functions/mathematical/fods/product.fods": "6fd8e17c9d2bd160709bab27ea1de4fddde778654065d082c3b96ff3aef5b29e",
+    "sc/qa/unit/data/functions/mathematical/fods/sumsq.fods": "db9dc1e58c8b634c06e0de409049558872583c3697379acda277b331da405456",
+    "sc/qa/unit/data/functions/array/fods/sumproduct.fods": "3dec3d33ca5425d883dae35a6c51bc0784e8929c029929793f5a1d9cf273ee60",
+    "sc/qa/unit/data/functions/array/fods/sumx2my2.fods": "7e668420e4a2e8c811dc24fd920c6d89fcbe972f8b3ce0f53f41f9749e3a8681",
+    "sc/qa/unit/data/functions/array/fods/sumx2py2.fods": "f8518447be1b3fae6775c3c39b86fe009e2b509144373ca620cf5a31ae9e561a",
+    "sc/qa/unit/data/functions/array/fods/sumxmy2.fods": "64a3323a8e37bd69a9aafa5cc8be87f046d3152914cb25e795a97db70cdfb18c"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from the exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 48,
+  "excluded_profile_variances": [
+    {
+      "function": "PRODUCT",
+      "row": 12,
+      "column": 1,
+      "reason": "The upstream PRODUCT() cache uses zero arguments; the selected aggregate profile requires at least one argument."
+    },
+    {
+      "function": "SUMPRODUCT",
+      "row": 15,
+      "column": 1,
+      "reason": "The source range includes M17, an upstream formula cell (of:=\"\"); the bounded native fixture refuses formula-cell inputs rather than evaluating or importing that cache."
+    },
+    {
+      "function": "SUMPRODUCT",
+      "source": "sc/qa/unit/data/functions/array/fods/sumproduct.fods",
+      "sheet": "Sheet2",
+      "row": 16,
+      "column": 1,
+      "formula": "of:=SUMPRODUCT([.J16:.J18];[.N16:.N18])",
+      "cached": "18",
+      "reference_cell": {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 14,
+        "type": "text",
+        "value": "Unknown"
+      },
+      "reason": "The selected contract converts malformed text in a referenced forced array to a formula Value error, while the LibreOffice cache treats the literal text cell as zero; retain the source/cache as an explicit native conversion variance."
+    }
+  ]
+}

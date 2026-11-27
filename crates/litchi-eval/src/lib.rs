@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 //! Formula evaluation engine shared across spreadsheet formats.
 //!
 //! This module provides a small, format-agnostic evaluation layer that works
@@ -11,10 +10,15 @@ pub mod parser;
 
 use self::engine::{ReferenceResolver, ResolvedName};
 use self::parser::{RangeRef, parse_range_reference, parse_single_cell_reference};
-use litchi_core::sheet::{CellValue, Result, WorkbookTrait};
+use litchi_core::edit::RefusalKind;
+use litchi_core::sheet::{
+    CellValue, Error as SheetError, LimitKind, Result, WorkbookTrait, Worksheet as _,
+};
+use parking_lot::{Mutex, RwLock};
 use std::borrow::Cow;
-use std::collections::{HashMap, HashSet};
-use tokio::sync::RwLock;
+use std::collections::HashMap;
+#[cfg(feature = "web_functions")]
+use std::error::Error;
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq)]
 struct CellRef {
@@ -25,22 +29,262 @@ struct CellRef {
 
 struct EvalState {
     cache: HashMap<CellRef, CellValue>,
-    visiting: HashSet<CellRef>,
 }
 
+/// Where one cell stands in one evaluation pass.
+///
+/// `Done` values live in the evaluator's cache and are shared by every pass;
+/// `InProgress` cells live in the pass's [`EvalSession`].
+///
+/// ```text
+/// NotStarted --read-----------------------------------> InProgress
+/// InProgress --value computed, no cycle through it----> Done(value)
+/// InProgress --value computed, inside a cycle---------> InProgress (waits for the cycle)
+/// InProgress --the cycle's first cell is computed-----> Done(circular error), whole cycle
+/// InProgress --evaluation fails, or the pass waits----> NotStarted
+///              on a transport response
+/// ```
+///
+/// Reading an `InProgress` cell yields the circular-reference error and
+/// records that the reader is on a cycle with it. Cells that can all reach
+/// one another are finished together, when the first of them that was
+/// started is computed, and every one of them is `Done` with the
+/// circular-reference error, as in LibreOffice (`Err:522`); a cell that only
+/// depends on the cycle is computed from that error. No value computed from
+/// the placeholder is kept for a cell on the cycle, so results do not depend
+/// on which cell is evaluated first.
+///
+/// A cell whose only cycle is a read of itself keeps the value its formula
+/// computes from the error. Several functions read every cell of a range
+/// they only measure (`COLUMNS(A1:C1)` in `B1`), and their result does not
+/// depend on evaluation order.
+enum CellStatus {
+    NotStarted,
+    /// `index` is the cell's position in [`Traversal::open`].
+    InProgress {
+        index: usize,
+    },
+    Done(CellValue),
+}
+
+/// A cell that is [`CellStatus::InProgress`].
+struct OpenCell {
+    key: CellRef,
+    /// The lowest position in [`Traversal::open`] this cell is known to
+    /// reach; below its own position, the cell is on a cycle with that one.
+    lowest: usize,
+}
+
+/// The cells in progress in one pass.
+#[derive(Default)]
+struct Traversal {
+    /// In the order they were started. A cell stays until its cycle closes.
+    open: Vec<OpenCell>,
+    /// The position in `open` of each cell in it.
+    index: HashMap<CellRef, usize>,
+    /// Positions in `open` of the cells whose formula is running, outermost
+    /// first.
+    chain: Vec<usize>,
+}
+
+impl Traversal {
+    /// The running formula read the cell at `index`.
+    fn reach(&mut self, index: usize) {
+        if let Some(reader) = self.chain.last().and_then(|at| self.open.get_mut(*at)) {
+            reader.lowest = reader.lowest.min(index);
+        }
+    }
+
+    /// Remove the cells from `index` onward.
+    fn close(&mut self, index: usize) -> Vec<CellRef> {
+        let cells: Vec<CellRef> = self.open.drain(index..).map(|cell| cell.key).collect();
+        for key in &cells {
+            self.index.remove(key);
+        }
+        cells
+    }
+}
+
+/// What computing a cell's value settled.
+enum Finished {
+    /// The cell is on a cycle that a cell started earlier closes.
+    OnOpenCycle,
+    /// These cells are done: the cell alone, or the cycle it closes.
+    Closed(Vec<CellRef>),
+}
+
+#[derive(Default)]
+struct EvalSession {
+    traversal: Mutex<Traversal>,
+    /// URLs this pass needs from the caller's transport, in request order.
+    #[cfg(feature = "web_functions")]
+    requests: Mutex<Vec<String>>,
+}
+
+/// A transport response as the synchronous engine sees it.
+#[cfg(feature = "web_functions")]
+pub(crate) enum Fetched {
+    /// No transport is configured.
+    NoTransport,
+    /// The response body, or `None` when the request failed.
+    Body(Option<Vec<u8>>),
+    /// Not fetched yet: recorded for the next pass.
+    Pending,
+}
+
+/// A `[@…]` structured reference outside a table row.
+const ROW_CONTEXT: SheetError = SheetError::refused(
+    RefusalKind::UnsupportedOperation,
+    "evaluate",
+    "a this-row structured reference requires row context",
+);
+
+/// A structured reference naming a column the table does not have.
+const MISSING_COLUMN: SheetError = SheetError::refused(
+    RefusalKind::NotFound,
+    "evaluate",
+    "the table has no column of that name",
+);
+
+/// Explicit table syntax requires a table definition from the caller.
+const MISSING_TABLE: SheetError = SheetError::refused(
+    RefusalKind::UnsupportedContent,
+    "evaluate",
+    "a structured reference requires a registered table",
+);
+
+impl EvalSession {
+    /// Record a URL the pass needs.
+    #[cfg(feature = "web_functions")]
+    fn request(&self, url: &str) {
+        let mut requests = self.requests.lock();
+        if !requests.iter().any(|known| known == url) {
+            requests.push(url.to_owned());
+        }
+    }
+
+    /// Whether the pass waits on a transport response, so values it computes
+    /// may rest on a placeholder.
+    fn is_suspended(&self) -> bool {
+        #[cfg(feature = "web_functions")]
+        {
+            !self.requests.lock().is_empty()
+        }
+        #[cfg(not(feature = "web_functions"))]
+        {
+            false
+        }
+    }
+
+    /// The number of formula cells on the current evaluation chain.
+    fn depth(&self) -> usize {
+        self.traversal.lock().chain.len()
+    }
+
+    /// The position of `key` among the cells in progress, if it is one.
+    fn position(&self, key: CellRef) -> Option<usize> {
+        self.traversal.lock().index.get(&key).copied()
+    }
+
+    /// `NotStarted -> InProgress`: the formula of `key` starts running.
+    fn begin(&self, key: CellRef) -> usize {
+        let mut traversal = self.traversal.lock();
+        let index = traversal.open.len();
+        traversal.open.push(OpenCell { key, lowest: index });
+        traversal.index.insert(key, index);
+        traversal.chain.push(index);
+        index
+    }
+
+    /// The running formula read the in-progress cell at `index`.
+    fn reach(&self, index: usize) {
+        self.traversal.lock().reach(index);
+    }
+
+    /// The formula of the cell at `index` produced a value.
+    fn finish(&self, index: usize) -> Finished {
+        let mut traversal = self.traversal.lock();
+        traversal.chain.pop();
+        let lowest = traversal.open.get(index).map_or(index, |cell| cell.lowest);
+        if lowest < index {
+            // The cell that read this one is on the same cycle.
+            traversal.reach(lowest);
+            Finished::OnOpenCycle
+        } else {
+            Finished::Closed(traversal.close(index))
+        }
+    }
+
+    /// `InProgress -> NotStarted`: the formula of the cell at `index` failed,
+    /// which also abandons the cells waiting on a cycle through it.
+    fn abandon(&self, index: usize) {
+        let mut traversal = self.traversal.lock();
+        traversal.chain.pop();
+        traversal.close(index);
+    }
+}
+
+#[cfg(test)]
+mod session_tests {
+    use super::*;
+
+    #[test]
+    fn cycle_tracking_is_local_and_clears_on_drop() {
+        let key = CellRef {
+            sheet_idx: 0,
+            row: 1,
+            col: 1,
+        };
+        let first = EvalSession::default();
+        let second = EvalSession::default();
+
+        let visit = first.begin(key);
+        assert_eq!(first.position(key), Some(visit));
+        assert_eq!(second.position(key), None);
+        let independent = second.begin(key);
+
+        assert!(matches!(first.finish(visit), Finished::Closed(cells) if cells == [key]));
+        assert_eq!(first.position(key), None);
+        assert_eq!(first.depth(), 0);
+        assert_eq!(second.position(key), Some(independent));
+        second.abandon(independent);
+        assert_eq!(second.position(key), None);
+        assert_eq!(second.depth(), 0);
+    }
+}
+
+#[cfg(feature = "web_functions")]
 use std::future::Future;
+#[cfg(feature = "web_functions")]
 use std::pin::Pin;
 
-pub(crate) type BoxFuture<'a, T> = Pin<Box<dyn Future<Output = T> + Send + 'a>>;
+/// Error returned by a caller-provided [`Fetch`] implementation.
+#[cfg(feature = "web_functions")]
+pub type FetchError = Box<dyn Error + Send + Sync + 'static>;
+
+/// Result returned by a caller-provided [`Fetch`] implementation.
+#[cfg(feature = "web_functions")]
+pub type FetchResult = std::result::Result<Vec<u8>, FetchError>;
+
+/// Runtime-neutral future returned by [`Fetch::get`].
+#[cfg(feature = "web_functions")]
+pub type FetchFuture<'a> = Pin<Box<dyn Future<Output = FetchResult> + Send + 'a>>;
+
+/// Caller-owned transport for formula functions that retrieve external data.
+///
+/// Litchi does not select an async runtime, perform implicit network I/O, or
+/// define network policy. Implementations may use any runtime and should stop
+/// reading once `max` bytes have been received. The evaluator independently
+/// checks that limit before accepting the response.
+#[cfg(feature = "web_functions")]
+pub trait Fetch: Send + Sync {
+    /// Retrieve `url`, returning at most `max` response bytes.
+    fn get<'a>(&'a self, url: &'a str, max: usize) -> FetchFuture<'a>;
+}
 
 /// Evaluation context used by the engine runtime.
 pub(crate) trait EngineCtx: Send + Sync {
-    fn get_cell_value<'a>(
-        &'a self,
-        sheet_name: &'a str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'a, Result<CellValue>>;
+    fn get_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue>;
 
     /// Returns the current evaluation position (sheet, row, col) if a formula is being
     /// evaluated. This is primarily used by functions such as ROW() or COLUMN() that need
@@ -51,19 +295,18 @@ pub(crate) trait EngineCtx: Send + Sync {
     ///
     /// This is useful for functions like ISFORMULA that need to inspect the cell's
     /// original content rather than the evaluated result.
-    fn raw_cell_value<'a>(
-        &'a self,
-        sheet_name: &'a str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'a, Result<CellValue>>;
+    fn raw_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue>;
 
     /// Returns true if the workbook backing this context uses the 1904 date system.
     fn is_1904_date_system(&self) -> bool;
 
-    /// Returns a shared HTTP client for web functions.
+    /// The response the caller's transport gave for `url`.
+    ///
+    /// The engine is synchronous: a URL not fetched yet is recorded and
+    /// reported as [`Fetched::Pending`], and the async wrapper fetches it
+    /// through the transport and evaluates again.
     #[cfg(feature = "web_functions")]
-    fn http_client(&self) -> &reqwest::Client;
+    fn fetched(&self, url: &str) -> Fetched;
 
     /// Returns the index of the given sheet (0-based).
     fn get_sheet_index(&self, name: &str) -> Option<usize>;
@@ -85,9 +328,20 @@ pub struct FormulaEvaluator<'a, W: WorkbookTrait + ?Sized> {
     names: HashMap<String, String>,
     local_names: HashMap<(String, String), String>,
     tables: HashMap<String, NamedTable>,
-    position_stack: RwLock<Vec<(String, u32, u32)>>,
+    max_depth: usize,
     #[cfg(feature = "web_functions")]
-    http_client: reqwest::Client,
+    fetch: Option<&'a dyn Fetch>,
+    /// Transport responses by URL (`None`: the request failed or exceeded
+    /// the response bound).
+    #[cfg(feature = "web_functions")]
+    responses: Mutex<HashMap<String, Option<Vec<u8>>>>,
+}
+
+/// Per-evaluation position, borrowed instead of stored in shared mutable state.
+struct At<'e, 'w, W: WorkbookTrait + ?Sized> {
+    evaluator: &'e FormulaEvaluator<'w, W>,
+    session: &'e EvalSession,
+    position: (String, u32, u32),
 }
 
 #[derive(Clone)]
@@ -100,102 +354,61 @@ struct NamedTable {
     headers: HashMap<String, u32>,
 }
 
-impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for FormulaEvaluator<'a, W> {
-    fn get_cell_value<'b>(
-        &'b self,
-        sheet_name: &'b str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'b, Result<CellValue>> {
-        Box::pin(async move {
-            let sheet_idx = *self
-                .sheet_index
-                .get(sheet_name)
-                .expect("Sheet name not found in index");
-            let key = CellRef {
-                sheet_idx,
-                row,
-                col,
-            };
-
-            // Fast path: cached value
-            {
-                let state = self.eval_state.read().await;
-                if let Some(v) = state.cache.get(&key) {
-                    return Ok(v.clone());
-                }
-
-                if state.visiting.contains(&key) {
-                    // Circular reference detected.
-                    return Ok(CellValue::Error("Circular reference detected".to_string()));
-                }
-            }
-
-            // Mark as visiting
-            {
-                let mut state = self.eval_state.write().await;
-                state.visiting.insert(key);
-            }
-
-            // Load raw value from workbook
-            let sheet = self.workbook.worksheet_by_name(sheet_name)?;
-            let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
-            let raw = value.into_owned();
-
-            // Evaluate value (handles formulas and cached results)
-            let result = self.evaluate_value(sheet_name, row, col, raw).await?;
-
-            // Store in cache and clear visiting
-            {
-                let mut state = self.eval_state.write().await;
-                state.visiting.remove(&key);
-                state.cache.insert(key, result.clone());
-            }
-
-            Ok(result)
-        })
+impl<'e, 'w, W: WorkbookTrait + Sync + Send + ?Sized> EngineCtx for At<'e, 'w, W>
+where
+    SheetError: From<W::Error>,
+{
+    fn get_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
+        self.evaluator
+            .get_cell_value_in(self.session, sheet_name, row, col)
     }
 
     fn current_position(&self) -> Option<(String, u32, u32)> {
-        // NOTE: This now returns a default or requires a sync way to access.
-        // For simplicity in this migration, we might need a sync guard or just accept that
-        // functions needing position might need to be async or we use a different mechanism.
-        // For now, use blocking read as it's just a stack of strings/u32.
-        self.position_stack.blocking_read().last().cloned()
+        Some(self.position.clone())
     }
 
-    fn raw_cell_value<'b>(
-        &'b self,
-        sheet_name: &'b str,
-        row: u32,
-        col: u32,
-    ) -> BoxFuture<'b, Result<CellValue>> {
-        Box::pin(async move {
-            let sheet = self.workbook.worksheet_by_name(sheet_name)?;
-            let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
-            Ok(value.into_owned())
-        })
+    fn raw_cell_value(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
+        self.evaluator.stored(sheet_name, row, col)
     }
 
     fn is_1904_date_system(&self) -> bool {
-        self.workbook.is_1904_date_system()
+        self.evaluator.workbook.is_1904_date_system()
     }
 
     #[cfg(feature = "web_functions")]
-    fn http_client(&self) -> &reqwest::Client {
-        &self.http_client
+    fn fetched(&self, url: &str) -> Fetched {
+        if self.evaluator.fetch.is_none() {
+            return Fetched::NoTransport;
+        }
+        if let Some(response) = self.evaluator.responses.lock().get(url) {
+            return Fetched::Body(response.clone());
+        }
+        self.session.request(url);
+        Fetched::Pending
     }
 
     fn get_sheet_index(&self, name: &str) -> Option<usize> {
-        self.sheet_index.get(name).copied()
+        self.evaluator.sheet_index.get(name).copied()
     }
 
     fn get_sheet_count(&self) -> usize {
-        self.workbook.worksheet_names().len()
+        self.evaluator.workbook.worksheet_names().len()
     }
 }
 
-impl<'a, W: WorkbookTrait + ?Sized> ReferenceResolver for FormulaEvaluator<'a, W> {
+impl<W: WorkbookTrait + Sync + Send + ?Sized> ReferenceResolver for At<'_, '_, W>
+where
+    SheetError: From<W::Error>,
+{
+    fn resolve_name(&self, current_sheet: &str, name: &str) -> Result<Option<ResolvedName>> {
+        self.evaluator.resolve_name(current_sheet, name)
+    }
+}
+
+impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> ReferenceResolver for FormulaEvaluator<'a, W>
+where
+    SheetError: From<W::Error>,
+{
     fn resolve_name(&self, current_sheet: &str, name: &str) -> Result<Option<ResolvedName>> {
         let trimmed = name.trim();
         if trimmed.is_empty() {
@@ -232,7 +445,10 @@ pub struct TableConfig<'a> {
     pub headers: &'a [String],
 }
 
-impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
+impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W>
+where
+    SheetError: From<W::Error>,
+{
     /// Create a new evaluator for the given workbook.
     pub fn new(workbook: &'a W) -> Self {
         let mut sheet_index = HashMap::new();
@@ -244,15 +460,140 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
             sheet_index,
             eval_state: RwLock::new(EvalState {
                 cache: HashMap::new(),
-                visiting: HashSet::new(),
             }),
             names: HashMap::new(),
             local_names: HashMap::new(),
             tables: HashMap::new(),
-            position_stack: RwLock::new(Vec::new()),
+            max_depth: usize::MAX,
             #[cfg(feature = "web_functions")]
-            http_client: reqwest::Client::new(),
+            fetch: None,
+            #[cfg(feature = "web_functions")]
+            responses: Mutex::new(HashMap::new()),
         }
+    }
+
+    /// Bound the chain of formula cells one evaluation follows; a longer
+    /// chain fails with [`litchi_core::sheet::Error::Limit`] of kind
+    /// [`LimitKind::Depth`]. Unbounded by default.
+    #[must_use]
+    pub fn with_max_depth(mut self, depth: usize) -> Self {
+        self.max_depth = depth;
+        self
+    }
+
+    /// Attach the transport used by functions such as `WEBSERVICE`.
+    ///
+    /// Evaluation is network-inert until a transport is explicitly supplied.
+    #[cfg(feature = "web_functions")]
+    #[must_use]
+    pub fn with_fetch(mut self, fetch: &'a dyn Fetch) -> Self {
+        self.fetch = Some(fetch);
+        self
+    }
+
+    /// The stored value of a cell, without evaluation.
+    fn stored(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
+        let sheet = self.workbook.worksheet_by_name(sheet_name)?;
+        let value: Cow<'_, CellValue> = sheet.cell_value(row, col)?;
+        Ok(value.into_owned())
+    }
+
+    fn get_cell_value_in(
+        &self,
+        session: &EvalSession,
+        sheet_name: &str,
+        row: u32,
+        col: u32,
+    ) -> Result<CellValue> {
+        let Some(sheet_idx) = self.sheet_index.get(sheet_name).copied() else {
+            return Err(SheetError::refused(
+                RefusalKind::NotFound,
+                "evaluate",
+                "the formula names a worksheet the workbook does not list",
+            ));
+        };
+        let key = CellRef {
+            sheet_idx,
+            row,
+            col,
+        };
+
+        let circular = || CellValue::Error("Circular reference detected".to_string());
+        let index = match self.status(session, key) {
+            CellStatus::Done(value) => return Ok(value),
+            CellStatus::InProgress { index } => {
+                self.check_depth(session)?;
+                session.reach(index);
+                return Ok(circular());
+            },
+            CellStatus::NotStarted => {
+                self.check_depth(session)?;
+                session.begin(key)
+            },
+        };
+
+        let result = self
+            .stored(sheet_name, row, col)
+            .and_then(|stored| match stored {
+                // Prefer the cached result embedded in the file.
+                CellValue::Formula {
+                    cached_value: Some(cached),
+                    ..
+                } => Ok(*cached),
+                // No cached value: evaluate the formula text. Any parsing or
+                // semantic issue is reported as `CellValue::Error` rather
+                // than a hard failure.
+                CellValue::Formula { formula, .. } => {
+                    self.evaluate_formula(session, sheet_name, row, col, &formula)
+                },
+                other => Ok(other),
+            });
+        let value = match result {
+            Ok(value) => value,
+            Err(error) => {
+                session.abandon(index);
+                return Err(error);
+            },
+        };
+
+        match session.finish(index) {
+            Finished::OnOpenCycle => Ok(circular()),
+            Finished::Closed(cells) => {
+                let value = if cells.len() > 1 { circular() } else { value };
+                // A value computed while an external fetch is outstanding may
+                // rest on a placeholder; the next pass computes it again.
+                if !session.is_suspended() {
+                    let mut state = self.eval_state.write();
+                    for cell in cells {
+                        state.cache.insert(cell, value.clone());
+                    }
+                }
+                Ok(value)
+            },
+        }
+    }
+
+    fn status(&self, session: &EvalSession, key: CellRef) -> CellStatus {
+        if let Some(value) = self.eval_state.read().cache.get(&key) {
+            return CellStatus::Done(value.clone());
+        }
+        match session.position(key) {
+            Some(index) => CellStatus::InProgress { index },
+            None => CellStatus::NotStarted,
+        }
+    }
+
+    /// Refuse to follow a chain of formula cells longer than `max_depth`.
+    fn check_depth(&self, session: &EvalSession) -> Result<()> {
+        let depth = session.depth();
+        if depth >= self.max_depth {
+            return Err(SheetError::Limit {
+                kind: LimitKind::Depth,
+                observed: depth + 1,
+                maximum: self.max_depth,
+            });
+        }
+        Ok(())
     }
 
     pub fn define_name(&mut self, name: &str, reference: &str) {
@@ -267,7 +608,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         );
     }
 
-    pub fn define_table(&mut self, config: TableConfig) {
+    pub fn define_table(&mut self, config: TableConfig<'_>) {
         let mut header_map = HashMap::new();
         for (i, h) in config.headers.iter().enumerate() {
             let col = config.start_col + i as u32;
@@ -334,6 +675,13 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
 
         let table = match self.tables.get(&table_name.to_uppercase()) {
             Some(t) => t,
+            // Returning None here turns the structured reference into an
+            // unresolved scalar name. Aggregates can then discard that error
+            // as nonnumeric input and manufacture a result such as SUM=0.
+            // Bare identifiers must still fall through to defined-name lookup.
+            None if name.contains('[') => {
+                return Err(MISSING_TABLE);
+            },
             None => return Ok(None),
         };
 
@@ -373,14 +721,14 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                 end_col: table.end_col,
             },
             StructuredReference::ThisRow { .. } => {
-                return Err("[@] this row references require row context".into());
+                return Err(ROW_CONTEXT);
             },
             StructuredReference::Column { column_name, .. } => {
                 let col = table
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                    .ok_or(MISSING_COLUMN)?;
                 let mut range = RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.start_row,
@@ -398,10 +746,8 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
-                return Err(
-                    format!("[@{}] this row references require row context", column_name).into(),
-                );
+                    .ok_or(MISSING_COLUMN)?;
+                return Err(ROW_CONTEXT);
             },
             StructuredReference::ColumnRange {
                 start_column,
@@ -412,12 +758,12 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&start_column.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", start_column))?;
+                    .ok_or(MISSING_COLUMN)?;
                 let end_col = table
                     .headers
                     .get(&end_column.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", end_column))?;
+                    .ok_or(MISSING_COLUMN)?;
                 let mut range = RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.start_row,
@@ -435,7 +781,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                    .ok_or(MISSING_COLUMN)?;
                 RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.start_row,
@@ -449,7 +795,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
                     .headers
                     .get(&column_name.to_uppercase())
                     .copied()
-                    .ok_or_else(|| format!("Column '{}' not found in table", column_name))?;
+                    .ok_or(MISSING_COLUMN)?;
                 RangeRef {
                     sheet: table.sheet.clone(),
                     start_row: table.end_row,
@@ -466,13 +812,40 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
     /// Evaluate a single cell in the given worksheet.
     ///
     /// Row and column are 1-based, consistent with the `Worksheet` trait.
+    ///
+    /// Evaluation is synchronous. The function is `async` only for
+    /// `WEBSERVICE`: a pass that needs a response the caller's [`Fetch`]
+    /// transport has not given yet records the URL, the transport is awaited
+    /// for it, and the cell is evaluated again (values already computed stay
+    /// cached). Without the `web_functions` feature, or without a transport,
+    /// the future completes on its first poll.
     pub async fn evaluate_cell(&self, sheet_name: &str, row: u32, col: u32) -> Result<CellValue> {
-        self.get_cell_value(sheet_name, row, col).await
+        loop {
+            let session = EvalSession::default();
+            let result = self.get_cell_value_in(&session, sheet_name, row, col);
+            if !self.resume(session).await {
+                return result;
+            }
+        }
     }
 
     /// Evaluate all cells in a worksheet and return a dense 2D grid
     /// covering the sheet's declared dimensions.
     pub async fn evaluate_sheet(&self, sheet_name: &str) -> Result<Vec<Vec<CellValue>>> {
+        loop {
+            let session = EvalSession::default();
+            let result = self.evaluate_sheet_in(&session, sheet_name);
+            if !self.resume(session).await {
+                return result;
+            }
+        }
+    }
+
+    fn evaluate_sheet_in(
+        &self,
+        session: &EvalSession,
+        sheet_name: &str,
+    ) -> Result<Vec<Vec<CellValue>>> {
         let sheet = self.workbook.worksheet_by_name(sheet_name)?;
         let dims = match sheet.dimensions() {
             Some(d) => d,
@@ -485,7 +858,7 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         for row in min_row..=max_row {
             let mut out_row = Vec::new();
             for col in min_col..=max_col {
-                out_row.push(self.get_cell_value(sheet_name, row, col).await?);
+                out_row.push(self.get_cell_value_in(session, sheet_name, row, col)?);
             }
             rows.push(out_row);
         }
@@ -493,49 +866,36 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
         Ok(rows)
     }
 
-    /// Core evaluation routine for a single cell value.
-    ///
-    /// This remains conservative and still prefers cached results when
-    /// available. When no cached result is present, it performs a minimal
-    /// evaluation of the formula text, currently limited to:
-    ///
-    /// - Literal constants (numbers, strings, booleans)
-    /// - Single-cell references (same-sheet or qualified with a sheet name)
-    async fn evaluate_value(
+    /// Fetch the responses the finished pass of `session` asked for. Returns
+    /// whether it fetched any, so the pass must run again.
+    #[cfg(feature = "web_functions")]
+    async fn resume(&self, session: EvalSession) -> bool {
+        let requests = session.requests.into_inner();
+        let Some(fetch) = self.fetch.filter(|_| !requests.is_empty()) else {
+            return false;
+        };
+        for url in requests {
+            let response = fetch
+                .get(&url, engine::MAX_RESPONSE_BYTES)
+                .await
+                .ok()
+                .filter(|bytes| bytes.len() <= engine::MAX_RESPONSE_BYTES);
+            self.responses.lock().insert(url, response);
+        }
+        true
+    }
+
+    #[cfg(not(feature = "web_functions"))]
+    async fn resume(&self, _session: EvalSession) -> bool {
+        false
+    }
+
+    fn evaluate_formula(
         &self,
+        session: &EvalSession,
         sheet_name: &str,
         row: u32,
         col: u32,
-        value: CellValue,
-    ) -> Result<CellValue> {
-        let result = match value {
-            CellValue::Formula {
-                formula,
-                cached_value,
-                ..
-            } => {
-                if let Some(cached) = cached_value {
-                    // Prefer the cached result embedded in the file.
-                    (*cached).clone()
-                } else {
-                    // No cached value – perform a minimal evaluation of the
-                    // formula text. Any parsing/semantic issues are reported as
-                    // CellValue::Error rather than hard failures.
-                    self.evaluate_formula(sheet_name, row, col, &formula)
-                        .await?
-                }
-            },
-            other => other,
-        };
-
-        Ok(result)
-    }
-
-    async fn evaluate_formula(
-        &self,
-        sheet_name: &str,
-        _row: u32,
-        _col: u32,
         expr: &str,
     ) -> Result<CellValue> {
         let s = expr.trim();
@@ -548,39 +908,17 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
             return Ok(CellValue::Error("Empty formula".to_string()));
         }
 
-        struct PositionGuard<'a> {
-            stack: &'a RwLock<Vec<(String, u32, u32)>>,
-        }
-
-        impl<'a> PositionGuard<'a> {
-            async fn new(
-                stack: &'a RwLock<Vec<(String, u32, u32)>>,
-                sheet: &str,
-                row: u32,
-                col: u32,
-            ) -> Self {
-                stack.write().await.push((sheet.to_string(), row, col));
-                PositionGuard { stack }
-            }
-        }
-
-        impl<'a> Drop for PositionGuard<'a> {
-            fn drop(&mut self) {
-                if let Ok(mut guard) = self.stack.try_write() {
-                    guard.pop();
-                }
-            }
-        }
-
-        let _position_guard =
-            PositionGuard::new(&self.position_stack, sheet_name, _row, _col).await;
-
         // General expression (e.g., A1+2, 1+2*3, CONCAT("a","b"),
         // TEXTJOIN("-",TRUE,A1:A3)). This uses the small expression parser
         // and runtime engine. If parsing fails, fall back to returning an
         // Error cell rather than panicking.
         if let Some(expr) = parser::parse_expression(sheet_name, body) {
-            return engine::evaluate_expression(self, sheet_name, &expr).await;
+            let at = At {
+                evaluator: self,
+                session,
+                position: (sheet_name.to_owned(), row, col),
+            };
+            return engine::evaluate_expression(&at, sheet_name, &expr);
         }
 
         // Unsupported or unrecognized formula in this MVP implementation.
@@ -588,5 +926,362 @@ impl<'a, W: WorkbookTrait + Sync + Send + ?Sized> FormulaEvaluator<'a, W> {
             "Unsupported formula for MVP evaluator: {}",
             s
         )))
+    }
+}
+
+#[cfg(all(test, feature = "web_functions"))]
+mod transport_tests {
+    //! `WEBSERVICE` through the evaluator: the synchronous core asks for a
+    //! URL, the async entry point awaits the caller's transport, and the
+    //! cell is evaluated again.
+
+    use super::*;
+    use litchi_core::sheet::{Cell, Worksheet};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    #[derive(Debug)]
+    pub(super) struct Book {
+        pub(super) names: Vec<String>,
+        pub(super) cells: HashMap<(u32, u32), CellValue>,
+    }
+
+    pub(super) struct Fixed<'a>(u32, u32, &'a CellValue);
+
+    impl Cell for Fixed<'_> {
+        fn column(&self) -> u32 {
+            self.1
+        }
+        fn coordinate(&self) -> String {
+            String::new()
+        }
+        fn row(&self) -> u32 {
+            self.0
+        }
+        fn value(&self) -> &CellValue {
+            self.2
+        }
+    }
+
+    impl Worksheet for Book {
+        type Error = SheetError;
+        type Cell<'a> = Fixed<'a>;
+        type Cells<'a> = std::iter::Empty<Result<Fixed<'a>>>;
+        type Rows<'a> = std::iter::Empty<Result<Cow<'a, [CellValue]>>>;
+
+        fn cell(&self, row: u32, column: u32) -> Result<Fixed<'_>> {
+            Ok(Fixed(
+                row,
+                column,
+                self.cells.get(&(row, column)).unwrap_or(CellValue::EMPTY),
+            ))
+        }
+        fn cell_by_coordinate(&self, _: &str) -> Result<Fixed<'_>> {
+            unreachable!()
+        }
+        fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
+            Ok(Cow::Borrowed(
+                self.cells.get(&(row, column)).unwrap_or(CellValue::EMPTY),
+            ))
+        }
+        fn cells(&self) -> Self::Cells<'_> {
+            std::iter::empty()
+        }
+        fn column_count(&self) -> usize {
+            3
+        }
+        fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
+            Some((1, 1, 1, 3))
+        }
+        fn name(&self) -> &str {
+            &self.names[0]
+        }
+        fn row(&self, _: usize) -> Result<Cow<'_, [CellValue]>> {
+            unreachable!()
+        }
+        fn row_count(&self) -> usize {
+            1
+        }
+        fn rows(&self) -> Self::Rows<'_> {
+            std::iter::empty()
+        }
+    }
+
+    impl WorkbookTrait for Book {
+        type Error = SheetError;
+        type Worksheet<'a> = &'a Book;
+        type Worksheets<'a> = std::iter::Once<Result<&'a Book>>;
+
+        fn active_sheet_index(&self) -> usize {
+            0
+        }
+        fn active_worksheet(&self) -> Result<&Book> {
+            Ok(self)
+        }
+        fn worksheet_by_index(&self, _: usize) -> Result<&Book> {
+            Ok(self)
+        }
+        fn worksheet_by_name(&self, _: &str) -> Result<&Book> {
+            Ok(self)
+        }
+        fn worksheet_count(&self) -> usize {
+            1
+        }
+        fn worksheet_names(&self) -> &[String] {
+            &self.names
+        }
+        fn worksheets(&self) -> Self::Worksheets<'_> {
+            std::iter::once(Ok(self))
+        }
+    }
+
+    pub(super) fn formula(text: &str) -> CellValue {
+        CellValue::Formula {
+            formula: text.to_owned(),
+            cached_value: None,
+            is_array: false,
+            array_range: None,
+        }
+    }
+
+    #[tokio::test]
+    async fn missing_table_references_refuse_without_breaking_registered_tables_or_names() {
+        for reference in ["Inventory[Quantity]", "Inventory[#All]", "Inventory[]"] {
+            let book = Book {
+                names: vec!["Sheet1".into()],
+                cells: HashMap::from([((1, 3), formula(&format!("SUM({reference})")))]),
+            };
+            assert_eq!(
+                FormulaEvaluator::new(&book)
+                    .evaluate_cell("Sheet1", 1, 3)
+                    .await,
+                Err(MISSING_TABLE)
+            );
+        }
+        let book = Book {
+            names: vec!["Sheet1".into()],
+            cells: HashMap::from([
+                ((1, 3), formula("SUM(Inventory[Quantity])")),
+                ((2, 3), formula("SUM(Total)")),
+                ((2, 1), CellValue::String("Quantity".into())),
+                ((3, 1), CellValue::Int(5)),
+                ((4, 1), CellValue::Int(7)),
+            ]),
+        };
+        let mut evaluator = FormulaEvaluator::new(&book);
+        assert_eq!(
+            evaluator.evaluate_cell("Sheet1", 1, 3).await,
+            Err(MISSING_TABLE)
+        );
+        evaluator.define_table(TableConfig {
+            name: "Inventory",
+            sheet_name: "Sheet1",
+            start_row: 2,
+            start_col: 1,
+            end_row: 4,
+            end_col: 1,
+            headers: &["Quantity".into()],
+        });
+        evaluator.define_name("Total", "Sheet1!A3:A4");
+        for row in [1, 2] {
+            assert_eq!(
+                evaluator.evaluate_cell("Sheet1", row, 3).await.unwrap(),
+                CellValue::Float(12.0)
+            );
+        }
+    }
+
+    /// Answers `https://a/` with `https://b/`, `https://b/` with `done`, and
+    /// suspends once before each answer, as a real transport would.
+    #[derive(Default)]
+    struct Chained {
+        calls: AtomicUsize,
+    }
+
+    impl Fetch for Chained {
+        fn get<'a>(&'a self, url: &'a str, _max: usize) -> FetchFuture<'a> {
+            self.calls.fetch_add(1, Ordering::Relaxed);
+            Box::pin(async move {
+                tokio::task::yield_now().await;
+                match url {
+                    "https://a/" => Ok(b"https://b/".to_vec()),
+                    "https://b/" => Ok(b"done".to_vec()),
+                    _ => Err("unknown".into()),
+                }
+            })
+        }
+    }
+
+    #[tokio::test]
+    async fn webservice_fetches_through_the_transport_and_reevaluates() {
+        let book = Book {
+            names: vec!["Sheet1".to_owned()],
+            cells: HashMap::from([
+                ((1, 1), formula("WEBSERVICE(\"https://a/\")")),
+                ((1, 2), formula("WEBSERVICE(A1)")),
+                ((1, 3), formula("CONCAT(B1,\"!\",A1)")),
+            ]),
+        };
+        let transport = Chained::default();
+        let evaluator = FormulaEvaluator::new(&book).with_fetch(&transport);
+        assert_eq!(
+            evaluator.evaluate_cell("Sheet1", 1, 3).await.unwrap(),
+            CellValue::String("done!https://b/".to_owned())
+        );
+        // One request per distinct URL; the chained one in a second pass.
+        assert_eq!(transport.calls.load(Ordering::Relaxed), 2);
+        assert_eq!(
+            evaluator.evaluate_sheet("Sheet1").await.unwrap(),
+            vec![vec![
+                CellValue::String("https://b/".to_owned()),
+                CellValue::String("done".to_owned()),
+                CellValue::String("done!https://b/".to_owned()),
+            ]]
+        );
+        assert_eq!(transport.calls.load(Ordering::Relaxed), 2);
+    }
+
+    #[tokio::test]
+    async fn webservice_failures_and_missing_transport_keep_their_values() {
+        let book = Book {
+            names: vec!["Sheet1".to_owned()],
+            cells: HashMap::from([((1, 1), formula("WEBSERVICE(\"https://x/\")"))]),
+        };
+        let transport = Chained::default();
+        let evaluator = FormulaEvaluator::new(&book).with_fetch(&transport);
+        assert_eq!(
+            evaluator.evaluate_cell("Sheet1", 1, 1).await.unwrap(),
+            CellValue::Error("#VALUE!".to_owned())
+        );
+        let offline = FormulaEvaluator::new(&book);
+        assert_eq!(
+            offline.evaluate_cell("Sheet1", 1, 1).await.unwrap(),
+            CellValue::Error("#CONNECT!".to_owned())
+        );
+    }
+}
+
+#[cfg(all(test, feature = "web_functions"))]
+mod cycle_tests {
+    //! Reference cycles: the result of a cell must not depend on which cell
+    //! of the workbook was evaluated first.
+
+    use super::transport_tests::{Book, formula};
+    use super::*;
+
+    const CIRCULAR: &str = "Circular reference detected";
+
+    fn book(cells: &[((u32, u32), CellValue)]) -> Book {
+        Book {
+            names: vec!["Sheet1".to_owned()],
+            cells: cells.iter().cloned().collect(),
+        }
+    }
+
+    /// Every ordering of `0..count`.
+    fn orders(count: usize) -> Vec<Vec<usize>> {
+        if count == 0 {
+            return vec![Vec::new()];
+        }
+        let mut all = Vec::new();
+        for shorter in orders(count - 1) {
+            for at in 0..=shorter.len() {
+                let mut order = shorter.clone();
+                order.insert(at, count - 1);
+                all.push(order);
+            }
+        }
+        all
+    }
+
+    /// Evaluate row 1 of `book` on a fresh evaluator, one cell at a time in
+    /// each possible order, and require the same row every time.
+    async fn row_in_every_order(book: &Book, columns: usize) -> Vec<CellValue> {
+        let mut expected: Option<Vec<CellValue>> = None;
+        for order in orders(columns) {
+            let evaluator = FormulaEvaluator::new(book);
+            let mut row = vec![CellValue::Empty; columns];
+            for &index in &order {
+                row[index] = evaluator
+                    .evaluate_cell("Sheet1", 1, index as u32 + 1)
+                    .await
+                    .unwrap();
+            }
+            match &expected {
+                Some(first) => assert_eq!(&row, first, "evaluation order {order:?}"),
+                None => expected = Some(row),
+            }
+        }
+        expected.unwrap()
+    }
+
+    #[tokio::test]
+    async fn two_cell_cycle_does_not_depend_on_evaluation_order() {
+        let book = book(&[
+            ((1, 1), formula("IFERROR(B1,0)")),
+            ((1, 2), formula("A1+1")),
+            ((1, 3), formula("IFERROR(A1,7)")),
+        ]);
+        let row = row_in_every_order(&book, 3).await;
+        assert_eq!(
+            row,
+            vec![
+                CellValue::Error(CIRCULAR.to_owned()),
+                CellValue::Error(CIRCULAR.to_owned()),
+                CellValue::Int(7),
+            ]
+        );
+        // One pass over the sheet agrees with cell-by-cell evaluation.
+        assert_eq!(
+            FormulaEvaluator::new(&book)
+                .evaluate_sheet("Sheet1")
+                .await
+                .unwrap(),
+            vec![row]
+        );
+    }
+
+    #[tokio::test]
+    async fn cycle_reached_through_a_finished_cell_does_not_depend_on_order() {
+        // A1 -> B1 -> D1 -> A1 and A1 -> C1 -> D1: C1 reaches the cycle
+        // through D1, which may already be finished when C1 reads it.
+        let book = book(&[
+            ((1, 1), formula("IFERROR(B1,0)+IFERROR(C1,0)")),
+            ((1, 2), formula("D1")),
+            ((1, 3), formula("IFERROR(D1,5)")),
+            ((1, 4), formula("A1")),
+            ((1, 5), formula("IFERROR(C1,9)+F1")),
+            ((1, 6), CellValue::Int(3)),
+        ]);
+        let circular = || CellValue::Error(CIRCULAR.to_owned());
+        assert_eq!(
+            row_in_every_order(&book, 6).await,
+            vec![
+                circular(),
+                circular(),
+                circular(),
+                circular(),
+                CellValue::Float(12.0),
+                CellValue::Int(3),
+            ]
+        );
+    }
+
+    #[tokio::test]
+    async fn a_cell_that_reads_only_itself_keeps_its_computed_value() {
+        // COLUMNS reads the cells of its range but uses only the shape, so
+        // B1 is not an error although its range contains B1.
+        let book = book(&[
+            ((1, 1), formula("A1+1")),
+            ((1, 2), formula("COLUMNS(A1:C1)")),
+            ((1, 3), formula("IFERROR(C1,4)")),
+        ]);
+        assert_eq!(
+            row_in_every_order(&book, 3).await,
+            vec![
+                CellValue::Error(CIRCULAR.to_owned()),
+                CellValue::Int(3),
+                CellValue::Int(4),
+            ]
+        );
     }
 }

@@ -1,3 +1,8 @@
+# Check every file out byte for byte on every platform. Tests compare fixtures,
+# generated resources and source copies exactly, so line endings must not
+# depend on the host's core.autocrlf setting.
+* -text
+
 # Treat all the Office files as binary
 
 # Legacy OLE2 files
@@ -10,6 +15,7 @@
 *.docx binary
 *.xlsx binary
 *.xlsb binary
+*.vba binary
 
 # OpenDocument
 *.odt binary
@@ -32,3 +38,15 @@
 *.jpg binary
 *.png binary
 *.wmf binary
+
+# Keep vendored upstream artifacts byte-identical to their licensed snapshot.
+vendor/zlib-rs/LICENSE whitespace=-blank-at-eol
+vendor/zlib-rs/src/deflate/test-data/paper-100k.pdf binary
+
+# Preserve exact upstream text and whitespace-sensitive fixture bytes.
+crates/litchi-iwa-protos/src/protos/*.proto whitespace=-blank-at-eof
+crates/litchi-drawingml/tests/fixtures/theme-part-native.xml whitespace=cr-at-eol
+crates/litchi-markdown/tests/corpus/*/LICENSE-CC-BY-SA-4.0.txt whitespace=-blank-at-eof
+crates/litchi-xlsx/tests/data/data_model/COPYING.LGPL whitespace=-blank-at-eol
+crates/litchi-ops/fuzz/corpus/batch_payload/quoted-sheet-trailing-space.json whitespace=-blank-at-eol
+test-data/officecli/examples/ppt/templates/styles/*/build.sh whitespace=-blank-at-eof,-blank-at-eol

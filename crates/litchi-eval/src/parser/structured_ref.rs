@@ -26,19 +26,19 @@ pub enum StructuredReference {
     Totals { table_name: String },
     /// All rows (headers + data + totals).
     All { table_name: String },
-    /// Current row intersection ([@]).
+    /// Current row intersection (`[@]`).
     ThisRow { table_name: String },
     /// Specific column (data rows only, no header).
     Column {
         table_name: String,
         column_name: String,
     },
-    /// Specific column in current row ([@ColumnName]).
+    /// Specific column in current row (`[@ColumnName]`).
     ColumnThisRow {
         table_name: String,
         column_name: String,
     },
-    /// Multiple columns range ([[Col1]:[Col2]]).
+    /// Multiple columns range (`[[Col1]:[Col2]]`).
     ColumnRange {
         table_name: String,
         start_column: String,

@@ -1,0 +1,97 @@
+use litchi_odp::{Builder, Package};
+
+#[test]
+fn builder_and_presentation_facade_round_trip() {
+    let mut builder = Builder::new();
+    builder
+        .add_slide_with_title("Welcome", "Hello from ODP")
+        .unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let package = Package::from_bytes(&bytes).unwrap();
+    let presentation = package.presentation().unwrap();
+    assert_eq!(presentation.slide_count().unwrap(), 1);
+    assert_eq!(presentation.text().unwrap(), "Welcome\nHello from ODP");
+    assert_eq!(package.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn presentation_facade_reports_empty_packages_without_slides() {
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let presentation = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
+    assert_eq!(presentation.slide_count().unwrap(), 0);
+    assert_eq!(presentation.text().unwrap(), "");
+}
+
+#[test]
+fn presentation_slide_matches_the_full_slide_list() {
+    let mut builder = Builder::new();
+    for index in 0..3 {
+        builder
+            .add_slide_with_title(&format!("Title {index}"), &format!("Body {index}"))
+            .unwrap();
+    }
+    let presentation = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .presentation()
+        .unwrap();
+    let slides = presentation.slides().unwrap();
+
+    for index in 0..=slides.len() {
+        assert_eq!(
+            presentation.slide(index).unwrap(),
+            slides.get(index).cloned()
+        );
+    }
+    assert_eq!(presentation.slide(usize::MAX).unwrap(), None);
+}
+
+#[test]
+fn semantic_page_and_layout_facades_round_trip() {
+    let measure =
+        litchi_odp::layout::Measure::new(1.0, litchi_odp::layout::Unit::Centimeter).unwrap();
+    let mut layouts = litchi_odp::layout::Collection::default();
+    let mut layout = litchi_odp::layout::Layout::new("title_layout").unwrap();
+    layout
+        .placeholders
+        .push(litchi_odp::layout::Placeholder::new(
+            litchi_odp::layout::Role::Title,
+            measure,
+            measure,
+            measure,
+            measure,
+        ));
+    layouts.layouts.push(layout);
+    layouts.validate().unwrap();
+
+    let page = litchi_odp::page::Page {
+        slide_index: 0,
+        name: Some("page1".to_string()),
+        style_name: None,
+        master_page_name: None,
+        page_layout_name: Some("title_layout".to_string()),
+        draw_id: None,
+        xml_id: None,
+        href: None,
+        navigation_order: Vec::new(),
+    };
+    let pages = litchi_odp::page::Collection::new(vec![page]).unwrap();
+
+    let mut builder = Builder::new();
+    builder.add_slide_with_title("Title", "Body").unwrap();
+    builder.set_layouts(layouts).unwrap();
+    builder.set_pages(Some(pages)).unwrap();
+    let presentation = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .presentation()
+        .unwrap();
+
+    assert_eq!(
+        presentation.layouts().unwrap().layouts[0].name,
+        "title_layout"
+    );
+    assert_eq!(
+        presentation.pages().unwrap().pages()[0].name.as_deref(),
+        Some("page1")
+    );
+    let _: Option<litchi_odp::slide::Slide> = presentation.slide(0).unwrap();
+}

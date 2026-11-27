@@ -1,0 +1,2183 @@
+//! Lossless source-backed worksheet visibility edits for BIFF8 XLS packages.
+//!
+//! This owner changes only the one-byte `hsState` field of existing
+//! `BoundSheet8` worksheet entries. It does not move sheet substreams, rewrite
+//! workbook views, or reinterpret macro/chart/module tabs. Every publication
+//! reopens the complete CFB and XLS workbook and retains an exact-source,
+//! reversible artifact patch.
+
+#![cfg_attr(
+    not(test),
+    deny(
+        clippy::expect_used,
+        clippy::panic,
+        clippy::todo,
+        clippy::unimplemented,
+        clippy::unwrap_used,
+        reason = "source-backed visibility edits return typed refusals"
+    )
+)]
+
+/// The sheet-visibility family error: the workbook error of the source or
+/// republished package.
+pub use crate::Error;
+use crate::records::{BoundSheetRecord, Encoding, SheetType, SheetVisible};
+use crate::workbook::{KeptCells, ValidationWorkbook};
+use crate::{Result, SheetKind, SheetVisibility, raw::Reader};
+use litchi_biff::Records;
+use litchi_cfb::{
+    ArtifactFingerprint, ComposedOverlaySource, OleFile, OverlayError, PublishReport,
+    SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
+};
+use litchi_core::binary;
+use litchi_core::edit::RefusalKind;
+use litchi_core::{Position, ReadAt, SourceVersion};
+use litchi_ole_common::object::{Limits, OpenOptions, Package as ObjectPackage, Targets};
+use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
+use std::fmt;
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
+use std::path::Path;
+use std::sync::Arc;
+
+const BOF: u16 = 0x0809;
+const EOF: u16 = 0x000a;
+const CODE_PAGE: u16 = 0x0042;
+const BOUND_SHEET: u16 = 0x0085;
+const FILE_PASS: u16 = 0x002f;
+const BIFF8: u16 = 0x0600;
+const WORKBOOK_GLOBALS: u16 = 0x0005;
+const PATCH_MAGIC: &[u8; 8] = b"LXSV0001";
+
+/// Maximum distinct worksheet visibility owners in one atomic publication.
+pub const MAX_VISIBILITY_CHANGES: usize = 64;
+
+#[derive(Debug, Clone)]
+struct SheetEntry {
+    position: usize,
+    name: String,
+    visibility: SheetVisibility,
+    kind: SheetKind,
+    visibility_offset: usize,
+    substream_offset: u32,
+}
+
+struct Inner {
+    bytes: Arc<[u8]>,
+    workbook_path: Vec<String>,
+    workbook_stream: Arc<[u8]>,
+    sheets: Vec<SheetEntry>,
+}
+
+/// Immutable, cheaply cloned source-backed XLS visibility snapshot.
+#[derive(Clone)]
+pub struct Snapshot {
+    inner: Arc<Inner>,
+}
+
+impl Snapshot {
+    /// Opens an unencrypted, unsigned and unprotected BIFF8 XLS package.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed CFB, BIFF, protection, duplicate-owner, allocation, or
+    /// complete-workbook validation error before publishing a snapshot.
+    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        let package = ObjectPackage::open_with_options(
+            bytes,
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )?;
+        Self::open_package(package)
+    }
+
+    /// Opens a captured, already-published package.
+    fn open_package(package: ObjectPackage) -> Result<Self> {
+        let workbook_path = select_workbook_path(&package)?;
+        let workbook_stream = package
+            .stream_shared(&workbook_path)
+            .ok_or_else(|| Error::InvalidData("selected XLS Workbook stream disappeared".into()))?;
+        let sheets = parse_directory(&workbook_stream)?;
+        require_visible_worksheet(&sheets)?;
+        let bytes = package.source_shared();
+        // The complete reader's validation-only mode: every record is
+        // validated as `Reader::new` validates it; no cell is decoded, and
+        // no cell is read here.
+        let workbook = Reader::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
+        require_unprotected(&workbook)?;
+        require_public_readback(&workbook, &sheets)?;
+        Ok(Self {
+            inner: Arc::new(Inner {
+                bytes: Arc::from(bytes.as_slice()),
+                workbook_path,
+                workbook_stream,
+                sheets,
+            }),
+        })
+    }
+
+    /// Exact source CFB artifact bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.inner.bytes
+    }
+
+    /// Exact source Workbook stream.
+    #[must_use]
+    pub fn workbook_stream(&self) -> &[u8] {
+        &self.inner.workbook_stream
+    }
+
+    /// Number of worksheet owners (chart, macro, and module tabs excluded).
+    #[must_use]
+    pub fn worksheet_count(&self) -> usize {
+        self.inner
+            .sheets
+            .iter()
+            .filter(|sheet| sheet.kind == SheetKind::WorksheetOrDialog)
+            .count()
+    }
+
+    /// Iterates worksheet owners in workbook tab order.
+    pub fn worksheets(&self) -> impl Iterator<Item = Worksheet<'_>> {
+        self.inner
+            .sheets
+            .iter()
+            .enumerate()
+            .filter_map(|(index, sheet)| {
+                (sheet.kind == SheetKind::WorksheetOrDialog).then_some(Worksheet {
+                    snapshot: self,
+                    index,
+                })
+            })
+    }
+
+    /// Resolves one worksheet by case-folded name or exact tab position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an ambiguity error for duplicate case-folded worksheet names.
+    /// Positions selecting chart, macro, or module tabs return `None`.
+    pub fn worksheet<'a>(&'a self, selector: Selector<'_>) -> Result<Option<Worksheet<'a>>> {
+        Ok(self.resolve(selector)?.map(|index| Worksheet {
+            snapshot: self,
+            index,
+        }))
+    }
+
+    /// Starts a detached bounded visibility edit.
+    /// A codec-level edit of this bare snapshot; its commit opens the result
+    /// with the default package policy. Package callers use
+    /// [`crate::Package::edit_sheet_visibility`].
+    #[cfg(test)]
+    #[must_use]
+    pub(crate) fn edit(&self) -> Edit {
+        self.edit_based(None)
+    }
+
+    #[cfg(test)]
+    fn edit_based(&self, base: crate::scoped::Base) -> Edit {
+        Edit {
+            base,
+            package: None,
+            source: Some(self.clone()),
+            changes: Vec::new(),
+        }
+    }
+
+    fn resolve(&self, selector: Selector<'_>) -> Result<Option<usize>> {
+        match selector {
+            Selector::Position(position) => {
+                Ok(self.inner.sheets.get(position.get()).and_then(|sheet| {
+                    (sheet.kind == SheetKind::WorksheetOrDialog).then_some(position.get())
+                }))
+            },
+            Selector::Name(name) => {
+                let mut matches = self.inner.sheets.iter().enumerate().filter(|(_, sheet)| {
+                    sheet.kind == SheetKind::WorksheetOrDialog && caseless_eq(&sheet.name, name)
+                });
+                let found = matches.next().map(|(index, _)| index);
+                if matches.next().is_some() {
+                    return Err(Error::refused(
+                        RefusalKind::InvalidValue,
+                        "edit sheet visibility",
+                        "worksheet name is ambiguous",
+                    ));
+                }
+                Ok(found)
+            },
+        }
+    }
+}
+
+impl fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("artifact_bytes", &self.inner.bytes.len())
+            .field("workbook_bytes", &self.inner.workbook_stream.len())
+            .field("worksheet_count", &self.worksheet_count())
+            .finish()
+    }
+}
+
+impl PartialEq for Snapshot {
+    fn eq(&self, other: &Self) -> bool {
+        self.bytes() == other.bytes()
+    }
+}
+
+impl Eq for Snapshot {}
+
+/// Borrowed worksheet visibility owner.
+#[derive(Debug, Clone, Copy)]
+pub struct Worksheet<'a> {
+    snapshot: &'a Snapshot,
+    index: usize,
+}
+
+impl<'a> Worksheet<'a> {
+    fn entry(self) -> &'a SheetEntry {
+        &self.snapshot.inner.sheets[self.index]
+    }
+
+    /// Zero-based workbook tab position.
+    #[must_use]
+    pub fn position(self) -> usize {
+        self.entry().position
+    }
+
+    /// Developer-visible worksheet name.
+    #[must_use]
+    pub fn name(self) -> &'a str {
+        &self.entry().name
+    }
+
+    /// Exact BIFF8 visible, hidden, or very-hidden state.
+    #[must_use]
+    pub fn visibility(self) -> SheetVisibility {
+        self.entry().visibility
+    }
+}
+
+/// Semantic selector for an existing worksheet owner.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum Selector<'a> {
+    /// Case-folded developer-visible tab name.
+    Name(&'a str),
+    /// Exact zero-based workbook tab position.
+    Position(Position),
+}
+
+impl<'a> From<&'a str> for Selector<'a> {
+    fn from(value: &'a str) -> Self {
+        Self::Name(value)
+    }
+}
+
+impl From<Position> for Selector<'_> {
+    fn from(value: Position) -> Self {
+        Self::Position(value)
+    }
+}
+
+impl From<usize> for Selector<'_> {
+    fn from(value: usize) -> Self {
+        Self::Position(Position::new(value))
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct Change {
+    sheet: usize,
+    before: SheetVisibility,
+    after: SheetVisibility,
+}
+
+/// Detached, bounded and failure-atomic worksheet visibility transaction.
+#[derive(Clone)]
+pub struct Edit {
+    base: crate::scoped::Base,
+    package: Option<crate::Package>,
+    source: Option<Snapshot>,
+    changes: Vec<Change>,
+}
+
+impl Edit {
+    fn source_ref(&mut self) -> Result<&Snapshot> {
+        if self.source.is_none() {
+            let package = self.package.clone().ok_or_else(|| {
+                Error::InvalidData("worksheet visibility edit lost its source package".into())
+            })?;
+            let (_, bytes) = crate::scoped::capture(&package)?;
+            self.source = Some(Snapshot::from_bytes(bytes)?);
+        }
+        self.source.as_ref().ok_or_else(|| {
+            Error::InvalidData("worksheet visibility edit source was not retained".into())
+        })
+    }
+
+    /// Stages one exact visible, hidden, or very-hidden outcome.
+    ///
+    /// # Errors
+    ///
+    /// Returns a missing/ambiguous/non-worksheet selector or finite-bound
+    /// refusal without changing the source artifact.
+    pub fn set_visibility(
+        &mut self,
+        selector: Selector<'_>,
+        visibility: SheetVisibility,
+    ) -> Result<&mut Self> {
+        let source = self.source_ref()?.clone();
+        let sheet = source
+            .resolve(selector)?
+            .ok_or_else(|| Error::WorksheetNotFound("visibility edit worksheet selector".into()))?;
+        if let Some(change) = self.changes.iter_mut().find(|change| change.sheet == sheet) {
+            change.after = visibility;
+            if change.before == change.after {
+                let sheet = change.sheet;
+                self.changes.retain(|candidate| candidate.sheet != sheet);
+            }
+            return Ok(self);
+        }
+        let before = source.inner.sheets[sheet].visibility;
+        if before == visibility {
+            return Ok(self);
+        }
+        if self.changes.len() >= MAX_VISIBILITY_CHANGES {
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit sheet visibility",
+                "the worksheet visibility edit exceeds its owner limit",
+            ));
+        }
+        self.changes
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("staging worksheet visibility changes"))?;
+        self.changes.push(Change {
+            sheet,
+            before,
+            after: visibility,
+        });
+        Ok(self)
+    }
+
+    /// Stages an ordinary hidden outcome.
+    pub fn hide(&mut self, selector: Selector<'_>) -> Result<&mut Self> {
+        self.set_visibility(selector, SheetVisibility::Hidden)
+    }
+
+    /// Stages a very-hidden outcome.
+    pub fn very_hide(&mut self, selector: Selector<'_>) -> Result<&mut Self> {
+        self.set_visibility(selector, SheetVisibility::VeryHidden)
+    }
+
+    /// Stages a visible outcome.
+    pub fn unhide(&mut self, selector: Selector<'_>) -> Result<&mut Self> {
+        self.set_visibility(selector, SheetVisibility::Visible)
+    }
+
+    /// Stages a whole caller-provided batch or leaves this transaction intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns the first selector, allocation, or bound error atomically.
+    pub fn set_visibility_batch<'a, I>(&mut self, changes: I) -> Result<&mut Self>
+    where
+        I: IntoIterator<Item = (Selector<'a>, SheetVisibility)>,
+    {
+        let mut candidate = self.clone();
+        for (selector, visibility) in changes {
+            candidate.set_visibility(selector, visibility)?;
+        }
+        *self = candidate;
+        Ok(self)
+    }
+
+    /// Reopens and publishes the complete package with an exact inverse patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns a final-visible-sheet, stale-field, CFB, complete-reopen, or
+    /// semantic-closure error without publishing partial bytes.
+    /// Validate the staged changes and publish them as a new package.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same refusals as the staging verbs, a patch conflict for
+    /// a stale owner, or [`Error::Signed`] for a changed signed workbook.
+    pub fn commit(self) -> Result<Commit> {
+        let base = self.base.clone();
+        let record = self.commit_record()?;
+        let package = crate::scoped::publish(base, record.patch.before(), record.patch.after())?;
+        Ok(Commit::new(package, record.patch, record.diagnostics))
+    }
+
+    pub(crate) fn commit_record(mut self) -> Result<RecordCommit> {
+        let source = self.source_ref()?.clone();
+        if self.changes.is_empty() {
+            let patch = Patch::new(
+                Arc::clone(&source.inner.bytes),
+                Arc::clone(&source.inner.bytes),
+            );
+            return Ok(RecordCommit {
+                snapshot: source,
+                patch,
+                diagnostics: Diagnostics::default(),
+            });
+        }
+        require_final_visible_worksheet(&source, &self.changes)?;
+        let mut workbook = source.inner.workbook_stream.to_vec();
+        for change in &self.changes {
+            let entry = source
+                .inner
+                .sheets
+                .get(change.sheet)
+                .ok_or(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "worksheet visibility owner is stale",
+                })?;
+            let field = workbook.get_mut(entry.visibility_offset).ok_or_else(|| {
+                Error::InvalidData("BoundSheet8 visibility field is outside Workbook".into())
+            })?;
+            if *field != encode_visibility(change.before) {
+                return Err(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "BoundSheet8 visibility precondition is stale",
+                });
+            }
+            *field = encode_visibility(change.after);
+        }
+        let package = ObjectPackage::open_with_options(
+            source.inner.bytes.to_vec(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )?;
+        let mut editor = package.edit()?;
+        editor.put_stream_shared(&source.inner.workbook_path, Arc::from(workbook))?;
+        let snapshot = Snapshot::open_package(editor.commit()?.into_package())?;
+        for change in &self.changes {
+            if snapshot
+                .inner
+                .sheets
+                .get(change.sheet)
+                .map(|entry| entry.visibility)
+                != Some(change.after)
+            {
+                return Err(Error::Internal(
+                    "worksheet visibility failed semantic readback",
+                ));
+            }
+        }
+        certify_workbook_transition(&source, &snapshot)?;
+        let patch = Patch::new(
+            Arc::clone(&source.inner.bytes),
+            Arc::clone(&snapshot.inner.bytes),
+        );
+        Ok(RecordCommit {
+            snapshot,
+            patch,
+            diagnostics: Diagnostics {
+                changed_worksheets: self.changes.len(),
+                touched_streams: 1,
+            },
+        })
+    }
+
+    /// Plans a protected, source-backed same-length visibility publication.
+    ///
+    /// The changed `BoundSheet8` fields are submitted as bounded
+    /// [`SameLengthStreamSplice`] values. The common CFB publisher retains the
+    /// source topology and all unselected streams, while the composed target is
+    /// reopened through the complete XLS reader before the plan is returned.
+    /// This method never falls back to [`Self::commit`]; callers that need a
+    /// length-changing or topology-changing edit must explicitly choose that
+    /// eager path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed refusal for a protected/signed/encrypted source, stale
+    /// `BoundSheet8` state, an invalid final-visible-sheet outcome, a changed
+    /// stream length, failed complete semantic readback, or a bounded CFB
+    /// overlay failure.
+    pub(crate) fn commit_source_backed(mut self) -> Result<SourceBackedCommit> {
+        let source_snapshot = self.source_ref()?.clone();
+        let effective: Vec<_> = self
+            .changes
+            .iter()
+            .filter(|change| change.before != change.after)
+            .collect();
+
+        if !effective.is_empty() {
+            require_final_visible_worksheet(&source_snapshot, &self.changes)?;
+        }
+
+        let mut splices = Vec::new();
+        splices
+            .try_reserve_exact(effective.len())
+            .map_err(|_error| Error::Allocation("staging source-backed visibility splices"))?;
+        for change in &effective {
+            let entry =
+                source_snapshot
+                    .inner
+                    .sheets
+                    .get(change.sheet)
+                    .ok_or(Error::PatchConflict {
+                        operation: "edit sheet visibility",
+                        reason: "source-backed worksheet visibility owner is stale",
+                    })?;
+            let field = source_snapshot
+                .inner
+                .workbook_stream
+                .get(entry.visibility_offset)
+                .ok_or_else(|| {
+                    Error::InvalidData("BoundSheet8 visibility field is outside Workbook".into())
+                })?;
+            let before = encode_visibility(change.before);
+            if *field != before {
+                return Err(Error::PatchConflict {
+                    operation: "edit sheet visibility",
+                    reason: "BoundSheet8 visibility precondition is stale",
+                });
+            }
+            let offset = u64::try_from(entry.visibility_offset).map_err(|_error| {
+                Error::InvalidData("BoundSheet8 visibility offset exceeds u64".into())
+            })?;
+            splices.push(SameLengthStreamSplice::new(
+                source_snapshot.inner.workbook_path.clone(),
+                offset,
+                Arc::from(vec![before]),
+                Arc::from(vec![encode_visibility(change.after)]),
+            ));
+        }
+
+        // Preserve the snapshot's immutable Arc ownership through CFB, exactly
+        // as the comments owner does. The version is the same `(address,
+        // length)` identity the previous private adapter reported, so the
+        // composed target's version is unchanged; the sealed provenance lets
+        // the plan compute its digests once instead of re-proving them.
+        let source = Arc::clone(&source_snapshot.inner.bytes);
+        let source_version =
+            SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
+        let publisher = SourceBackedOverlayPublisher::open_owned(
+            source,
+            source_version,
+            litchi_cfb::SharedOleFileLimits::default(),
+        )
+        .map_err(overlay_to_error)?;
+        let (plan, owner_validated) = publisher
+            .plan_splices_with_owner(splices, StreamSpliceLimits::default(), |candidate| {
+                verify_source_backed_candidate(candidate.clone(), &source_snapshot, &effective)
+                    .map_err(VisibilityOwnerError::Owner)
+            })
+            .map_err(VisibilityOwnerError::into_error)?;
+        if owner_validated.is_none() {
+            verify_source_backed_readback(&plan, &source_snapshot, &effective)?;
+        }
+
+        let source_workbook_bytes = u64::try_from(source_snapshot.inner.workbook_stream.len())
+            .map_err(|_error| Error::InvalidData("Workbook stream length exceeds u64".into()))?;
+        let source_bytes = u64::try_from(source_snapshot.inner.bytes.len())
+            .map_err(|_error| Error::InvalidData("source CFB length exceeds u64".into()))?;
+        let diagnostics = SourceBackedDiagnostics {
+            changed_worksheets: effective.len(),
+            touched_streams: usize::from(!plan.is_noop()),
+            splice_count: effective.len(),
+            replacement_bytes: u64::try_from(effective.len()).map_err(|_error| {
+                Error::InvalidData("visibility splice count exceeds u64".into())
+            })?,
+            changed_spans: plan.changed_spans(),
+            source_bytes,
+            source_workbook_bytes,
+            target_workbook_bytes: source_workbook_bytes,
+            source_fingerprint: plan.source_fingerprint(),
+            target_fingerprint: plan.target_fingerprint(),
+        };
+        Ok(SourceBackedCommit {
+            source: source_snapshot,
+            plan,
+            diagnostics,
+        })
+    }
+}
+
+impl fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("source", &self.source)
+            .field("staged_changes", &self.changes.len())
+            .finish()
+    }
+}
+
+/// Content-free visibility publication diagnostics.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed_worksheets: usize,
+    touched_streams: usize,
+}
+
+impl Diagnostics {
+    /// Whether the commit changed the package.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.touched_streams > 0
+    }
+
+    /// Number of distinct changed worksheet owners.
+    #[must_use]
+    pub const fn changed_worksheets(self) -> usize {
+        self.changed_worksheets
+    }
+
+    /// Number of changed logical CFB streams.
+    #[must_use]
+    pub const fn touched_streams(self) -> usize {
+        self.touched_streams
+    }
+}
+
+/// A published worksheet-visibility edit: the new package, its exact
+/// reversible artifact patch and diagnostics.
+pub type Commit = litchi_core::edit::Commit<crate::Package, Patch, Diagnostics>;
+
+/// The visibility family has no caller-selected limit dimension: an edit
+/// changes at most [`MAX_VISIBILITY_CHANGES`] owners and the republished
+/// package is admitted under the source package's limits.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {}
+
+/// The record-level result of a visibility edit, before publication.
+#[derive(Clone)]
+pub(crate) struct RecordCommit {
+    #[cfg_attr(not(test), allow(dead_code, reason = "the record-level tests read it"))]
+    snapshot: Snapshot,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+#[cfg(test)]
+#[allow(dead_code, reason = "not every record-level test reads every part")]
+impl RecordCommit {
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    pub(crate) const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    pub(crate) const fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics
+    }
+}
+
+impl crate::Package {
+    /// The worksheet visibility read view of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is not a supported BIFF8 workbook.
+    pub fn sheet_visibility(&self) -> Result<Snapshot> {
+        let (_, bytes) = crate::scoped::capture(self)?;
+        Snapshot::from_bytes(bytes)
+    }
+
+    /// Start a worksheet-visibility edit of this package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an encrypted, protected or unsupported workbook.
+    pub fn edit_sheet_visibility(&self) -> Result<Edit> {
+        if self.is_encrypted() {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit sheet visibility",
+                "an encrypted workbook cannot be republished by a scoped edit",
+            ));
+        }
+        Ok(Edit {
+            base: Some(self.clone()),
+            package: Some(self.clone()),
+            source: None,
+            changes: Vec::new(),
+        })
+    }
+
+    /// Replay a worksheet-visibility patch onto the exact package it was
+    /// made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] when this package is not the patch's
+    /// source, or [`Error::Signed`] for a changed signed workbook.
+    pub fn apply_sheet_visibility(&self, patch: &Patch) -> Result<Commit> {
+        let before = crate::scoped::replay_source(self, patch.before(), "edit sheet visibility")?;
+        let source = Snapshot::from_bytes(before)?;
+        let target = patch.apply(&source)?;
+        let package = crate::scoped::publish(Some(self.clone()), patch.before(), target.bytes())?;
+        let diagnostics = Diagnostics {
+            changed_worksheets: 0,
+            touched_streams: usize::from(!patch.is_noop()),
+        };
+        Ok(Commit::new(package, patch.clone(), diagnostics))
+    }
+}
+
+/// The content-free diagnostics of a source-backed publication, published
+/// as a source-backed family's `Diagnostics` (`crate::source_backed`).
+pub(crate) mod source_diagnostics {
+    #[allow(
+        unused_imports,
+        reason = "the definition keeps its parent module's vocabulary"
+    )]
+    use super::*;
+
+    /// Content-free evidence for a same-length source-backed visibility
+    /// publication.
+    ///
+    /// The diagnostics retain only bounded counts, lengths, and opaque CFB
+    /// fingerprints. Workbook payload bytes and worksheet names are not copied
+    /// into this value.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    pub struct Diagnostics {
+        pub(super) changed_worksheets: usize,
+        pub(super) touched_streams: usize,
+        pub(super) splice_count: usize,
+        pub(super) replacement_bytes: u64,
+        pub(super) changed_spans: usize,
+        pub(super) source_bytes: u64,
+        pub(super) source_workbook_bytes: u64,
+        pub(super) target_workbook_bytes: u64,
+        pub(super) source_fingerprint: ArtifactFingerprint,
+        pub(super) target_fingerprint: ArtifactFingerprint,
+    }
+
+    impl Diagnostics {
+        /// Whether the commit changed the workbook.
+        #[must_use]
+        pub const fn changed(self) -> bool {
+            self.changed_spans > 0
+        }
+
+        /// Number of distinct worksheet owners changed by the transaction.
+        #[must_use]
+        pub const fn changed_worksheets(self) -> usize {
+            self.changed_worksheets
+        }
+
+        /// Number of logical CFB streams selected for the overlay.
+        #[must_use]
+        pub const fn touched_streams(self) -> usize {
+            self.touched_streams
+        }
+
+        /// Number of source-relative visibility splices submitted to CFB.
+        #[must_use]
+        pub const fn splice_count(self) -> usize {
+            self.splice_count
+        }
+
+        /// Aggregate replacement bytes retained by the splice plan.
+        #[must_use]
+        pub const fn replacement_bytes(self) -> u64 {
+            self.replacement_bytes
+        }
+
+        /// Number of physical CFB spans retained by the overlay plan.
+        #[must_use]
+        pub const fn changed_spans(self) -> usize {
+            self.changed_spans
+        }
+
+        /// Complete source CFB length.
+        #[must_use]
+        pub const fn source_bytes(self) -> u64 {
+            self.source_bytes
+        }
+
+        /// Source `Workbook`/`Book` stream length.
+        #[must_use]
+        pub const fn source_workbook_bytes(self) -> u64 {
+            self.source_workbook_bytes
+        }
+
+        /// Candidate `Workbook`/`Book` stream length.
+        #[must_use]
+        pub const fn target_workbook_bytes(self) -> u64 {
+            self.target_workbook_bytes
+        }
+
+        /// Exact source CFB fingerprint checked by the overlay plan.
+        #[must_use]
+        pub const fn source_fingerprint(self) -> ArtifactFingerprint {
+            self.source_fingerprint
+        }
+
+        /// Exact composed target CFB fingerprint checked by the overlay plan.
+        #[must_use]
+        pub const fn target_fingerprint(self) -> ArtifactFingerprint {
+            self.target_fingerprint
+        }
+    }
+}
+
+use source_diagnostics::Diagnostics as SourceBackedDiagnostics;
+/// A checked source-bound same-length XLS visibility publication plan.
+pub(crate) struct SourceBackedCommit {
+    source: Snapshot,
+    plan: ValidatedOverlayPlan,
+    diagnostics: SourceBackedDiagnostics,
+}
+
+impl SourceBackedCommit {
+    /// The checked overlay plan and its diagnostics.
+    pub(crate) fn into_plan(self) -> (ValidatedOverlayPlan, SourceBackedDiagnostics) {
+        (self.plan, self.diagnostics)
+    }
+
+    /// Exact immutable source snapshot used by this plan.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    #[must_use]
+    pub(crate) const fn source(&self) -> &Snapshot {
+        &self.source
+    }
+
+    /// Content-free publication evidence.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    #[must_use]
+    pub(crate) const fn diagnostics(&self) -> SourceBackedDiagnostics {
+        self.diagnostics
+    }
+
+    /// Whether this publication is an exact source identity no-op.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    #[must_use]
+    pub(crate) fn is_noop(&self) -> bool {
+        self.plan.is_noop()
+    }
+
+    /// Streams the complete source-backed candidate to a sequential sink.
+    ///
+    /// A sink failure may leave a typed prefix in the sink; inspect the
+    /// returned [`OverlayError`] before deciding whether to retry.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn write_to<W: Write>(&self, writer: &mut W) -> Result<PublishReport, OverlayError> {
+        self.plan.write_to(writer)
+    }
+
+    /// Publishes through the common synced sibling-file and atomic-rename
+    /// path.
+    #[cfg_attr(
+        not(test),
+        allow(
+            dead_code,
+            reason = "the unit tests drive the record-level publishers; Package and source_backed are the public routes"
+        )
+    )]
+    pub(crate) fn save<P: AsRef<Path>>(&self, path: P) -> Result<PublishReport, OverlayError> {
+        self.plan.save(path)
+    }
+}
+
+impl fmt::Debug for SourceBackedCommit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("SourceBackedCommit")
+            .field("source", &self.source)
+            .field("plan", &self.plan)
+            .field("diagnostics", &self.diagnostics)
+            .finish()
+    }
+}
+
+/// Exact-source reversible replacement of one XLS visibility artifact.
+#[derive(Clone)]
+pub struct Patch {
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+}
+
+impl Patch {
+    fn new(before: Arc<[u8]>, after: Arc<[u8]>) -> Self {
+        Self { before, after }
+    }
+
+    /// Parses the bounded stable `LXSV0001` artifact envelope and certifies
+    /// that its only logical change is worksheet `BoundSheet8.hsState`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a wire, package, protection, or semantic-closure error.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.get(..PATCH_MAGIC.len()) != Some(PATCH_MAGIC) {
+            return Err(Error::InvalidData(
+                "worksheet visibility patch has the wrong magic".into(),
+            ));
+        }
+        let before_len = read_patch_len(bytes, 8)?;
+        let after_len = read_patch_len(bytes, 16)?;
+        let body_start = 24_usize;
+        let before_end = body_start
+            .checked_add(before_len)
+            .ok_or_else(|| Error::InvalidData("visibility patch length overflow".into()))?;
+        let after_end = before_end
+            .checked_add(after_len)
+            .ok_or_else(|| Error::InvalidData("visibility patch length overflow".into()))?;
+        if after_end != bytes.len() {
+            return Err(Error::InvalidData(
+                "worksheet visibility patch length is not canonical".into(),
+            ));
+        }
+        let limits = Limits::default();
+        let max = usize::try_from(limits.max_total_size)
+            .map_err(|_error| Error::InvalidData("package limit exceeds usize".into()))?;
+        if before_len > max || after_len > max {
+            return Err(Error::refused(
+                RefusalKind::InvalidValue,
+                "edit sheet visibility",
+                "worksheet visibility patch artifact exceeds package bounds",
+            ));
+        }
+        let before = Snapshot::from_bytes(bytes[body_start..before_end].to_vec())?;
+        let after = Snapshot::from_bytes(bytes[before_end..after_end].to_vec())?;
+        certify_workbook_transition(&before, &after)?;
+        compare_other_streams(&before, &after)?;
+        Ok(Self::new(
+            Arc::clone(&before.inner.bytes),
+            Arc::clone(&after.inner.bytes),
+        ))
+    }
+
+    /// Serializes the stable bounded artifact envelope.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation or platform-length error.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let before_len = u64::try_from(self.before.len())
+            .map_err(|_error| Error::InvalidData("source artifact exceeds u64".into()))?;
+        let after_len = u64::try_from(self.after.len())
+            .map_err(|_error| Error::InvalidData("target artifact exceeds u64".into()))?;
+        let capacity = 24_usize
+            .checked_add(self.before.len())
+            .and_then(|value| value.checked_add(self.after.len()))
+            .ok_or_else(|| Error::InvalidData("visibility patch length overflow".into()))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|_error| Error::Allocation("serializing worksheet visibility patch"))?;
+        bytes.extend_from_slice(PATCH_MAGIC);
+        bytes.extend_from_slice(&before_len.to_le_bytes());
+        bytes.extend_from_slice(&after_len.to_le_bytes());
+        bytes.extend_from_slice(&self.before);
+        bytes.extend_from_slice(&self.after);
+        Ok(bytes)
+    }
+
+    /// Exact source artifact required by this patch.
+    #[must_use]
+    pub fn before(&self) -> &[u8] {
+        &self.before
+    }
+
+    /// Exact target artifact produced by this patch.
+    #[must_use]
+    pub fn after(&self) -> &[u8] {
+        &self.after
+    }
+
+    /// Whether the exact artifact transition is empty.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
+    /// Applies only to the exact retained immutable source artifact.
+    ///
+    /// # Errors
+    ///
+    /// Returns a stale-source or complete-reopen validation error.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.bytes() != self.before() {
+            return Err(Error::PatchConflict {
+                operation: "edit sheet visibility",
+                reason: "worksheet visibility patch source does not match its base snapshot",
+            });
+        }
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        let target = Snapshot::from_bytes(self.after.to_vec())?;
+        certify_workbook_transition(source, &target)?;
+        Ok(target)
+    }
+
+    /// Exact durable inverse artifact transition.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+        }
+    }
+}
+
+impl fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("before_bytes", &self.before.len())
+            .field("after_bytes", &self.after.len())
+            .field("is_noop", &self.is_noop())
+            .finish()
+    }
+}
+
+fn select_workbook_path(package: &ObjectPackage) -> Result<Vec<String>> {
+    let workbook = vec!["Workbook".to_string()];
+    let book = vec!["Book".to_string()];
+    match (
+        package.stream(&workbook).is_some(),
+        package.stream(&book).is_some(),
+    ) {
+        (true, false) => Ok(workbook),
+        (false, true) => Ok(book),
+        (false, false) => Err(Error::InvalidData(
+            "XLS package has no Workbook or Book stream".into(),
+        )),
+        (true, true) => Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "XLS package has ambiguous Workbook and Book streams",
+        )),
+    }
+}
+
+fn parse_directory(workbook: &[u8]) -> Result<Vec<SheetEntry>> {
+    let mut records = Records::new(workbook, litchi_biff::Limits::default())?;
+    let first = records.next().ok_or(Error::Eof("Workbook globals BOF"))??;
+    require_bof(first.payload())?;
+    let mut encoding = Encoding::from_codepage(1252)?;
+    let mut sheets = Vec::new();
+    let mut found_eof = false;
+    for record_result in records {
+        let record = record_result?;
+        match record.kind().get() {
+            CODE_PAGE if record.payload().len() == 2 => {
+                // The same Windows-1252 fallback the reader applies (and records
+                // in its tolerance report) for a page without an exact codec.
+                encoding = Encoding::from_codepage_or_fallback(binary::read_u16_le_at(
+                    record.payload(),
+                    0,
+                )?)
+                .0;
+            },
+            BOUND_SHEET => {
+                let raw_visibility =
+                    record
+                        .payload()
+                        .get(4)
+                        .copied()
+                        .ok_or_else(|| Error::InvalidRecord {
+                            record_type: BOUND_SHEET,
+                            message: "BoundSheet8 is truncated before hsState".into(),
+                        })?;
+                if raw_visibility > 2 {
+                    return Err(Error::InvalidRecord {
+                        record_type: BOUND_SHEET,
+                        message: format!(
+                            "BoundSheet8 hsState must be exactly 0, 1, or 2; found 0x{raw_visibility:02X}"
+                        ),
+                    });
+                }
+                let bound = BoundSheetRecord::parse(record.payload(), &encoding)?;
+                let kind = match bound.sheet_type {
+                    SheetType::WorkSheet => SheetKind::WorksheetOrDialog,
+                    SheetType::MacroSheet => SheetKind::MacroSheet,
+                    SheetType::ChartSheet => SheetKind::ChartSheet,
+                    SheetType::VBModule => SheetKind::VbaModule,
+                };
+                let visibility = decode_visibility(bound.visible);
+                let visibility_offset = record
+                    .offset()
+                    .checked_add(8)
+                    .ok_or_else(|| Error::InvalidData("BoundSheet8 offset overflow".into()))?;
+                sheets
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation("indexing BoundSheet8 owners"))?;
+                sheets.push(SheetEntry {
+                    position: sheets.len(),
+                    name: bound.name,
+                    visibility,
+                    kind,
+                    visibility_offset,
+                    substream_offset: bound.position,
+                });
+            },
+            FILE_PASS => return Err(Error::PasswordRequired),
+            EOF => {
+                found_eof = true;
+                break;
+            },
+            _ => {},
+        }
+    }
+    if !found_eof {
+        return Err(Error::Eof("Workbook globals EOF"));
+    }
+    if sheets.is_empty() {
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "worksheet visibility owner requires a BoundSheet8 directory",
+        ));
+    }
+    let mut positions = std::collections::HashSet::new();
+    for sheet in &sheets {
+        if !positions.insert(sheet.substream_offset) {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit sheet visibility",
+                "duplicate BoundSheet8 substream owner",
+            ));
+        }
+        let offset = usize::try_from(sheet.substream_offset)
+            .map_err(|_error| Error::InvalidData("sheet substream offset exceeds usize".into()))?;
+        if offset >= workbook.len() {
+            return Err(Error::InvalidRecord {
+                record_type: BOUND_SHEET,
+                message: "BoundSheet8 points outside the Workbook stream".into(),
+            });
+        }
+    }
+    Ok(sheets)
+}
+
+fn require_bof(payload: &[u8]) -> Result<()> {
+    if payload.len() < 4 {
+        return Err(Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        });
+    }
+    let version = binary::read_u16_le_at(payload, 0)?;
+    let substream = binary::read_u16_le_at(payload, 2)?;
+    if version != BIFF8 || substream != WORKBOOK_GLOBALS {
+        return Err(Error::InvalidRecord {
+            record_type: BOF,
+            message: "visibility edits require a BIFF8 workbook-globals BOF".into(),
+        });
+    }
+    Ok(())
+}
+
+fn require_unprotected<R: Read + Seek>(workbook: &ValidationWorkbook<R>) -> Result<()> {
+    let protection = workbook.protection();
+    if protection.structure_protected()
+        || protection.windows_protected()
+        || protection.password().is_set()
+        || protection.revisions_protected()
+        || protection.revision_password().is_set()
+        || protection.write_protected()
+        || protection.file_sharing().is_some()
+    {
+        return Err(Error::refused(
+            RefusalKind::Protected,
+            "edit sheet visibility",
+            "protected or shared workbooks are not eligible for visibility edits",
+        ));
+    }
+    for metadata in workbook.sheets() {
+        let Some(index) = metadata.parsed_worksheet_index() else {
+            continue;
+        };
+        let protection = workbook.worksheet_protection(index)?;
+        if protection.is_protected()
+            || protection.objects_protected()
+            || protection.scenarios_protected()
+            || protection.has_password()
+        {
+            return Err(Error::refused(
+                RefusalKind::Protected,
+                "edit sheet visibility",
+                "protected worksheets are not eligible for visibility edits",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_public_readback<R: Read + Seek>(
+    workbook: &ValidationWorkbook<R>,
+    sheets: &[SheetEntry],
+) -> Result<()> {
+    if workbook.sheets().len() != sheets.len() {
+        return Err(Error::Internal(
+            "BoundSheet8 directory is incomplete on public readback",
+        ));
+    }
+    for (metadata, sheet) in workbook.sheets().iter().zip(sheets) {
+        if metadata.workbook_index() != sheet.position
+            || metadata.name() != sheet.name
+            || metadata.kind() != sheet.kind
+            || metadata.visibility() != sheet.visibility
+        {
+            return Err(Error::Internal(
+                "BoundSheet8 owner failed exact public readback",
+            ));
+        }
+        if sheet.kind == SheetKind::WorksheetOrDialog && metadata.parsed_worksheet_index().is_none()
+        {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit sheet visibility",
+                "a worksheet was not published by the complete XLS reader",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn require_visible_worksheet(sheets: &[SheetEntry]) -> Result<()> {
+    if sheets.iter().any(|sheet| {
+        sheet.kind == SheetKind::WorksheetOrDialog && sheet.visibility == SheetVisibility::Visible
+    }) {
+        Ok(())
+    } else {
+        Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "an XLS workbook must retain at least one visible worksheet",
+        ))
+    }
+}
+
+fn require_final_visible_worksheet(source: &Snapshot, changes: &[Change]) -> Result<()> {
+    if source
+        .inner
+        .sheets
+        .iter()
+        .enumerate()
+        .any(|(index, sheet)| {
+            sheet.kind == SheetKind::WorksheetOrDialog
+                && changes
+                    .iter()
+                    .find(|change| change.sheet == index)
+                    .map_or(sheet.visibility, |change| change.after)
+                    == SheetVisibility::Visible
+        })
+    {
+        Ok(())
+    } else {
+        Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit sheet visibility",
+            "visibility batch would hide every worksheet",
+        ))
+    }
+}
+
+fn certify_workbook_transition(before: &Snapshot, after: &Snapshot) -> Result<()> {
+    if before.inner.workbook_path != after.inner.workbook_path
+        || before.inner.sheets.len() != after.inner.sheets.len()
+        || before.workbook_stream().len() != after.workbook_stream().len()
+    {
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "visibility patch changes the Workbook owner inventory",
+        ));
+    }
+    let mut allowed = Vec::new();
+    for (left, right) in before.inner.sheets.iter().zip(&after.inner.sheets) {
+        if left.position != right.position
+            || left.name != right.name
+            || left.kind != right.kind
+            || left.visibility_offset != right.visibility_offset
+            || left.substream_offset != right.substream_offset
+        {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet visibility",
+                "visibility patch changes a BoundSheet8 owner identity",
+            ));
+        }
+        if left.visibility != right.visibility {
+            if left.kind != SheetKind::WorksheetOrDialog {
+                return Err(Error::refused(
+                    RefusalKind::UnsupportedOperation,
+                    "edit sheet visibility",
+                    "visibility patch targets a non-worksheet owner",
+                ));
+            }
+            allowed
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("certifying visibility patch fields"))?;
+            allowed.push(left.visibility_offset);
+        }
+        if before.workbook_stream().get(left.visibility_offset)
+            != Some(&encode_visibility(left.visibility))
+            || after.workbook_stream().get(right.visibility_offset)
+                != Some(&encode_visibility(right.visibility))
+        {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedContent,
+                "edit sheet visibility",
+                "visibility patch contains a noncanonical BoundSheet8.hsState byte",
+            ));
+        }
+    }
+    if allowed.len() > MAX_VISIBILITY_CHANGES {
+        return Err(Error::refused(
+            RefusalKind::InvalidValue,
+            "edit sheet visibility",
+            "visibility patch exceeds its worksheet-owner limit",
+        ));
+    }
+    allowed.sort_unstable();
+    let mut allowed_index = 0_usize;
+    for (offset, (left, right)) in before
+        .workbook_stream()
+        .iter()
+        .zip(after.workbook_stream())
+        .enumerate()
+    {
+        if left == right {
+            continue;
+        }
+        while allowed
+            .get(allowed_index)
+            .is_some_and(|field| *field < offset)
+        {
+            allowed_index += 1;
+        }
+        if allowed.get(allowed_index) != Some(&offset) {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet visibility",
+                "visibility patch changes Workbook bytes outside BoundSheet8.hsState",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn compare_other_streams(before: &Snapshot, after: &Snapshot) -> Result<()> {
+    let mut left = OleFile::open(
+        Cursor::new(before.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
+    let mut right = OleFile::open(
+        Cursor::new(after.bytes()),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
+    if left.sector_size() != right.sector_size()
+        || root_identity(&left) != root_identity(&right)
+        || directory_catalog(&left)? != directory_catalog(&right)?
+    {
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "visibility patch changes the CFB directory or root metadata",
+        ));
+    }
+    let mut left_paths = left.list_streams();
+    let mut right_paths = right.list_streams();
+    left_paths.sort();
+    right_paths.sort();
+    if left_paths != right_paths {
+        return Err(Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "visibility patch changes the CFB stream catalog",
+        ));
+    }
+    for path in left_paths {
+        if path == before.inner.workbook_path {
+            continue;
+        }
+        let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+        if left.open_stream(&refs)? != right.open_stream(&refs)? {
+            return Err(Error::refused(
+                RefusalKind::UnsupportedOperation,
+                "edit sheet visibility",
+                "visibility patch changes an unrelated CFB stream",
+            ));
+        }
+    }
+    Ok(())
+}
+
+struct PositionalReader {
+    source: ComposedOverlaySource,
+    position: u64,
+}
+
+impl PositionalReader {
+    fn new(source: ComposedOverlaySource) -> Self {
+        Self {
+            source,
+            position: 0,
+        }
+    }
+}
+
+impl Read for PositionalReader {
+    fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+        let count = self.source.read_at(self.position, output)?;
+        self.position = self
+            .position
+            .checked_add(count as u64)
+            .ok_or_else(|| std::io::Error::other("positional reader offset overflow"))?;
+        Ok(count)
+    }
+}
+
+impl Seek for PositionalReader {
+    fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+        let length = self.source.len()?;
+        let target = match position {
+            SeekFrom::Start(offset) => i128::from(offset),
+            SeekFrom::Current(offset) => i128::from(self.position) + i128::from(offset),
+            SeekFrom::End(offset) => i128::from(length) + i128::from(offset),
+        };
+        if target < 0 || target > i128::from(u64::MAX) {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "positional reader seek is outside the source",
+            ));
+        }
+        self.position = target as u64;
+        Ok(self.position)
+    }
+}
+
+fn overlay_to_error(error: OverlayError) -> Error {
+    match error {
+        OverlayError::Ole(error) => Error::Cfb(error),
+        OverlayError::Io(error) => Error::Io(error),
+        _ => Error::refused(
+            RefusalKind::UnsupportedOperation,
+            "edit sheet visibility",
+            "source-backed visibility overlay refused",
+        ),
+    }
+}
+
+enum VisibilityOwnerError {
+    Overlay(OverlayError),
+    Owner(Error),
+}
+
+impl VisibilityOwnerError {
+    fn into_error(self) -> Error {
+        match self {
+            Self::Overlay(error) => overlay_to_error(error),
+            Self::Owner(error) => error,
+        }
+    }
+}
+
+impl From<OverlayError> for VisibilityOwnerError {
+    fn from(error: OverlayError) -> Self {
+        Self::Overlay(error)
+    }
+}
+
+fn verify_source_backed_readback(
+    plan: &ValidatedOverlayPlan,
+    source: &Snapshot,
+    changes: &[&Change],
+) -> Result<()> {
+    let candidate = plan.composed_source().map_err(overlay_to_error)?;
+    verify_source_backed_candidate(candidate, source, changes)
+}
+
+fn verify_source_backed_candidate(
+    candidate: ComposedOverlaySource,
+    source: &Snapshot,
+    changes: &[&Change],
+) -> Result<()> {
+    let workbook = Reader::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
+    require_unprotected(&workbook)?;
+
+    let mut sheets = Vec::new();
+    sheets
+        .try_reserve_exact(source.inner.sheets.len())
+        .map_err(|_error| Error::Allocation("retaining source-backed sheet readback"))?;
+    sheets.extend(source.inner.sheets.iter().cloned());
+    for change in changes {
+        let sheet = sheets.get_mut(change.sheet).ok_or(Error::Internal(
+            "source-backed worksheet disappeared during readback",
+        ))?;
+        sheet.visibility = change.after;
+    }
+    require_public_readback(&workbook, &sheets)?;
+    for change in changes {
+        let metadata = workbook.sheets().get(change.sheet).ok_or(Error::Internal(
+            "source-backed worksheet disappeared during readback",
+        ))?;
+        if metadata.visibility() != change.after {
+            return Err(Error::Internal(
+                "source-backed worksheet visibility readback disagreed with the staged state",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn root_identity(ole: &OleFile<Cursor<&[u8]>>) -> Option<(String, u8, String)> {
+    ole.root_entry()
+        .map(|entry| (entry.name.clone(), entry.entry_type, entry.clsid.clone()))
+}
+
+fn directory_catalog(ole: &OleFile<Cursor<&[u8]>>) -> Result<Vec<(Vec<String>, u8, String)>> {
+    let limits = Limits::default();
+    let maximum = limits
+        .max_streams
+        .saturating_add(limits.max_objects.saturating_mul(limits.max_storage_depth));
+    let mut catalog = Vec::new();
+    let mut pending = vec![Vec::<String>::new()];
+    while let Some(parent) = pending.pop() {
+        let refs = parent.iter().map(String::as_str).collect::<Vec<_>>();
+        for entry in ole.list_directory_entries(&refs)? {
+            if catalog.len() >= maximum {
+                return Err(Error::refused(
+                    RefusalKind::InvalidValue,
+                    "edit sheet visibility",
+                    "CFB directory catalog exceeds visibility patch bounds",
+                ));
+            }
+            let mut path = parent.clone();
+            path.try_reserve(1)
+                .map_err(|_error| Error::Allocation("certifying CFB directory paths"))?;
+            path.push(entry.name.clone());
+            catalog
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("certifying CFB directory entries"))?;
+            catalog.push((path.clone(), entry.entry_type, entry.clsid.clone()));
+            if entry.entry_type == 0x01 {
+                pending
+                    .try_reserve(1)
+                    .map_err(|_error| Error::Allocation("walking CFB storage catalog"))?;
+                pending.push(path);
+            }
+        }
+    }
+    catalog.sort();
+    Ok(catalog)
+}
+
+fn encode_visibility(visibility: SheetVisibility) -> u8 {
+    match visibility {
+        SheetVisibility::Visible => 0,
+        SheetVisibility::Hidden => 1,
+        SheetVisibility::VeryHidden => 2,
+    }
+}
+
+fn decode_visibility(visibility: SheetVisible) -> SheetVisibility {
+    match visibility {
+        SheetVisible::Visible => SheetVisibility::Visible,
+        SheetVisible::Hidden => SheetVisibility::Hidden,
+        SheetVisible::VeryHidden => SheetVisibility::VeryHidden,
+    }
+}
+
+fn caseless_eq(left: &str, right: &str) -> bool {
+    crate::sheet_name::equivalent(left, right)
+}
+
+fn read_patch_len(bytes: &[u8], offset: usize) -> Result<usize> {
+    let field = bytes.get(offset..offset + 8).ok_or_else(|| {
+        Error::InvalidData("worksheet visibility patch header is truncated".into())
+    })?;
+    usize::try_from(u64::from_le_bytes([
+        field[0], field[1], field[2], field[3], field[4], field[5], field[6], field[7],
+    ]))
+    .map_err(|_error| Error::InvalidData("visibility patch length exceeds usize".into()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_cfb::{OleFile, OleWriter};
+    use std::io;
+
+    fn package(sheet_count: usize) -> Vec<u8> {
+        let mut writer = crate::Builder::new();
+        for index in 0..sheet_count {
+            let sheet = writer.add_worksheet(&format!("Sheet{index}")).unwrap();
+            writer.write_number(sheet, 0, 0, index as f64).unwrap();
+        }
+        let mut output = Cursor::new(Vec::new());
+        writer.build().unwrap().write_to(&mut output).unwrap();
+        let mut package = ObjectPackage::open_with_options(
+            output.into_inner(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .unwrap()
+        .edit()
+        .unwrap();
+        package
+            .add_stream(vec!["Opaque".to_string()], b"untouched".to_vec())
+            .unwrap();
+        crate::scoped::object_editor_bytes(&package).unwrap()
+    }
+
+    /// The generic commit publishes the rendering its package publication
+    /// already validated. It must be byte-identical to the second render the
+    /// commit used to publish (stream put, then finish), in release builds
+    /// too, where the commit's own debug re-derivation is compiled out.
+    #[test]
+    fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
+        for (sheets, target, visibility) in [
+            (2, 1, SheetVisibility::Hidden),
+            (3, 2, SheetVisibility::VeryHidden),
+            (4, 1, SheetVisibility::Hidden),
+        ] {
+            let source = Snapshot::from_bytes(package(sheets)).unwrap();
+            let mut edit = source.edit();
+            edit.set_visibility(Selector::Position(Position::new(target)), visibility)
+                .unwrap();
+            let commit = edit.commit_record().unwrap();
+            let mut rerendered = ObjectPackage::open_with_options(
+                source.bytes().to_vec(),
+                OpenOptions::new()
+                    .targets(Targets::default())
+                    .limits(Limits::default()),
+            )
+            .and_then(|package| package.edit())
+            .unwrap();
+            rerendered
+                .put_stream_shared(
+                    &source.inner.workbook_path,
+                    Arc::from(commit.snapshot().workbook_stream()),
+                )
+                .unwrap();
+            assert_eq!(
+                commit.snapshot().bytes(),
+                crate::scoped::object_editor_bytes(&rerendered)
+                    .unwrap()
+                    .as_slice()
+            );
+        }
+    }
+
+    fn stream(bytes: &[u8], path: &[&str]) -> Vec<u8> {
+        OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap()
+            .open_stream(path)
+            .unwrap()
+    }
+
+    fn edit_workbook(source: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
+        let mut package = ObjectPackage::open_with_options(
+            source.to_vec(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .and_then(|package| package.edit())
+        .unwrap();
+        let path = vec!["Workbook".to_string()];
+        let mut workbook = package.stream(&path).unwrap().to_vec();
+        edit(&mut workbook);
+        package.put_stream(&path, workbook).unwrap();
+        crate::scoped::object_editor_bytes(&package).unwrap()
+    }
+
+    fn signed(source: &[u8]) -> Vec<u8> {
+        rebuild(source, |writer| {
+            writer
+                .create_stream(&["DigitalSignature"], b"signature")
+                .unwrap();
+        })
+    }
+
+    fn rebuild(source: &[u8], configure: impl FnOnce(&mut OleWriter)) -> Vec<u8> {
+        let mut ole =
+            OleFile::open(Cursor::new(source), litchi_cfb::OleFileLimits::default()).unwrap();
+        let mut writer = OleWriter::new();
+        for path in ole.list_streams() {
+            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            writer
+                .create_stream(&refs, &ole.open_stream(&refs).unwrap())
+                .unwrap();
+        }
+        configure(&mut writer);
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
+        output.into_inner()
+    }
+
+    #[test]
+    fn hides_unhides_and_very_hides_exact_fixed_width_owners() {
+        let source = Snapshot::from_bytes(package(3)).unwrap();
+        let before = source.workbook_stream().to_vec();
+        let mut transaction = source.edit();
+        transaction.hide("sHeEt1".into()).unwrap();
+        transaction.very_hide(2usize.into()).unwrap();
+        let commit = transaction.commit_record().unwrap();
+        assert_eq!(commit.diagnostics().changed_worksheets(), 2);
+        assert_eq!(commit.diagnostics().touched_streams(), 1);
+        assert_eq!(
+            commit
+                .snapshot()
+                .worksheet("Sheet1".into())
+                .unwrap()
+                .unwrap()
+                .visibility(),
+            SheetVisibility::Hidden
+        );
+        assert_eq!(
+            commit
+                .snapshot()
+                .worksheet(2usize.into())
+                .unwrap()
+                .unwrap()
+                .visibility(),
+            SheetVisibility::VeryHidden
+        );
+        assert_eq!(before.len(), commit.snapshot().workbook_stream().len());
+        assert_eq!(
+            before
+                .iter()
+                .zip(commit.snapshot().workbook_stream())
+                .filter(|(left, right)| left != right)
+                .count(),
+            2
+        );
+        assert_eq!(stream(source.bytes(), &["Opaque"]), b"untouched");
+        assert_eq!(stream(commit.snapshot().bytes(), &["Opaque"]), b"untouched");
+
+        let mut unhide = commit.snapshot().edit();
+        unhide.unhide("SHEET1".into()).unwrap();
+        let unhidden = unhide.commit_record().unwrap();
+        assert_eq!(
+            unhidden
+                .snapshot()
+                .worksheet(1usize.into())
+                .unwrap()
+                .unwrap()
+                .visibility(),
+            SheetVisibility::Visible
+        );
+    }
+
+    #[test]
+    fn source_backed_visibility_publishes_one_and_bounded_batches() {
+        let source = Snapshot::from_bytes(package(3)).unwrap();
+        let source_directory = {
+            let ole = OleFile::open(
+                Cursor::new(source.bytes()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
+            directory_catalog(&ole).unwrap()
+        };
+        let mut edit = source.edit();
+        edit.hide(1usize.into()).unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        assert_eq!(commit.diagnostics().changed_worksheets(), 1);
+        assert_eq!(commit.diagnostics().touched_streams(), 1);
+        assert_eq!(commit.diagnostics().splice_count(), 1);
+        assert_eq!(commit.diagnostics().replacement_bytes(), 1);
+        assert!(commit.diagnostics().changed_spans() > 0);
+        assert_ne!(
+            commit.diagnostics().source_fingerprint(),
+            commit.diagnostics().target_fingerprint()
+        );
+
+        let mut output = Vec::new();
+        let report = commit.write_to(&mut output).unwrap();
+        assert_eq!(report.changed_spans(), commit.diagnostics().changed_spans());
+        let reopened = Snapshot::from_bytes(output.clone()).unwrap();
+        assert_eq!(
+            reopened
+                .worksheet(1usize.into())
+                .unwrap()
+                .unwrap()
+                .visibility(),
+            SheetVisibility::Hidden
+        );
+        assert_eq!(stream(&output, &["Opaque"]), b"untouched");
+        let target_directory = {
+            let ole = OleFile::open(
+                Cursor::new(output.as_slice()),
+                litchi_cfb::OleFileLimits::default(),
+            )
+            .unwrap();
+            directory_catalog(&ole).unwrap()
+        };
+        assert_eq!(source_directory, target_directory);
+
+        let changed_offsets = source
+            .workbook_stream()
+            .iter()
+            .zip(reopened.workbook_stream())
+            .enumerate()
+            .filter_map(|(offset, (before, after))| (before != after).then_some(offset))
+            .collect::<Vec<_>>();
+        assert_eq!(
+            changed_offsets,
+            vec![source.inner.sheets[1].visibility_offset]
+        );
+
+        let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
+        let mut bounded = source.edit();
+        bounded
+            .set_visibility_batch((1..=MAX_VISIBILITY_CHANGES).map(|position| {
+                (
+                    Selector::Position(Position::new(position)),
+                    SheetVisibility::Hidden,
+                )
+            }))
+            .unwrap();
+        let bounded = bounded.commit_source_backed().unwrap();
+        assert_eq!(
+            bounded.diagnostics().changed_worksheets(),
+            MAX_VISIBILITY_CHANGES
+        );
+        assert_eq!(bounded.diagnostics().splice_count(), MAX_VISIBILITY_CHANGES);
+        assert_eq!(
+            bounded.diagnostics().replacement_bytes(),
+            MAX_VISIBILITY_CHANGES as u64
+        );
+        let mut output = Vec::new();
+        bounded.write_to(&mut output).unwrap();
+        let reopened = Snapshot::from_bytes(output).unwrap();
+        assert_eq!(
+            reopened
+                .worksheets()
+                .filter(|sheet| sheet.visibility() == SheetVisibility::Visible)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn source_backed_visibility_noop_and_cap_plus_one_are_atomic() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        let noop = source.edit().commit_source_backed().unwrap();
+        assert!(noop.is_noop());
+        assert_eq!(noop.diagnostics().changed_worksheets(), 0);
+        assert_eq!(noop.diagnostics().touched_streams(), 0);
+        assert_eq!(noop.diagnostics().splice_count(), 0);
+        assert_eq!(noop.diagnostics().replacement_bytes(), 0);
+        assert_eq!(
+            noop.diagnostics().source_fingerprint(),
+            noop.diagnostics().target_fingerprint()
+        );
+        let mut output = Vec::new();
+        noop.write_to(&mut output).unwrap();
+        assert_eq!(output, source.bytes());
+
+        let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
+        let mut refused = source.edit();
+        assert!(
+            refused
+                .set_visibility_batch((0..=MAX_VISIBILITY_CHANGES).map(|position| {
+                    (
+                        Selector::Position(Position::new(position)),
+                        SheetVisibility::Hidden,
+                    )
+                }))
+                .is_err()
+        );
+        let noop = refused.commit_source_backed().unwrap();
+        assert!(noop.is_noop());
+        assert_eq!(noop.source().bytes(), source.bytes());
+    }
+
+    struct PartialSink {
+        accepted: usize,
+        limit: usize,
+    }
+
+    impl Write for PartialSink {
+        fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+            if self.accepted >= self.limit {
+                return Err(io::Error::new(
+                    io::ErrorKind::BrokenPipe,
+                    "test sink stopped",
+                ));
+            }
+            let count = bytes.len().min(self.limit - self.accepted);
+            self.accepted += count;
+            Ok(count)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn source_backed_visibility_reports_partial_sink_and_save_failures() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        let mut edit = source.edit();
+        edit.hide(1usize.into()).unwrap();
+        let commit = edit.commit_source_backed().unwrap();
+        let mut sink = PartialSink {
+            accepted: 0,
+            limit: 23,
+        };
+        let error = commit.write_to(&mut sink).unwrap_err();
+        assert!(matches!(
+            error,
+            OverlayError::IncompleteOutput {
+                progress: litchi_cfb::OutputProgress::Prefix { .. },
+                ..
+            }
+        ));
+
+        let path = std::env::temp_dir().join(format!(
+            "litchi-xls-visibility-missing-parent-{}",
+            std::process::id()
+        ));
+        let missing = path.join("child").join("output.xls");
+        let error = commit.save(&missing).unwrap_err();
+        assert!(matches!(
+            error,
+            OverlayError::Ole(litchi_cfb::OleError::Io(_))
+                | OverlayError::Io(_)
+                | OverlayError::Unavailable { .. }
+        ));
+    }
+
+    #[test]
+    fn refuses_hiding_every_worksheet_atomically() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        let mut transaction = source.edit();
+        transaction.hide(0usize.into()).unwrap();
+        transaction.hide(1usize.into()).unwrap();
+        assert!(transaction.commit_record().is_err());
+        assert_eq!(
+            source
+                .worksheets()
+                .filter(|sheet| sheet.visibility() == SheetVisibility::Visible)
+                .count(),
+            2
+        );
+    }
+
+    #[test]
+    fn batch_accepts_cap_and_refuses_cap_plus_one_without_staging_prefix() {
+        let source = Snapshot::from_bytes(package(MAX_VISIBILITY_CHANGES + 2)).unwrap();
+        let mut transaction = source.edit();
+        transaction
+            .set_visibility_batch((1..=MAX_VISIBILITY_CHANGES).map(|position| {
+                (
+                    Selector::Position(Position::new(position)),
+                    SheetVisibility::Hidden,
+                )
+            }))
+            .unwrap();
+        let commit = transaction.commit_record().unwrap();
+        assert_eq!(
+            commit.diagnostics().changed_worksheets(),
+            MAX_VISIBILITY_CHANGES
+        );
+
+        let mut refused = source.edit();
+        assert!(
+            refused
+                .set_visibility_batch((0..=MAX_VISIBILITY_CHANGES).map(|position| {
+                    (
+                        Selector::Position(Position::new(position)),
+                        SheetVisibility::Hidden,
+                    )
+                }))
+                .is_err()
+        );
+        let noop = refused.commit_record().unwrap();
+        assert!(noop.patch().is_noop());
+        assert_eq!(noop.snapshot().bytes(), source.bytes());
+    }
+
+    #[test]
+    fn exact_patch_rejects_stale_and_durable_inverse_restores_source() {
+        let source = Snapshot::from_bytes(package(3)).unwrap();
+        let mut transaction = source.edit();
+        transaction.hide(2usize.into()).unwrap();
+        let commit = transaction.commit_record().unwrap();
+        let wire = commit.patch().to_bytes().unwrap();
+        let durable = Patch::from_bytes(&wire).unwrap();
+        assert!(durable.apply(commit.snapshot()).is_err());
+        assert_eq!(
+            durable.apply(&source).unwrap().bytes(),
+            commit.snapshot().bytes()
+        );
+        let inverse_wire = durable.inverse().to_bytes().unwrap();
+        let inverse = Patch::from_bytes(&inverse_wire).unwrap();
+        assert_eq!(
+            inverse.apply(commit.snapshot()).unwrap().bytes(),
+            source.bytes()
+        );
+    }
+
+    #[test]
+    fn selector_rules_and_nonworksheet_positions_are_exact() {
+        let bytes = package(2);
+        let source = Snapshot::from_bytes(bytes.clone()).unwrap();
+        assert_eq!(
+            source
+                .worksheet("sHeEt0".into())
+                .unwrap()
+                .unwrap()
+                .position(),
+            0
+        );
+        assert!(source.worksheet(99usize.into()).unwrap().is_none());
+
+        let chart_typed = edit_workbook(&bytes, |workbook| {
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
+                .filter_map(std::result::Result::ok)
+                .filter(|record| record.kind().get() == BOUND_SHEET)
+                .nth(1)
+                .unwrap()
+                .offset();
+            workbook[offset + 9] = 0x02;
+        });
+        let chart_typed = Snapshot::from_bytes(chart_typed).unwrap();
+        assert!(chart_typed.worksheet(1usize.into()).unwrap().is_none());
+        assert!(chart_typed.edit().hide(1usize.into()).is_err());
+    }
+
+    #[test]
+    fn protected_signed_and_encrypted_sources_are_refused() {
+        let bytes = package(2);
+        assert!(Snapshot::from_bytes(signed(&bytes)).is_err());
+
+        let protected = edit_workbook(&bytes, |workbook| {
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
+                .filter_map(std::result::Result::ok)
+                .find(|record| record.kind().get() == crate::protection::PROTECT_TYPE)
+                .unwrap()
+                .offset();
+            workbook[offset + 4..offset + 6].copy_from_slice(&1_u16.to_le_bytes());
+        });
+        assert!(Snapshot::from_bytes(protected).is_err());
+
+        let encrypted = edit_workbook(&bytes, |workbook| {
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
+                .filter_map(std::result::Result::ok)
+                .find(|record| record.kind().get() == CODE_PAGE)
+                .unwrap()
+                .offset();
+            workbook[offset..offset + 2].copy_from_slice(&FILE_PASS.to_le_bytes());
+        });
+        assert!(matches!(
+            Snapshot::from_bytes(encrypted),
+            Err(Error::PasswordRequired)
+        ));
+
+        let reserved_visibility = edit_workbook(&bytes, |workbook| {
+            let offset = Records::new(workbook, litchi_biff::Limits::default())
+                .expect("valid BIFF limits")
+                .filter_map(std::result::Result::ok)
+                .find(|record| record.kind().get() == BOUND_SHEET)
+                .unwrap()
+                .offset();
+            workbook[offset + 8] = 0x81;
+        });
+        assert!(Snapshot::from_bytes(reserved_visibility).is_err());
+    }
+
+    #[test]
+    fn duplicate_case_folded_names_are_refused_or_reported_ambiguous() {
+        let duplicate = edit_workbook(&package(2), |workbook| {
+            let (offset, payload_len) = {
+                let second = Records::new(workbook, litchi_biff::Limits::default())
+                    .expect("valid BIFF limits")
+                    .filter_map(std::result::Result::ok)
+                    .filter(|record| record.kind().get() == BOUND_SHEET)
+                    .nth(1)
+                    .unwrap();
+                (second.offset(), second.payload().len())
+            };
+            let last_name_byte = offset + 4 + payload_len - 1;
+            workbook[last_name_byte] = b'0';
+        });
+        match Snapshot::from_bytes(duplicate) {
+            Ok(snapshot) => assert!(snapshot.worksheet("SHEET0".into()).is_err()),
+            Err(error) => assert!(error.to_string().to_lowercase().contains("sheet")),
+        }
+    }
+
+    #[test]
+    fn deserialization_rejects_unrelated_stream_changes() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        let mut package = ObjectPackage::open_with_options(
+            source.bytes().to_vec(),
+            OpenOptions::new()
+                .targets(Targets::default())
+                .limits(Limits::default()),
+        )
+        .and_then(|package| package.edit())
+        .unwrap();
+        package
+            .put_stream(&["Opaque".to_string()], b"changed".to_vec())
+            .unwrap();
+        let unrelated =
+            Snapshot::from_bytes(crate::scoped::object_editor_bytes(&package).unwrap()).unwrap();
+        let forged = Patch::new(
+            Arc::clone(&source.inner.bytes),
+            Arc::clone(&unrelated.inner.bytes),
+        );
+        assert!(Patch::from_bytes(&forged.to_bytes().unwrap()).is_err());
+    }
+
+    #[test]
+    fn deserialization_binds_empty_storages_and_root_metadata() {
+        let source = Snapshot::from_bytes(package(2)).unwrap();
+        for changed in [
+            rebuild(source.bytes(), |writer| {
+                writer.create_storage(&["EmptyStorage"]).unwrap();
+            }),
+            rebuild(source.bytes(), |writer| writer.set_root_clsid([0x5a; 16])),
+        ] {
+            let changed = Snapshot::from_bytes(changed).unwrap();
+            let forged = Patch::new(
+                Arc::clone(&source.inner.bytes),
+                Arc::clone(&changed.inner.bytes),
+            );
+            assert!(Patch::from_bytes(&forged.to_bytes().unwrap()).is_err());
+        }
+    }
+}

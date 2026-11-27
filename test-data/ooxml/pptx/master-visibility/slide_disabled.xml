@@ -1,0 +1,6 @@
+<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    showMasterSp="0" showMasterPhAnim="false">
+  <p:cSld name="Slide with master content disabled">
+    <p:spTree/>
+  </p:cSld>
+</p:sld>

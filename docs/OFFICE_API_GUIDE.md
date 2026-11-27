@@ -21,16 +21,37 @@ Litchi provides a comprehensive, high-performance API for working with Microsoft
 - **Type-safe**: Leveraging Rust's type system for correctness
 - **Production-ready**: Fast, safe, and well-tested
 
+Format-specific OOXML package APIs are owned directly by `litchi-docx`,
+`litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb`. `litchi-opc` owns the package
+graph, `litchi-ooxml-common` owns shared OOXML vocabulary and package services,
+and `litchi-fonts` owns font discovery, subsetting, embedding, and obfuscation.
+Use `litchi` for format detection and `litchi::open`, which reads any
+supported format through one `File` type (see [Unified API](#unified-api)).
+
+Standalone examples below assume the corresponding owner crates are listed in
+your `Cargo.toml`:
+
+```toml
+[dependencies]
+litchi-docx = "0.0.1"
+litchi-pptx = "0.0.1"
+litchi-xlsx = "0.0.1"
+litchi-xlsb = "0.0.1"
+litchi-opc = "0.0.1"
+litchi-ooxml-common = "0.0.1"
+litchi-drawingml = "0.0.1"
+```
+
 ## Word Documents (DOCX)
 
 ### Creating Documents
 
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_docx::Builder;
 
-// Create a new document
-let mut pkg = Package::new()?;
-let mut doc = pkg.document_mut()?;
+// Author a new document
+let mut builder = Builder::new()?;
+let doc = builder.document()?;
 
 // Add headings
 doc.add_heading("Document Title", 1)?;
@@ -46,8 +67,12 @@ para.add_run_with_text("and italic text").italic(true);
 
 // Add tables
 let table = doc.add_table(3, 4); // 3 rows, 4 columns
-table.cell(0, 0).unwrap().set_text("Header 1");
-table.cell(0, 1).unwrap().set_text("Header 2");
+if let Some(cell) = table.cell(0, 0) {
+    cell.set_text("Header 1");
+}
+if let Some(cell) = table.cell(0, 1) {
+    cell.set_text("Header 2");
+}
 
 // Set metadata
 pkg.properties_mut().title = Some("My Document".to_string());
@@ -60,7 +85,7 @@ pkg.save("output.docx")?;
 ### Reading Documents
 
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_docx::Package;
 
 // Open document
 let pkg = Package::open("document.docx")?;
@@ -103,22 +128,104 @@ println!("Found in {} paragraphs", matches.len());
 
 ### Updating Documents
 
+An opened document is an immutable snapshot. Every change stages an edit and
+commits a new package; the source is never mutated.
+
 ```rust
-use litchi::ooxml::docx::Package;
+use litchi_core::Position;
+use litchi_docx::Package;
 
 // Open existing document
-let mut pkg = Package::open("document.docx")?;
-let mut doc = pkg.document_mut()?;
+let pkg = Package::open("document.docx")?;
+let end = pkg.document_snapshot()?.paragraph_count();
 
 // Add new content
-doc.add_heading("New Section", 2)?;
-doc.add_paragraph_with_text("Additional content...");
+let mut edit = pkg.edit()?;
+edit.insert_paragraph(Position::new(end), "Additional content...")?;
+let pkg = edit.commit()?.into_package();
 
 // Update metadata
-pkg.properties_mut().last_modified_by = Some("Editor Name".to_string());
+let mut metadata = pkg.edit_metadata();
+metadata.update(|props| props.last_modified_by = Some("Editor Name".to_string()));
+let mut pkg = metadata.commit()?.into_package();
 
 // Save (can overwrite or save to new file)
 pkg.save("updated.docx")?;
+```
+
+### Custom Properties and XML Data
+
+Custom document properties use the shared, bounded `custom::{Props, Value}`
+vocabulary. Names follow Office's case-insensitive identity rules, while the
+original spelling is preserved. Insert is fallible so invalid names, values,
+or resource limits cannot be bypassed.
+
+```rust
+use litchi_ooxml_common::custom::Value;
+use litchi_docx::Package;
+
+let mut pkg = Package::open("document.docx")?;
+pkg.custom_props_mut().insert("Project", "Litchi")?;
+pkg.custom_props_mut().insert("Version", Value::I32(38))?;
+
+if let Some(value) = pkg.custom_props().get("PROJECT") {
+    println!("Project: {value:?}");
+}
+
+pkg.custom_props_mut().remove("Version");
+pkg.save("updated.docx")?;
+```
+
+Custom XML payloads stay inert: Litchi validates their bounded XML and package
+graph but never fetches schemas or executes XPath. Loaded payloads borrow shared
+immutable OPC storage internally, so repeated relationships do not duplicate
+the XML allocation.
+
+```rust
+use litchi_ooxml_common::custom_xml::Conformance;
+use litchi_docx::{NewStore, Package};
+
+let mut pkg = Package::open("document.docx")?;
+let item = pkg.add_custom_xml(NewStore {
+    xml: br#"<customer xmlns="urn:customer" id="7"/>"#.to_vec(),
+    content_type: "application/xml".to_string(),
+    id: "{11111111-1111-4111-8111-111111111111}".to_string(),
+    schemas: vec!["urn:customer".to_string()],
+    conformance: Conformance::Transitional,
+})?;
+
+println!("Stored {} bytes in {}", item.xml().len(), item.part());
+pkg.set_custom_xml(
+    "{11111111-1111-4111-8111-111111111111}",
+    br#"<customer xmlns="urn:customer" id="8"/>"#.to_vec(),
+)?;
+pkg.save("updated.docx")?;
+```
+
+Embedded Object and Embedded Package discovery uses the same borrowed,
+bounded inventory on DOCX, PPTX, XLSX, and XLSB packages. It reports explicit
+relationship occurrences without opening nested files, activating OLE, or
+fetching external targets.
+
+```rust
+use litchi_ooxml_common::embedded::Target;
+use litchi_docx::Package;
+
+let pkg = Package::open("document.docx")?;
+for entry in pkg.embedded()? {
+    match entry.target() {
+        Target::Internal(payload) => println!(
+            "{:?}: {} bytes in {} ({})",
+            entry.kind(),
+            payload.bytes().len(),
+            payload.part(),
+            payload.content_type(),
+        ),
+        Target::External(target) => {
+            println!("{:?}: inert external target {target}", entry.kind());
+        },
+    }
+}
 ```
 
 ### Advanced Document Operations
@@ -155,15 +262,80 @@ if let Some(style) = styles.get_by_name("Heading 1")? {
 }
 ```
 
+### Document Inventories (Read-Only)
+
+SmartArt diagrams and DrawingML text boxes are exposed as typed, inert
+inventories in both transitional and Strict namespace dialects:
+
+```rust
+use litchi_docx::Package;
+
+let pkg = Package::open("document.docx")?;
+
+// SmartArt (DrawingML diagram) inventory: data-model node trees plus
+// layout/quick-style/colors part metadata.
+for art in pkg.smart_arts()? {
+    println!("Diagram: {:?} ({} parts)", art.diagram_type(), art.text().lines().count());
+    println!("{}", art.text());
+}
+
+// Text boxes and WordArt anchored in the main document, including VML
+// fallbacks collapsed from mc:AlternateContent.
+for text_box in pkg.text_boxes()? {
+    let name = text_box.name.as_deref().unwrap_or("<unnamed>");
+    println!("Shape '{name}' (word art: {})", text_box.is_word_art());
+    println!("{}", text_box.text());
+}
+```
+
+### Authoring Rich Content
+
+Text boxes, SmartArt diagrams, embedded OLE objects, and legacy VML shapes
+can be authored through `Builder::document()` and round-trip through the
+read inventories above:
+
+```rust
+use litchi_docx::{MutableTextBox, MutableOleObject, MutableSmartArt, MutableVmlShape, VmlShapeKind};
+use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
+use litchi_docx::Builder;
+
+let mut builder = Builder::new()?;
+let doc = builder.document()?;
+
+// DrawingML text box with formatted runs and body properties.
+let mut text_box = MutableTextBox::new("Intro Box", 2_743_200, 914_400)?; // 3" x 1"
+text_box.add_run("Bold heading").bold = true;
+text_box.add_paragraph_with_text("Second paragraph");
+doc.add_text_box(text_box);
+
+// SmartArt: definition parts and the dgm:relIds anchor are generated.
+let diagram = SmartArtBuilder::new(DiagramType::Process)
+    .add_items(["Plan", "Build", "Ship"])
+    .build();
+doc.add_smart_art(MutableSmartArt::new(diagram)?);
+
+// Inert embedded OLE payload with a validated ProgID.
+let ole = MutableOleObject::new("Package", vec![0x50, 0x4B, 0x03, 0x04])?;
+doc.add_ole_object(ole);
+
+// Legacy VML shape with fill and stroke colors.
+let mut shape = MutableVmlShape::new(VmlShapeKind::RoundRectangle, 1_828_800, 914_400)?;
+shape.set_fill_color("FFDDEE")?;
+shape.set_stroke_color("336699")?;
+doc.add_vml_shape(shape);
+
+builder.build()?.save("output.docx")?;
+```
+
 ## Excel Spreadsheets (XLSX)
 
 ### Creating Workbooks
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Package;
 
-// Create new workbook
-let mut wb = Workbook::create()?;
+// Create new workbook package
+let mut wb = Package::new()?;
 
 // Access first worksheet
 let mut ws = wb.worksheet_mut(0)?;
@@ -199,7 +371,7 @@ wb.save("output.xlsx")?;
 ### Reading Workbooks
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Workbook;
 
 // Open workbook
 let wb = Workbook::open("workbook.xlsx")?;
@@ -243,7 +415,7 @@ println!("Found in {} cells", matches.len());
 ### Updating Workbooks
 
 ```rust
-use litchi::ooxml::xlsx::Workbook;
+use litchi_xlsx::Workbook;
 
 // Open existing workbook
 let mut wb = Workbook::open("workbook.xlsx")?;
@@ -291,12 +463,35 @@ if ws.is_cell_empty(1, 1) {
 println!("Non-empty cells: {}", ws.non_empty_cell_count());
 ```
 
+### Pivot Inventories (Read-Only)
+
+Pivot charts bound to a worksheet's pivot tables are exposed as a typed,
+validated graph; XLSB workbooks additionally expose their PivotCache
+definition streams:
+
+```rust
+use litchi_xlsx::Workbook;
+
+let wb = Workbook::open("report.xlsx")?;
+
+// Pivot charts: chart part, c:pivotSource metadata, per-series drop-zone
+// visibility, and the resolved typed pivot table.
+for chart in wb.pivot_charts_on_sheet("Sheet1")? {
+    println!("Pivot chart '{}' -> table '{}'",
+        chart.part_name, chart.pivot_table.name);
+}
+
+// XLSB PivotCache definitions (via litchi_xlsb::Workbook):
+// refresh metadata, sources, cache fields, shared items, grouping,
+// OLAP hierarchies, and calculated members.
+```
+
 ## PowerPoint Presentations (PPTX)
 
 ### Creating Presentations
 
 ```rust
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::Package;
 
 // Create new presentation
 let mut pkg = Package::new()?;
@@ -335,7 +530,7 @@ pkg.save("output.pptx")?;
 ### Reading Presentations
 
 ```rust
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::Package;
 
 // Open presentation
 let pkg = Package::open("presentation.pptx")?;
@@ -365,7 +560,7 @@ for (idx, slide) in pres.slides()?.iter().enumerate() {
 ### Updating Presentations
 
 ```rust
-use litchi::ooxml::pptx::Package;
+use litchi_pptx::Package;
 
 // Open existing presentation
 let mut pkg = Package::open("presentation.pptx")?;
@@ -415,23 +610,345 @@ if slide.is_empty()? {
 }
 ```
 
-## Unified API
+### Masters, Themes, and Package-Level Authoring
 
-For simpler operations, use the unified helper API:
+Slide masters, layouts, themes, embedded OLE objects, and ink annotations
+are authored at the package level and re-validated against the read-side
+graph rules:
 
 ```rust
-use litchi::ooxml::api::helpers;
+use litchi_pptx::{Package, SlideLayoutKind, ThemeColorScheme, ThemeColorSlot, ThemeColorValue, ThemeFontScheme, ThemeFontFace};
 
-// Extract text from any Office format
-let text = helpers::extract_text("document.docx")?;
-println!("{}", text);
+let mut pkg = Package::new()?;
 
-// Get metadata from any format
-let props = helpers::get_properties("document.docx")?;
-if let Some(title) = props.title {
-    println!("Title: {}", title);
+// A new slide master with default text styles, plus a typed layout.
+let master = pkg.add_slide_master()?;
+let _layout = pkg.add_slide_layout(&master.part_name, SlideLayoutKind::TitleOnly, "Custom", &[])?;
+
+// A theme with a typed 12-slot color scheme and major/minor fonts.
+let colors = ThemeColorScheme::new("Brand")
+    .with_color(ThemeColorSlot::Accent1, ThemeColorValue::Srgb("4472C4".to_string()));
+let fonts = ThemeFontScheme::new("Brand", ThemeFontFace::new("Calibri Light"), ThemeFontFace::new("Calibri"));
+let theme = pkg.add_theme("Brand", &colors, &fonts)?;
+pkg.attach_theme_to_master(&master.part_name, &theme.part_name)?;
+
+// Inert ink annotation (validated InkML stored verbatim).
+// PackURI comes from the litchi-opc crate.
+let inkml = br#"<ink xmlns="http://www.w3.org/2003/InkML"><traceGroup/></ink>"#;
+let slide = litchi_opc::PackURI::new("/ppt/slides/slide1.xml")?;
+pkg.add_ink_annotation(&slide, inkml)?;
+
+pkg.save("branded.pptx")?;
+```
+
+## Unified API
+
+The `litchi` facade reads every format it supports through one entry point.
+`litchi::open(path)` (or `litchi::open_bytes(bytes)`) detects the format from
+the content in one pass and returns a `File`: an enum with one variant per
+format, plus `File::Locked` for an encrypted input and `File::Signed` for a
+signed one. The common case needs no options and no format knowledge.
+
+The unified API provides path queries and immutable edits for integrated
+formats. Inspect `file.capabilities()` for the supported verbs, elements and
+properties; coverage differs by format and retained source state. Each write
+returns a new `File`, and the original remains readable. Explicit edits and
+atomic batches discard their candidate when any operation fails.
+
+Legacy PPT supports top-level shape text/geometry setters, existing slide
+visibility records, and slide removal/reordering. For example, with the `ppt`
+feature enabled and an input containing at least two slides with an editable
+text shape on the first:
+
+```rust
+use litchi::{Placement, props};
+
+let source = litchi::open("slides.ppt")?;
+let commit = source.edit(|edit| {
+    edit.set("/slide[1]/shape[1]", props! { "text" => "Updated title" })?;
+    edit.move_to("/slide[1]", Placement::End)?;
+    edit.remove("/slide[1]")
+})?;
+commit.file().save_as("revised.ppt")?;
+```
+
+PPT edits retain native dependency checks and reversible history. Slide/shape
+insertion, shape removal and rich-text formatting are still explicit gaps.
+Removing a slide can retain unreachable native incremental-history payloads;
+this operation does not sanitize the file.
+
+| `litchi::open` returns | For |
+|---|---|
+| `File::Doc`, `File::Docx`, `File::Rtf`, `File::Odt` | Word-processing documents |
+| `File::Ppt`, `File::Pptx`, `File::Odp` | Presentations |
+| `File::Xls`, `File::Xlsx`, `File::Xlsb`, `File::Ods` | Workbooks |
+| `File::Pages`, `File::Keynote`, `File::Numbers` | Apple iWork packages and package directories |
+| `File::Locked` | An encrypted DOC, XLS, PPT, or OOXML package |
+| `File::Signed` | A signed OOXML or legacy binary file |
+
+Each variant exists only when its cargo feature is enabled. An app-authored
+iWork package directory opens as its single-file form, and `save()` writes
+it back as a directory.
+
+The examples in this section run inside a function that returns
+`litchi::Result<()>`.
+
+### Reading any format
+
+```rust
+let file = litchi::open("document.docx")?;
+println!("{:?} ({:?})", file.format(), file.family());
+
+// Reads that every format shares are methods on `File`.
+println!("{}", file.text()?);
+if let Some(props) = file.metadata()? {
+    if let Some(title) = props.title {
+        println!("Title: {}", title);
+    }
 }
 ```
+
+`metadata()` returns `None` only for a format that reports no metadata at
+all (PPTX and PPT without core properties). `tolerance_report()` lists what
+the reader repaired.
+
+### Family views
+
+Family reads go through the view of the file's family. A view refuses a file
+of another family with `unsupported_format`, and `Error::detected` names the
+format it found.
+
+```rust
+let document = litchi::open("document.docx")?;
+let view = document.document()?;
+println!("paragraphs: {}", view.paragraph_count()?);
+for element in view.elements()? {
+    if let Some(paragraph) = element.as_paragraph() {
+        println!("{}", paragraph.text()?);
+    }
+}
+
+let presentation = litchi::open("slides.pptx")?;
+println!("slides: {}", presentation.presentation()?.slide_count()?);
+
+let workbook = litchi::open("workbook.xlsx")?;
+println!("sheets: {:?}", workbook.workbook()?.worksheet_names()?);
+
+// The wrong family is a typed refusal, not a guess.
+let error = document.workbook().unwrap_err();
+assert_eq!(error.code(), litchi::Code::UnsupportedFormat);
+assert_eq!(error.detected(), Some(litchi::FileFormat::Docx));
+```
+
+The paragraph, table, and slide values the views return are interim wrappers
+(`litchi::compat`) that a node view will replace.
+
+`WorkbookView` also implements the generic `litchi::sheet::WorkbookTrait` by
+static dispatch, so formula evaluation borrows it directly (feature `eval`;
+the sheet traits report boxed errors, so this function returns one):
+
+```rust
+use litchi::sheet::FormulaEvaluator;
+
+async fn evaluate(path: &str) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    let file = litchi::open(path)?;
+    let workbook = file.workbook()?;
+    let evaluator = FormulaEvaluator::new(&workbook);
+    println!("{:?}", evaluator.evaluate_cell("Sheet1", 1, 3).await?);
+    Ok(())
+}
+```
+
+An ODS workbook reports its worksheet names and count through the trait but
+refuses worksheet access with `unsupported_capability`.
+
+### XLSX worksheet and cell selection
+
+Format-specific reads live on the handle each `File` variant carries. With
+the `xlsx` feature, the `Xlsx` handle exposes one read-only selector surface:
+
+```rust
+use litchi::File;
+use litchi::format::xlsx::SelectedCellView;
+
+fn inspect_xlsx(path: &str) -> litchi::Result<()> {
+    let File::Xlsx(workbook) = litchi::open(path)? else {
+        return Ok(());
+    };
+    println!("worksheets: {}", workbook.worksheet_count()?);
+
+    // Names use case-insensitive XLSX matching. A missing name or an
+    // out-of-bounds zero-based position returns Ok(None).
+    let Some(by_name) = workbook.sheet("dAtA")? else {
+        return Ok(());
+    };
+    let Some(by_position) = workbook.sheet(0usize)? else {
+        return Ok(());
+    };
+    assert_eq!(by_name.position(), by_position.position());
+
+    // A1 references use Excel's one-based lexical notation. Raw tuples use
+    // zero-based (row, column) coordinates.
+    let a1 = by_name.cell("A1")?;
+    let raw = by_name.cell((0_u32, 0_u32))?;
+    assert_eq!(a1, raw);
+
+    match by_name.cell("B2")? {
+        SelectedCellView::Missing => println!("no stored cell"),
+        SelectedCellView::Covered(range) => println!("covered by {range}"),
+        SelectedCellView::Stored(cell) => println!("stored cell: {cell:?}"),
+        _ => println!("another cell state"),
+    }
+
+    // A1 range endpoints are inclusive; raw bounds are zero-based and
+    // half-open. The result is an owned sparse Vec<SelectedCell>.
+    let _a1_cells = by_name.cells("A1:F3")?;
+    let _raw_cells = by_name.cells((0_u32, 0_u32, 3_u32, 6_u32))?;
+    Ok(())
+}
+```
+
+`Xlsx::sheet(name_or_position)` returns
+`litchi::Result<Option<SelectedWorksheet>>`. Names are case-insensitive and
+positions are zero-based; `None` means that the requested name or position is
+absent. `SelectedWorksheet` is a lifetime-free, `Clone + Send + Sync` owned
+handle over the eager or source-backed worksheet owner chosen at open. Its
+`name()` and `position()` report the canonical worksheet name and checked
+zero-based workbook position.
+
+`cell` returns an owned `SelectedCellView`: `Missing` means no stored cell or
+covering merge, `Covered` identifies a merged follower, and `Stored(Cell)`
+preserves the XLSX `Empty`, `Formula`, and `Unknown` states without converting
+them through the generic sheet traits. `cells` returns an owned sparse
+`Vec<SelectedCell>` and does not synthesize absent cells or merged followers.
+
+Selection is catalog-only for source-backed workbooks; worksheet and range
+payloads are deferred until a selected read. The XLSX-owned selected scanner,
+fallback materialization, deferred-Part cache, source-freshness fence,
+resource limits, cancellation checks, and typed source-change errors remain
+in force. Every failure is a `litchi::Error` that keeps the XLSX error as its
+source (`Error::leaf`): a chart or other non-grid sheet is `unsupported_type`
+with the XLSX `NotWorksheet` error, a file that changed after open is
+`io_error`, and an invalid cell coordinate or range keeps the XLSX
+`Coordinate` or `Range` error. Eager XLSX opens expose the same selected
+semantics. Other formats have no `sheet` selector; read them through
+`File::workbook`.
+
+### Encrypted and signed files
+
+An encrypted input opens as `File::Locked`. Its reads and views fail with
+`document_protected`, whose suggestion names `Locked::unlock`. With the
+`encryption` feature, `unlock` consumes the handle and opens the content
+from the source the open retained; credentials never pass through
+`OpenOptions`.
+
+```rust
+use litchi::{File, Password};
+
+let file = match litchi::open("protected.doc")? {
+    File::Locked(locked) => {
+        println!("{:?} encrypted with {:?}", locked.format(), locked.encryption());
+        // A wrong password is `invalid_argument`, suggesting a check.
+        locked.unlock(Password::new("password".to_owned()))?
+    },
+    file => file,
+};
+println!("{}", file.text()?);
+```
+
+A signed input opens as `File::Signed`. Reads go to the file it wraps
+(`Signed::file`), and nothing is verified at open. So that no edit can strip
+a signature silently, editing will require consuming the signature first:
+`Signed::unsign` returns the file with its removal authorized, and
+`File::is_signed` reports `false` for it.
+
+```rust
+use litchi::File;
+
+if let File::Signed(signed) = litchi::open("contract.docx")? {
+    println!("signed in its {:?} container", signed.origin());
+    println!("{}", signed.file().text()?);
+    let unsigned: File = signed.unsign();
+    assert!(!unsigned.is_signed());
+}
+```
+
+### Dump and the raw layer
+
+`file.dump()` writes a document out as an OfficeCLI v2 batch: replaying it
+with `batch` onto `litchi::create(format)` rebuilds the body, sheets or
+slides. Content the write verbs cannot rebuild is listed in
+`Dump::warnings`, never dropped silently.
+
+```rust
+use litchi::BatchMode;
+
+let file = litchi::open("report.docx")?;
+let dump = file.dump()?;
+let copy = litchi::create(litchi::FileFormat::Docx)?.batch(dump.items(), BatchMode::Atomic)?;
+assert_eq!(copy.file.text()?, file.text()?);
+```
+
+The raw layer is the escape hatch for package parts (DOCX, XLSX, PPTX and
+XLSB; packaged ODF for reads): `parts()`, `raw("/document")` or any part
+name, `add_part(parent, NewPart)`, `raw_set(part, xpath, action, xml)` and a
+read-only structural `validate()`. Every raw write returns a new `File` and
+passes the package's XML publication audit first.
+
+```rust
+use litchi::raw::Action;
+
+let file = litchi::open("report.docx")?;
+let edited = file.raw_set("/document", "//w:body", Action::Prepend,
+    Some("<w:p><w:r><w:t>Draft</w:t></w:r></w:p>"))?;
+assert!(edited.file.validate()?.is_valid());
+```
+
+### Errors, limits, and options
+
+Every unified failure is one `litchi::Error` with a stable `Code`
+(`code().as_str()` is the `snake_case` name), a message, an optional
+suggestion, the format involved, and the format crate's typed error as its
+`source()` (`Error::leaf` returns it as an enum). Its `Display` names the code
+and the suggestion, so print the source chain to see the format crate's
+reason.
+
+```rust
+use litchi::{Code, OpenOptions};
+
+match litchi::open("notes.pages") {
+    Ok(file) => println!("{}", file.text()?),
+    Err(error) if error.code() == Code::UnsupportedFormat => {
+        // Some(Pages) in a build without the `pages` feature.
+        println!("{:?}", error.detected());
+        // "enable the `pages` cargo feature"
+        println!("{:?}", error.suggestion());
+    },
+    Err(error) => return Err(error),
+}
+
+// Limits and policy go through `OpenOptions`; plain `open` needs none.
+let options = OpenOptions::new().max_input_bytes(16);
+let error = litchi::open_bytes_with(vec![0_u8; 1024], &options).unwrap_err();
+assert_eq!(error.code(), Code::LimitExceeded);
+```
+
+| Code | When |
+|---|---|
+| `file_not_found` | The path does not exist. |
+| `unsupported_format` | Not an Office file (`detected()` is `None`), or a format `litchi::open` does not open (`detected()` names it; Apple iWork files and formats whose cargo feature is off come with a suggestion). A family view reports it too, for a file of another family. |
+| `corrupt_file` | A container, record, XML part, or payload is malformed. |
+| `limit_exceeded` | A read limit was exceeded; the suggestion is to raise it if the input is trusted. |
+| `document_protected` | A `File::Locked` was read; the suggestion names `Locked::unlock`. |
+| `invalid_argument` | `Locked::unlock` got the wrong password. |
+| `io_error` | Reading failed, or a source-backed file changed after open. |
+| `unsupported_capability` | The format cannot do what was asked: Markdown of a workbook, unlocking an encrypted XLSB package, an ODS worksheet through the sheet traits. |
+| `cancelled` | The execution context in `OpenOptions` was cancelled. |
+
+`OpenOptions` also selects the owner (`SourceMode::Auto` or `Eager`), sets
+the OOXML, legacy, and OpenDocument read limits, and takes an execution
+context for cancellation. With the `markdown` feature, `File` converts to
+Markdown through `litchi::markdown::ToMarkdown`.
 
 ## Performance Tips
 
@@ -467,22 +984,25 @@ for para in doc.paragraphs()? {
 
 ## Error Handling
 
-All operations return `Result` types with descriptive errors:
+The unified API reports one `litchi::Error` with a stable code; see
+[Errors, limits, and options](#errors-limits-and-options).
+Format-specific operations return their owner crate's `Result` type. For
+example, DOCX errors are defined by `litchi-docx`:
 
 ```rust
-use litchi::ooxml::error::OoxmlError;
+use litchi_docx::{Error, Package};
 
 match Package::open("document.docx") {
     Ok(pkg) => {
         // Process document
     }
-    Err(OoxmlError::IoError(e)) => {
+    Err(Error::Io(e)) => {
         eprintln!("IO error: {}", e);
     }
-    Err(OoxmlError::InvalidFormat(msg)) => {
+    Err(Error::InvalidFormat(msg)) => {
         eprintln!("Invalid format: {}", msg);
     }
-    Err(OoxmlError::PartNotFound(part)) => {
+    Err(Error::PartNotFound(part)) => {
         eprintln!("Missing part: {}", part);
     }
     Err(e) => {
@@ -520,4 +1040,3 @@ cargo doc --open
 ## License
 
 See the main project LICENSE file for details.
-

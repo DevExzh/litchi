@@ -1,0 +1,157 @@
+mod repair_support;
+
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{Formatting, StyleBlock, write::Writer};
+
+fn block<'a>(document: &'a Tree<'a>, text: &str) -> &'a StyleBlock<'a> {
+    document
+        .blocks()
+        .iter()
+        .find(|block| block.text.contains(text))
+        .unwrap_or_else(|| panic!("missing block containing {text}"))
+}
+
+fn write(document: &Tree<'_>) -> String {
+    let mut output = Vec::new();
+    Writer::new(&mut output).write_document(document).unwrap();
+    String::from_utf8(output).unwrap()
+}
+
+#[test]
+fn parses_group_inheritance_restoration_plain_and_last_wins() {
+    let document = Tree::parse(
+        concat!(
+            r"{\rtf1\cb0 Zero {\cb2 Inner} Tail ",
+            r"\cb1\cb3 Last{\plain Reset} {\*\unknown\cb4 Hidden}Visible}"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+
+    assert_eq!(
+        block(&document, "Zero").formatting.background_color,
+        Some(0)
+    );
+    assert_eq!(
+        block(&document, "Inner").formatting.background_color,
+        Some(2)
+    );
+    assert_eq!(
+        block(&document, "Tail").formatting.background_color,
+        Some(0)
+    );
+    assert_eq!(
+        block(&document, "Last").formatting.background_color,
+        Some(3)
+    );
+    assert_eq!(block(&document, "Reset").formatting.background_color, None);
+    assert_eq!(
+        block(&document, "Visible").formatting.background_color,
+        Some(3)
+    );
+}
+
+#[test]
+fn character_style_and_body_round_trip_in_canonical_color_order() {
+    let source = concat!(
+        r"{\rtf1{\stylesheet{\*\cs9\additive\cb2 Back;}}",
+        r"\highlight3\cb2\cf1 Body}"
+    );
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(
+        document
+            .stylesheet()
+            .get(9)
+            .unwrap()
+            .formatting
+            .background_color,
+        Some(2)
+    );
+
+    let once = write(&document);
+    assert!(once.contains(r"\cf1\cb2\highlight3"));
+    let reparsed = Tree::parse(&once, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(
+        block(&reparsed, "Body").formatting.background_color,
+        Some(2)
+    );
+    assert_eq!(write(&reparsed), once);
+}
+
+#[test]
+fn mutation_preserves_explicit_zero_and_omission() {
+    let mut formatting = Formatting::default();
+    assert_eq!(formatting.background_color, None);
+    formatting.set_background_color(Some(0));
+    assert_eq!(formatting.background_color, Some(0));
+    formatting.clear_background_color();
+    assert_eq!(formatting.background_color, None);
+}
+
+#[test]
+fn rejects_missing_negative_overflow_and_unrepresentable_shape_runs() {
+    for source in [
+        r"{\rtf1\cb Missing}",
+        r"{\rtf1\cb-1 Negative}",
+        r"{\rtf1\cb65536 Overflow}",
+        concat!(r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 one", r"\cb2 two}}}}"),
+    ] {
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
+            "{source}"
+        );
+    }
+
+    let inert = Tree::parse(
+        concat!(
+            r"{\rtf1{\*\unknown\cb65536 hidden}",
+            r"{\field{\*\fldinst TEST \cb65536}{\fldrslt cached}}Visible}"
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(block(&inert, "Visible").formatting.background_color, None);
+}
+
+#[test]
+fn parses_libreoffice_producer_fragment_and_round_trips_uniform_shape_text() {
+    let fixture = include_str!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/fdo53556.rtf"
+    ));
+    let start = fixture.find(r"{\pard\cb1 ").unwrap();
+    let producer = &fixture[start..];
+    let end = producer.find('}').unwrap() + 1;
+    let document = Tree::parse(
+        &format!(r"{{\rtf1{}}}", &producer[..end]),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        block(&document, "ARL STATISTICS")
+            .formatting
+            .background_color,
+        Some(1)
+    );
+
+    let shape = Tree::parse(
+        r"{\rtf1{\shp{\*\shpinst{\shptxt\cb1 uniform}}}}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(
+        shape.shapes()[0].text_formatting.unwrap().background_color,
+        Some(1)
+    );
+    let serialized = write(&shape);
+    assert!(serialized.contains(r"{\shptxt \cb1"));
+    let reparsed = Tree::parse(&serialized, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert!(reparsed.shapes().iter().any(|shape| {
+        shape
+            .text_formatting
+            .is_some_and(|formatting| formatting.background_color == Some(1))
+    }));
+}

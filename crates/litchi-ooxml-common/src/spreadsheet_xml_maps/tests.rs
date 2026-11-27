@@ -1,0 +1,559 @@
+use super::*;
+
+fn fixture() -> XmlMapInfo {
+    XmlMapInfo {
+        selection_namespaces: "xmlns:x='urn:test'".into(),
+        schemas: vec![XmlSchema {
+            id: "schema-1".into(),
+            schema_reference: Some("urn:test".into()),
+            namespace: Some("urn:test".into()),
+            payload_xml: Some(
+                format!(r#"<x:schema xmlns:x="urn:test" xmlns="{NS_TEXT}"/>"#).into_bytes(),
+            ),
+        }],
+        maps: vec![XmlMap {
+            id: 1,
+            name: "map".into(),
+            root_element: "root".into(),
+            schema_id: "schema-1".into(),
+            show_import_export_validation_errors: true,
+            auto_fit: true,
+            append: false,
+            preserve_sort_auto_filter_layout: true,
+            preserve_format: true,
+            data_binding: None,
+        }],
+    }
+}
+
+#[test]
+fn parses_validates_and_serializes_both_conformance_families() {
+    let value = fixture();
+    validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).unwrap();
+    for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
+        let xml = serialize_xml_map_info(&value, conformance, &XmlMapLimits::DEFAULT).unwrap();
+        assert_eq!(
+            parse_xml_map_info(&xml, &XmlMapLimits::DEFAULT).unwrap(),
+            value
+        );
+    }
+}
+
+#[test]
+fn source_patch_preserves_unmodeled_markup() {
+    let before = fixture();
+    let source = serialize_xml_map_info(
+        &before,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let mut after = before.clone();
+    after.maps[0].name = "edited".into();
+    let patched = patch_xml_map_info_source(
+        &source,
+        &before,
+        &after,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(
+        parse_xml_map_info(&patched, &XmlMapLimits::DEFAULT).unwrap(),
+        after
+    );
+}
+
+#[test]
+fn exposes_the_codec_limits() {
+    assert_eq!(XmlMapLimits::default(), XmlMapLimits::DEFAULT);
+    assert_eq!(XmlMapLimits::DEFAULT.max_maps, 65_536);
+}
+
+#[test]
+fn caller_limits_cover_every_bounded_resource() {
+    let value = fixture();
+    let xml = serialize_xml_map_info(
+        &value,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_part_bytes = xml.len() - 1;
+    assert!(parse_xml_map_info(&xml, &limits).is_err());
+    assert!(serialize_xml_map_info(&value, XmlMapConformance::Transitional, &limits,).is_err());
+
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_schemas = 0;
+    assert!(validate_xml_map_info(&value, &limits).is_err());
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_maps = 0;
+    assert!(validate_xml_map_info(&value, &limits).is_err());
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_string_bytes = value.selection_namespaces.len() - 1;
+    assert!(validate_xml_map_info(&value, &limits).is_err());
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_opaque_bytes = value.schemas[0].payload_xml.as_ref().unwrap().len() - 1;
+    assert!(validate_xml_map_info(&value, &limits).is_err());
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_depth = 0;
+    assert!(validate_xml_map_info(&value, &limits).is_err());
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_events = 1;
+    assert!(validate_xml_map_info(&value, &limits).is_err());
+}
+
+#[test]
+fn enforces_office_map_and_binding_boundaries() {
+    let mut value = fixture();
+    value.maps[0].id = i32::MAX as u32;
+    value.maps[0].name = "n".repeat(65_535);
+    validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).unwrap();
+
+    value.maps[0].id = 0;
+    assert!(validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).is_err());
+    value.maps[0].id = i32::MAX as u32 + 1;
+    assert!(validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).is_err());
+    value.maps[0].id = 1;
+    value.maps[0].name.push('n');
+    assert!(validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).is_err());
+
+    value.maps[0].name = "map".into();
+    value.maps[0].data_binding = Some(DataBinding {
+        data_binding_name: Some("binding".into()),
+        file_binding: Some(true),
+        connection_id: Some(i32::MAX as u32),
+        file_binding_name: Some("file".into()),
+        load_mode: 1,
+        payload_xml: None,
+    });
+    validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).unwrap();
+    value.maps[0].data_binding.as_mut().unwrap().connection_id = None;
+    assert!(validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).is_err());
+    {
+        let binding = value.maps[0].data_binding.as_mut().unwrap();
+        binding.file_binding = Some(false);
+        binding.file_binding_name = None;
+    }
+    assert!(validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).is_ok());
+    value.maps[0].data_binding.as_mut().unwrap().connection_id = Some(1);
+    assert!(validate_xml_map_info(&value, &XmlMapLimits::DEFAULT).is_err());
+}
+
+#[test]
+fn detects_conformance_and_canonicalizes_boolean_words() {
+    let value = fixture();
+    for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
+        let xml = serialize_xml_map_info(&value, conformance, &XmlMapLimits::DEFAULT).unwrap();
+        let text = std::str::from_utf8(&xml).unwrap();
+        assert!(text.contains("AutoFit=\"true\""));
+        assert!(text.contains("Append=\"false\""));
+        let parsed = parse_xml_map_info_with_conformance(&xml, &XmlMapLimits::DEFAULT).unwrap();
+        assert_eq!(parsed.info, value);
+        assert_eq!(parsed.conformance, conformance);
+    }
+
+    let xml = serialize_xml_map_info(
+        &value,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let numeric = String::from_utf8(xml)
+        .unwrap()
+        .replace("=\"true\"", "=\"1\"")
+        .replace("=\"false\"", "=\"0\"");
+    assert!(parse_xml_map_info(numeric.as_bytes(), &XmlMapLimits::DEFAULT).is_err());
+}
+
+#[test]
+fn rejects_numeric_map_and_file_binding_booleans() {
+    let namespace = NS_TEXT;
+    let valid = format!(
+        r#"<MapInfo xmlns="{namespace}" SelectionNamespaces=""><Schema ID="s"/><Map ID="1" Name="m" RootElement="r" SchemaID="s" ShowImportExportValidationErrors="false" AutoFit="true" Append="false" PreserveSortAFLayout="true" PreserveFormat="true"><DataBinding FileBinding="true" ConnectionID="1" DataBindingLoadMode="1"/></Map></MapInfo>"#,
+    );
+    assert!(parse_xml_map_info(valid.as_bytes(), &XmlMapLimits::DEFAULT).is_ok());
+
+    for invalid in [
+        valid.replacen("AutoFit=\"true\"", "AutoFit=\"1\"", 1),
+        valid.replacen("Append=\"false\"", "Append=\"0\"", 1),
+        valid.replacen("FileBinding=\"true\"", "FileBinding=\"1\"", 1),
+    ] {
+        assert!(parse_xml_map_info(invalid.as_bytes(), &XmlMapLimits::DEFAULT).is_err());
+    }
+}
+
+#[test]
+fn schema_language_is_ignored_but_preserved_by_source_patch() {
+    let namespace = NS_TEXT;
+    let source = format!(
+        r#"<?xml version="1.0"?><MapInfo xmlns="{namespace}" SelectionNamespaces=""><Schema ID="s" SchemaLanguage="en-US"/><Map ID="1" Name="old" RootElement="r" SchemaID="s" ShowImportExportValidationErrors="false" AutoFit="true" Append="false" PreserveSortAFLayout="true" PreserveFormat="true"/></MapInfo>"#,
+    );
+    let before = parse_xml_map_info(source.as_bytes(), &XmlMapLimits::DEFAULT).unwrap();
+    let mut after = before.clone();
+    after.maps[0].name = "renamed".into();
+    let patched = patch_xml_map_info_source(
+        source.as_bytes(),
+        &before,
+        &after,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let patched = std::str::from_utf8(&patched).unwrap();
+    assert!(patched.contains("SchemaLanguage=\"en-US\""));
+    assert!(patched.contains("Name=\"renamed\""));
+}
+
+#[test]
+fn source_patch_preserves_comments_extensions_and_canonicalizes_edits() {
+    let namespace = NS_TEXT;
+    let source = format!(
+        r#"<?xml version="1.0"?><MapInfo xmlns="{namespace}" xmlns:f="urn:future" SelectionNamespaces=""><!--keep--><Schema ID="s"><f:payload/></Schema><Map ID="1" Name="old" RootElement="r" SchemaID="s" ShowImportExportValidationErrors="false" AutoFit="true" Append="false" PreserveSortAFLayout="true" PreserveFormat="true"/></MapInfo>"#,
+    );
+    let before = parse_xml_map_info(source.as_bytes(), &XmlMapLimits::DEFAULT).unwrap();
+    let mut after = before.clone();
+    after.maps[0].name = "new".into();
+    after.maps[0].append = true;
+    let patched = patch_xml_map_info_source(
+        source.as_bytes(),
+        &before,
+        &after,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let patched = std::str::from_utf8(&patched).unwrap();
+    assert!(patched.contains("<!--keep-->"));
+    assert!(patched.contains("<f:payload/>"));
+    assert!(patched.contains("Name=\"new\""));
+    assert!(patched.contains("Append=\"true\""));
+}
+
+#[test]
+fn serializes_a_large_catalog_with_amortized_growth() {
+    let mut value = fixture();
+    value.schemas[0].payload_xml = None;
+    value.maps = (1..=10_000)
+        .map(|id| XmlMap {
+            id,
+            name: format!("catalog-map-{id:05}-{}", "n".repeat(48)),
+            root_element: format!("root{id}"),
+            schema_id: "schema-1".into(),
+            show_import_export_validation_errors: id % 2 == 0,
+            auto_fit: true,
+            append: false,
+            preserve_sort_auto_filter_layout: true,
+            preserve_format: true,
+            data_binding: None,
+        })
+        .collect();
+
+    let xml = serialize_xml_map_info(
+        &value,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    assert!(xml.len() < XmlMapLimits::DEFAULT.max_part_bytes);
+    assert_eq!(
+        parse_xml_map_info(&xml, &XmlMapLimits::DEFAULT).unwrap(),
+        value
+    );
+}
+
+#[test]
+fn source_patch_honors_relaxed_limits_above_default() {
+    let before = fixture();
+    let source = serialize_xml_map_info(
+        &before,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let mut after = before.clone();
+    after.selection_namespaces = "n".repeat(XmlMapLimits::DEFAULT.max_part_bytes + 1024);
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_part_bytes = after.selection_namespaces.len() + source.len() + 1024;
+    limits.max_string_bytes = after.selection_namespaces.len();
+
+    let patched = patch_xml_map_info_source(
+        &source,
+        &before,
+        &after,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &limits,
+    )
+    .unwrap();
+    assert!(patched.len() > XmlMapLimits::DEFAULT.max_part_bytes);
+    assert_eq!(parse_xml_map_info(&patched, &limits).unwrap(), after);
+}
+
+#[test]
+fn source_patch_enforces_the_exact_output_boundary() {
+    let before = fixture();
+    let source = serialize_xml_map_info(
+        &before,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let mut after = before.clone();
+    after.selection_namespaces.push_str("-longer");
+    let expected = patch_xml_map_info_source(
+        &source,
+        &before,
+        &after,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+
+    let mut limits = XmlMapLimits::DEFAULT;
+    limits.max_part_bytes = expected.len();
+    assert_eq!(
+        patch_xml_map_info_source(
+            &source,
+            &before,
+            &after,
+            XmlMapConformance::Transitional,
+            XmlMapConformance::Transitional,
+            &limits,
+        )
+        .unwrap(),
+        expected,
+    );
+    limits.max_part_bytes -= 1;
+    assert!(
+        patch_xml_map_info_source(
+            &source,
+            &before,
+            &after,
+            XmlMapConformance::Transitional,
+            XmlMapConformance::Transitional,
+            &limits,
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn borrowed_projection_serializes_and_patches_without_payload_clones() {
+    let before = fixture();
+    let before_ref = XmlMapInfoRef::from_owned(&before, &XmlMapLimits::DEFAULT).unwrap();
+    assert!(std::ptr::eq(
+        before_ref.schemas[0].payload_xml.unwrap().as_ptr(),
+        before.schemas[0].payload_xml.as_ref().unwrap().as_ptr(),
+    ));
+    assert!(std::ptr::eq(
+        before_ref.maps[0].name.as_ptr(),
+        before.maps[0].name.as_ptr(),
+    ));
+
+    let owned_xml = serialize_xml_map_info(
+        &before,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let borrowed_xml = serialize_xml_map_info_ref(
+        &before_ref,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(borrowed_xml, owned_xml);
+    validate_xml_map_info_ref(&before_ref, &XmlMapLimits::DEFAULT).unwrap();
+
+    let mut after = before.clone();
+    after.maps[0].name = "borrowed-edit".into();
+    let after_ref = XmlMapInfoRef::from_owned(&after, &XmlMapLimits::DEFAULT).unwrap();
+    let owned_patch = patch_xml_map_info_source(
+        &owned_xml,
+        &before,
+        &after,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let borrowed_patch = patch_xml_map_info_source_ref(
+        &owned_xml,
+        &before_ref,
+        &after_ref,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    assert_eq!(borrowed_patch, owned_patch);
+}
+
+/// The payload read back from the fixture's part with its schema payload
+/// replaced by `payload`.
+fn parsed_payload(payload: &str) -> Vec<u8> {
+    let value = fixture();
+    let xml = String::from_utf8(
+        serialize_xml_map_info(
+            &value,
+            XmlMapConformance::Transitional,
+            &XmlMapLimits::DEFAULT,
+        )
+        .unwrap(),
+    )
+    .unwrap();
+    let original = std::str::from_utf8(value.schemas[0].payload_xml.as_deref().unwrap()).unwrap();
+    assert_eq!(xml.matches(original).count(), 1);
+    let xml = xml.replace(original, payload);
+    parse_xml_map_info(xml.as_bytes(), &XmlMapLimits::DEFAULT)
+        .unwrap()
+        .schemas[0]
+        .payload_xml
+        .clone()
+        .unwrap()
+}
+
+#[test]
+fn opaque_payload_roots_keep_their_bytes_and_gain_only_undeclared_bindings() {
+    // `MapInfo` declares the default namespace, which each payload inherits.
+    let inherited = format!(r#" xmlns="{NS_TEXT}""#);
+    for (payload, expected) in [
+        (
+            r#"<x:schema xmlns:x="urn:test"/>"#.to_owned(),
+            format!(r#"<x:schema xmlns:x="urn:test"{inherited}/>"#),
+        ),
+        // Repeated attributes are kept as written.
+        (
+            r#"<x:schema xmlns:x="urn:test" a="1" a="2"/>"#.to_owned(),
+            format!(r#"<x:schema xmlns:x="urn:test" a="1" a="2"{inherited}/>"#),
+        ),
+        (
+            r#"<x:schema xmlns:x="urn:test" a="1" a="2"><x:child/></x:schema>"#.to_owned(),
+            format!(r#"<x:schema xmlns:x="urn:test" a="1" a="2"{inherited}><x:child/></x:schema>"#),
+        ),
+        // A repeated declaration still declares its name.
+        (
+            r#"<x:schema xmlns:x="urn:test" xmlns="urn:first" xmlns="urn:second"/>"#.to_owned(),
+            r#"<x:schema xmlns:x="urn:test" xmlns="urn:first" xmlns="urn:second"/>"#.to_owned(),
+        ),
+    ] {
+        assert_eq!(
+            String::from_utf8(parsed_payload(&payload)).unwrap(),
+            expected,
+            "{payload}"
+        );
+    }
+}
+
+#[test]
+fn a_declaration_inside_a_repeated_attribute_value_no_longer_hides_a_binding() {
+    // quick-xml resumed inside the repeated `a`'s value, read an `xmlns`
+    // there, and the inherited default namespace was not appended. The tag
+    // declares no default namespace, so it is appended now.
+    let payload = r#"<x:schema xmlns:x="urn:test" a="1" a="v xmlns='urn:phantom'"/>"#;
+    assert_eq!(
+        String::from_utf8(parsed_payload(payload)).unwrap(),
+        format!(
+            r#"<x:schema xmlns:x="urn:test" a="1" a="v xmlns='urn:phantom'" xmlns="{NS_TEXT}"/>"#
+        )
+    );
+}
+
+#[test]
+fn opaque_payload_roots_of_many_repeated_names_keep_their_bytes() {
+    // 20,000 names and 20,000 repeats of the last.
+    let mut attributes = String::new();
+    for index in 0..20_000 {
+        attributes.push_str(&format!(" n{index:05}=\"\""));
+    }
+    for _ in 0..20_000 {
+        attributes.push_str(" n19999=\"\"");
+    }
+    let payload = format!(r#"<x:schema xmlns:x="urn:test"{attributes}/>"#);
+    assert_eq!(
+        String::from_utf8(parsed_payload(&payload)).unwrap(),
+        format!(r#"<x:schema xmlns:x="urn:test"{attributes} xmlns="{NS_TEXT}"/>"#)
+    );
+}
+
+#[test]
+fn source_patch_retains_added_and_reordered_catalog_entries() {
+    for conformance in [XmlMapConformance::Transitional, XmlMapConformance::Strict] {
+        let before = fixture();
+        let source = serialize_xml_map_info(&before, conformance, &XmlMapLimits::DEFAULT).unwrap();
+        let mut expanded = before.clone();
+        let mut schema = expanded.schemas[0].clone();
+        schema.id = "schema-2".into();
+        expanded.schemas.push(schema);
+        let mut map = expanded.maps[0].clone();
+        map.id = 2;
+        map.name = "second".into();
+        map.schema_id = "schema-2".into();
+        expanded.maps.push(map);
+        let output = patch_xml_map_info_source(
+            &source,
+            &before,
+            &expanded,
+            conformance,
+            conformance,
+            &XmlMapLimits::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_xml_map_info(&output, &XmlMapLimits::DEFAULT).unwrap(),
+            expanded
+        );
+        let mut reordered = expanded.clone();
+        reordered.schemas.reverse();
+        reordered.maps.reverse();
+        let output = patch_xml_map_info_source(
+            &output,
+            &expanded,
+            &reordered,
+            conformance,
+            conformance,
+            &XmlMapLimits::DEFAULT,
+        )
+        .unwrap();
+        assert_eq!(
+            parse_xml_map_info(&output, &XmlMapLimits::DEFAULT).unwrap(),
+            reordered
+        );
+    }
+}
+
+#[test]
+fn source_conformance_changes_preserve_opaque_default_namespace() {
+    let value = fixture();
+    let xml = serialize_xml_map_info(
+        &value,
+        XmlMapConformance::Transitional,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let xml = String::from_utf8(xml).unwrap().replace(
+        &format!(r#"<x:schema xmlns:x="urn:test" xmlns="{NS_TEXT}"/>"#),
+        r#"<x:schema xmlns:x="urn:test"/>"#,
+    );
+    let before = parse_xml_map_info(xml.as_bytes(), &XmlMapLimits::DEFAULT).unwrap();
+    assert_eq!(before, value);
+    let strict = patch_xml_map_info_source(
+        xml.as_bytes(),
+        &before,
+        &before,
+        XmlMapConformance::Transitional,
+        XmlMapConformance::Strict,
+        &XmlMapLimits::DEFAULT,
+    )
+    .unwrap();
+    let parsed = parse_xml_map_info_with_conformance(&strict, &XmlMapLimits::DEFAULT).unwrap();
+    assert_eq!(parsed.conformance, XmlMapConformance::Strict);
+    assert_eq!(parsed.info, before);
+}

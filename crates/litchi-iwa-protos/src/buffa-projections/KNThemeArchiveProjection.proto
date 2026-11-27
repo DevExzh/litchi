@@ -1,0 +1,29 @@
+// Wire-only projection derived from `KNArchives.proto`:
+//
+// - `KN.ThemeArchive.super` remains opaque because the shared TSS theme owner
+//   has its own source-preserving codec;
+// - singular UUID/reference/default fields are borrowed through Buffa;
+// - template records are streamed by `keynote_theme_codec.rs` so an
+//   input-width generated vector can never cross this boundary.
+//
+// The outer codec validates and preserves every source field. Fields absent
+// here (`classicThemeRecords`, custom timing curves, and motion backgrounds)
+// remain opaque source spans.
+syntax = "proto2";
+
+package LitchiIwaKeynoteThemeProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message KeynoteThemeArchive {
+  required bytes super = 1;
+  optional string uuid = 3;
+  optional Reference default_template_slide_node = 5;
+  optional Reference default_template_slide_node_reference = 6;
+  optional bool default_template_slide_node_is_our_best_guess = 7;
+  optional Reference live_video_source_collection = 9;
+}

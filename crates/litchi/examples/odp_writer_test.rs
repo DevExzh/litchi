@@ -13,7 +13,7 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::{Metadata, ShapeType};
 #[cfg(feature = "odf")]
-use litchi::odf::{PresentationBuilder, Shape, Slide};
+use litchi::odp::{Builder, Shape, Slide};
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -25,8 +25,8 @@ fn main() -> Result<()> {
         output_file
     );
 
-    // Create a new presentation using PresentationBuilder
-    let mut builder = PresentationBuilder::new();
+    // Create a new presentation using the ODP builder.
+    let mut builder = Builder::new();
 
     // Set document metadata
     println!("✅ Setting metadata...");
@@ -118,7 +118,7 @@ fn main() -> Result<()> {
     builder.add_slide_with_title(
         "Usage Example",
         "Creating a presentation with litchi:\n\n\
-        let mut builder = PresentationBuilder::new();\n\
+        let mut builder = Builder::new();\n\
         builder.add_slide_with_title(\n\
             \"My Slide\",\n\
             \"Slide content here\"\n\
@@ -133,6 +133,9 @@ fn main() -> Result<()> {
         text: String::new(),
         index: 0,
         notes: Some("This slide demonstrates custom shape creation".to_string()),
+        transition: None,
+        animations: Vec::new(),
+        legacy_animation: None,
         shapes: vec![
             Shape {
                 shape_type: ShapeType::TextBox,
@@ -143,6 +146,7 @@ fn main() -> Result<()> {
                 width: Some("8cm".to_string()),
                 height: Some("2cm".to_string()),
                 style_name: None,
+                ..Shape::new()
             },
             Shape {
                 shape_type: ShapeType::TextBox,
@@ -153,6 +157,7 @@ fn main() -> Result<()> {
                 width: Some("8cm".to_string()),
                 height: Some("2cm".to_string()),
                 style_name: None,
+                ..Shape::new()
             },
             Shape {
                 shape_type: ShapeType::TextBox,
@@ -163,6 +168,7 @@ fn main() -> Result<()> {
                 width: Some("10cm".to_string()),
                 height: Some("2cm".to_string()),
                 style_name: None,
+                ..Shape::new()
             },
         ],
     };
@@ -270,6 +276,9 @@ fn main() -> Result<()> {
         text: String::new(),
         index: 0,
         notes: Some("Final slide with acknowledgments".to_string()),
+        transition: None,
+        animations: Vec::new(),
+        legacy_animation: None,
         shapes: vec![Shape {
             shape_type: ShapeType::TextBox,
             text: "Litchi Library - ODF Support\n\nThank you for using litchi!".to_string(),
@@ -279,13 +288,14 @@ fn main() -> Result<()> {
             width: Some("14cm".to_string()),
             height: Some("4cm".to_string()),
             style_name: None,
+            ..Shape::new()
         }],
     };
     builder.add_slide_element(slide16)?;
 
     // Save the presentation
     println!("💾 Saving presentation to: {}", output_file);
-    builder.save(output_file)?;
+    builder.build()?.save(output_file)?;
 
     println!("✅ Presentation saved successfully!");
     println!("\n📊 Presentation Contents:");

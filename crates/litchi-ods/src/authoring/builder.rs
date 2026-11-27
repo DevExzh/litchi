@@ -1,0 +1,894 @@
+use crate::model::database_range::Range as DatabaseRange;
+use crate::model::names::{Definition, Expression, Range};
+use crate::worksheet::{Cell, Sheet};
+use litchi_core::{Error, Result};
+use litchi_odf_common::calculation::Settings;
+use litchi_odf_common::core::PackageWriter;
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
+use quick_xml::{
+    events::Event,
+    name::{Namespace, ResolveResult},
+};
+
+const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
+const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+const MAX_CONTENT_XML_BYTES: usize = 256 * 1024 * 1024;
+const MAX_CONTENT_XML_DEPTH: usize = 1024;
+
+/// Minimal package builder; richer sheet authoring is migrated independently.
+#[derive(Clone, Debug)]
+pub struct Builder {
+    content_xml: String,
+    definitions: Vec<Definition>,
+    metadata: litchi_core::Metadata,
+    settings: Option<Settings>,
+    table_templates: Vec<crate::styles::table_template::Template>,
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl Builder {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            content_xml: empty_content().to_owned(),
+            definitions: Vec::new(),
+            metadata: litchi_core::Metadata::default(),
+            settings: None,
+            table_templates: Vec::new(),
+        }
+    }
+
+    pub fn content_xml(mut self, xml: impl Into<String>) -> Self {
+        self.content_xml = xml.into();
+        self
+    }
+
+    /// Borrow the compact metadata value that will be written to `meta.xml`.
+    #[must_use]
+    pub fn metadata(&self) -> &litchi_core::Metadata {
+        &self.metadata
+    }
+
+    /// Replace the supported metadata value used for the next build.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_metadata(&mut self, metadata: litchi_core::Metadata) -> Result<&mut Self> {
+        let snapshot =
+            crate::metadata::Snapshot::from_source(None, XmlStreamLimits::owner_default_value())?;
+        let mut transaction = snapshot.transaction();
+        transaction.replace(metadata.clone())?;
+        self.metadata = metadata;
+        Ok(self)
+    }
+
+    /// Borrow the calculation settings that will be emitted in `content.xml`.
+    #[must_use]
+    pub fn settings(&self) -> Option<&Settings> {
+        self.settings.as_ref()
+    }
+
+    /// Set or clear validated calculation settings.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_settings(&mut self, settings: Option<Settings>) -> Result<&mut Self> {
+        if let Some(settings) = &settings {
+            settings.validate()?;
+        }
+        self.settings = settings;
+        Ok(self)
+    }
+
+    /// Borrow standalone table templates authored into the next package.
+    #[must_use]
+    pub fn table_templates(&self) -> &[crate::styles::table_template::Template] {
+        &self.table_templates
+    }
+
+    /// Replace the complete standalone table-template catalog.
+    pub fn set_table_templates(
+        &mut self,
+        templates: Vec<crate::styles::table_template::Template>,
+    ) -> Result<&mut Self> {
+        let snapshot = crate::styles::table_template::Snapshot::from_source(None)?;
+        let mut edit = snapshot.edit();
+        edit.replace(templates)?;
+        self.table_templates = edit.templates().to_vec();
+        Ok(self)
+    }
+
+    /// Stage a bounded table-template update in the builder.
+    pub fn edit_table_templates<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::styles::table_template::Edit) -> Result<()>,
+    {
+        let snapshot = crate::styles::table_template::Snapshot::from_source(None)?;
+        let mut edit = snapshot.edit();
+        edit.replace(self.table_templates.clone())?;
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        self.table_templates = commit.snapshot().templates().to_vec();
+        Ok(self)
+    }
+
+    /// Borrow the inert scenario declarations currently staged in
+    /// `content.xml`.
+    pub fn scenarios(&self) -> Result<crate::scenario::Snapshot> {
+        crate::scenario::Snapshot::parse(&self.content_xml).map_err(|error| {
+            Error::InvalidFormat(format!("ODS scenario metadata inspection failed: {error}"))
+        })
+    }
+
+    /// Stage a source-bound, inert scenario metadata update in the builder.
+    ///
+    /// The update records declarations only.  It never applies a what-if
+    /// scenario, evaluates formulas, or refreshes external data.
+    pub fn edit_scenarios<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::scenario::Edit) -> Result<()>,
+    {
+        let snapshot = self.scenarios()?;
+        let mut edit = snapshot.edit();
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            self.content_xml = commit.snapshot().source_xml().to_owned();
+        }
+        Ok(self)
+    }
+
+    /// Borrow the inert database-range declarations currently staged in the
+    /// builder's content XML.
+    pub fn database_ranges(&self) -> Result<Vec<DatabaseRange>> {
+        crate::database_range::parse_content(&self.content_xml).map(|(ranges, _)| ranges)
+    }
+
+    /// Replace the complete database-range catalog while preserving whether
+    /// an existing empty owner is physical.
+    pub fn set_database_ranges(&mut self, ranges: Vec<DatabaseRange>) -> Result<&mut Self> {
+        let (_, present) = crate::database_range::parse_content(&self.content_xml)?;
+        let candidate = if present || !ranges.is_empty() {
+            Some(ranges.as_slice())
+        } else {
+            None
+        };
+        let updated = crate::database_range::replace_content(&self.content_xml, candidate)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Append one inert database-range declaration atomically.
+    pub fn add_database_range(&mut self, range: DatabaseRange) -> Result<&mut Self> {
+        let mut ranges = self.database_ranges()?;
+        ranges.push(range);
+        self.set_database_ranges(ranges)
+    }
+
+    /// Remove the physical database-range owner from the next package.
+    pub fn clear_database_ranges(&mut self) -> Result<&mut Self> {
+        let updated = crate::database_range::replace_content(&self.content_xml, None)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Stage source-checked inert database-range CRUD in the builder.
+    pub fn edit_database_ranges<F>(&mut self, update: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut crate::database_range::Draft) -> Result<()>,
+    {
+        let mut edit = crate::database_range::Draft::from_source(&self.content_xml)?;
+        update(&mut edit)?;
+        let commit = edit.commit()?;
+        if commit.changed() {
+            self.content_xml = commit.into_source_xml();
+        }
+        Ok(self)
+    }
+
+    /// Decode the builder's current typed worksheet snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn sheets(&self) -> Result<Vec<Sheet>> {
+        crate::worksheet::codec::parse(&self.content_xml)
+    }
+
+    /// Atomically replace all worksheets in the builder's content snapshot.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_sheets(&mut self, sheets: Vec<Sheet>) -> Result<&mut Self> {
+        let updated = crate::worksheet::package::replace_tables(&self.content_xml, &sheets)?;
+        self.content_xml = updated;
+        Ok(self)
+    }
+
+    /// Append one validated worksheet while preserving sheet order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn add_sheet(&mut self, sheet: Sheet) -> Result<&mut Self> {
+        let mut sheets = self.sheets()?;
+        sheets.push(sheet);
+        self.set_sheets(sheets)
+    }
+
+    /// Remove one worksheet by its exact ODF name.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn remove_sheet(&mut self, name: &str) -> Result<Sheet> {
+        let mut sheets = self.sheets()?;
+        let index = sheets
+            .iter()
+            .position(|sheet| sheet.name == name)
+            .ok_or_else(|| Error::InvalidFormat(format!("ODS sheet '{name}' was not found")))?;
+        let removed = sheets.remove(index);
+        self.set_sheets(sheets)?;
+        Ok(removed)
+    }
+
+    /// Atomically replace one logical cell in a named worksheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_cell(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        cell: Cell,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_cell(row, column, cell))
+    }
+
+    /// Clear one logical cell while retaining its direct style, if any.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn clear_cell(&mut self, sheet_name: &str, row: usize, column: usize) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.clear_cell(row, column))
+    }
+
+    /// Set an inert formula on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_formula(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        formula: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let formula = formula.into();
+        self.edit_sheet(sheet_name, move |sheet| {
+            sheet.set_formula(row, column, formula)
+        })
+    }
+
+    /// Set a direct cell style reference on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_cell_style(
+        &mut self,
+        sheet_name: &str,
+        row: usize,
+        column: usize,
+        style_name: impl Into<String>,
+    ) -> Result<&mut Self> {
+        let style_name = style_name.into();
+        self.edit_sheet(sheet_name, move |sheet| {
+            sheet.set_cell_style(row, column, style_name)
+        })
+    }
+
+    /// Set or clear one worksheet's direct table title.
+    pub fn set_sheet_title(
+        &mut self,
+        sheet_name: &str,
+        title: Option<String>,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_title(title))
+    }
+
+    /// Set or clear one worksheet's direct table description.
+    pub fn set_sheet_description(
+        &mut self,
+        sheet_name: &str,
+        description: Option<String>,
+    ) -> Result<&mut Self> {
+        self.edit_sheet(sheet_name, |sheet| sheet.set_description(description))
+    }
+
+    fn edit_sheet<F>(&mut self, sheet_name: &str, operation: F) -> Result<&mut Self>
+    where
+        F: FnOnce(&mut Sheet) -> Result<()>,
+    {
+        let sheets = self.sheets()?;
+        let candidate = crate::worksheet::transaction::edit(&sheets, |candidate| {
+            let sheet = candidate
+                .iter_mut()
+                .find(|sheet| sheet.name == sheet_name)
+                .ok_or_else(|| {
+                    Error::InvalidFormat(format!("ODS sheet '{sheet_name}' was not found"))
+                })?;
+            operation(sheet)
+        })?;
+        self.set_sheets(candidate)
+    }
+
+    /// Return authored named definitions in their insertion order.
+    #[must_use]
+    pub fn definitions(&self) -> &[Definition] {
+        &self.definitions
+    }
+
+    /// Append a validated named range to the builder.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn add_range(&mut self, range: Range) -> Result<&mut Self> {
+        self.add_definition(range.into())
+    }
+
+    /// Append a validated named expression to the builder.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn add_expression(&mut self, expression: Expression) -> Result<&mut Self> {
+        self.add_definition(expression.into())
+    }
+
+    /// Append a named definition while preserving authored order.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn add_definition(&mut self, definition: Definition) -> Result<&mut Self> {
+        let mut candidate = self.definitions.clone();
+        candidate.push(definition);
+        crate::model::names::validate_collection(&candidate)?;
+        self.definitions = candidate;
+        Ok(self)
+    }
+
+    /// Build the spreadsheet into an immutable [`crate::Package`].
+    ///
+    /// Output (`save`, `save_with_durability`, `to_bytes`, `write_to`) lives
+    /// on the returned package. Building never consults the clock or any
+    /// other ambient state: two builders with equal inputs produce
+    /// byte-identical packages.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an authored part fails validation or cannot be
+    /// serialized.
+    pub fn build(self) -> std::result::Result<crate::Package, crate::Error> {
+        Ok(crate::Package::from_authored(self.build_bytes()?)?)
+    }
+
+    /// Build the complete package bytes (crate-internal authoring helper).
+    pub(crate) fn build_bytes(self) -> Result<Vec<u8>> {
+        let mut content_xml = if self.definitions.is_empty() {
+            self.content_xml
+        } else {
+            crate::codec::names::replace(&self.content_xml, &self.definitions)?
+        };
+        if let Some(settings) = &self.settings {
+            // Authored content is admitted under the documented owner default.
+            let snapshot = crate::settings::Snapshot::from_content_xml(
+                &content_xml,
+                XmlStreamLimits::owner_default_value(),
+            )?;
+            let mut transaction = snapshot.transaction();
+            transaction.replace(settings.clone())?;
+            content_xml = transaction.commit()?.into_owned();
+        }
+        validate_content_xml(&content_xml)?;
+        crate::worksheet::codec::parse(&content_xml)?;
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+        writer.set_mimetype(MIMETYPE)?;
+        writer.add_file("content.xml", content_xml.as_bytes())?;
+        if self.metadata.has_data() {
+            let snapshot = crate::metadata::Snapshot::from_source(
+                None,
+                XmlStreamLimits::owner_default_value(),
+            )?;
+            let mut transaction = snapshot.transaction();
+            transaction.replace(self.metadata)?;
+            if let Some(metadata_xml) = transaction.commit()?.into_owned_xml() {
+                writer.add_file("meta.xml", metadata_xml.as_bytes())?;
+            }
+        }
+        if !self.table_templates.is_empty() {
+            let styles_xml =
+                crate::styles::table_template::styles_xml_for_templates(&self.table_templates)?;
+            writer.add_file("styles.xml", styles_xml.as_bytes())?;
+        }
+        writer.finish_to_bytes()
+    }
+}
+
+/// Validate the minimal ODF package-content hierarchy required by an ODS.
+///
+/// This is intentionally a structural boundary check rather than a complete
+/// schema validator. The reader borrows `xml`, so authoring does not create a
+/// second content buffer or an intermediate DOM. This standalone path keeps
+/// the historical inline event loop for latency parity on non-fused callers;
+/// the fused open parse drives the equivalent [`ValidateHandler`] instead.
+pub(crate) fn validate_content_xml(xml: &str) -> Result<()> {
+    validate_size(xml)?;
+
+    let xml_limits = XmlStreamLimits::new(
+        MAX_CONTENT_XML_BYTES as u64,
+        MAX_CONTENT_XML_DEPTH,
+        4_000_000,
+        1_000_000,
+        MAX_CONTENT_XML_BYTES,
+    )?;
+    let mut reader = ResolvedReader::from_xml(xml, xml_limits)?;
+    reader.config_mut().check_end_names = true;
+    let mut buffer = Vec::new();
+    let mut depth = 0usize;
+    let mut root_closed = false;
+    let mut body_open = false;
+    let mut body_seen = false;
+    let mut spreadsheet_seen = false;
+
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(|error| {
+                litchi_odf_common::map_resolved_reader_error(error, "invalid ODS content.xml")
+            })?;
+
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    if root_closed {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one root element".to_string(),
+                        ));
+                    }
+                    if !is_office_element(
+                        &namespace,
+                        element.local_name().as_ref(),
+                        b"document-content",
+                    ) {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must be office:document-content".to_string(),
+                        ));
+                    }
+                } else if depth == 1
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"body")
+                {
+                    if body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    body_seen = true;
+                    body_open = true;
+                } else if is_office_element(&namespace, element.local_name().as_ref(), b"body") {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if depth == 2
+                    && body_open
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"spreadsheet")
+                {
+                    if spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    spreadsheet_seen = true;
+                } else if is_office_element(
+                    &namespace,
+                    element.local_name().as_ref(),
+                    b"spreadsheet",
+                ) {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+
+                if depth == MAX_CONTENT_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS content.xml nesting exceeds {MAX_CONTENT_XML_DEPTH} elements"
+                    )));
+                }
+                depth += 1;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body and office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+
+                if depth == 1
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"body")
+                {
+                    if body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    body_seen = true;
+                } else if is_office_element(&namespace, element.local_name().as_ref(), b"body") {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if depth == 2
+                    && body_open
+                    && is_office_element(&namespace, element.local_name().as_ref(), b"spreadsheet")
+                {
+                    if spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    spreadsheet_seen = true;
+                } else if is_office_element(
+                    &namespace,
+                    element.local_name().as_ref(),
+                    b"spreadsheet",
+                ) {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has an unexpected closing element".to_string(),
+                    ));
+                }
+
+                if depth == 1 {
+                    if !is_office_element(
+                        &namespace,
+                        element.local_name().as_ref(),
+                        b"document-content",
+                    ) {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must close with office:document-content"
+                                .to_string(),
+                        ));
+                    }
+                    if body_open {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml closes its root before office:body".to_string(),
+                        ));
+                    }
+                    depth = 0;
+                    root_closed = true;
+                } else {
+                    if depth == 2
+                        && body_open
+                        && is_office_element(&namespace, element.local_name().as_ref(), b"body")
+                    {
+                        body_open = false;
+                        if !spreadsheet_seen {
+                            return Err(Error::InvalidFormat(
+                                "office:body must contain office:spreadsheet".to_string(),
+                            ));
+                        }
+                    }
+                    depth -= 1;
+                }
+            },
+            Event::Text(text) if depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::CData(text) if depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::GeneralRef(reference) => {
+                crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS XML character reference: {error}"))
+                })?;
+                if depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has a character reference outside its root".to_string(),
+                    ));
+                }
+            },
+            Event::Eof => {
+                if !root_closed || depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml ended before its root element was closed".to_string(),
+                    ));
+                }
+                if !body_seen || !spreadsheet_seen {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body with office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+                return Ok(());
+            },
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::Text(_)
+            | Event::CData(_) => {},
+        }
+        buffer.clear();
+    }
+}
+
+fn is_office_element(namespace: &ResolveResult<'_>, local_name: &[u8], expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE)
+        && local_name == expected
+}
+
+fn has_non_whitespace(value: &[u8]) -> bool {
+    !value.iter().all(u8::is_ascii_whitespace)
+}
+
+/// Enforce the pre-parse byte-size limit of the package-content check.
+pub(crate) fn validate_size(xml: &str) -> Result<()> {
+    if xml.len() > MAX_CONTENT_XML_BYTES {
+        return Err(Error::InvalidFormat(format!(
+            "ODS content.xml exceeds {MAX_CONTENT_XML_BYTES} bytes"
+        )));
+    }
+    Ok(())
+}
+
+/// Whether the resolved namespace is the ODF office namespace, classified by
+/// the fused open parse exactly where the historical loop body classified it.
+pub(crate) fn is_office_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(Namespace(uri)) if *uri == OFFICE_NAMESPACE)
+}
+
+/// Streaming event handler holding the [`validate_content_xml`] scan state.
+///
+/// The fused open parse ([`crate::open_parse`]) drives one shared tokenizer
+/// through this handler, while [`validate_content_xml`] keeps its historical
+/// inline loop for latency parity on non-fused callers; both apply the same
+/// checks, limits, and error messages at the same events.
+#[derive(Debug, Default)]
+pub(crate) struct ValidateHandler {
+    depth: usize,
+    root_closed: bool,
+    body_open: bool,
+    body_seen: bool,
+    spreadsheet_seen: bool,
+}
+
+impl ValidateHandler {
+    /// Process one resolved event whose namespace was classified with
+    /// [`is_office_namespace`]; the resolved value borrows the reader
+    /// mutably, so callers classify it immediately after the read exactly as
+    /// the historical loop body did.
+    pub(crate) fn on_event(&mut self, is_office: bool, event: &Event<'_>) -> Result<()> {
+        match event {
+            Event::Start(element) => {
+                if self.depth == 0 {
+                    if self.root_closed {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one root element".to_string(),
+                        ));
+                    }
+                    if !(is_office && element.local_name().as_ref() == b"document-content") {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must be office:document-content".to_string(),
+                        ));
+                    }
+                } else if self.depth == 1 && is_office && element.local_name().as_ref() == b"body" {
+                    if self.body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    self.body_seen = true;
+                    self.body_open = true;
+                } else if is_office && element.local_name().as_ref() == b"body" {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if self.depth == 2
+                    && self.body_open
+                    && is_office
+                    && element.local_name().as_ref() == b"spreadsheet"
+                {
+                    if self.spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    self.spreadsheet_seen = true;
+                } else if is_office && element.local_name().as_ref() == b"spreadsheet" {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+
+                if self.depth == MAX_CONTENT_XML_DEPTH {
+                    return Err(Error::InvalidFormat(format!(
+                        "ODS content.xml nesting exceeds {MAX_CONTENT_XML_DEPTH} elements"
+                    )));
+                }
+                self.depth += 1;
+            },
+            Event::Empty(element) => {
+                if self.depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body and office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+
+                if self.depth == 1 && is_office && element.local_name().as_ref() == b"body" {
+                    if self.body_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:body".to_string(),
+                        ));
+                    }
+                    self.body_seen = true;
+                } else if is_office && element.local_name().as_ref() == b"body" {
+                    return Err(Error::InvalidFormat(
+                        "office:body must be a direct child of office:document-content".to_string(),
+                    ));
+                } else if self.depth == 2
+                    && self.body_open
+                    && is_office
+                    && element.local_name().as_ref() == b"spreadsheet"
+                {
+                    if self.spreadsheet_seen {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml has more than one office:spreadsheet".to_string(),
+                        ));
+                    }
+                    self.spreadsheet_seen = true;
+                } else if is_office && element.local_name().as_ref() == b"spreadsheet" {
+                    return Err(Error::InvalidFormat(
+                        "office:spreadsheet must be a direct child of office:body".to_string(),
+                    ));
+                }
+            },
+            Event::End(element) => {
+                if self.depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has an unexpected closing element".to_string(),
+                    ));
+                }
+
+                if self.depth == 1 {
+                    if !(is_office && element.local_name().as_ref() == b"document-content") {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml root must close with office:document-content"
+                                .to_string(),
+                        ));
+                    }
+                    if self.body_open {
+                        return Err(Error::InvalidFormat(
+                            "ODS content.xml closes its root before office:body".to_string(),
+                        ));
+                    }
+                    self.depth = 0;
+                    self.root_closed = true;
+                } else {
+                    if self.depth == 2
+                        && self.body_open
+                        && is_office
+                        && element.local_name().as_ref() == b"body"
+                    {
+                        self.body_open = false;
+                        if !self.spreadsheet_seen {
+                            return Err(Error::InvalidFormat(
+                                "office:body must contain office:spreadsheet".to_string(),
+                            ));
+                        }
+                    }
+                    self.depth -= 1;
+                }
+            },
+            Event::Text(text) if self.depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::CData(text) if self.depth == 0 && has_non_whitespace(text.as_ref()) => {
+                return Err(Error::InvalidFormat(
+                    "ODS content.xml has non-whitespace text outside its root".to_string(),
+                ));
+            },
+            Event::GeneralRef(reference) => {
+                crate::xml_reference::decode(reference.as_ref()).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS XML character reference: {error}"))
+                })?;
+                if self.depth == 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml has a character reference outside its root".to_string(),
+                    ));
+                }
+            },
+            Event::Eof => {
+                if !self.root_closed || self.depth != 0 {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml ended before its root element was closed".to_string(),
+                    ));
+                }
+                if !self.body_seen || !self.spreadsheet_seen {
+                    return Err(Error::InvalidFormat(
+                        "ODS content.xml must contain office:body with office:spreadsheet"
+                            .to_string(),
+                    ));
+                }
+            },
+            Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::Text(_)
+            | Event::CData(_) => {},
+        }
+        Ok(())
+    }
+
+    /// Every structural check runs mid-stream or at `Event::Eof`, so the
+    /// post-stream finish never fails.
+    pub(crate) fn finish(self) -> Result<()> {
+        Ok(())
+    }
+}
+
+fn empty_content() -> &'static str {
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" office:version="1.3"><office:body><office:spreadsheet/></office:body></office:document-content>"#
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Builder;
+
+    const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+
+    #[test]
+    fn build_accepts_namespace_aliases_and_empty_spreadsheet() {
+        let content = format!(
+            r#"<o:document-content xmlns:o="{OFFICE}"><o:body><o:spreadsheet/></o:body></o:document-content>"#
+        );
+
+        assert!(Builder::new().content_xml(content).build().is_ok());
+    }
+
+    #[test]
+    fn build_rejects_malformed_or_incomplete_ods_content() {
+        let malformed = Builder::new()
+            .content_xml(format!(
+                r#"<office:document-content xmlns:office="{OFFICE}"><office:body>"#
+            ))
+            .build()
+            .expect_err("test operation should fail as asserted")
+            .to_string();
+        assert!(malformed.contains("ended before its root element was closed"));
+
+        let incomplete = Builder::new()
+            .content_xml(format!(
+                r#"<office:document-content xmlns:office="{OFFICE}"><office:body/></office:document-content>"#
+            ))
+            .build()
+            .expect_err("test operation should fail as asserted")
+            .to_string();
+        assert!(incomplete.contains("office:spreadsheet"));
+    }
+}

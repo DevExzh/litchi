@@ -1,0 +1,1275 @@
+//! BIFF8 password-to-open encryption handling.
+
+use super::error::{EncryptionKind, Error, Result};
+use litchi_crypto::legacy_rc4;
+use litchi_crypto::rc4 as office_rc4;
+use litchi_crypto::rc4::{Context, Error as CryptoError, Flags, Header};
+use rand::{TryRng, rngs::SysRng};
+use zeroize::Zeroizing;
+
+const FILEPASS_SID: u16 = 0x002f;
+const WRITEPROTECT_SID: u16 = 0x0086;
+const BOUNDSHEET8_SID: u16 = 0x0085;
+const BINARY_RC4_FILEPASS_LEN: usize = 2 + legacy_rc4::HEADER_LEN;
+const BINARY_RC4_BLOCK_SIZE: usize = 1024;
+const CODEPAGE_SID: u16 = 0x0042;
+const BOF_SID: u16 = 0x0809;
+const EOF_SID: u16 = 0x000a;
+const CRYPTOAPI_RC4_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
+
+/// Password-to-open encryption profiles supported by the BIFF8 reader and
+/// writer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncryptionProfile {
+    /// Legacy BIFF8 XOR obfuscation. Passwords are limited to 15 ANSI characters.
+    XorObfuscation,
+    /// Office 97-2003 binary RC4 with its fixed 40-bit key derivation.
+    OfficeBinaryRc4,
+    /// `CryptoAPI` RC4 with a key length from 40 through 128 bits.
+    CryptoApiRc4 { key_bits: u16 },
+}
+
+/// Caller-owned entropy for one BIFF8 RC4 authoring attempt.
+///
+/// RC4 headers contain a salt and a verifier.  A [`Builder`](crate::Builder)
+/// never obtains those bytes from ambient randomness: pass one entropy token
+/// with [`Builder::set_encryption_entropy`](crate::Builder::set_encryption_entropy)
+/// before building an Office Binary RC4 or CryptoAPI RC4 workbook.  The token
+/// is move-only and is consumed by that attempt, including when the attempt
+/// later fails.  Supplying a fresh token for every distinct plaintext and
+/// password is required; do not reuse a salt with the same password across
+/// different plaintexts.
+///
+/// [`generate`](Self::generate) is the explicit convenience constructor for a
+/// cryptographically random token.  [`from_bytes`](Self::from_bytes) is useful
+/// for deterministic tests and reproducible pipelines, where the caller owns
+/// the risk of selecting unique secret material.
+///
+/// The token intentionally has no `Clone` or `Debug` implementation:
+///
+/// ```compile_fail
+/// use litchi_xls::EncryptionEntropy;
+/// let entropy = EncryptionEntropy::from_bytes([0; 16], [1; 16]);
+/// let _copy = entropy.clone();
+/// ```
+pub struct EncryptionEntropy {
+    salt: Zeroizing<[u8; 16]>,
+    verifier: Zeroizing<[u8; 16]>,
+}
+
+impl EncryptionEntropy {
+    /// Generate fresh salt and verifier bytes using the operating system RNG.
+    ///
+    /// Randomness is obtained only by this explicit constructor; workbook
+    /// building itself never consults an ambient random source.
+    pub fn generate() -> Result<Self> {
+        Ok(Self {
+            salt: random_16("binary RC4 salt")?,
+            verifier: random_16("binary RC4 verifier")?,
+        })
+    }
+
+    /// Construct deterministic entropy from caller-provided bytes.
+    ///
+    /// The token is still consumed after one RC4 build attempt.  Never reuse
+    /// the same salt and password for distinct plaintexts: doing so reuses an
+    /// RC4 keystream and can disclose information about both workbooks.
+    #[must_use]
+    pub fn from_bytes(salt: [u8; 16], verifier: [u8; 16]) -> Self {
+        Self {
+            salt: Zeroizing::new(salt),
+            verifier: Zeroizing::new(verifier),
+        }
+    }
+}
+
+/// Explicit capability required to author legacy BIFF8 XOR obfuscation.
+///
+/// XOR obfuscation is retained for interoperability with legacy documents, not
+/// for confidentiality. It is decode-only by default; construct this policy
+/// at the call site to make an intentional compatibility downgrade visible in
+/// code and diagnostics.
+#[derive(Debug, PartialEq, Eq)]
+#[must_use = "weak encryption must be explicitly passed to Builder::set_xor_obfuscation_password"]
+pub struct WeakEncryptionPolicy {
+    _private: (),
+}
+
+impl WeakEncryptionPolicy {
+    /// Explicitly permit writing legacy BIFF8 XOR obfuscation.
+    pub const fn allow_xor_obfuscation() -> Self {
+        Self { _private: () }
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct WriterEncryption {
+    pub(crate) password: Zeroizing<String>,
+    pub(crate) profile: EncryptionProfile,
+}
+
+pub(crate) fn validate_writer_encryption(password: &str, profile: EncryptionProfile) -> Result<()> {
+    if password.is_empty() {
+        return Err(Error::InvalidData(
+            "password-to-open password cannot be empty".to_string(),
+        ));
+    }
+    match profile {
+        EncryptionProfile::XorObfuscation => {
+            let characters = password.chars().count();
+            if characters > 15 {
+                return Err(Error::InvalidData(
+                    "BIFF8 XOR passwords cannot exceed 15 ANSI characters".to_string(),
+                ));
+            }
+            if password
+                .chars()
+                .any(|character| u32::from(character) > 0xff)
+            {
+                return Err(Error::InvalidData(
+                    "BIFF8 XOR passwords must contain only ANSI characters".to_string(),
+                ));
+            }
+        },
+        EncryptionProfile::OfficeBinaryRc4 | EncryptionProfile::CryptoApiRc4 { .. } => {
+            if password.encode_utf16().count() > 255 {
+                return Err(Error::InvalidData(
+                    "BIFF8 RC4 passwords cannot exceed 255 UTF-16 code units".to_string(),
+                ));
+            }
+        },
+    }
+    if let EncryptionProfile::CryptoApiRc4 { key_bits } = profile
+        && (!(40..=128).contains(&key_bits) || key_bits % 8 != 0)
+    {
+        return Err(Error::InvalidData(
+            "CryptoAPI RC4 key length must be a multiple of 8 from 40 through 128 bits".to_string(),
+        ));
+    }
+    Ok(())
+}
+
+const INITIAL_CODE_ARRAY: [u16; 15] = [
+    0xe1f0, 0x1d0f, 0xcc9c, 0x84c0, 0x110c, 0x0e10, 0xf1ce, 0x313e, 0x1872, 0xe139, 0xd40f, 0x84f9,
+    0x280c, 0xa96a, 0x4ec3,
+];
+
+const PAD_ARRAY: [u8; 15] = [
+    0xbb, 0xff, 0xff, 0xba, 0xff, 0xff, 0xb9, 0x80, 0x00, 0xbe, 0x0f, 0x00, 0xbf, 0x0f, 0x00,
+];
+
+const ENCRYPTION_MATRIX: [[u16; 7]; 15] = [
+    [0xaefc, 0x4dd9, 0x9bb2, 0x2745, 0x4e8a, 0x9d14, 0x2a09],
+    [0x7b61, 0xf6c2, 0xfda5, 0xeb6b, 0xc6f7, 0x9dcf, 0x2bbf],
+    [0x4563, 0x8ac6, 0x05ad, 0x0b5a, 0x16b4, 0x2d68, 0x5ad0],
+    [0x0375, 0x06ea, 0x0dd4, 0x1ba8, 0x3750, 0x6ea0, 0xdd40],
+    [0xd849, 0xa0b3, 0x5147, 0xa28e, 0x553d, 0xaa7a, 0x44d5],
+    [0x6f45, 0xde8a, 0xad35, 0x4a4b, 0x9496, 0x390d, 0x721a],
+    [0xeb23, 0xc667, 0x9cef, 0x29ff, 0x53fe, 0xa7fc, 0x5fd9],
+    [0x47d3, 0x8fa6, 0x0f6d, 0x1eda, 0x3db4, 0x7b68, 0xf6d0],
+    [0xb861, 0x60e3, 0xc1c6, 0x93ad, 0x377b, 0x6ef6, 0xddec],
+    [0x45a0, 0x8b40, 0x06a1, 0x0d42, 0x1a84, 0x3508, 0x6a10],
+    [0xaa51, 0x4483, 0x8906, 0x022d, 0x045a, 0x08b4, 0x1168],
+    [0x76b4, 0xed68, 0xcaf1, 0x85c3, 0x1ba7, 0x374e, 0x6e9c],
+    [0x3730, 0x6e60, 0xdcc0, 0xa9a1, 0x4363, 0x86c6, 0x1dad],
+    [0x3331, 0x6662, 0xccc4, 0x89a9, 0x0373, 0x06e6, 0x0dcc],
+    [0x1021, 0x2042, 0x4084, 0x8108, 0x1231, 0x2462, 0x48c4],
+];
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct XorObfuscation {
+    key: u16,
+    verifier: u16,
+}
+
+enum FilePassRecord {
+    Xor(XorObfuscation),
+    BinaryRc4(legacy_rc4::Header),
+    CryptoApi { header: Header, key_bits: u16 },
+    Unsupported(EncryptionKind),
+}
+
+/// The password-to-open family found in one structurally valid `FILEPASS`
+/// record.  Validation only uses this to report presence and support status;
+/// it never derives a key or decrypts the source.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum FilePassKind {
+    Xor,
+    BinaryRc4,
+    CryptoApi,
+    Unsupported(EncryptionKind),
+}
+
+/// Inspect one `FILEPASS` payload without retaining or decrypting it.
+pub(crate) fn inspect_filepass(data: &[u8]) -> Result<FilePassKind> {
+    match FilePassRecord::parse(data) {
+        Ok(FilePassRecord::Xor(_)) => Ok(FilePassKind::Xor),
+        Ok(FilePassRecord::BinaryRc4(_)) => Ok(FilePassKind::BinaryRc4),
+        Ok(FilePassRecord::CryptoApi { .. }) => Ok(FilePassKind::CryptoApi),
+        Ok(FilePassRecord::Unsupported(kind)) => Ok(FilePassKind::Unsupported(kind)),
+        Err(Error::UnsupportedEncryption(kind)) => Ok(FilePassKind::Unsupported(kind)),
+        Err(error) => Err(error),
+    }
+}
+
+impl FilePassRecord {
+    fn parse(data: &[u8]) -> Result<Self> {
+        if data.len() < 2 {
+            return Err(Error::MalformedFilePass(
+                "missing encryption type".to_string(),
+            ));
+        }
+        let encryption_type = u16::from_le_bytes([data[0], data[1]]);
+        match encryption_type {
+            0 => {
+                if data.len() != 6 {
+                    return Err(Error::MalformedFilePass(format!(
+                        "XOR FILEPASS must contain exactly 6 bytes, found {}",
+                        data.len()
+                    )));
+                }
+                Ok(Self::Xor(XorObfuscation {
+                    key: u16::from_le_bytes([data[2], data[3]]),
+                    verifier: u16::from_le_bytes([data[4], data[5]]),
+                }))
+            },
+            1 => {
+                if data.len() < 6 {
+                    return Err(Error::MalformedFilePass(
+                        "encrypted FILEPASS is missing its version".to_string(),
+                    ));
+                }
+                let major = u16::from_le_bytes([data[2], data[3]]);
+                let minor = u16::from_le_bytes([data[4], data[5]]);
+                if matches!((major, minor), (2..=4, 2)) {
+                    let header =
+                        office_rc4::parse_header(&data[2..]).map_err(map_cryptoapi_header_error)?;
+                    let key_bits = u16::try_from(header.key_bits())
+                        .map_err(|_| Error::UnsupportedEncryption(EncryptionKind::CryptoApi))?;
+                    return Ok(Self::CryptoApi { header, key_bits });
+                }
+                if (major, minor) != (1, 1) {
+                    return Ok(Self::Unsupported(EncryptionKind::CryptoApi));
+                }
+                if data.len() != BINARY_RC4_FILEPASS_LEN {
+                    return Err(Error::MalformedFilePass(format!(
+                        "binary RC4 FILEPASS must contain exactly {BINARY_RC4_FILEPASS_LEN} bytes, found {}",
+                        data.len()
+                    )));
+                }
+                let header =
+                    legacy_rc4::parse_header(&data[2..]).map_err(map_legacy_header_error)?;
+                Ok(Self::BinaryRc4(header))
+            },
+            other => Ok(Self::Unsupported(EncryptionKind::Unknown(other))),
+        }
+    }
+}
+
+enum WorkbookCipher {
+    Xor([u8; 16]),
+    BinaryRc4(legacy_rc4::Context),
+    CryptoApi(Context),
+}
+
+struct WriterEncryptionMaterial {
+    filepass: Vec<u8>,
+    cipher: WorkbookCipher,
+}
+
+fn random_16(field: &str) -> Result<Zeroizing<[u8; 16]>> {
+    let mut value = Zeroizing::new([0u8; 16]);
+    SysRng.try_fill_bytes(value.as_mut()).map_err(|error| {
+        Error::InvalidData(format!("failed to generate BIFF8 {field}: {error}"))
+    })?;
+    Ok(value)
+}
+
+fn prepare_writer_material(
+    encryption: &WriterEncryption,
+    entropy: Option<&EncryptionEntropy>,
+) -> Result<WriterEncryptionMaterial> {
+    validate_writer_encryption(&encryption.password, encryption.profile)?;
+    match encryption.profile {
+        EncryptionProfile::XorObfuscation => {
+            let mut filepass = Vec::with_capacity(6);
+            filepass.extend_from_slice(&0u16.to_le_bytes());
+            filepass.extend_from_slice(&create_xor_key(&encryption.password).to_le_bytes());
+            filepass.extend_from_slice(&create_xor_verifier(&encryption.password).to_le_bytes());
+            Ok(WriterEncryptionMaterial {
+                filepass,
+                cipher: WorkbookCipher::Xor(create_xor_array(&encryption.password)),
+            })
+        },
+        EncryptionProfile::OfficeBinaryRc4 => {
+            let entropy = entropy.ok_or(Error::EncryptionEntropyRequired)?;
+            let (header, context) =
+                legacy_rc4::build_header(&encryption.password, &entropy.salt, &entropy.verifier)
+                    .map_err(map_legacy_runtime_error)?;
+
+            let mut filepass = Vec::with_capacity(BINARY_RC4_FILEPASS_LEN);
+            filepass.extend_from_slice(&1u16.to_le_bytes());
+            filepass.extend_from_slice(&header);
+            Ok(WriterEncryptionMaterial {
+                filepass,
+                cipher: WorkbookCipher::BinaryRc4(context),
+            })
+        },
+        EncryptionProfile::CryptoApiRc4 { key_bits } => {
+            let entropy = entropy.ok_or(Error::EncryptionEntropyRequired)?;
+            let (header, context) = office_rc4::build_header(
+                &encryption.password,
+                usize::from(key_bits),
+                Flags::CRYPTO_API,
+                CRYPTOAPI_RC4_PROVIDER,
+                &entropy.salt,
+                &entropy.verifier,
+            )
+            .map_err(map_cryptoapi_runtime_error)?;
+            let mut filepass = Vec::with_capacity(2 + header.len());
+            filepass.extend_from_slice(&1u16.to_le_bytes());
+            filepass.extend_from_slice(&header);
+            Ok(WriterEncryptionMaterial {
+                filepass,
+                cipher: WorkbookCipher::CryptoApi(context),
+            })
+        },
+    }
+}
+
+struct ClearWorkbookPlan {
+    filepass_offset: usize,
+    boundsheet_payloads: Vec<usize>,
+}
+
+/// Where FILEPASS will be inserted into a generated workbook-globals
+/// substream: directly after its BOF, or after the one WRITEPROTECT that
+/// directly follows the BOF.
+///
+/// ```text
+/// Unopened --globals BOF--> Open { after_writeprotect: false }
+/// Open { after_writeprotect: false } --WRITEPROTECT--> Open { after_writeprotect: true }
+/// Open { .. } --any other globals record--> Closed
+/// ```
+///
+/// A second WRITEPROTECT in `Open { after_writeprotect: true }` is refused.
+/// `offset` is the byte position right after the last record of the slot.
+/// A stream that never leaves `Unopened` has no BOF.
+#[derive(Clone, Copy)]
+enum FilepassSlotState {
+    Unopened,
+    Open {
+        offset: usize,
+        after_writeprotect: bool,
+    },
+    Closed {
+        offset: usize,
+    },
+}
+
+fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
+    let mut position = 0usize;
+    let mut record_positions = std::collections::HashSet::new();
+    let mut boundsheet_payloads = Vec::new();
+    let mut filepass_slot = FilepassSlotState::Unopened;
+    let mut codepage_seen = false;
+    let mut globals_eof = None;
+    let mut saw_filepass = false;
+
+    while position < workbook.len() {
+        let header_end = position
+            .checked_add(4)
+            .ok_or_else(|| Error::InvalidData("BIFF record header offset overflow".to_string()))?;
+        if header_end > workbook.len() {
+            return Err(Error::InvalidData(
+                "truncated BIFF record header in generated Workbook stream".to_string(),
+            ));
+        }
+        record_positions.insert(position);
+        let sid = u16::from_le_bytes([workbook[position], workbook[position + 1]]);
+        let data_len = usize::from(u16::from_le_bytes([
+            workbook[position + 2],
+            workbook[position + 3],
+        ]));
+        let record_end = header_end
+            .checked_add(data_len)
+            .ok_or_else(|| Error::InvalidData("BIFF record length overflow".to_string()))?;
+        if record_end > workbook.len() {
+            return Err(Error::InvalidData(format!(
+                "generated BIFF record 0x{sid:04x} extends beyond the Workbook stream"
+            )));
+        }
+        let in_globals = globals_eof.is_none();
+        if position == 0 {
+            if sid != BOF_SID
+                || data_len < 4
+                || workbook[header_end + 2..header_end + 4] != 0x0005u16.to_le_bytes()
+            {
+                return Err(Error::InvalidData(
+                    "generated Workbook stream does not begin with a workbook-globals BOF"
+                        .to_string(),
+                ));
+            }
+            filepass_slot = FilepassSlotState::Open {
+                offset: record_end,
+                after_writeprotect: false,
+            };
+        } else if sid == FILEPASS_SID {
+            saw_filepass = true;
+        }
+        if in_globals && position != 0 {
+            match filepass_slot {
+                FilepassSlotState::Open {
+                    offset,
+                    after_writeprotect,
+                } => {
+                    if sid == WRITEPROTECT_SID {
+                        if after_writeprotect {
+                            return Err(Error::InvalidData(
+                                "generated workbook globals contain duplicate WRITEPROTECT records"
+                                    .to_string(),
+                            ));
+                        }
+                        filepass_slot = FilepassSlotState::Open {
+                            offset: record_end,
+                            after_writeprotect: true,
+                        };
+                    } else {
+                        filepass_slot = FilepassSlotState::Closed { offset };
+                    }
+                },
+                FilepassSlotState::Unopened | FilepassSlotState::Closed { .. } => {},
+            }
+        }
+        if in_globals && sid == CODEPAGE_SID {
+            if codepage_seen {
+                return Err(Error::InvalidData(
+                    "generated workbook globals contain duplicate CODEPAGE records".to_string(),
+                ));
+            }
+            codepage_seen = true;
+        }
+        if in_globals && sid == BOUNDSHEET8_SID {
+            if data_len < 4 {
+                return Err(Error::InvalidData(
+                    "generated BOUNDSHEET8 record is truncated".to_string(),
+                ));
+            }
+            boundsheet_payloads.push(header_end);
+        }
+        if in_globals && sid == EOF_SID {
+            globals_eof = Some(record_end);
+        }
+        position = record_end;
+    }
+    if saw_filepass {
+        return Err(Error::MalformedFilePass(
+            "generated Workbook stream already contains FILEPASS".to_string(),
+        ));
+    }
+    let filepass_offset = match filepass_slot {
+        FilepassSlotState::Unopened => {
+            return Err(Error::InvalidData(
+                "generated Workbook stream is missing its BOF".to_string(),
+            ));
+        },
+        FilepassSlotState::Open { offset, .. } | FilepassSlotState::Closed { offset } => offset,
+    };
+    let globals_eof = globals_eof.ok_or_else(|| {
+        Error::InvalidData("generated workbook globals are missing EOF".to_string())
+    })?;
+    if !codepage_seen {
+        return Err(Error::InvalidData(
+            "generated workbook globals are missing CODEPAGE".to_string(),
+        ));
+    }
+    if filepass_offset >= globals_eof {
+        return Err(Error::InvalidData(
+            "generated FILEPASS slot is outside workbook globals".to_string(),
+        ));
+    }
+    for &payload in &boundsheet_payloads {
+        let target =
+            u32::from_le_bytes(workbook[payload..payload + 4].try_into().unwrap()) as usize;
+        if target < globals_eof || !record_positions.contains(&target) {
+            return Err(Error::InvalidData(
+                "BOUNDSHEET8 references an invalid substream offset".to_string(),
+            ));
+        }
+        if u16::from_le_bytes([workbook[target], workbook[target + 1]]) != BOF_SID {
+            return Err(Error::InvalidData(
+                "BOUNDSHEET8 does not reference a BOF record".to_string(),
+            ));
+        }
+    }
+    Ok(ClearWorkbookPlan {
+        filepass_offset,
+        boundsheet_payloads,
+    })
+}
+
+/// Insert FILEPASS into a completely generated clear Workbook stream and encrypt it.
+pub(crate) fn encrypt_workbook_for_write(
+    mut workbook: Vec<u8>,
+    encryption: &WriterEncryption,
+    entropy: Option<&EncryptionEntropy>,
+) -> Result<Vec<u8>> {
+    let plan = inspect_clear_workbook(&workbook)?;
+    let mut material = prepare_writer_material(encryption, entropy)?;
+    let filepass_len = u16::try_from(material.filepass.len()).map_err(|_error| {
+        Error::InvalidData("FILEPASS payload exceeds the BIFF8 record limit".to_string())
+    })?;
+    let shift = material
+        .filepass
+        .len()
+        .checked_add(4)
+        .ok_or_else(|| Error::InvalidData("FILEPASS record size overflow".to_string()))?;
+    for payload in plan.boundsheet_payloads {
+        let target = u32::from_le_bytes(workbook[payload..payload + 4].try_into().unwrap());
+        let shifted = target
+            .checked_add(u32::try_from(shift).map_err(|_error| {
+                Error::InvalidData("FILEPASS record size exceeds u32".to_string())
+            })?)
+            .ok_or_else(|| Error::InvalidData("BOUNDSHEET8 offset overflow".to_string()))?;
+        workbook[payload..payload + 4].copy_from_slice(&shifted.to_le_bytes());
+    }
+    let mut record = Vec::with_capacity(shift);
+    record.extend_from_slice(&FILEPASS_SID.to_le_bytes());
+    record.extend_from_slice(&filepass_len.to_le_bytes());
+    record.append(&mut material.filepass);
+    workbook.splice(plan.filepass_offset..plan.filepass_offset, record);
+
+    let mut position = 0usize;
+    let mut saw_filepass = false;
+    while position < workbook.len() {
+        let header_end = position + 4;
+        let sid = u16::from_le_bytes([workbook[position], workbook[position + 1]]);
+        let data_len = usize::from(u16::from_le_bytes([
+            workbook[position + 2],
+            workbook[position + 3],
+        ]));
+        let record_end = header_end.checked_add(data_len).ok_or_else(|| {
+            Error::InvalidData("encrypted BIFF record length overflow".to_string())
+        })?;
+        if record_end > workbook.len() {
+            return Err(Error::InvalidData(
+                "encrypted BIFF traversal exceeded the Workbook stream".to_string(),
+            ));
+        }
+        if sid == FILEPASS_SID {
+            if saw_filepass {
+                return Err(Error::MalformedFilePass(
+                    "multiple FILEPASS records".to_string(),
+                ));
+            }
+            saw_filepass = true;
+        } else if saw_filepass {
+            let clear_prefix = if is_never_encrypted_record(sid) {
+                data_len
+            } else if sid == BOUNDSHEET8_SID {
+                data_len.min(4)
+            } else {
+                0
+            };
+            match &mut material.cipher {
+                WorkbookCipher::Xor(array) => {
+                    for index in clear_prefix..data_len {
+                        let absolute = header_end + index;
+                        let array_index = (record_end + index) & 0x0f;
+                        workbook[absolute] =
+                            (workbook[absolute] ^ array[array_index]).rotate_right(3);
+                    }
+                },
+                WorkbookCipher::BinaryRc4(stream) => {
+                    let encrypted_start = header_end + clear_prefix;
+                    legacy_rc4::apply_at(
+                        stream,
+                        BINARY_RC4_BLOCK_SIZE,
+                        encrypted_start,
+                        &mut workbook[encrypted_start..record_end],
+                    )
+                    .map_err(map_legacy_runtime_error)?;
+                },
+                WorkbookCipher::CryptoApi(context) => {
+                    let encrypted_start = header_end + clear_prefix;
+                    apply_cryptoapi_at(
+                        &mut workbook[encrypted_start..record_end],
+                        encrypted_start,
+                        context,
+                    )?;
+                },
+            }
+        }
+        position = record_end;
+    }
+    if !saw_filepass {
+        return Err(Error::InvalidData("FILEPASS insertion failed".to_string()));
+    }
+    Ok(workbook)
+}
+
+/// Validate `FILEPASS` and decrypt eligible BIFF8 record payloads in place.
+#[cfg(test)]
+pub(crate) fn prepare_workbook_stream(
+    workbook: Vec<u8>,
+    password: Option<&str>,
+) -> Result<Vec<u8>> {
+    prepare_workbook_stream_with_state(workbook, password).map(|(workbook, _)| workbook)
+}
+
+/// Validate/decrypt a Workbook stream and retain the exact profile selected by
+/// its `FILEPASS` record. The state is returned with the transformed bytes so
+/// an eager owner can carry it into a package publication guard and encryption
+/// projection without rescanning the BIFF payload.
+pub(crate) fn prepare_workbook_stream_with_state(
+    mut workbook: Vec<u8>,
+    password: Option<&str>,
+) -> Result<(Vec<u8>, Option<EncryptionProfile>)> {
+    let mut position = 0usize;
+    let mut cipher = None;
+    let mut saw_filepass = false;
+    let mut encryption = None;
+
+    while position < workbook.len() {
+        let header_end = position.checked_add(4).ok_or_else(|| {
+            Error::UnexpectedEndOfStream("BIFF record header offset overflow".to_string())
+        })?;
+        if header_end > workbook.len() {
+            return Err(Error::UnexpectedEndOfStream(
+                "truncated BIFF record header".to_string(),
+            ));
+        }
+        let sid = u16::from_le_bytes([workbook[position], workbook[position + 1]]);
+        let data_len =
+            u16::from_le_bytes([workbook[position + 2], workbook[position + 3]]) as usize;
+        let record_end = header_end.checked_add(data_len).ok_or_else(|| {
+            Error::UnexpectedEndOfStream("BIFF record length overflow".to_string())
+        })?;
+        if record_end > workbook.len() {
+            return Err(Error::UnexpectedEndOfStream(format!(
+                "record 0x{sid:04x} extends beyond the Workbook stream"
+            )));
+        }
+
+        // FILEPASS is a workbook-globals record. Once the globals EOF is
+        // reached without one, worksheet substreams and trailing OLE padding
+        // cannot change the workbook's encryption state.
+        if sid == 0x000A && !saw_filepass {
+            return Ok((workbook, None));
+        }
+
+        if sid == FILEPASS_SID {
+            if saw_filepass {
+                return Err(Error::MalformedFilePass(
+                    "multiple FILEPASS records".to_string(),
+                ));
+            }
+            saw_filepass = true;
+            match FilePassRecord::parse(&workbook[header_end..record_end])? {
+                FilePassRecord::Xor(obfuscation) => {
+                    let password = password.ok_or(Error::PasswordRequired)?;
+                    if create_xor_key(password) != obfuscation.key
+                        || create_xor_verifier(password) != obfuscation.verifier
+                    {
+                        return Err(Error::InvalidPassword);
+                    }
+                    cipher = Some(WorkbookCipher::Xor(create_xor_array(password)));
+                    encryption = Some(EncryptionProfile::XorObfuscation);
+                },
+                FilePassRecord::BinaryRc4(filepass) => {
+                    let password = password.ok_or(Error::PasswordRequired)?;
+                    let context = legacy_rc4::verify(&filepass, password)
+                        .map_err(map_legacy_runtime_error)?
+                        .ok_or(Error::InvalidPassword)?;
+                    cipher = Some(WorkbookCipher::BinaryRc4(context));
+                    encryption = Some(EncryptionProfile::OfficeBinaryRc4);
+                },
+                FilePassRecord::CryptoApi { header, key_bits } => {
+                    let password = password.ok_or(Error::PasswordRequired)?;
+                    let context = office_rc4::verify(&header, password)
+                        .map_err(map_cryptoapi_runtime_error)?
+                        .ok_or(Error::InvalidPassword)?;
+                    cipher = Some(WorkbookCipher::CryptoApi(context));
+                    encryption = Some(EncryptionProfile::CryptoApiRc4 { key_bits });
+                },
+                FilePassRecord::Unsupported(kind) => {
+                    return Err(Error::UnsupportedEncryption(kind));
+                },
+            }
+        } else if let Some(active_cipher) = cipher.as_mut() {
+            let clear_prefix = if is_never_encrypted_record(sid) {
+                data_len
+            } else if sid == BOUNDSHEET8_SID {
+                data_len.min(4)
+            } else {
+                0
+            };
+            match active_cipher {
+                WorkbookCipher::Xor(array) => {
+                    for index in clear_prefix..data_len {
+                        let absolute = header_end + index;
+                        let array_index = (record_end + index) & 0x0f;
+                        workbook[absolute] = workbook[absolute].rotate_left(3) ^ array[array_index];
+                    }
+                },
+                WorkbookCipher::BinaryRc4(stream) => {
+                    let encrypted_start = header_end + clear_prefix;
+                    legacy_rc4::apply_at(
+                        stream,
+                        BINARY_RC4_BLOCK_SIZE,
+                        encrypted_start,
+                        &mut workbook[encrypted_start..record_end],
+                    )
+                    .map_err(map_legacy_runtime_error)?;
+                },
+                WorkbookCipher::CryptoApi(context) => {
+                    let encrypted_start = header_end + clear_prefix;
+                    apply_cryptoapi_at(
+                        &mut workbook[encrypted_start..record_end],
+                        encrypted_start,
+                        context,
+                    )?;
+                },
+            }
+        }
+
+        position = record_end;
+    }
+
+    Ok((workbook, encryption))
+}
+
+fn map_cryptoapi_header_error(error: CryptoError) -> Error {
+    match error {
+        CryptoError::Malformed(message) => Error::MalformedFilePass(message),
+        CryptoError::UnsupportedVersion { .. } | CryptoError::UnsupportedAlgorithm => {
+            Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
+        },
+        _ => Error::MalformedFilePass("CryptoAPI RC4 error".to_string()),
+    }
+}
+
+fn map_cryptoapi_runtime_error(error: CryptoError) -> Error {
+    match error {
+        CryptoError::Malformed(message) => Error::InvalidData(message),
+        CryptoError::UnsupportedVersion { .. } | CryptoError::UnsupportedAlgorithm => {
+            Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
+        },
+        _ => Error::InvalidData("CryptoAPI RC4 error".to_string()),
+    }
+}
+
+fn map_legacy_header_error(error: legacy_rc4::Error) -> Error {
+    match error {
+        legacy_rc4::Error::Malformed(message) => Error::MalformedFilePass(message),
+        legacy_rc4::Error::PasswordTooLong { units } => Error::MalformedFilePass(format!(
+            "legacy RC4 password contains {units} UTF-16 code units; maximum is 255"
+        )),
+        legacy_rc4::Error::UnsupportedVersion { .. } => {
+            Error::UnsupportedEncryption(EncryptionKind::BinaryRc4)
+        },
+        legacy_rc4::Error::InvalidBlockSize { size } => Error::MalformedFilePass(format!(
+            "legacy RC4 block size {size} is outside the bounded range"
+        )),
+        legacy_rc4::Error::StreamRangeOverflow => {
+            Error::MalformedFilePass("legacy RC4 stream range overflow".to_string())
+        },
+        _ => Error::MalformedFilePass("legacy RC4 error".to_string()),
+    }
+}
+
+fn map_legacy_runtime_error(error: legacy_rc4::Error) -> Error {
+    match error {
+        legacy_rc4::Error::Malformed(message) => Error::InvalidData(message),
+        legacy_rc4::Error::PasswordTooLong { units } => Error::InvalidData(format!(
+            "legacy RC4 password contains {units} UTF-16 code units; maximum is 255"
+        )),
+        legacy_rc4::Error::UnsupportedVersion { .. } => {
+            Error::UnsupportedEncryption(EncryptionKind::BinaryRc4)
+        },
+        legacy_rc4::Error::InvalidBlockSize { .. } | legacy_rc4::Error::StreamRangeOverflow => {
+            Error::InvalidData(error.to_string())
+        },
+        _ => Error::InvalidData("legacy RC4 error".to_string()),
+    }
+}
+
+fn apply_cryptoapi_at(mut data: &mut [u8], mut absolute: usize, context: &Context) -> Result<()> {
+    while !data.is_empty() {
+        let block = u32::try_from(absolute / BINARY_RC4_BLOCK_SIZE).map_err(|_error| {
+            Error::InvalidData("Workbook stream is too large for CryptoAPI RC4".to_string())
+        })?;
+        let block_offset = absolute % BINARY_RC4_BLOCK_SIZE;
+        let count = data
+            .len()
+            .min(BINARY_RC4_BLOCK_SIZE.saturating_sub(block_offset));
+        office_rc4::apply_at(context, block, block_offset, &mut data[..count])
+            .map_err(map_cryptoapi_runtime_error)?;
+        absolute = absolute.checked_add(count).ok_or_else(|| {
+            Error::InvalidData("Workbook CryptoAPI stream offset overflow".to_string())
+        })?;
+        data = &mut data[count..];
+    }
+    Ok(())
+}
+
+fn is_never_encrypted_record(sid: u16) -> bool {
+    matches!(
+        sid,
+        0x0809 // BOF
+            | 0x002f // FILEPASS
+            | 0x0194 // UsrExcl
+            | 0x0195 // FileLock
+            | 0x00e1 // InterfaceHdr
+            | 0x0196 // RRDInfo
+            | 0x0138 // RRDHead
+    )
+}
+
+fn password_bytes(password: &str) -> Vec<u8> {
+    password
+        .encode_utf16()
+        .take(15)
+        .map(|unit| {
+            let low = crate::utils::truncate_u16_to_u8(unit);
+            if low == 0 { (unit >> 8) as u8 } else { low }
+        })
+        .collect()
+}
+
+fn rotate_left_base15(value: u16) -> u16 {
+    ((value << 1) & 0x7fff) | ((value >> 14) & 1)
+}
+
+fn create_xor_verifier(password: &str) -> u16 {
+    let bytes = password_bytes(password);
+    if bytes.is_empty() {
+        return 0;
+    }
+    let mut verifier = 0u16;
+    for byte in bytes.iter().rev() {
+        verifier = rotate_left_base15(verifier) ^ u16::from(*byte);
+    }
+    rotate_left_base15(verifier) ^ crate::utils::truncate_usize_to_u16(bytes.len()) ^ 0xce4b
+}
+
+fn create_xor_key(password: &str) -> u16 {
+    let bytes = password_bytes(password);
+    if bytes.is_empty() {
+        return 0;
+    }
+    let mut key = INITIAL_CODE_ARRAY[bytes.len() - 1];
+    for (matrix_line, mut byte) in (15 - bytes.len()..).zip(bytes) {
+        for matrix_value in ENCRYPTION_MATRIX[matrix_line] {
+            if byte & 1 != 0 {
+                key ^= matrix_value;
+            }
+            byte >>= 1;
+        }
+    }
+    key
+}
+
+fn create_xor_array(password: &str) -> [u8; 16] {
+    let bytes = password_bytes(password);
+    let mut array = [0u8; 16];
+    array[..bytes.len()].copy_from_slice(&bytes);
+    let padding_len = if bytes.is_empty() {
+        15
+    } else {
+        16 - bytes.len()
+    };
+    array[bytes.len()..bytes.len() + padding_len].copy_from_slice(&PAD_ARRAY[..padding_len]);
+
+    let key = create_xor_key(password).to_le_bytes();
+    for (index, byte) in array.iter_mut().enumerate() {
+        *byte = (*byte ^ key[index & 1]).rotate_left(2);
+    }
+    array
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{OpenOptions, raw::Reader};
+    use litchi_core::sheet::{Cell, CellValue};
+
+    fn poi_fixture(name: &str) -> std::path::PathBuf {
+        std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/poi/test-data/spreadsheet")
+            .join(name)
+    }
+
+    fn append_record(stream: &mut Vec<u8>, sid: u16, data: &[u8]) {
+        stream.extend_from_slice(&sid.to_le_bytes());
+        stream.extend_from_slice(&(data.len() as u16).to_le_bytes());
+        stream.extend_from_slice(data);
+    }
+
+    fn binary_rc4_filepass(
+        salt: [u8; 16],
+        encrypted_verifier: [u8; 16],
+        encrypted_verifier_hash: [u8; 16],
+    ) -> Vec<u8> {
+        let mut data = vec![1, 0, 1, 0, 1, 0];
+        data.extend_from_slice(&salt);
+        data.extend_from_slice(&encrypted_verifier);
+        data.extend_from_slice(&encrypted_verifier_hash);
+        data
+    }
+
+    fn cryptoapi_filepass(major: u16, key_bits: u32) -> Vec<u8> {
+        let mut data = vec![1, 0];
+        data.extend_from_slice(&major.to_le_bytes());
+        data.extend_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(&4u32.to_le_bytes());
+        data.extend_from_slice(&32u32.to_le_bytes());
+        data.extend_from_slice(&4u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&0x6801u32.to_le_bytes());
+        data.extend_from_slice(&0x8004u32.to_le_bytes());
+        data.extend_from_slice(&key_bits.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&16u32.to_le_bytes());
+        data.extend_from_slice(&[0x11; 16]);
+        data.extend_from_slice(&[0x22; 16]);
+        data.extend_from_slice(&20u32.to_le_bytes());
+        data.extend_from_slice(&[0x33; 20]);
+        data
+    }
+
+    fn encrypt_payload(data: &mut [u8], record_end: usize, clear_prefix: usize, array: &[u8; 16]) {
+        for index in clear_prefix..data.len() {
+            data[index] = (data[index] ^ array[(record_end + index) & 0x0f]).rotate_right(3);
+        }
+    }
+
+    #[test]
+    fn method_one_vectors_match_apache_poi() {
+        assert_eq!(create_xor_key("abc"), 20_810);
+        assert_eq!(create_xor_verifier("abc"), 52_250);
+        assert_eq!(
+            create_xor_array("abc"),
+            [
+                0xac, 0xcc, 0xa4, 0xab, 0xd6, 0xba, 0xc3, 0xba, 0xd6, 0xa3, 0x2b, 0x45, 0xd3, 0x79,
+                0x29, 0xbb,
+            ]
+        );
+    }
+
+    #[test]
+    fn validates_filepass_structure_and_password() {
+        assert!(matches!(
+            FilePassRecord::parse(&[0]),
+            Err(Error::MalformedFilePass(_))
+        ));
+        assert!(matches!(
+            FilePassRecord::parse(&[0, 0, 1, 2]),
+            Err(Error::MalformedFilePass(_))
+        ));
+
+        let mut stream = Vec::new();
+        append_record(&mut stream, FILEPASS_SID, &[0, 0, 0x4a, 0x51, 0x1a, 0xcc]);
+        assert!(matches!(
+            prepare_workbook_stream(stream.clone(), None),
+            Err(Error::PasswordRequired)
+        ));
+        assert!(matches!(
+            prepare_workbook_stream(stream, Some("wrong")),
+            Err(Error::InvalidPassword)
+        ));
+    }
+
+    #[test]
+    fn decrypts_payloads_with_clear_record_exceptions() {
+        let array = create_xor_array("abc");
+        let mut stream = Vec::new();
+        append_record(&mut stream, FILEPASS_SID, &[0, 0, 0x4a, 0x51, 0x1a, 0xcc]);
+
+        let expected = b"encrypted payload".to_vec();
+        let mut encrypted = expected.clone();
+        let record_end = stream.len() + 4 + encrypted.len();
+        encrypt_payload(&mut encrypted, record_end, 0, &array);
+        append_record(&mut stream, 0x1234, &encrypted);
+
+        let mut bound_sheet = vec![4, 3, 2, 1, 9, 8, 7, 6];
+        let expected_bound_sheet = bound_sheet.clone();
+        let record_end = stream.len() + 4 + bound_sheet.len();
+        encrypt_payload(&mut bound_sheet, record_end, 4, &array);
+        append_record(&mut stream, BOUNDSHEET8_SID, &bound_sheet);
+
+        let decrypted = prepare_workbook_stream(stream, Some("abc")).unwrap();
+        let first_data = 10 + 4;
+        assert_eq!(
+            &decrypted[first_data..first_data + expected.len()],
+            expected
+        );
+        let bound_data = first_data + expected.len() + 4;
+        assert_eq!(
+            &decrypted[bound_data..bound_data + expected_bound_sheet.len()],
+            expected_bound_sheet
+        );
+    }
+
+    #[test]
+    fn validates_cryptoapi_filepass_headers() {
+        for (major, key_bits) in [(2, 40), (3, 56), (4, 120), (4, 128)] {
+            assert!(matches!(
+                FilePassRecord::parse(&cryptoapi_filepass(major, key_bits)),
+                Ok(FilePassRecord::CryptoApi { .. })
+            ));
+        }
+
+        let mut truncated = cryptoapi_filepass(4, 128);
+        truncated.pop();
+        assert!(matches!(
+            FilePassRecord::parse(&truncated),
+            Err(Error::MalformedFilePass(_))
+        ));
+
+        let mut trailing = cryptoapi_filepass(4, 128);
+        trailing.push(0);
+        assert!(matches!(
+            FilePassRecord::parse(&trailing),
+            Err(Error::MalformedFilePass(_))
+        ));
+
+        let mut unsupported = cryptoapi_filepass(4, 128);
+        unsupported[22..26].copy_from_slice(&0x660eu32.to_le_bytes());
+        assert!(matches!(
+            FilePassRecord::parse(&unsupported),
+            Err(Error::UnsupportedEncryption(EncryptionKind::CryptoApi))
+        ));
+    }
+
+    #[test]
+    fn cryptoapi_cursor_handles_key_sizes_clear_gaps_and_block_boundaries() {
+        for key_bits in [40, 56, 120, 128] {
+            let context = office_rc4::context("cursor-test", &[0x5a; 16], key_bits).unwrap();
+            let original = vec![0xa5; 80];
+            let mut encrypted = original.clone();
+            apply_cryptoapi_at(&mut encrypted, 1000, &context).unwrap();
+            assert_ne!(encrypted, original);
+            apply_cryptoapi_at(&mut encrypted, 1000, &context).unwrap();
+            assert_eq!(encrypted, original);
+
+            let mut first = vec![0x11; 12];
+            let mut second = vec![0x22; 12];
+            apply_cryptoapi_at(&mut first, 1010, &context).unwrap();
+            apply_cryptoapi_at(&mut second, 1040, &context).unwrap();
+            apply_cryptoapi_at(&mut first, 1010, &context).unwrap();
+            apply_cryptoapi_at(&mut second, 1040, &context).unwrap();
+            assert_eq!(first, vec![0x11; 12]);
+            assert_eq!(second, vec![0x22; 12]);
+        }
+    }
+
+    #[test]
+    fn opens_apache_poi_cryptoapi_workbook() {
+        let path = poi_fixture("35897-type4.xls");
+        let open = |password| {
+            Reader::new_with_options(
+                std::fs::File::open(&path).unwrap(),
+                OpenOptions::new().password(password),
+            )
+        };
+        assert!(matches!(open(None), Err(Error::PasswordRequired)));
+        assert!(matches!(open(Some("wrong")), Err(Error::InvalidPassword)));
+        open(Some("freedom")).unwrap();
+    }
+
+    #[test]
+    fn binary_rc4_verifier_uses_one_continuous_cipher() {
+        let filepass = binary_rc4_filepass(
+            [
+                0xdf, 0x35, 0x52, 0x38, 0x0d, 0x75, 0x4a, 0xe6, 0x85, 0xc2, 0xfd, 0x78, 0xce, 0x3d,
+                0xd1, 0xb6,
+            ],
+            [
+                0xd4, 0x04, 0x43, 0xec, 0xb7, 0xa7, 0x6f, 0x6a, 0xd2, 0x68, 0xc7, 0xdf, 0xcf, 0xa8,
+                0x80, 0x68,
+            ],
+            [
+                0x8d, 0xc2, 0x63, 0xcc, 0xe1, 0x1d, 0xe0, 0x05, 0x20, 0x16, 0x96, 0xaf, 0x48, 0x59,
+                0x94, 0x64,
+            ],
+        );
+        let header = legacy_rc4::parse_header(&filepass[2..]).unwrap();
+        assert!(legacy_rc4::verify(&header, "5ecret").unwrap().is_some());
+        assert!(legacy_rc4::verify(&header, "Secret").unwrap().is_none());
+    }
+
+    #[test]
+    fn binary_rc4_filepass_length_is_exact() {
+        let valid = binary_rc4_filepass([0; 16], [0; 16], [0; 16]);
+        assert!(matches!(
+            FilePassRecord::parse(&valid),
+            Ok(FilePassRecord::BinaryRc4(_))
+        ));
+        for length in [53, 55] {
+            let mut malformed = valid.clone();
+            malformed.resize(length, 0);
+            assert!(matches!(
+                FilePassRecord::parse(&malformed),
+                Err(Error::MalformedFilePass(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn binary_rc4_cursor_handles_clear_gaps_and_block_boundaries() {
+        let (_, encoder_context) =
+            legacy_rc4::build_header("cursor", &[0x31; 16], &[0x72; 16]).unwrap();
+        let (_, decoder_context) =
+            legacy_rc4::build_header("cursor", &[0x31; 16], &[0x72; 16]).unwrap();
+        let plaintext = vec![0x5a; 80];
+        let mut encrypted = plaintext.clone();
+        legacy_rc4::apply_at(
+            &encoder_context,
+            BINARY_RC4_BLOCK_SIZE,
+            1000,
+            &mut encrypted,
+        )
+        .unwrap();
+        assert_ne!(encrypted, plaintext);
+        legacy_rc4::apply_at(
+            &decoder_context,
+            BINARY_RC4_BLOCK_SIZE,
+            1000,
+            &mut encrypted,
+        )
+        .unwrap();
+        assert_eq!(encrypted, plaintext);
+
+        let mut first = vec![0x11; 12];
+        let mut second = vec![0x22; 12];
+        let (_, encoder) = legacy_rc4::build_header("ranges", &[0x11; 16], &[0x22; 16]).unwrap();
+        let (_, decoder) = legacy_rc4::build_header("ranges", &[0x11; 16], &[0x22; 16]).unwrap();
+        legacy_rc4::apply_at(&encoder, BINARY_RC4_BLOCK_SIZE, 1010, &mut first).unwrap();
+        legacy_rc4::apply_at(&encoder, BINARY_RC4_BLOCK_SIZE, 1040, &mut second).unwrap();
+        legacy_rc4::apply_at(&decoder, BINARY_RC4_BLOCK_SIZE, 1010, &mut first).unwrap();
+        legacy_rc4::apply_at(&decoder, BINARY_RC4_BLOCK_SIZE, 1040, &mut second).unwrap();
+        assert_eq!(first, vec![0x11; 12]);
+        assert_eq!(second, vec![0x22; 12]);
+    }
+
+    #[test]
+    fn opens_apache_poi_xor_encrypted_workbook() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls");
+        let file = std::fs::File::open(path).unwrap();
+        let workbook = Reader::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
+        let cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 0).unwrap();
+        assert!(matches!(cell.value(), CellValue::Float(value) if *value == 1.0));
+    }
+
+    #[test]
+    fn opens_apache_poi_binary_rc4_workbook() {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/xls/password.xls");
+        let wrong_password_file = std::fs::File::open(&path).unwrap();
+        assert!(matches!(
+            Reader::new_with_options(wrong_password_file, OpenOptions::new().password("wrong"),),
+            Err(Error::InvalidPassword)
+        ));
+        let file = std::fs::File::open(path).unwrap();
+        let workbook =
+            Reader::new_with_options(file, OpenOptions::new().password("password")).unwrap();
+        let worksheet = workbook.xls_worksheet(0).unwrap();
+        let found = (0..128).any(|row| {
+            (0..32).any(|column| {
+                matches!(
+                    worksheet.get_cell(row, column).map(Cell::value),
+                    Some(CellValue::String(value)) if value.contains("ZIP bomb")
+                )
+            })
+        });
+        assert!(
+            found,
+            "expected decrypted ZIP-bomb text in the first worksheet"
+        );
+    }
+}
+
+#[cfg(test)]
+mod filepass_slot_tests {
+    use super::*;
+
+    /// Builds a generated Workbook stream from one record per letter: `B` the
+    /// globals BOF (`b` one of the wrong substream type), `W` WRITEPROTECT,
+    /// `C` CODEPAGE, `F` FILEPASS, `E` EOF and `O` an unrelated record. The
+    /// answer is the FILEPASS insertion offset the scan chose, or its error.
+    fn outcome(letters: &str) -> String {
+        let mut stream = Vec::new();
+        for letter in letters.chars() {
+            let (sid, data): (u16, &[u8]) = match letter {
+                'B' => (BOF_SID, &[0x00, 0x06, 0x05, 0x00]),
+                'b' => (BOF_SID, &[0x00, 0x06, 0x10, 0x00]),
+                'W' => (WRITEPROTECT_SID, &[]),
+                'C' => (CODEPAGE_SID, &[0xb0, 0x04]),
+                'F' => (FILEPASS_SID, &[0, 0]),
+                'E' => (EOF_SID, &[]),
+                'O' => (0x0018, &[1]),
+                other => panic!("unknown test record letter {other}"),
+            };
+            stream.extend_from_slice(&sid.to_le_bytes());
+            stream.extend_from_slice(&(data.len() as u16).to_le_bytes());
+            stream.extend_from_slice(data);
+        }
+        match inspect_clear_workbook(&stream) {
+            Ok(plan) => format!("{letters} => slot at {}", plan.filepass_offset),
+            Err(error) => format!("{letters} => {error}"),
+        }
+    }
+
+    /// The FILEPASS slot after the globals BOF and an optional WRITEPROTECT is
+    /// probed with every short globals order.
+    #[test]
+    fn filepass_slot_follows_bof_and_one_writeprotect() {
+        let actual: Vec<String> = [
+            "", "B", "BE", "BCE", "BWCE", "BCWE", "BWWCE", "BWCWE", "BOWCE", "BWOWCE", "BCEW",
+            "BCEWW", "BWCEW", "BWE", "BWEC", "BEC", "BCEC", "BCCE", "BFCE", "BCFE", "BCEF", "bCE",
+            "OBCE", "BOCE", "BWOCE", "BEBCE", "BCEBE", "BWCEBWE", "W", "BW", "BWC",
+        ]
+        .iter()
+        .map(|case| outcome(case))
+        .collect();
+        assert_eq!(actual, FILEPASS_SLOT_EXPECTED);
+    }
+
+    const FILEPASS_SLOT_EXPECTED: &[&str] = &[
+        " => Invalid data: generated Workbook stream is missing its BOF",
+        "B => Invalid data: generated workbook globals are missing EOF",
+        "BE => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BCE => slot at 8",
+        "BWCE => slot at 12",
+        "BCWE => slot at 8",
+        "BWWCE => Invalid data: generated workbook globals contain duplicate WRITEPROTECT records",
+        "BWCWE => slot at 12",
+        "BOWCE => slot at 8",
+        "BWOWCE => slot at 12",
+        "BCEW => slot at 8",
+        "BCEWW => slot at 8",
+        "BWCEW => slot at 12",
+        "BWE => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BWEC => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BEC => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BCEC => slot at 8",
+        "BCCE => Invalid data: generated workbook globals contain duplicate CODEPAGE records",
+        "BFCE => Malformed FILEPASS record: generated Workbook stream already contains FILEPASS",
+        "BCFE => Malformed FILEPASS record: generated Workbook stream already contains FILEPASS",
+        "BCEF => Malformed FILEPASS record: generated Workbook stream already contains FILEPASS",
+        "bCE => Invalid data: generated Workbook stream does not begin with a workbook-globals BOF",
+        "OBCE => Invalid data: generated Workbook stream does not begin with a workbook-globals BOF",
+        "BOCE => slot at 8",
+        "BWOCE => slot at 12",
+        "BEBCE => Invalid data: generated workbook globals are missing CODEPAGE",
+        "BCEBE => slot at 8",
+        "BWCEBWE => slot at 12",
+        "W => Invalid data: generated Workbook stream does not begin with a workbook-globals BOF",
+        "BW => Invalid data: generated workbook globals are missing EOF",
+        "BWC => Invalid data: generated workbook globals are missing EOF",
+    ];
+}

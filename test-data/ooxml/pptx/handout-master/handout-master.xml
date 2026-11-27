@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:handoutMaster xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:bg>
+      <p:bgPr>
+        <a:solidFill>
+          <a:srgbClr val="112233"/>
+        </a:solidFill>
+      </p:bgPr>
+    </p:bg>
+  </p:cSld>
+  <p:hf hdr="1" ftr="1" sldNum="1" dt="1"/>
+  <p:clrMap bg1="lt1" tx1="dk1" bg2="lt2" tx2="dk2" accent1="accent1"
+      accent2="accent2" accent3="accent3" accent4="accent4" accent5="accent5"
+      accent6="accent6" hlink="hlink" folHlink="folHlink"/>
+</p:handoutMaster>

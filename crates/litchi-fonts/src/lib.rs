@@ -1,58 +1,29 @@
-//! Font discovery, loading, and subsetting for the Litchi office-formats library.
+//! Portable font metadata, embedding, OOXML obfuscation, and optional native
+//! discovery or OpenType subsetting.
+//!
+//! The crate keeps format-independent font ownership in semantic modules:
+//! [`embedding`] prepares publishable font data from a caller-supplied
+//! resolver, [`obfuscation`] implements the OOXML XOR transform, and the
+//! optional `discovery` and `subset` modules provide native backends.
 
-use std::collections::HashMap;
+#![forbid(unsafe_code)]
 
-use roaring::RoaringBitmap;
+#[cfg(feature = "discovery")]
+pub mod discovery;
+pub mod embedding;
+pub mod model;
+pub mod obfuscation;
+#[cfg(feature = "subset")]
+pub mod subset;
 
-pub mod loader;
-pub mod subsetter;
-
-pub use loader::*;
-pub use subsetter::*;
-
-/// Trait for document types that can collect all glyphs (characters) used in the document.
-///
-/// This is used to determine which fonts need to be embedded and which glyphs
-/// should be included in font subsets.
-///
-/// Uses `RoaringBitmap` instead of `HashSet<char>` for better cache locality and memory efficiency.
-/// The bitmap stores Unicode code points (u32 values from chars).
-pub trait CollectGlyphs {
-    /// Returns a map of font names to the set of character code points used with that font.
-    fn collect_glyphs(&self) -> HashMap<String, RoaringBitmap>;
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FontData {
-    pub name: String,
-    pub data: Vec<u8>,
-    pub index: u32,
-    pub properties: Option<FontProperties>,
-}
-
-/// Font properties needed for Office font embedding
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub struct FontProperties {
-    pub panose: Option<String>,
-    pub charset: Option<String>,
-    pub family: Option<String>,
-    pub pitch: Option<String>,
-    /// Unicode signature (usb0, usb1, usb2, usb3, csb0, csb1)
-    pub sig: Option<(String, String, String, String, String, String)>,
-}
-
-pub trait FontSubsetter {
-    fn subset(&self, font: &FontData, glyph_ids: &[u16]) -> Result<Vec<u8>, FontError>;
-}
-
-#[derive(Debug, thiserror::Error)]
-pub enum FontError {
-    #[error("Font not found: {0}")]
-    NotFound(String),
-    #[error("Invalid font data")]
-    InvalidData,
-    #[error("Subsetting failed: {0}")]
-    SubsettingFailed(String),
-    #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
-}
+#[cfg(feature = "discovery")]
+pub use discovery::Loader;
+#[cfg(feature = "automatic")]
+pub use embedding::prepare;
+pub use embedding::{Mode, PreparationLimits, Prepared, Resolver, prepare_with};
+pub use model::{
+    Charset, CollectGlyphs, Family, FontData, FontError, FontProperties, GlyphMap, Glyphs, License,
+    LicenseError, Panose, Permission, Pitch, Request, Restrictions, Signature, Style,
+};
+#[cfg(feature = "subset")]
+pub use subset::{Allsorts, Limits, Subsetter, glyph_ids};

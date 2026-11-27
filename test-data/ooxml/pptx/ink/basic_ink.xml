@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<inkml:ink xmlns:inkml="http://www.w3.org/2003/InkML">
+  <inkml:traceGroup>
+    <inkml:trace>0 0, 10 10</inkml:trace>
+    <inkml:trace>10 10, 20 20</inkml:trace>
+  </inkml:traceGroup>
+</inkml:ink>

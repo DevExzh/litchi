@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  LibreOffice `calcext` sparklines attached to a sheet, modeled on what
+  LibreOffice Calc writes for Insert > Sparkline:
+
+    * "Scores" carries two `calcext:sparkline-group` elements after the rows
+      (and after any conditional formats, matching LibreOffice's order).
+    * The first group exercises the full attribute set: type, line width,
+      empty-cell mode, marker flags, axis types with a custom bound, and two
+      color slots. Its `calcext:sparkline-*-complex-color` theme-color child
+      is valid LibreOffice output that litchi deliberately skips.
+    * The second group is minimal and holds two sparklines, one of them with
+      a multi-range `calcext:data-range`.
+    * Litchi stores all of this as typed inert data and never renders the
+      sparklines or resolves the addresses.
+-->
+<office:document
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:calcext="urn:org:documentfoundation:names:experimental:calc:xmlns:calcext:1.0"
+    xmlns:loext="urn:org:documentfoundation:names:experimental:office:xmlns:loext:1.0"
+    office:mimetype="application/vnd.oasis.opendocument.spreadsheet"
+    office:version="1.3">
+  <office:body>
+    <office:spreadsheet>
+      <table:table table:name="Scores">
+        <table:table-row>
+          <table:table-cell office:value-type="float" office:value="3"><text:p>3</text:p></table:table-cell>
+          <table:table-cell office:value-type="float" office:value="7"><text:p>7</text:p></table:table-cell>
+          <table:table-cell office:value-type="float" office:value="5"><text:p>5</text:p></table:table-cell>
+        </table:table-row>
+        <table:table-row>
+          <table:table-cell office:value-type="float" office:value="9"><text:p>9</text:p></table:table-cell>
+          <table:table-cell office:value-type="float" office:value="1"><text:p>1</text:p></table:table-cell>
+          <table:table-cell office:value-type="float" office:value="4"><text:p>4</text:p></table:table-cell>
+        </table:table-row>
+        <calcext:sparkline-groups>
+          <calcext:sparkline-group calcext:id="{1C5C5DE0-3C09-4CB3-A3EC-9E763301EC82}" calcext:type="column" calcext:line-width="1pt" calcext:display-empty-cells-as="gap" calcext:markers="true" calcext:high="true" calcext:low="true" calcext:negative="true" calcext:display-x-axis="true" calcext:min-axis-type="custom" calcext:max-axis-type="individual" calcext:manual-min="-5" calcext:color-series="#0369a3" calcext:color-low="#c9211e">
+            <calcext:sparkline-series-complex-color loext:theme-type="accent3" loext:color-type="theme">
+              <loext:transformation loext:type="lummod" loext:value="6000"/>
+            </calcext:sparkline-series-complex-color>
+            <calcext:sparklines>
+              <calcext:sparkline calcext:cell-address="Scores.D1" calcext:data-range="Scores.A1:Scores.C1"/>
+            </calcext:sparklines>
+          </calcext:sparkline-group>
+          <calcext:sparkline-group calcext:type="line">
+            <calcext:sparklines>
+              <calcext:sparkline calcext:cell-address="Scores.D2" calcext:data-range="Scores.A2:Scores.C2"/>
+              <calcext:sparkline calcext:cell-address="Scores.E2" calcext:data-range="Scores.A1:Scores.A2 Scores.C1:Scores.C2"/>
+            </calcext:sparklines>
+          </calcext:sparkline-group>
+        </calcext:sparkline-groups>
+      </table:table>
+    </office:spreadsheet>
+  </office:body>
+</office:document>

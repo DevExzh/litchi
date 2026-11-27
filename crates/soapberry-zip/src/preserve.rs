@@ -1,0 +1,7106 @@
+//! Conservative raw-member preservation for ZIP archive rewrites.
+//!
+//! This module intentionally accepts only single-disk ZIP archives whose
+//! framing can be copied without interpretation or normalization.
+//! It validates source layout/range declarations and every requested action
+//! before writing to the destination, so an unsupported layout never produces
+//! a partial preserved archive.
+
+use crate::office::ArchiveLimits;
+use crate::office::VerifiedPrecompressedEntry;
+use crate::office::{CancellationProbe, ParallelWriteLimits, ParallelWriteSession};
+use crate::writer::{ReusableDeflateState, ReusedDeflateEncoder};
+use crate::{
+    CompressionMethod, EndOfCentralDirectoryRecordFixed, Error, ErrorKind, LimitResource, ReaderAt,
+    ZipArchive, ZipArchiveWriter, ZipFileHeaderFixed, ZipLocalFileHeaderFixed,
+    accounting::{AccountingWriteKind, ZipOperationAccounting, usize_to_u64, write_all_counted},
+    extra_fields::{ExtraFieldId, ExtraFields},
+};
+use std::fmt;
+use std::io::Write;
+use std::mem::size_of;
+use std::num::NonZeroUsize;
+use std::ops::Range;
+use std::panic::{AssertUnwindSafe, catch_unwind};
+use std::sync::Arc;
+
+mod replay;
+#[cfg(test)]
+mod replay_tests;
+
+pub use replay::{
+    ReplayLimits, ReplayMeasurement, ReplayPass, ReplayProgress, ReplayPublicationError,
+    ReplayResource, replay_memory_upper_bound,
+};
+
+const COPY_CHUNK_SIZE: usize = 64 * 1024;
+const CENTRAL_LOCAL_HEADER_OFFSET: Range<usize> = 42..46;
+const ZIP64_LOCATOR_SIZE: usize = 20;
+const ZIP64_EOCD_FIXED_SIZE: usize = 56;
+const ZIP64_EOCD_FIXED_PAYLOAD_SIZE: u64 = 44;
+const ZIP64_LOCATOR_SIGNATURE: u32 = 0x0706_4b50;
+
+/// An opaque, stable identifier for an entry in a [`PreservationIndex`].
+///
+/// IDs are assigned in central-directory order and cannot be constructed by
+/// callers. They remain valid for the lifetime of their index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct PreservationEntryId(u32);
+
+/// A policy failure while preparing a preservation output.
+///
+/// The archive and caller failures remain typed and are available through the
+/// accessors below.  Formatting is deliberately content-free: a caller's
+/// diagnostic cannot become part of a stable ZIP error message or debug log.
+pub enum PreservationAdmissionError<E> {
+    /// The source archive or the prepared output layout was rejected.
+    Archive(Error),
+    /// The caller's recipient policy rejected the prepared output.
+    Admission(E),
+}
+
+impl<E> PreservationAdmissionError<E> {
+    /// Return the archive failure, when the archive could not be prepared.
+    #[must_use]
+    pub fn archive(&self) -> Option<&Error> {
+        match self {
+            Self::Archive(error) => Some(error),
+            Self::Admission(_) => None,
+        }
+    }
+
+    /// Return the caller's policy failure, when admission was rejected.
+    #[must_use]
+    pub fn admission(&self) -> Option<&E> {
+        match self {
+            Self::Archive(_) => None,
+            Self::Admission(error) => Some(error),
+        }
+    }
+}
+
+impl<E> fmt::Debug for PreservationAdmissionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive(_) => "PreservationAdmissionError::Archive",
+            Self::Admission(_) => "PreservationAdmissionError::Admission",
+        })
+    }
+}
+
+impl<E> fmt::Display for PreservationAdmissionError<E> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::Archive(_) => "preservation archive preparation failed",
+            Self::Admission(_) => "preservation output admission failed",
+        })
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for PreservationAdmissionError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Archive(error) => Some(error),
+            Self::Admission(error) => Some(error),
+        }
+    }
+}
+
+/// Final per-member facts available to a preservation recipient policy.
+///
+/// All lengths and sizes describe the bytes that the writer will publish,
+/// including any ZIP64 central-record promotion.  The value contains no
+/// member payload or archive bytes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PreservationOutputEntry {
+    raw_name_len: u64,
+    extra_len: u64,
+    comment_len: u64,
+    metadata_len: u64,
+    central_record_len: u64,
+    compressed_size: u64,
+    uncompressed_size: u64,
+}
+
+impl PreservationOutputEntry {
+    /// Length of the raw central-directory member name.
+    #[must_use]
+    pub const fn raw_name_len(self) -> u64 {
+        self.raw_name_len
+    }
+
+    /// Length of the final central-directory extra-field region.
+    #[must_use]
+    pub const fn extra_len(self) -> u64 {
+        self.extra_len
+    }
+
+    /// Length of the final central-directory file-comment region.
+    #[must_use]
+    pub const fn comment_len(self) -> u64 {
+        self.comment_len
+    }
+
+    /// Length of all variable central-directory metadata, including the raw
+    /// name, extra fields and file comment.
+    #[must_use]
+    pub const fn metadata_len(self) -> u64 {
+        self.metadata_len
+    }
+
+    /// Length of the final central-directory record, including its fixed
+    /// header and variable metadata.
+    #[must_use]
+    pub const fn central_record_len(self) -> u64 {
+        self.central_record_len
+    }
+
+    /// Final compressed payload size declared by the central record.
+    #[must_use]
+    pub const fn compressed_size(self) -> u64 {
+        self.compressed_size
+    }
+
+    /// Final decoded payload size declared by the central record.
+    #[must_use]
+    pub const fn uncompressed_size(self) -> u64 {
+        self.uncompressed_size
+    }
+}
+
+/// Borrowed final layout facts for a preservation recipient policy.
+///
+/// The profile is created only by an admission-enabled write.  It borrows the
+/// small metrics retained by the prepared layout and never owns compressed,
+/// local-record or complete-archive bytes.
+#[derive(Debug)]
+pub struct PreservationOutputProfile<'a> {
+    entries: &'a [PreservationOutputEntry],
+    prefix_bytes: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+    archive_bytes: u64,
+}
+
+impl<'a> PreservationOutputProfile<'a> {
+    /// Bytes before the first local member in the published archive.
+    ///
+    /// Preservation indexes reject source prelude bytes, so this is currently
+    /// always zero. It is exposed explicitly so recipient policies account for
+    /// the complete archive geometry rather than silently assuming a prefix.
+    #[must_use]
+    pub const fn prefix_bytes(&self) -> u64 {
+        self.prefix_bytes
+    }
+
+    /// Number of retained entries in the final archive.
+    #[must_use]
+    pub const fn entry_count(&self) -> u64 {
+        self.entry_count
+    }
+
+    /// Final local-member bytes, including local framing and payload bytes.
+    #[must_use]
+    pub const fn local_bytes(&self) -> u64 {
+        self.local_bytes
+    }
+
+    /// Final central-directory bytes, including promoted records.
+    #[must_use]
+    pub const fn central_directory_bytes(&self) -> u64 {
+        self.central_directory_bytes
+    }
+
+    /// Total variable central-directory metadata bytes.
+    #[must_use]
+    pub const fn central_metadata_bytes(&self) -> u64 {
+        self.central_metadata_bytes
+    }
+
+    /// Final ZIP tail bytes, including ZIP64 EOCD and locator when present.
+    #[must_use]
+    pub const fn tail_bytes(&self) -> u64 {
+        self.tail_bytes
+    }
+
+    /// Final archive-comment bytes.
+    #[must_use]
+    pub const fn archive_comment_bytes(&self) -> u64 {
+        self.archive_comment_bytes
+    }
+
+    /// Exact final archive length, including all framing and the comment.
+    #[must_use]
+    pub const fn archive_bytes(&self) -> u64 {
+        self.archive_bytes
+    }
+
+    /// Final per-entry metrics in central-directory order.
+    #[must_use]
+    pub fn entries(&self) -> &'a [PreservationOutputEntry] {
+        self.entries
+    }
+}
+
+/// A validated source member available to a preservation plan.
+#[derive(Debug, Clone)]
+pub struct PreservedEntry {
+    id: PreservationEntryId,
+    local_span: Range<u64>,
+    central_record: Range<u64>,
+    central_bytes: Vec<u8>,
+    wayfinder: crate::ZipArchiveEntryWayfinder,
+    central_local_header_offset_patch: CentralLocalHeaderOffsetPatch,
+    compression_method: CompressionMethod,
+    local_central_name_mismatch: bool,
+}
+
+#[derive(Debug, Clone)]
+enum CentralLocalHeaderOffsetPatch {
+    Fixed32,
+    Zip64(Range<usize>),
+}
+
+#[derive(Debug, Clone)]
+struct Zip64Tail {
+    eocd: Vec<u8>,
+    locator: Vec<u8>,
+    classic_eocd: Vec<u8>,
+}
+
+impl Zip64Tail {
+    fn extensible_data_len(&self) -> Result<usize, Error> {
+        self.eocd
+            .len()
+            .checked_sub(ZIP64_EOCD_FIXED_SIZE)
+            .ok_or_else(|| unsupported("ZIP64 EOCD framing"))
+    }
+
+    fn len(&self) -> Result<u64, Error> {
+        let byte_len = self
+            .eocd
+            .len()
+            .checked_add(self.locator.len())
+            .and_then(|length| length.checked_add(self.classic_eocd.len()))
+            .ok_or_else(|| unsupported("ZIP64 tail length"))?;
+        usize_to_u64(byte_len, "ZIP64 tail length")
+    }
+}
+
+impl PreservedEntry {
+    /// The stable opaque ID used by [`PreservationPlan`].
+    pub fn id(&self) -> PreservationEntryId {
+        self.id
+    }
+
+    /// The raw local-member span: local header through the next local header
+    /// (or the central directory for the final member).
+    pub fn local_span(&self) -> Range<u64> {
+        self.local_span.clone()
+    }
+
+    /// The exact source range of this central-directory record.
+    pub fn central_record(&self) -> Range<u64> {
+        self.central_record.clone()
+    }
+
+    /// The compression method declared by this entry's central-directory
+    /// record.
+    ///
+    /// The central record is parsed and structurally validated while the
+    /// [`PreservationIndex`] is built, so this accessor does not read the
+    /// member payload.
+    pub fn compression_method(&self) -> CompressionMethod {
+        self.compression_method
+    }
+
+    /// The declared compressed payload size, with ZIP64 fields resolved by
+    /// the physical index. This excludes local headers and data descriptors.
+    pub fn compressed_size(&self) -> u64 {
+        self.wayfinder.compressed_size_hint()
+    }
+
+    /// The declared decoded payload size, with ZIP64 fields resolved by the
+    /// physical index. Indexing does not decode the payload or verify its CRC.
+    pub fn uncompressed_size(&self) -> u64 {
+        self.wayfinder.uncompressed_size_hint()
+    }
+
+    /// The exact raw member-name bytes from this entry's central-directory
+    /// record. These bytes are not normalized or decoded as UTF-8.
+    pub fn raw_name_bytes(&self) -> &[u8] {
+        let name_len = usize::from(u16::from_le_bytes([
+            self.central_bytes[28],
+            self.central_bytes[29],
+        ]));
+        &self.central_bytes[ZipFileHeaderFixed::SIZE..ZipFileHeaderFixed::SIZE + name_len]
+    }
+}
+
+/// A newly generated ordinary ZIP member.
+///
+/// Regeneration uses [`ZipArchiveWriter`] for the member grammar. Only Store
+/// and Deflate are supported by this low-level primitive; callers needing any
+/// other generated representation should choose a different writer path.
+#[derive(Debug, Clone)]
+pub struct RegeneratedEntry {
+    name: String,
+    data: RegeneratedPayload,
+    compression: CompressionMethod,
+}
+
+#[derive(Debug, Clone)]
+enum RegeneratedPayload {
+    Owned(Vec<u8>),
+    Shared(Arc<Vec<u8>>),
+    Precompressed(VerifiedPrecompressedEntry),
+}
+
+impl RegeneratedPayload {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Owned(data) => data,
+            Self::Shared(data) => data,
+            Self::Precompressed(_) => {
+                unreachable!("precompressed payload has no logical byte slice")
+            },
+        }
+    }
+}
+
+impl RegeneratedEntry {
+    pub fn new(name: impl Into<String>, data: impl Into<Vec<u8>>) -> Self {
+        Self {
+            name: name.into(),
+            data: RegeneratedPayload::Owned(data.into()),
+            compression: CompressionMethod::Store,
+        }
+    }
+
+    /// Create a regenerated member that shares an immutable payload.
+    ///
+    /// This is useful when a caller already retains the complete generated
+    /// payload and the ZIP writer only needs to borrow it during publication.
+    pub fn new_shared(name: impl Into<String>, data: Arc<Vec<u8>>) -> Self {
+        Self {
+            name: name.into(),
+            data: RegeneratedPayload::Shared(data),
+            compression: CompressionMethod::Store,
+        }
+    }
+
+    /// Create a regenerated member from a ZIP-reader-issued verified
+    /// compressed payload.  The token carries its own method, actual CRC, and
+    /// decoded size; callers cannot provide unchecked metadata or bytes.
+    pub fn new_precompressed_shared(
+        name: impl Into<String>,
+        data: VerifiedPrecompressedEntry,
+    ) -> Self {
+        let compression = data.compression_method();
+        Self {
+            name: name.into(),
+            data: RegeneratedPayload::Precompressed(data),
+            compression,
+        }
+    }
+
+    /// Select the compression method for an ordinary logical payload.
+    ///
+    /// A verified precompressed payload keeps the method issued by its ZIP
+    /// reader; this builder call therefore leaves that token's method fixed.
+    #[must_use]
+    pub fn compression_method(mut self, compression: CompressionMethod) -> Self {
+        if !matches!(&self.data, RegeneratedPayload::Precompressed(_)) {
+            self.compression = compression;
+        }
+        self
+    }
+}
+
+/// One action in a [`PreservationPlan`].
+#[derive(Debug, Clone)]
+pub enum PreservationAction {
+    /// Copy the validated local span and raw central record for this entry.
+    Copy(PreservationEntryId),
+    /// Omit this source entry from the rewritten archive.
+    Omit(PreservationEntryId),
+    /// Replace this entry using the existing ZIP writer's ordinary semantics.
+    Regenerate {
+        id: PreservationEntryId,
+        entry: RegeneratedEntry,
+    },
+}
+
+/// The compression wave a [`PreservationPlan`] admits under a write policy.
+///
+/// A wave is decided before any member is compressed, from the plan alone. Its
+/// width is what the *balance* of the changed set justifies, not what the
+/// set's total size suggests: the time a split can remove is the total minus
+/// the largest member, because that member is the longest pole however many
+/// workers are available. A plan whose changed set is one dominant member and
+/// a few small ones is therefore a serial wave at every requested width.
+///
+/// A width of one is the sequential path this crate has always taken, byte for
+/// byte and error for error.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct DeflateWave {
+    tasks: usize,
+    width: NonZeroUsize,
+    total_bytes: u64,
+    largest_bytes: u64,
+}
+
+impl DeflateWave {
+    /// Number of regenerated members this wave would compress.
+    #[must_use]
+    pub const fn tasks(self) -> usize {
+        self.tasks
+    }
+
+    /// Granted width. One means the sequential path.
+    #[must_use]
+    pub const fn width(self) -> NonZeroUsize {
+        self.width
+    }
+
+    /// Whether the wave would use more than one worker.
+    #[must_use]
+    pub const fn is_parallel(self) -> bool {
+        self.width.get() > 1
+    }
+
+    /// Total declared payload of the regenerated members, in bytes.
+    #[must_use]
+    pub const fn total_bytes(self) -> u64 {
+        self.total_bytes
+    }
+
+    /// Declared payload of the largest regenerated member, in bytes.
+    #[must_use]
+    pub const fn largest_bytes(self) -> u64 {
+        self.largest_bytes
+    }
+
+    /// Payload left once the longest pole is placed, in bytes.
+    #[must_use]
+    pub const fn remainder_bytes(self) -> u64 {
+        self.total_bytes.saturating_sub(self.largest_bytes)
+    }
+
+    /// Narrows this wave to at most `width` workers.
+    ///
+    /// A caller whose own budget granted fewer permits than the policy asked
+    /// for narrows the wave and proceeds; it never fails for that reason.
+    #[must_use]
+    pub fn narrowed_to(mut self, width: NonZeroUsize) -> Self {
+        if width < self.width {
+            self.width = width;
+        }
+        self
+    }
+}
+
+/// Declared payload length of a regenerated member that a worker would
+/// compress, or `None` when the member takes a bounded direct path.
+///
+/// Precompressed members are framed from bytes that are already compressed and
+/// stored members are copied, so neither is a compression task.
+fn deflate_task_len(entry: &RegeneratedEntry) -> Option<u64> {
+    if entry.compression != CompressionMethod::Deflate {
+        return None;
+    }
+    match &entry.data {
+        RegeneratedPayload::Owned(data) => Some(data.len() as u64),
+        RegeneratedPayload::Shared(data) => Some(data.len() as u64),
+        RegeneratedPayload::Precompressed(_) => None,
+    }
+}
+
+fn plan_deflate_tasks(plan: &PreservationPlan) -> impl Iterator<Item = &RegeneratedEntry> {
+    plan.actions
+        .iter()
+        .filter_map(|action| match action {
+            PreservationAction::Regenerate { entry, .. } => Some(entry),
+            PreservationAction::Copy(_) | PreservationAction::Omit(_) => None,
+        })
+        .chain(plan.appended.iter().map(Arc::as_ref))
+        .filter(|entry| deflate_task_len(entry).is_some())
+}
+
+/// A complete rewrite plan for a [`PreservationIndex`].
+///
+/// A plan must mention every source ID exactly once. The action list itself is
+/// not an ordering control: raw local spans retain source physical order and
+/// central records retain source central-directory order, even when those two
+/// orders differ. Appended local records are emitted after all source local
+/// records and before the central directory; appended central records are
+/// emitted after all source central records.
+#[derive(Debug, Clone, Default)]
+pub struct PreservationPlan {
+    actions: Vec<PreservationAction>,
+    appended: Vec<Arc<RegeneratedEntry>>,
+}
+
+impl PreservationPlan {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    pub fn copy_all<R>(index: &PreservationIndex<'_, R>) -> Self
+    where
+        R: ReaderAt,
+    {
+        Self {
+            actions: index
+                .entries
+                .iter()
+                .map(|entry| PreservationAction::Copy(entry.id))
+                .collect(),
+            appended: Vec::new(),
+        }
+    }
+
+    pub fn push(&mut self, action: PreservationAction) {
+        self.actions.push(action);
+    }
+
+    /// Fallibly reserve action capacity before building a bounded plan.
+    pub fn try_reserve_exact(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.actions.try_reserve_exact(additional)
+    }
+
+    /// Fallibly reserve capacity for appended generated members.
+    pub fn try_reserve_appended(
+        &mut self,
+        additional: usize,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve_exact(additional)
+    }
+
+    /// Append one generated member in the order it should appear after all
+    /// source local records and before the central directory, with its central
+    /// record after all source central records.
+    ///
+    /// The source action list remains separate and must still mention every
+    /// source ID exactly once. Appended members are generated before the sink
+    /// sees any bytes, so a member-generation failure cannot leave partial
+    /// output behind.
+    pub fn try_append(
+        &mut self,
+        entry: RegeneratedEntry,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve(1)?;
+        self.appended.push(Arc::new(entry));
+        Ok(())
+    }
+
+    /// Append a retained immutable member without cloning its name or payload.
+    ///
+    /// Only the handle vector grows; the caller may reuse the same entry in
+    /// another plan after success or publication failure.
+    pub fn try_append_shared(
+        &mut self,
+        entry: Arc<RegeneratedEntry>,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve(1)?;
+        self.appended.push(entry);
+        Ok(())
+    }
+
+    pub fn actions(&self) -> &[PreservationAction] {
+        &self.actions
+    }
+
+    /// Generated members in their requested append order.
+    pub fn appended(&self) -> &[Arc<RegeneratedEntry>] {
+        &self.appended
+    }
+
+    /// Decides the compression wave this plan admits under `limits`.
+    ///
+    /// The decision is made from the plan alone, before any member is
+    /// compressed, and is purely advisory: a caller that ignores it, or passes
+    /// the returned wave to
+    /// [`PreservationIndex::write_to_with_session`](crate::PreservationIndex::write_to_with_session)
+    /// after narrowing it, gets the same bytes either way.
+    ///
+    /// Three conditions must all hold for a wave wider than one:
+    ///
+    /// 1. at least two regenerated members are deflate compression tasks
+    ///    (stored and already-compressed members are copied, not compressed);
+    /// 2. the payload remaining once the largest member is placed is at least
+    ///    [`ParallelWriteLimits::min_parallelizable_bytes`];
+    /// 3. that remainder supports the width at the policy's per-task floor,
+    ///    which caps the width at `1 + remainder / min_task_bytes`.
+    #[must_use]
+    pub fn deflate_wave(&self, limits: ParallelWriteLimits) -> DeflateWave {
+        let mut tasks = 0_usize;
+        let mut total_bytes = 0_u64;
+        let mut largest_bytes = 0_u64;
+        for entry in plan_deflate_tasks(self) {
+            let bytes = deflate_task_len(entry).unwrap_or_default();
+            tasks = tasks.saturating_add(1);
+            total_bytes = total_bytes.saturating_add(bytes);
+            largest_bytes = largest_bytes.max(bytes);
+        }
+        let remainder = total_bytes.saturating_sub(largest_bytes);
+        let mut width = 1_usize;
+        if tasks >= 2 && remainder >= limits.min_parallelizable_bytes() {
+            width = limits
+                .workers()
+                .get()
+                .min(limits.max_in_flight_tasks().get())
+                .min(tasks);
+            if limits.min_task_bytes() > 0 {
+                let by_floor = usize::try_from(remainder / limits.min_task_bytes())
+                    .unwrap_or(usize::MAX)
+                    .saturating_add(1);
+                width = width.min(by_floor);
+            }
+            width = width.max(1);
+        }
+        DeflateWave {
+            tasks,
+            width: NonZeroUsize::new(width).unwrap_or(NonZeroUsize::MIN),
+            total_bytes,
+            largest_bytes,
+        }
+    }
+}
+
+/// The policy governing the preservation format accepted by the index.
+#[allow(dead_code)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PreservationPolicy {
+    /// Preserve ZIP32 framing only. This remains an internal refusal policy;
+    /// public constructors use [`Self::AllowZip64`].
+    Zip32Only,
+    /// Permit validated ZIP64 framing and per-entry metadata to be retained.
+    AllowZip64,
+}
+
+/// An indexed, structurally validated single-disk ZIP source.
+pub struct PreservationIndex<'source, R> {
+    source: &'source R,
+    entries: Vec<PreservedEntry>,
+    local_order: Vec<usize>,
+    archive_comment: Vec<u8>,
+    zip64_tail: Option<Zip64Tail>,
+    archive_end_offset: u64,
+}
+
+/// Return the additional allocation upper bound for one replacement replay.
+///
+/// This is deliberately a scalar contract.  The ZIP representation remains
+/// private to this crate while format owners can reserve the ownership that
+/// this module will create before constructing an index.  `metadata_bytes`
+/// must include the complete central directory, ZIP64 tail, and archive
+/// comment, as returned by
+/// [`crate::office::IndexedArchive::preservation_metadata_bytes`].
+/// The four metadata terms cover the retained index bytes, generated target
+/// framing/central bytes, ZIP64 promotion copies, and the prepared tail.  The
+/// per-entry terms use the actual private layout sizes rather than a guessed
+/// object allowance; the twelve source ranges are the promotion capacity used
+/// by [`promote_central_record`].
+pub(crate) fn preservation_memory_upper_bound(
+    entry_count: usize,
+    metadata_bytes: u64,
+) -> Option<u64> {
+    let entries = u64::try_from(entry_count).ok()?;
+    let entries_with_target = entries.checked_add(1)?;
+    let size = |value: usize| u64::try_from(value).ok();
+    let per_entry = [
+        size(size_of::<PreservedEntry>())?,
+        size(size_of::<usize>())?,
+        size(size_of::<PreservationAction>())?,
+        size(size_of::<Option<PreparedEntry>>())?,
+        size(size_of::<PreparedEntry>())?,
+        size(size_of::<CentralOffsetPatch>())?,
+        size(size_of::<PromotedCentral>())?,
+    ]
+    .into_iter()
+    .try_fold(0u64, |total, value| total.checked_add(value))?;
+    let per_entry = entries.checked_mul(per_entry)?;
+    let prepared_and_layout = entries_with_target.checked_mul(
+        size(size_of::<PreparedEntry>())?
+            .checked_add(size(size_of::<u64>())?)?
+            .checked_add(size(size_of::<CentralOffsetPatch>())?)?,
+    )?;
+    let promotion_ranges = entries
+        .checked_mul(12)?
+        .checked_mul(size(size_of::<Range<usize>>())?)?;
+    let promotion_extra_bytes = entries.checked_mul(12)?;
+    let variable_bytes = metadata_bytes.checked_mul(4)?;
+    let fixed_bytes = size(size_of::<PreparedZip64Tail>())?
+        .checked_add(u64::try_from(COPY_CHUNK_SIZE).ok()?)?
+        // A replay target's local framing, central fixed header, and ZIP
+        // descriptor are bounded by its source central metadata plus this
+        // constant.  Its variable member name is already in metadata_bytes.
+        .checked_add(128)?;
+
+    per_entry
+        .checked_add(prepared_and_layout)?
+        .checked_add(promotion_ranges)?
+        .checked_add(promotion_extra_bytes)?
+        .checked_add(variable_bytes)?
+        .checked_add(fixed_bytes)
+}
+
+impl<'source, R> PreservationIndex<'source, R>
+where
+    R: ReaderAt,
+{
+    /// Builds a preservation index under explicit archive metadata limits
+    /// without reading member bodies.
+    ///
+    /// Multi-disk, prefixed, ambiguous, overlapping, and truncated layouts are
+    /// rejected with [`ErrorKind::UnsupportedPreservation`] before a caller
+    /// can begin writing a plan. ZIP64 framing is retained when the source
+    /// passes the same single-disk and field-resolution checks as ZIP32.
+    /// Preservation retains every source central-directory record verbatim,
+    /// including records for directory members and the EOCD comment. The
+    /// archive profile's `max_files` bounds non-directory source members;
+    /// directory records are retained too, but consume only the metadata
+    /// budget. `max_metadata_bytes` covers the aggregate variable central
+    /// metadata, ZIP64 extensible data, and EOCD comment. Limits are validated
+    /// in a metadata-only pass before any owned entry or raw-record buffers are
+    /// reserved. ZIP64 framing and extensible tail data are retained when the
+    /// source passes the same structural checks as ZIP32.
+    pub fn new(
+        archive: &'source ZipArchive<R>,
+        buffer: &mut [u8],
+        limits: ArchiveLimits,
+    ) -> Result<Self, Error> {
+        Self::new_with_policy(archive, buffer, limits, PreservationPolicy::AllowZip64)
+    }
+
+    /// Builds the internal ZIP64 preservation foundation under explicit
+    /// archive metadata limits. The public constructors use the same policy;
+    /// this entry point remains available to crate-internal tests that need to
+    /// exercise the narrower ZIP32 policy explicitly.
+    #[allow(dead_code)]
+    pub(crate) fn new_with_policy(
+        archive: &'source ZipArchive<R>,
+        buffer: &mut [u8],
+        limits: ArchiveLimits,
+        policy: PreservationPolicy,
+    ) -> Result<Self, Error> {
+        if archive.is_zip64() && policy == PreservationPolicy::Zip32Only {
+            return Err(unsupported("ZIP64 preservation is not enabled"));
+        }
+
+        let central_start = archive.directory_offset();
+        let head_eocd_offset = archive.head_eocd_offset();
+        let eocd_offset = archive.eocd_offset();
+        let archive_end = archive.end_offset();
+        if central_start > head_eocd_offset
+            || head_eocd_offset > eocd_offset
+            || archive_end < eocd_offset
+        {
+            return Err(unsupported("invalid central-directory bounds"));
+        }
+
+        let mut eocd_bytes = [0u8; EndOfCentralDirectoryRecordFixed::SIZE];
+        archive
+            .get_ref()
+            .read_exact_at(&mut eocd_bytes, eocd_offset)?;
+        let eocd = EndOfCentralDirectoryRecordFixed::parse(&eocd_bytes)?;
+        if !valid_classic_disk_fields(&eocd, archive.is_zip64()) {
+            return Err(unsupported("multi-disk archives"));
+        }
+        if archive.is_zip64()
+            && !valid_classic_zip64_fields(
+                &eocd,
+                archive.entries_hint(),
+                archive.central_directory_size(),
+                archive.directory_offset(),
+            )
+        {
+            return Err(unsupported("classic EOCD disagrees with ZIP64 metadata"));
+        }
+
+        let eocd_fixed_len = usize_to_u64(eocd_bytes.len(), "archive comment length")?;
+        let comment_len_u64 = archive_end
+            .checked_sub(eocd_offset)
+            .and_then(|length| length.checked_sub(eocd_fixed_len))
+            .ok_or_else(|| unsupported("archive comment length"))?;
+        let comment_len =
+            usize::try_from(comment_len_u64).map_err(|_| unsupported("archive comment length"))?;
+        if comment_len_u64 > limits.max_metadata_bytes {
+            return Err(limit_error(
+                LimitResource::MetadataBytes,
+                comment_len_u64,
+                limits.max_metadata_bytes,
+            ));
+        }
+
+        let zip64_tail = if archive.is_zip64() {
+            let max_extensible_data = limits
+                .max_metadata_bytes
+                .checked_sub(comment_len_u64)
+                .ok_or_else(|| unsupported("ZIP64 metadata budget"))?;
+            Some(
+                read_zip64_tail(
+                    archive.get_ref(),
+                    archive.head_eocd_offset(),
+                    archive.eocd_offset(),
+                    archive.entries_hint(),
+                    archive.central_directory_size(),
+                    archive.directory_offset(),
+                    max_extensible_data,
+                )
+                .map_err(|error| map_metadata_limit_error(error, comment_len_u64, limits))?,
+            )
+        } else {
+            None
+        };
+        let zip64_extensible_data_u64 = zip64_tail
+            .as_ref()
+            .map(|tail| {
+                tail.extensible_data_len()
+                    .and_then(|length| usize_to_u64(length, "ZIP64 extensible data"))
+            })
+            .transpose()?
+            .unwrap_or(0);
+        let metadata_prefix_u64 = comment_len_u64
+            .checked_add(zip64_extensible_data_u64)
+            .ok_or_else(|| unsupported("metadata budget overflow"))?;
+        if metadata_prefix_u64 > limits.max_metadata_bytes {
+            return Err(limit_error(
+                LimitResource::MetadataBytes,
+                metadata_prefix_u64,
+                limits.max_metadata_bytes,
+            ));
+        }
+
+        let entry_count_hint = archive.entries_hint();
+        let max_files_u64 = u64::try_from(limits.max_files).unwrap_or(u64::MAX);
+        let central_metadata_budget = limits
+            .max_metadata_bytes
+            .checked_sub(metadata_prefix_u64)
+            .ok_or_else(|| unsupported("central-directory metadata budget"))?;
+
+        // Validate every central record's bounded metadata and structural
+        // declaration before reserving the owned preservation index. This
+        // keeps a hostile count or oversized metadata from causing ownership
+        // allocation before the corresponding limit is reported.
+        let mut iterator = archive.entries_with_metadata_limit(buffer, central_metadata_budget);
+        let mut entry_count_u64 = 0u64;
+        let mut file_count_u64 = 0u64;
+        while let Some(record) = iterator
+            .next_entry()
+            .map_err(|error| map_metadata_limit_error(error, metadata_prefix_u64, limits))?
+        {
+            if policy == PreservationPolicy::Zip32Only && record.is_zip64() {
+                return Err(unsupported("ZIP64 entry preservation is not enabled"));
+            }
+            if !record.wayfinder().borrowed_provenance_supported() {
+                return Err(unsupported("unresolved ZIP64 entry fields"));
+            }
+
+            let raw_name_bytes = u64::try_from(record.file_path().as_ref().len())
+                .map_err(|_| unsupported("member name length"))?;
+            if raw_name_bytes > limits.max_member_name_bytes {
+                return Err(limit_error(
+                    LimitResource::MemberNameBytes,
+                    raw_name_bytes,
+                    limits.max_member_name_bytes,
+                ));
+            }
+
+            if !record.is_dir() {
+                file_count_u64 = file_count_u64
+                    .checked_add(1)
+                    .ok_or_else(|| unsupported("central-directory file count"))?;
+                if file_count_u64 > max_files_u64 {
+                    return Err(limit_error(
+                        LimitResource::FileCount,
+                        file_count_u64,
+                        max_files_u64,
+                    ));
+                }
+            }
+
+            central_record_span(&record, head_eocd_offset)?;
+            entry_count_u64 = entry_count_u64
+                .checked_add(1)
+                .ok_or_else(|| unsupported("central-directory entry count"))?;
+        }
+
+        if entry_count_u64 != entry_count_hint {
+            return Err(unsupported("central-directory entry count mismatch"));
+        }
+
+        // Fixed central headers are retained alongside variable metadata. The
+        // saturated arithmetic intentionally preserves UNBOUNDED semantics,
+        // while the checked multiplication still rejects impossible ownership
+        // sizes before any reservation.
+        let central_fixed_record_len = usize_to_u64(
+            ZipFileHeaderFixed::SIZE,
+            "central-directory fixed record length",
+        )?;
+        let fixed_central_bytes = entry_count_u64
+            .checked_mul(central_fixed_record_len)
+            .ok_or_else(|| unsupported("central-directory source budget"))?;
+        let source_budget = limits
+            .max_metadata_bytes
+            .saturating_add(fixed_central_bytes);
+
+        let comment_offset = eocd_offset
+            .checked_add(eocd_fixed_len)
+            .ok_or_else(|| unsupported("archive comment offset"))?;
+        let archive_comment = read_vec(archive.get_ref(), comment_offset, comment_len)?;
+
+        let entry_count = usize::try_from(entry_count_u64)
+            .map_err(|_| unsupported("central-directory entry count"))?;
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(entry_count)
+            .map_err(|source| allocation("preservation-index entries", source))?;
+
+        let mut iterator = archive.entries_with_metadata_limit(buffer, central_metadata_budget);
+        let mut retained_source_bytes = metadata_prefix_u64;
+        while let Some(record) = iterator
+            .next_entry()
+            .map_err(|error| map_metadata_limit_error(error, metadata_prefix_u64, limits))?
+        {
+            if policy == PreservationPolicy::Zip32Only && record.is_zip64() {
+                return Err(unsupported("ZIP64 entry preservation is not enabled"));
+            }
+            let wayfinder = record.wayfinder();
+            if !wayfinder.borrowed_provenance_supported() {
+                return Err(unsupported("unresolved ZIP64 entry fields"));
+            }
+
+            let (central_offset, central_len, central_end) =
+                central_record_span(&record, head_eocd_offset)?;
+            let central_len_u64 = usize_to_u64(central_len, "central-directory record length")?;
+            let next_retained_source_bytes = retained_source_bytes
+                .checked_add(central_len_u64)
+                .ok_or_else(|| unsupported("central-directory source budget"))?;
+            if next_retained_source_bytes > source_budget {
+                return Err(limit_error(
+                    LimitResource::MetadataBytes,
+                    next_retained_source_bytes,
+                    source_budget,
+                ));
+            }
+
+            let central_bytes = read_vec(archive.get_ref(), central_offset, central_len)?;
+            retained_source_bytes = next_retained_source_bytes;
+            let central_fixed = ZipFileHeaderFixed::parse(&central_bytes)?;
+            let central_local_header_offset_patch = central_local_header_offset_patch(
+                &record,
+                &central_fixed,
+                &central_bytes,
+                central_offset,
+                central_end,
+            )?;
+
+            let id = PreservationEntryId(
+                u32::try_from(entries.len()).map_err(|_| unsupported("too many entries"))?,
+            );
+            entries.push(PreservedEntry {
+                id,
+                local_span: record.local_header_offset()..record.local_header_offset(),
+                central_record: central_offset..central_end,
+                central_bytes,
+                wayfinder,
+                central_local_header_offset_patch,
+                compression_method: central_fixed.compression_method.as_method(),
+                local_central_name_mismatch: false,
+            });
+        }
+
+        if usize_to_u64(entries.len(), "central-directory entry count")? != entry_count_u64 {
+            return Err(unsupported("central-directory entry count mismatch"));
+        }
+
+        let mut expected_central = central_start;
+        for entry in &entries {
+            if entry.central_record.start != expected_central {
+                return Err(unsupported("non-contiguous central-directory records"));
+            }
+            expected_central = entry.central_record.end;
+        }
+        if expected_central != head_eocd_offset {
+            return Err(unsupported("central-directory trailing bytes"));
+        }
+
+        let mut local_order = Vec::new();
+        local_order
+            .try_reserve_exact(entries.len())
+            .map_err(|source| allocation("preservation local order", source))?;
+        local_order.extend(0..entries.len());
+        local_order.sort_unstable_by_key(|&index| entries[index].local_span.start);
+        if entries.is_empty() && (central_start != 0 || head_eocd_offset != 0) {
+            return Err(unsupported("archive prelude data"));
+        }
+        if let Some(&first) = local_order.first() {
+            if entries[first].local_span.start != 0 {
+                return Err(unsupported("archive prelude data"));
+            }
+        }
+
+        for position in 0..local_order.len() {
+            let index = local_order[position];
+            let local_start = entries[index].local_span.start;
+            let local_end = local_order
+                .get(
+                    position
+                        .checked_add(1)
+                        .ok_or_else(|| unsupported("local-member order"))?,
+                )
+                .map(|next| entries[*next].local_span.start)
+                .unwrap_or(central_start);
+            if local_start >= local_end || local_end > central_start {
+                return Err(unsupported("overlapping or empty local-member spans"));
+            }
+
+            let local_central_name_mismatch =
+                validate_local_span(archive, &entries[index], local_end, policy)?;
+            entries[index].local_central_name_mismatch = local_central_name_mismatch;
+            entries[index].local_span.end = local_end;
+        }
+
+        Ok(Self {
+            source: archive.get_ref(),
+            entries,
+            local_order,
+            archive_comment,
+            zip64_tail,
+            archive_end_offset: archive_end,
+        })
+    }
+
+    /// The source members in original central-directory order.
+    pub fn entries(&self) -> &[PreservedEntry] {
+        &self.entries
+    }
+
+    /// The exact exclusive end offset of the located ZIP archive.
+    ///
+    /// This is the EOCD signature offset plus the fixed EOCD record and its
+    /// comment. It deliberately excludes any bytes trailing the located
+    /// archive in the underlying source.
+    pub fn archive_end_offset(&self) -> u64 {
+        self.archive_end_offset
+    }
+
+    /// Validates `plan` completely, then writes it to a non-seekable sink.
+    pub fn write_to<W>(&self, plan: &PreservationPlan, sink: W) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_accounting(plan, sink, &mut accounting)
+    }
+
+    /// Validate and write a preservation plan while recording unchanged source
+    /// bytes accepted by the publication sink. The counter intentionally
+    /// includes unchanged local-member spans, unchanged central-record bytes
+    /// outside regenerated local offsets, and the source archive comment; it
+    /// is not payload-only. Generated member framing and payload are excluded
+    /// from this raw-source counter.
+    pub fn write_to_with_accounting<W>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        self.write_prepared(plan, sink, accounting, None)
+    }
+
+    /// Validate a preservation plan, admit its exact final layout, then write
+    /// it to a non-seekable sink. The admission callback runs after all
+    /// compression, ZIP64 promotion and tail preparation, and before the
+    /// first sink byte is accepted.
+    pub fn write_to_with_admission<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_admission_and_accounting(plan, sink, &mut accounting, admission)
+    }
+
+    /// [`write_to_with_admission`](Self::write_to_with_admission) while
+    /// recording accepted source bytes in the supplied accounting value.
+    pub fn write_to_with_admission_and_accounting<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_prepared_with_admission(plan, sink, accounting, None, admission)
+    }
+
+    /// Admit the exact final layout of a scheduled preservation write before
+    /// publication. Compression scheduling and the bounded worker session are
+    /// retained; admission is the only additional pre-publication phase.
+    pub fn write_to_with_admission_and_session<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_admission_and_accounting_and_session(
+            plan,
+            sink,
+            &mut accounting,
+            session,
+            wave,
+            cancellation,
+            admission,
+        )
+    }
+
+    /// [`write_to_with_admission_and_session`](Self::write_to_with_admission_and_session)
+    /// while recording accepted source bytes.
+    pub fn write_to_with_admission_and_accounting_and_session<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        self.write_prepared_with_admission(
+            plan,
+            sink,
+            accounting,
+            Some(ScheduledWave {
+                session,
+                wave,
+                cancellation,
+            }),
+            admission,
+        )
+    }
+
+    /// Validates `plan` completely, then writes it to a non-seekable sink,
+    /// compressing its regenerated members on an explicit write session.
+    ///
+    /// `wave` is the plan's own verdict from
+    /// [`PreservationPlan::deflate_wave`], optionally narrowed by the caller's
+    /// budget. A wave of width one takes exactly the sequential path
+    /// [`write_to`](Self::write_to) takes, builds no pool, and starts no
+    /// thread.
+    ///
+    /// Scheduling decides only *when* a member is compressed. Which bytes each
+    /// member contributes, the physical order of local records, the
+    /// central-directory order and every typed refusal are all unchanged: a
+    /// member's compressed form is a pure function of that member, and the
+    /// first error in plan order is the error returned, never the first error
+    /// in time.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`write_to`](Self::write_to), plus a typed
+    /// failure when a local worker pool cannot be created, and
+    /// [`ErrorKind::Cancelled`] when `cancellation` reports cancellation
+    /// before or during the wave — in which case nothing has been written to
+    /// `sink`, because every member is compressed before the first byte is
+    /// emitted.
+    pub fn write_to_with_session<W>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut accounting = ZipOperationAccounting::default();
+        self.write_to_with_accounting_and_session(
+            plan,
+            sink,
+            &mut accounting,
+            session,
+            wave,
+            cancellation,
+        )
+    }
+
+    /// [`write_to_with_session`](Self::write_to_with_session) while recording
+    /// unchanged source bytes accepted by the publication sink.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as
+    /// [`write_to_with_session`](Self::write_to_with_session).
+    pub fn write_to_with_accounting_and_session<W>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        session: &ParallelWriteSession,
+        wave: DeflateWave,
+        cancellation: &dyn CancellationProbe,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        self.write_prepared(
+            plan,
+            sink,
+            accounting,
+            Some(ScheduledWave {
+                session,
+                wave,
+                cancellation,
+            }),
+        )
+    }
+
+    fn write_prepared<W>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        scheduled: Option<ScheduledWave<'_>>,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut prepared = self.prepare_with(plan, scheduled)?;
+        let layout = self.validate_output_layout(&mut prepared)?;
+
+        self.emit_prepared(prepared, layout, sink, accounting)
+    }
+
+    fn write_prepared_with_admission<W, F, E>(
+        &self,
+        plan: &PreservationPlan,
+        sink: W,
+        accounting: &mut ZipOperationAccounting,
+        scheduled: Option<ScheduledWave<'_>>,
+        admission: F,
+    ) -> Result<W, PreservationAdmissionError<E>>
+    where
+        W: Write,
+        F: FnOnce(&PreservationOutputProfile<'_>) -> Result<(), E>,
+    {
+        let mut prepared = self
+            .prepare_with(plan, scheduled)
+            .map_err(PreservationAdmissionError::Archive)?;
+        let layout = self
+            .validate_output_layout(&mut prepared)
+            .map_err(PreservationAdmissionError::Archive)?;
+        let profile = build_output_profile(&prepared, &layout, &self.entries)
+            .map_err(PreservationAdmissionError::Archive)?;
+        admission(&profile.view()).map_err(PreservationAdmissionError::Admission)?;
+        self.emit_prepared(prepared, layout, sink, accounting)
+            .map_err(PreservationAdmissionError::Archive)
+    }
+
+    fn emit_prepared<W>(
+        &self,
+        prepared: Vec<PreparedEntry>,
+        layout: OutputLayout,
+        mut sink: W,
+        accounting: &mut ZipOperationAccounting,
+    ) -> Result<W, Error>
+    where
+        W: Write,
+    {
+        let mut copy_buffer = [0u8; COPY_CHUNK_SIZE];
+        for &index in &self.local_order {
+            if prepared[index].omitted {
+                continue;
+            }
+            write_prepared_local(
+                &prepared[index].local,
+                prepared[index].generated_payload.as_ref(),
+                self.source,
+                &mut sink,
+                &mut copy_buffer,
+                accounting,
+            )?;
+        }
+        for entry in prepared.iter().skip(self.entries.len()) {
+            if entry.omitted {
+                continue;
+            }
+            write_prepared_local(
+                &entry.local,
+                entry.generated_payload.as_ref(),
+                self.source,
+                &mut sink,
+                &mut copy_buffer,
+                accounting,
+            )?;
+        }
+
+        for (entry, patch) in prepared
+            .iter()
+            .filter(|entry| !entry.omitted)
+            .zip(layout.central_patches.iter())
+        {
+            let central = entry.central.bytes(&self.entries);
+            let is_unchanged = matches!(&entry.central, PreparedCentral::Copy(_));
+            let source_ranges = match &entry.central {
+                PreparedCentral::Promoted(promotions) => promotions
+                    .first()
+                    .and_then(|promotion| promotion.source_ranges.as_deref()),
+                _ => None,
+            };
+            write_prepared_central(
+                &mut sink,
+                central,
+                patch,
+                is_unchanged,
+                source_ranges,
+                accounting,
+            )?;
+        }
+        write_prepared_tail(&layout.tail, &mut sink, accounting)?;
+        write_all_counted(
+            &mut sink,
+            &self.archive_comment,
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
+        sink.flush()?;
+        Ok(sink)
+    }
+
+    fn prepare(&self, plan: &PreservationPlan) -> Result<Vec<PreparedEntry>, Error> {
+        self.prepare_with(plan, None)
+    }
+
+    fn prepare_with(
+        &self,
+        plan: &PreservationPlan,
+        scheduled: Option<ScheduledWave<'_>>,
+    ) -> Result<Vec<PreparedEntry>, Error> {
+        if plan.actions.len() != self.entries.len() {
+            return Err(unsupported("plan does not cover every entry exactly once"));
+        }
+
+        let mut preserved_name_mismatch = false;
+        let mut generated_new_member = !plan.appended.is_empty();
+        for action in &plan.actions {
+            let (id, is_copy, generated) = match action {
+                PreservationAction::Copy(id) => (*id, true, None),
+                PreservationAction::Omit(id) => (*id, false, None),
+                PreservationAction::Regenerate { id, entry } => (*id, false, Some(entry)),
+            };
+            let index = usize::try_from(id.0).map_err(|_| unsupported("invalid entry ID"))?;
+            let Some(source_entry) = self.entries.get(index) else {
+                return Err(unsupported("invalid entry ID"));
+            };
+            if is_copy && source_entry.local_central_name_mismatch {
+                preserved_name_mismatch = true;
+            }
+            if let Some(entry) = generated {
+                if entry.name.as_bytes() != source_entry.raw_name_bytes() {
+                    generated_new_member = true;
+                }
+            }
+        }
+        if preserved_name_mismatch && generated_new_member {
+            return Err(unsupported(
+                "new members are unsupported with local and central filename mismatch",
+            ));
+        }
+
+        // Every regenerated member is compressed before the first local record
+        // is emitted, so scheduling the compression cannot move the emission
+        // boundary and a cancelled wave leaves the sink untouched.
+        let mut compressed = match scheduled {
+            Some(scheduled) if scheduled.wave.is_parallel() => {
+                if scheduled.cancellation.is_cancelled() {
+                    return Err(crate::office::cancelled_error());
+                }
+                let compressed = compress_deflate_wave(plan, &scheduled)?;
+                if scheduled.cancellation.is_cancelled() {
+                    return Err(crate::office::cancelled_error());
+                }
+                Some(compressed)
+            },
+            Some(_) | None => None,
+        };
+
+        let mut prepared = Vec::new();
+        prepared
+            .try_reserve_exact(self.entries.len())
+            .map_err(|source| allocation("preservation plan", source))?;
+        prepared.resize_with(self.entries.len(), || None);
+        for action in &plan.actions {
+            let (id, generated, omitted) = match action {
+                PreservationAction::Copy(id) => (*id, None, false),
+                PreservationAction::Omit(id) => (*id, None, true),
+                PreservationAction::Regenerate { id, entry } => (*id, Some(entry), false),
+            };
+            let index = usize::try_from(id.0).map_err(|_| unsupported("invalid entry ID"))?;
+            let Some(source_entry) = self.entries.get(index) else {
+                return Err(unsupported("invalid entry ID"));
+            };
+            if prepared[index].is_some() || source_entry.id != id {
+                return Err(unsupported("duplicate entry ID in plan"));
+            }
+
+            prepared[index] = Some(if omitted {
+                PreparedEntry {
+                    local: PreparedLocal::Generated(Vec::new()),
+                    central: PreparedCentral::Generated(Vec::new()),
+                    generated_payload: None,
+                    omitted: true,
+                }
+            } else {
+                match generated {
+                    None => PreparedEntry {
+                        local: PreparedLocal::Copy(source_entry.local_span.clone()),
+                        central: PreparedCentral::Copy(index),
+                        generated_payload: None,
+                        omitted: false,
+                    },
+                    Some(entry) => take_prepared_entry(compressed.as_mut(), entry)?,
+                }
+            });
+        }
+
+        let complete_len = self
+            .entries
+            .len()
+            .checked_add(plan.appended.len())
+            .ok_or_else(|| unsupported("prepared preservation plan length"))?;
+        let mut complete = Vec::new();
+        complete
+            .try_reserve_exact(complete_len)
+            .map_err(|source| allocation("prepared preservation plan", source))?;
+        for entry in prepared {
+            complete.push(
+                entry.ok_or_else(|| unsupported("plan does not cover every entry exactly once"))?,
+            );
+        }
+        for entry in &plan.appended {
+            complete.push(take_prepared_entry(compressed.as_mut(), entry)?);
+        }
+        Ok(complete)
+    }
+
+    fn validate_output_layout(
+        &self,
+        prepared: &mut [PreparedEntry],
+    ) -> Result<OutputLayout, Error> {
+        if prepared.len() < self.entries.len() {
+            return Err(unsupported("prepared preservation plan length"));
+        }
+        let mut local_offsets = Vec::new();
+        local_offsets
+            .try_reserve_exact(prepared.len())
+            .map_err(|source| allocation("preservation local offsets", source))?;
+        local_offsets.resize(prepared.len(), 0_u64);
+        let mut local_size = 0u64;
+        for &index in &self.local_order {
+            if prepared[index].omitted {
+                continue;
+            }
+            validate_prepared_local(&prepared[index], self.archive_end_offset)?;
+            local_offsets[index] = local_size;
+            local_size = local_size
+                .checked_add(prepared[index].local.len()?)
+                .ok_or_else(|| unsupported("output offset overflow"))?;
+        }
+        for (index, entry) in prepared.iter().enumerate().skip(self.entries.len()) {
+            if entry.omitted {
+                continue;
+            }
+            validate_prepared_local(entry, self.archive_end_offset)?;
+            local_offsets[index] = local_size;
+            local_size = local_size
+                .checked_add(entry.local.len()?)
+                .ok_or_else(|| unsupported("output offset overflow"))?;
+        }
+
+        // A fixed-width central offset cannot describe a member after the
+        // ZIP32 range. Promote the central record before measuring the
+        // directory: inserting the ZIP64 extra changes both its record length
+        // and the eventual tail offsets. All promotion and validation remains
+        // in this preflight phase, before the sink sees any bytes.
+        for (index, entry) in prepared.iter_mut().enumerate() {
+            if entry.omitted || local_offsets[index] < u64::from(u32::MAX) {
+                continue;
+            }
+            let needs_promotion = match &entry.central {
+                PreparedCentral::Copy(source_index) => matches!(
+                    &self
+                        .entries
+                        .get(*source_index)
+                        .ok_or_else(|| unsupported("invalid prepared central record"))?
+                        .central_local_header_offset_patch,
+                    CentralLocalHeaderOffsetPatch::Fixed32
+                ),
+                PreparedCentral::Generated(_) | PreparedCentral::Shared { .. } => true,
+                PreparedCentral::Promoted(_) => false,
+            };
+            if needs_promotion {
+                promote_prepared_central(entry, local_offsets[index], &self.entries)?;
+            }
+        }
+
+        let entry_count = usize_to_u64(retained_entry_count(prepared), "preservation entry count")?;
+        let central_size = prepared.iter().try_fold(0u64, |size, entry| {
+            if entry.omitted {
+                return Ok(size);
+            }
+            let central = entry.central.checked_bytes(&self.entries)?;
+            let central_len = usize_to_u64(central.len(), "central-directory record length")?;
+            size.checked_add(central_len)
+                .ok_or_else(|| unsupported("output offset overflow"))
+        })?;
+        let central_start = local_size;
+        let central_end = central_start
+            .checked_add(central_size)
+            .ok_or_else(|| unsupported("output offset overflow"))?;
+        let archive_comment_len = usize_to_u64(self.archive_comment.len(), "archive comment")?;
+        let zip32_tail_size =
+            usize_to_u64(EndOfCentralDirectoryRecordFixed::SIZE, "fixed EOCD size")?;
+        let zip64_tail_size = usize_to_u64(
+            ZIP64_EOCD_FIXED_SIZE
+                .checked_add(ZIP64_LOCATOR_SIZE)
+                .and_then(|size| size.checked_add(EndOfCentralDirectoryRecordFixed::SIZE))
+                .ok_or_else(|| unsupported("ZIP64 tail size"))?,
+            "ZIP64 tail size",
+        )?;
+        let zip32_output_size = central_end
+            .checked_add(zip32_tail_size)
+            .and_then(|size| size.checked_add(archive_comment_len))
+            .ok_or_else(|| unsupported("output offset overflow"))?;
+        let needs_zip64_tail = self.zip64_tail.is_none()
+            && (local_size >= u64::from(u32::MAX)
+                || central_size >= u64::from(u32::MAX)
+                || zip32_output_size >= u64::from(u32::MAX)
+                || retained_entry_count(prepared) >= usize::from(u16::MAX));
+        let tail_size = match self.zip64_tail.as_ref() {
+            Some(tail) => tail.len()?,
+            None if needs_zip64_tail => zip64_tail_size,
+            None => zip32_tail_size,
+        };
+        let output_size = central_end
+            .checked_add(tail_size)
+            .and_then(|size| size.checked_add(archive_comment_len))
+            .ok_or_else(|| unsupported("output offset overflow"))?;
+
+        let mut central_patches = Vec::new();
+        central_patches
+            .try_reserve_exact(prepared.len())
+            .map_err(|source| allocation("preservation central patches", source))?;
+        for (index, entry) in prepared.iter().enumerate() {
+            if entry.omitted {
+                continue;
+            }
+            let central = entry.central.checked_bytes(&self.entries)?;
+            let fixed32_offset = match &entry.central {
+                PreparedCentral::Copy(source_index) => {
+                    matches!(
+                        &self.entries[*source_index].central_local_header_offset_patch,
+                        CentralLocalHeaderOffsetPatch::Fixed32
+                    )
+                },
+                PreparedCentral::Generated(_) | PreparedCentral::Shared { .. } => true,
+                PreparedCentral::Promoted(_) => false,
+            };
+            if fixed32_offset && local_offsets[index] >= u64::from(u32::MAX) {
+                return Err(unsupported("ZIP64 generated local-header offset"));
+            }
+
+            let patch = match &entry.central {
+                PreparedCentral::Copy(source_index) => {
+                    match &self.entries[*source_index].central_local_header_offset_patch {
+                        CentralLocalHeaderOffsetPatch::Fixed32 => {
+                            let offset = u32::try_from(local_offsets[index])
+                                .map_err(|_| unsupported("ZIP64 output promotion"))?;
+                            let mut bytes = [0u8; 8];
+                            bytes[..4].copy_from_slice(&offset.to_le_bytes());
+                            CentralOffsetPatch {
+                                start: CENTRAL_LOCAL_HEADER_OFFSET.start,
+                                end: CENTRAL_LOCAL_HEADER_OFFSET.end,
+                                bytes,
+                                len: 4,
+                            }
+                        },
+                        CentralLocalHeaderOffsetPatch::Zip64(range) => {
+                            let width = range
+                                .end
+                                .checked_sub(range.start)
+                                .ok_or_else(|| unsupported("invalid central offset patch"))?;
+                            if width != 8 || range.end > central.len() {
+                                return Err(unsupported("invalid central offset patch"));
+                            }
+                            let mut bytes = [0u8; 8];
+                            bytes.copy_from_slice(&local_offsets[index].to_le_bytes());
+                            CentralOffsetPatch {
+                                start: range.start,
+                                end: range.end,
+                                bytes,
+                                len: 8,
+                            }
+                        },
+                    }
+                },
+                PreparedCentral::Promoted(promotions) => {
+                    let promotion = promotions
+                        .first()
+                        .ok_or_else(|| unsupported("invalid promoted central record"))?;
+                    let offset_range = &promotion.offset_range;
+                    if offset_range.end > central.len()
+                        || offset_range.end.checked_sub(offset_range.start) != Some(8)
+                    {
+                        return Err(unsupported("invalid promoted central offset range"));
+                    }
+                    let mut bytes = [0u8; 8];
+                    bytes.copy_from_slice(&local_offsets[index].to_le_bytes());
+                    CentralOffsetPatch {
+                        start: offset_range.start,
+                        end: offset_range.end,
+                        bytes,
+                        len: 8,
+                    }
+                },
+                PreparedCentral::Generated(_) | PreparedCentral::Shared { .. } => {
+                    if CENTRAL_LOCAL_HEADER_OFFSET.end > central.len() {
+                        return Err(unsupported("invalid central offset patch"));
+                    }
+                    let offset = u32::try_from(local_offsets[index])
+                        .map_err(|_| unsupported("ZIP64 output promotion"))?;
+                    let mut bytes = [0u8; 8];
+                    bytes[..4].copy_from_slice(&offset.to_le_bytes());
+                    CentralOffsetPatch {
+                        start: CENTRAL_LOCAL_HEADER_OFFSET.start,
+                        end: CENTRAL_LOCAL_HEADER_OFFSET.end,
+                        bytes,
+                        len: 4,
+                    }
+                },
+            };
+            central_patches.push(patch);
+        }
+        if self.zip64_tail.is_none() && !needs_zip64_tail && output_size >= u64::from(u32::MAX) {
+            return Err(unsupported("ZIP64 output promotion"));
+        }
+        if self.archive_comment.len() > usize::from(u16::MAX) {
+            return Err(unsupported("ZIP64 output promotion"));
+        }
+
+        let tail = if let Some(zip64_tail) = &self.zip64_tail {
+            PreparedTail::Zip64(prepare_zip64_tail(
+                Some(zip64_tail),
+                entry_count,
+                central_size,
+                central_start,
+                archive_comment_len,
+            )?)
+        } else if needs_zip64_tail {
+            PreparedTail::Zip64(prepare_zip64_tail(
+                None,
+                entry_count,
+                central_size,
+                central_start,
+                archive_comment_len,
+            )?)
+        } else {
+            PreparedTail::Zip32(prepare_zip32_tail(
+                entry_count,
+                central_size,
+                central_start,
+                archive_comment_len,
+            )?)
+        };
+        Ok(OutputLayout {
+            central_patches,
+            tail,
+            output_size,
+            entry_count,
+            local_bytes: local_size,
+            central_directory_bytes: central_size,
+            tail_bytes: tail_size,
+            archive_comment_bytes: archive_comment_len,
+        })
+    }
+}
+
+#[derive(Debug)]
+struct CentralOffsetPatch {
+    start: usize,
+    end: usize,
+    bytes: [u8; 8],
+    len: usize,
+}
+
+#[derive(Debug)]
+struct PreparedZip64Tail {
+    eocd: Vec<u8>,
+    locator: [u8; ZIP64_LOCATOR_SIZE],
+    classic_eocd: [u8; EndOfCentralDirectoryRecordFixed::SIZE],
+    source_backed: bool,
+}
+
+#[derive(Debug)]
+enum PreparedTail {
+    Zip32([u8; EndOfCentralDirectoryRecordFixed::SIZE]),
+    Zip64(PreparedZip64Tail),
+}
+
+#[derive(Debug)]
+struct OutputLayout {
+    central_patches: Vec<CentralOffsetPatch>,
+    tail: PreparedTail,
+    output_size: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+}
+
+struct PreparedOutputProfile {
+    entries: Vec<PreservationOutputEntry>,
+    prefix_bytes: u64,
+    entry_count: u64,
+    local_bytes: u64,
+    central_directory_bytes: u64,
+    central_metadata_bytes: u64,
+    tail_bytes: u64,
+    archive_comment_bytes: u64,
+    archive_bytes: u64,
+}
+
+impl PreparedOutputProfile {
+    fn view(&self) -> PreservationOutputProfile<'_> {
+        PreservationOutputProfile {
+            entries: &self.entries,
+            prefix_bytes: self.prefix_bytes,
+            entry_count: self.entry_count,
+            local_bytes: self.local_bytes,
+            central_directory_bytes: self.central_directory_bytes,
+            central_metadata_bytes: self.central_metadata_bytes,
+            tail_bytes: self.tail_bytes,
+            archive_comment_bytes: self.archive_comment_bytes,
+            archive_bytes: self.archive_bytes,
+        }
+    }
+}
+
+fn central_entry_sizes(central: &[u8]) -> Result<(u64, u64), Error> {
+    let fixed = ZipFileHeaderFixed::parse(central)?;
+    let name_end = ZipFileHeaderFixed::SIZE
+        .checked_add(usize::from(fixed.file_name_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    let extra_end = name_end
+        .checked_add(usize::from(fixed.extra_field_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    let record_end = extra_end
+        .checked_add(usize::from(fixed.file_comment_len))
+        .ok_or_else(|| unsupported("central-directory metadata range"))?;
+    if record_end != central.len() {
+        return Err(unsupported("central-directory record length"));
+    }
+    let extra = &central[name_end..extra_end];
+    let mut compressed = (
+        u64::from(fixed.compressed_size),
+        fixed.compressed_size == u32::MAX,
+    );
+    let mut uncompressed = (
+        u64::from(fixed.uncompressed_size),
+        fixed.uncompressed_size == u32::MAX,
+    );
+    if !compressed.1 && !uncompressed.1 {
+        return Ok((compressed.0, uncompressed.0));
+    }
+
+    let mut fields = ExtraFields::new(extra);
+    while !fields.remaining_bytes().is_empty() {
+        let Some((field_id, field_data)) = fields.next() else {
+            return Err(unsupported("malformed central extra fields"));
+        };
+        if field_id != ExtraFieldId::ZIP64 {
+            continue;
+        }
+        let mut cursor = 0usize;
+        let read_u64 = |cursor: &mut usize| -> Result<u64, Error> {
+            let end = cursor
+                .checked_add(8)
+                .ok_or_else(|| unsupported("ZIP64 size field"))?;
+            let bytes = field_data
+                .get(*cursor..end)
+                .ok_or_else(|| unsupported("truncated ZIP64 size field"))?;
+            *cursor = end;
+            Ok(u64::from_le_bytes(
+                bytes
+                    .try_into()
+                    .map_err(|_| unsupported("ZIP64 size field"))?,
+            ))
+        };
+        if uncompressed.1 {
+            uncompressed.0 = read_u64(&mut cursor)?;
+            uncompressed.1 = false;
+        }
+        if compressed.1 {
+            compressed.0 = read_u64(&mut cursor)?;
+            compressed.1 = false;
+        }
+        break;
+    }
+    if compressed.1 || uncompressed.1 {
+        return Err(unsupported("missing ZIP64 size fields"));
+    }
+    Ok((compressed.0, uncompressed.0))
+}
+
+fn build_output_profile(
+    prepared: &[PreparedEntry],
+    layout: &OutputLayout,
+    source_entries: &[PreservedEntry],
+) -> Result<PreparedOutputProfile, Error> {
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(
+            usize::try_from(layout.entry_count)
+                .map_err(|_| unsupported("preservation output entry count"))?,
+        )
+        .map_err(|source| allocation("preservation output profile", source))?;
+    let mut metadata_total = 0_u64;
+    for entry in prepared.iter().filter(|entry| !entry.omitted) {
+        let central = entry.central.checked_bytes(source_entries)?;
+        let fixed = ZipFileHeaderFixed::parse(central)?;
+        let metadata_len = u64::from(fixed.file_name_len)
+            .checked_add(u64::from(fixed.extra_field_len))
+            .and_then(|size| size.checked_add(u64::from(fixed.file_comment_len)))
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        metadata_total = metadata_total
+            .checked_add(metadata_len)
+            .ok_or_else(|| unsupported("central-directory metadata length"))?;
+        let (compressed_size, uncompressed_size) = central_entry_sizes(central)?;
+        entries.push(PreservationOutputEntry {
+            raw_name_len: u64::from(fixed.file_name_len),
+            extra_len: u64::from(fixed.extra_field_len),
+            comment_len: u64::from(fixed.file_comment_len),
+            metadata_len,
+            central_record_len: usize_to_u64(central.len(), "central-directory record length")?,
+            compressed_size,
+            uncompressed_size,
+        });
+    }
+    if usize_to_u64(entries.len(), "preservation output entry count")? != layout.entry_count {
+        return Err(unsupported("preservation output profile mismatch"));
+    }
+    Ok(PreparedOutputProfile {
+        entries,
+        prefix_bytes: 0,
+        entry_count: layout.entry_count,
+        local_bytes: layout.local_bytes,
+        central_directory_bytes: layout.central_directory_bytes,
+        central_metadata_bytes: metadata_total,
+        tail_bytes: layout.tail_bytes,
+        archive_comment_bytes: layout.archive_comment_bytes,
+        archive_bytes: layout.output_size,
+    })
+}
+
+fn write_prepared_central<W: Write>(
+    sink: &mut W,
+    bytes: &[u8],
+    patch: &CentralOffsetPatch,
+    count_source: bool,
+    source_ranges: Option<&[Range<usize>]>,
+    accounting: &mut ZipOperationAccounting,
+) -> Result<(), Error> {
+    debug_assert!(patch.start <= patch.end);
+    debug_assert_eq!(patch.end.checked_sub(patch.start), Some(patch.len));
+    debug_assert!(patch.end <= bytes.len());
+    if let Some(source_ranges) = source_ranges {
+        write_prepared_central_range(sink, bytes, 0, patch.start, source_ranges, accounting)?;
+    } else if count_source {
+        write_all_counted(
+            sink,
+            &bytes[..patch.start],
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
+    } else {
+        sink.write_all(&bytes[..patch.start])?;
+    }
+    sink.write_all(&patch.bytes[..patch.len])?;
+    if let Some(source_ranges) = source_ranges {
+        write_prepared_central_range(
+            sink,
+            bytes,
+            patch.end,
+            bytes.len(),
+            source_ranges,
+            accounting,
+        )?;
+    } else if count_source {
+        write_all_counted(
+            sink,
+            &bytes[patch.end..],
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
+    } else {
+        sink.write_all(&bytes[patch.end..])?;
+    }
+    Ok(())
+}
+
+fn write_prepared_central_range<W: Write>(
+    sink: &mut W,
+    bytes: &[u8],
+    start: usize,
+    end: usize,
+    source_ranges: &[Range<usize>],
+    accounting: &mut ZipOperationAccounting,
+) -> Result<(), Error> {
+    let mut cursor = start;
+    for source_range in source_ranges {
+        if source_range.end <= start {
+            continue;
+        }
+        if source_range.start >= end {
+            break;
+        }
+        let range_start = source_range.start.max(start);
+        let range_end = source_range.end.min(end);
+        if range_end <= cursor {
+            continue;
+        }
+        if range_start > cursor {
+            sink.write_all(&bytes[cursor..range_start])?;
+        }
+        write_all_counted(
+            sink,
+            &bytes[range_start..range_end],
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
+        cursor = range_end;
+    }
+    if cursor < end {
+        sink.write_all(&bytes[cursor..end])?;
+    }
+    Ok(())
+}
+
+fn write_prepared_tail<W: Write>(
+    tail: &PreparedTail,
+    sink: &mut W,
+    accounting: &mut ZipOperationAccounting,
+) -> Result<(), Error> {
+    match tail {
+        PreparedTail::Zip32(eocd) => sink.write_all(eocd)?,
+        PreparedTail::Zip64(tail) => {
+            if !tail.source_backed {
+                sink.write_all(&tail.eocd)?;
+                sink.write_all(&tail.locator)?;
+                sink.write_all(&tail.classic_eocd)?;
+                return Ok(());
+            }
+            write_all_counted(
+                sink,
+                &tail.eocd[..24],
+                accounting,
+                AccountingWriteKind::RawUnchangedSource,
+            )?;
+            sink.write_all(&tail.eocd[24..56])?;
+            write_all_counted(
+                sink,
+                &tail.eocd[56..],
+                accounting,
+                AccountingWriteKind::RawUnchangedSource,
+            )?;
+
+            write_all_counted(
+                sink,
+                &tail.locator[..8],
+                accounting,
+                AccountingWriteKind::RawUnchangedSource,
+            )?;
+            sink.write_all(&tail.locator[8..16])?;
+            write_all_counted(
+                sink,
+                &tail.locator[16..],
+                accounting,
+                AccountingWriteKind::RawUnchangedSource,
+            )?;
+
+            write_all_counted(
+                sink,
+                &tail.classic_eocd[..8],
+                accounting,
+                AccountingWriteKind::RawUnchangedSource,
+            )?;
+            sink.write_all(&tail.classic_eocd[8..20])?;
+            write_all_counted(
+                sink,
+                &tail.classic_eocd[20..],
+                accounting,
+                AccountingWriteKind::RawUnchangedSource,
+            )?;
+        },
+    }
+    Ok(())
+}
+
+fn prepare_zip32_tail(
+    entry_count: u64,
+    central_size: u64,
+    central_offset: u64,
+    comment_len: u64,
+) -> Result<[u8; EndOfCentralDirectoryRecordFixed::SIZE], Error> {
+    let entry_count =
+        u16::try_from(entry_count).map_err(|_| unsupported("ZIP64 output promotion"))?;
+    let central_size =
+        u32::try_from(central_size).map_err(|_| unsupported("ZIP64 output promotion"))?;
+    let central_offset =
+        u32::try_from(central_offset).map_err(|_| unsupported("ZIP64 output promotion"))?;
+    let comment_len =
+        u16::try_from(comment_len).map_err(|_| unsupported("ZIP64 output promotion"))?;
+    let mut eocd = [0u8; EndOfCentralDirectoryRecordFixed::SIZE];
+    eocd[..4].copy_from_slice(&0x0605_4b50u32.to_le_bytes());
+    eocd[8..10].copy_from_slice(&entry_count.to_le_bytes());
+    eocd[10..12].copy_from_slice(&entry_count.to_le_bytes());
+    eocd[12..16].copy_from_slice(&central_size.to_le_bytes());
+    eocd[16..20].copy_from_slice(&central_offset.to_le_bytes());
+    eocd[20..22].copy_from_slice(&comment_len.to_le_bytes());
+    Ok(eocd)
+}
+
+fn prepare_zip64_tail(
+    tail: Option<&Zip64Tail>,
+    entry_count: u64,
+    central_size: u64,
+    central_offset: u64,
+    comment_len: u64,
+) -> Result<PreparedZip64Tail, Error> {
+    let Some(tail) = tail else {
+        let zip64_eocd_offset = central_offset
+            .checked_add(central_size)
+            .ok_or_else(|| unsupported("ZIP64 EOCD output offset"))?;
+        let mut eocd = Vec::new();
+        eocd.try_reserve_exact(ZIP64_EOCD_FIXED_SIZE)
+            .map_err(|source| allocation("prepared ZIP64 EOCD", source))?;
+        eocd.resize(ZIP64_EOCD_FIXED_SIZE, 0);
+        eocd[..4].copy_from_slice(&0x0606_4b50u32.to_le_bytes());
+        eocd[4..12].copy_from_slice(&ZIP64_EOCD_FIXED_PAYLOAD_SIZE.to_le_bytes());
+        eocd[12..14].copy_from_slice(&45u16.to_le_bytes());
+        eocd[14..16].copy_from_slice(&45u16.to_le_bytes());
+        eocd[16..20].copy_from_slice(&0u32.to_le_bytes());
+        eocd[20..24].copy_from_slice(&0u32.to_le_bytes());
+        eocd[24..32].copy_from_slice(&entry_count.to_le_bytes());
+        eocd[32..40].copy_from_slice(&entry_count.to_le_bytes());
+        eocd[40..48].copy_from_slice(&central_size.to_le_bytes());
+        eocd[48..56].copy_from_slice(&central_offset.to_le_bytes());
+
+        let mut locator = [0u8; ZIP64_LOCATOR_SIZE];
+        locator[..4].copy_from_slice(&ZIP64_LOCATOR_SIGNATURE.to_le_bytes());
+        locator[4..8].copy_from_slice(&0u32.to_le_bytes());
+        locator[8..16].copy_from_slice(&zip64_eocd_offset.to_le_bytes());
+        locator[16..20].copy_from_slice(&1u32.to_le_bytes());
+
+        let mut classic_eocd = [0u8; EndOfCentralDirectoryRecordFixed::SIZE];
+        classic_eocd[..4].copy_from_slice(&0x0605_4b50u32.to_le_bytes());
+        // A synthesized ZIP64 tail must be discoverable from the classic
+        // EOCD. Emit the four ZIP32 sentinels even when an individual value
+        // still fits; the ZIP64 EOCD carries the authoritative values.
+        classic_eocd[8..10].copy_from_slice(&u16::MAX.to_le_bytes());
+        classic_eocd[10..12].copy_from_slice(&u16::MAX.to_le_bytes());
+        classic_eocd[12..16].copy_from_slice(&u32::MAX.to_le_bytes());
+        classic_eocd[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
+        classic_eocd[20..22].copy_from_slice(
+            &u16::try_from(comment_len)
+                .map_err(|_| unsupported("ZIP64 output promotion"))?
+                .to_le_bytes(),
+        );
+        return Ok(PreparedZip64Tail {
+            eocd,
+            locator,
+            classic_eocd,
+            source_backed: false,
+        });
+    };
+
+    if tail.eocd.len() < ZIP64_EOCD_FIXED_SIZE
+        || tail.locator.len() != ZIP64_LOCATOR_SIZE
+        || tail.classic_eocd.len() != EndOfCentralDirectoryRecordFixed::SIZE
+    {
+        return Err(unsupported("invalid retained ZIP64 tail"));
+    }
+
+    let size = u64::from_le_bytes(
+        tail.eocd
+            .get(4..12)
+            .ok_or_else(|| unsupported("invalid retained ZIP64 tail"))?
+            .try_into()
+            .map_err(|_| unsupported("invalid retained ZIP64 tail"))?,
+    );
+    let expected_len = size
+        .checked_add(12)
+        .ok_or_else(|| unsupported("ZIP64 EOCD output length"))?;
+    if usize_to_u64(tail.eocd.len(), "ZIP64 EOCD output length")? != expected_len {
+        return Err(unsupported("invalid retained ZIP64 tail"));
+    }
+    let zip64_eocd_offset = central_offset
+        .checked_add(central_size)
+        .ok_or_else(|| unsupported("ZIP64 EOCD output offset"))?;
+
+    let mut zip64_eocd = Vec::new();
+    zip64_eocd
+        .try_reserve_exact(tail.eocd.len())
+        .map_err(|source| allocation("prepared ZIP64 EOCD", source))?;
+    zip64_eocd.extend_from_slice(&tail.eocd);
+    zip64_eocd[24..32].copy_from_slice(&entry_count.to_le_bytes());
+    zip64_eocd[32..40].copy_from_slice(&entry_count.to_le_bytes());
+    zip64_eocd[40..48].copy_from_slice(&central_size.to_le_bytes());
+    zip64_eocd[48..56].copy_from_slice(&central_offset.to_le_bytes());
+    let mut locator = [0u8; ZIP64_LOCATOR_SIZE];
+    locator.copy_from_slice(&tail.locator);
+    locator[8..16].copy_from_slice(&zip64_eocd_offset.to_le_bytes());
+
+    let mut classic_eocd = [0u8; EndOfCentralDirectoryRecordFixed::SIZE];
+    classic_eocd.copy_from_slice(&tail.classic_eocd);
+    let original_num_entries = u16::from_le_bytes(
+        tail.classic_eocd[8..10]
+            .try_into()
+            .map_err(|_| unsupported("invalid retained ZIP64 tail"))?,
+    );
+    let original_total_entries = u16::from_le_bytes(
+        tail.classic_eocd[10..12]
+            .try_into()
+            .map_err(|_| unsupported("invalid retained ZIP64 tail"))?,
+    );
+    let original_central_size = u32::from_le_bytes(
+        tail.classic_eocd[12..16]
+            .try_into()
+            .map_err(|_| unsupported("invalid retained ZIP64 tail"))?,
+    );
+    let original_central_offset = u32::from_le_bytes(
+        tail.classic_eocd[16..20]
+            .try_into()
+            .map_err(|_| unsupported("invalid retained ZIP64 tail"))?,
+    );
+    classic_eocd[8..10].copy_from_slice(&zip32_u16_field(original_num_entries, entry_count)?);
+    classic_eocd[10..12].copy_from_slice(&zip32_u16_field(original_total_entries, entry_count)?);
+    classic_eocd[12..16].copy_from_slice(&zip32_u32_field(original_central_size, central_size)?);
+    classic_eocd[16..20]
+        .copy_from_slice(&zip32_u32_field(original_central_offset, central_offset)?);
+    Ok(PreparedZip64Tail {
+        eocd: zip64_eocd,
+        locator,
+        classic_eocd,
+        source_backed: true,
+    })
+}
+
+fn zip32_u16_field(original: u16, value: u64) -> Result<[u8; 2], Error> {
+    if original == u16::MAX || value >= u64::from(u16::MAX) {
+        Ok(u16::MAX.to_le_bytes())
+    } else {
+        Ok(u16::try_from(value)
+            .map_err(|_| unsupported("ZIP64 output promotion"))?
+            .to_le_bytes())
+    }
+}
+
+fn zip32_u32_field(original: u32, value: u64) -> Result<[u8; 4], Error> {
+    if original == u32::MAX || value >= u64::from(u32::MAX) {
+        Ok(u32::MAX.to_le_bytes())
+    } else {
+        Ok(u32::try_from(value)
+            .map_err(|_| unsupported("ZIP64 output promotion"))?
+            .to_le_bytes())
+    }
+}
+
+struct PreparedEntry {
+    local: PreparedLocal,
+    central: PreparedCentral,
+    generated_payload: Option<GeneratedPayload>,
+    omitted: bool,
+}
+
+struct GeneratedPayload {
+    range: Range<usize>,
+    kind: AccountingWriteKind,
+}
+
+fn retained_entry_count(prepared: &[PreparedEntry]) -> usize {
+    prepared.iter().filter(|entry| !entry.omitted).count()
+}
+
+enum PreparedCentral {
+    Copy(usize),
+    Generated(Vec<u8>),
+    /// Generated local and central records may share the one archive buffer.
+    ///
+    /// Keeping ranges into the finished one-entry archive avoids copying the
+    /// central record into a second allocation merely to retain it while the
+    /// local record is emitted to a forward-only sink.
+    Shared {
+        bytes: Arc<Vec<u8>>,
+        range: Range<usize>,
+    },
+    /// A source or generated central record whose fixed-width local-header
+    /// offset was promoted to the ZIP64 extra field during preflight.
+    Promoted(Vec<PromotedCentral>),
+}
+
+impl PreparedCentral {
+    fn bytes<'a>(&'a self, entries: &'a [PreservedEntry]) -> &'a [u8] {
+        match self {
+            Self::Copy(index) => &entries[*index].central_bytes,
+            Self::Generated(bytes) => bytes,
+            Self::Shared { bytes, range } => &bytes[range.start..range.end],
+            Self::Promoted(promotions) => {
+                &promotions
+                    .first()
+                    .expect("promoted central record is preflighted")
+                    .bytes
+            },
+        }
+    }
+
+    fn checked_bytes<'a>(&'a self, entries: &'a [PreservedEntry]) -> Result<&'a [u8], Error> {
+        match self {
+            Self::Copy(index) => entries
+                .get(*index)
+                .map(|entry| entry.central_bytes.as_slice())
+                .ok_or_else(|| unsupported("invalid prepared central record")),
+            Self::Generated(bytes) => Ok(bytes),
+            Self::Shared { bytes, range } => bytes
+                .get(range.clone())
+                .ok_or_else(|| unsupported("invalid prepared central range")),
+            Self::Promoted(promotions) => {
+                let promotion = promotions
+                    .first()
+                    .ok_or_else(|| unsupported("invalid promoted central record"))?;
+                let bytes = &promotion.bytes;
+                let offset_range = &promotion.offset_range;
+                if offset_range.end > bytes.len()
+                    || offset_range.end.checked_sub(offset_range.start) != Some(8)
+                {
+                    return Err(unsupported("invalid promoted central offset range"));
+                }
+                if let Some(source_ranges) = &promotion.source_ranges {
+                    validate_source_ranges(bytes.len(), offset_range, source_ranges)?;
+                }
+                Ok(bytes)
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+struct PromotedCentral {
+    bytes: Vec<u8>,
+    offset_range: Range<usize>,
+    source_ranges: Option<Vec<Range<usize>>>,
+}
+
+fn promote_prepared_central(
+    entry: &mut PreparedEntry,
+    local_header_offset: u64,
+    source_entries: &[PreservedEntry],
+) -> Result<(), Error> {
+    let promoted = match &entry.central {
+        PreparedCentral::Copy(source_index) => {
+            let source = source_entries
+                .get(*source_index)
+                .ok_or_else(|| unsupported("invalid prepared central record"))?;
+            promote_central_record(&source.central_bytes, local_header_offset, true)?
+        },
+        PreparedCentral::Generated(bytes) => {
+            promote_central_record(bytes, local_header_offset, false)?
+        },
+        PreparedCentral::Shared { bytes, range } => {
+            let central = bytes
+                .get(range.clone())
+                .ok_or_else(|| unsupported("invalid prepared central range"))?;
+            promote_central_record(central, local_header_offset, false)?
+        },
+        PreparedCentral::Promoted(_) => return Ok(()),
+    };
+    let mut promotions = Vec::new();
+    promotions
+        .try_reserve_exact(1)
+        .map_err(|source| allocation("promoted central records", source))?;
+    promotions.push(promoted);
+    entry.central = PreparedCentral::Promoted(promotions);
+    Ok(())
+}
+
+fn promote_central_record(
+    bytes: &[u8],
+    local_header_offset: u64,
+    source_backed: bool,
+) -> Result<PromotedCentral, Error> {
+    let fixed = ZipFileHeaderFixed::parse(bytes)
+        .map_err(|_| unsupported("invalid prepared central record"))?;
+    let record_len = ZipFileHeaderFixed::SIZE
+        .checked_add(fixed.variable_length())
+        .ok_or_else(|| unsupported("central-directory record length"))?;
+    if record_len != bytes.len() || fixed.local_header_offset == u32::MAX {
+        return Err(unsupported("invalid central offset promotion source"));
+    }
+
+    let name_end = ZipFileHeaderFixed::SIZE
+        .checked_add(usize::from(fixed.file_name_len))
+        .ok_or_else(|| unsupported("central-directory record length"))?;
+    let extra_end = name_end
+        .checked_add(usize::from(fixed.extra_field_len))
+        .ok_or_else(|| unsupported("central-directory record length"))?;
+    if extra_end.checked_add(usize::from(fixed.file_comment_len)) != Some(bytes.len()) {
+        return Err(unsupported("invalid prepared central record"));
+    }
+    let extra = &bytes[name_end..extra_end];
+
+    let mut zip64_field = None;
+    let mut fields = ExtraFields::new(extra);
+    while !fields.remaining_bytes().is_empty() {
+        let before = fields.remaining_bytes().len();
+        let Some((field_id, field_data)) = fields.next() else {
+            return Err(unsupported("malformed central extra fields"));
+        };
+        let field_start = extra
+            .len()
+            .checked_sub(before)
+            .ok_or_else(|| unsupported("central extra field range"))?;
+        let field_len = 4usize
+            .checked_add(field_data.len())
+            .ok_or_else(|| unsupported("central extra field range"))?;
+        let field_end = field_start
+            .checked_add(field_len)
+            .ok_or_else(|| unsupported("central extra field range"))?;
+        if field_id == ExtraFieldId::ZIP64
+            && zip64_field
+                .replace((field_start, field_end, field_data.len()))
+                .is_some()
+        {
+            return Err(unsupported("duplicate central ZIP64 extra fields"));
+        }
+    }
+    if !fields.remaining_bytes().is_empty() {
+        return Err(unsupported("malformed central extra fields"));
+    }
+
+    let needs_uncompressed = fixed.uncompressed_size == u32::MAX;
+    let needs_compressed = fixed.compressed_size == u32::MAX;
+    let needs_disk = fixed.disk_number_start == u16::MAX;
+    let existing_body_len = usize::from(u8::from(needs_uncompressed))
+        .checked_add(usize::from(u8::from(needs_compressed)))
+        .and_then(|count| count.checked_mul(8))
+        .and_then(|size| size.checked_add(usize::from(u8::from(needs_disk)).checked_mul(4)?))
+        .ok_or_else(|| unsupported("central ZIP64 extra length"))?;
+
+    let (zip64_field_start, zip64_field_end, zip64_body_len, zip64_insert_pos) =
+        if let Some((field_start, field_end, body_len)) = zip64_field {
+            if body_len != existing_body_len {
+                return Err(unsupported("ambiguous central ZIP64 extra fields"));
+            }
+            let body_start = field_start
+                .checked_add(4)
+                .ok_or_else(|| unsupported("central ZIP64 extra range"))?;
+            let insert_pos = body_start
+                .checked_add(existing_body_len)
+                .and_then(|pos| pos.checked_sub(usize::from(u8::from(needs_disk)).checked_mul(4)?))
+                .ok_or_else(|| unsupported("central ZIP64 extra range"))?;
+            (Some(field_start), Some(field_end), body_len, insert_pos)
+        } else {
+            if needs_uncompressed || needs_compressed || needs_disk {
+                return Err(unsupported("missing central ZIP64 extra field"));
+            }
+            (None, None, 0, extra.len())
+        };
+
+    let inserted_len = if zip64_field_start.is_some() { 8 } else { 12 };
+    let new_extra_len = extra
+        .len()
+        .checked_add(inserted_len)
+        .ok_or_else(|| unsupported("central ZIP64 extra length"))?;
+    let new_extra_len_u16 = u16::try_from(new_extra_len)
+        .map_err(|_| unsupported("central ZIP64 extra length overflow"))?;
+    let new_record_len = bytes
+        .len()
+        .checked_add(inserted_len)
+        .ok_or_else(|| unsupported("central-directory record length"))?;
+
+    let mut promoted = Vec::new();
+    promoted
+        .try_reserve_exact(new_record_len)
+        .map_err(|source| allocation("promoted central record", source))?;
+    let mut source_ranges = source_backed.then(Vec::new);
+    if let Some(ranges) = &mut source_ranges {
+        ranges
+            .try_reserve_exact(12)
+            .map_err(|source| allocation("promoted central source ranges", source))?;
+    }
+
+    append_central_source_piece(&mut promoted, &mut source_ranges, bytes, 0..4);
+    append_central_source_piece(&mut promoted, &mut source_ranges, bytes, 4..6);
+    let new_version_needed = fixed.version_needed.max(45);
+    if fixed.version_needed == new_version_needed {
+        append_central_source_piece(&mut promoted, &mut source_ranges, bytes, 6..8);
+    } else {
+        promoted.extend_from_slice(&new_version_needed.to_le_bytes());
+    }
+    append_central_source_piece(&mut promoted, &mut source_ranges, bytes, 8..30);
+    promoted.extend_from_slice(&new_extra_len_u16.to_le_bytes());
+    append_central_source_piece(&mut promoted, &mut source_ranges, bytes, 32..42);
+    promoted.extend_from_slice(&u32::MAX.to_le_bytes());
+    append_central_source_piece(&mut promoted, &mut source_ranges, bytes, 46..name_end);
+
+    let offset_range =
+        if let (Some(field_start), Some(field_end)) = (zip64_field_start, zip64_field_end) {
+            let field_start_in_record = name_end
+                .checked_add(field_start)
+                .ok_or_else(|| unsupported("central ZIP64 extra range"))?;
+            let field_end_in_record = name_end
+                .checked_add(field_end)
+                .ok_or_else(|| unsupported("central ZIP64 extra range"))?;
+            append_central_source_piece(
+                &mut promoted,
+                &mut source_ranges,
+                bytes,
+                name_end..field_start_in_record,
+            );
+            append_central_source_piece(
+                &mut promoted,
+                &mut source_ranges,
+                bytes,
+                field_start_in_record..field_start_in_record + 2,
+            );
+            let zip64_body_len = u16::try_from(zip64_body_len + 8)
+                .map_err(|_| unsupported("central ZIP64 extra length overflow"))?;
+            promoted.extend_from_slice(&zip64_body_len.to_le_bytes());
+            let body_start_in_record = field_start_in_record
+                .checked_add(4)
+                .ok_or_else(|| unsupported("central ZIP64 extra range"))?;
+            let insert_in_record = name_end
+                .checked_add(zip64_insert_pos)
+                .ok_or_else(|| unsupported("central ZIP64 extra range"))?;
+            append_central_source_piece(
+                &mut promoted,
+                &mut source_ranges,
+                bytes,
+                body_start_in_record..insert_in_record,
+            );
+            let offset_start = promoted.len();
+            promoted.extend_from_slice(&local_header_offset.to_le_bytes());
+            let offset_range = offset_start..offset_start + 8;
+            append_central_source_piece(
+                &mut promoted,
+                &mut source_ranges,
+                bytes,
+                insert_in_record..field_end_in_record,
+            );
+            append_central_source_piece(
+                &mut promoted,
+                &mut source_ranges,
+                bytes,
+                field_end_in_record..extra_end,
+            );
+            offset_range
+        } else {
+            append_central_source_piece(
+                &mut promoted,
+                &mut source_ranges,
+                bytes,
+                name_end..extra_end,
+            );
+            promoted.extend_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+            promoted.extend_from_slice(&8u16.to_le_bytes());
+            let offset_start = promoted.len();
+            promoted.extend_from_slice(&local_header_offset.to_le_bytes());
+            let offset_range = offset_start..offset_start + 8;
+            offset_range
+        };
+
+    append_central_source_piece(
+        &mut promoted,
+        &mut source_ranges,
+        bytes,
+        extra_end..bytes.len(),
+    );
+    if promoted.len() != new_record_len {
+        return Err(unsupported("central ZIP64 promotion length"));
+    }
+    if let Some(ranges) = &source_ranges {
+        validate_source_ranges(promoted.len(), &offset_range, ranges)?;
+    }
+    Ok(PromotedCentral {
+        bytes: promoted,
+        offset_range,
+        source_ranges,
+    })
+}
+
+fn append_central_source_piece(
+    output: &mut Vec<u8>,
+    source_ranges: &mut Option<Vec<Range<usize>>>,
+    source: &[u8],
+    range: Range<usize>,
+) {
+    if range.start == range.end {
+        return;
+    }
+    let start = output.len();
+    output.extend_from_slice(&source[range]);
+    if let Some(ranges) = source_ranges {
+        let end = output.len();
+        if let Some(last) = ranges.last_mut() {
+            if last.end == start {
+                last.end = end;
+                return;
+            }
+        }
+        ranges.push(start..end);
+    }
+}
+
+fn validate_source_ranges(
+    bytes_len: usize,
+    offset_range: &Range<usize>,
+    source_ranges: &[Range<usize>],
+) -> Result<(), Error> {
+    let mut previous_end = 0usize;
+    for range in source_ranges {
+        if range.start > range.end
+            || range.end > bytes_len
+            || range.start < previous_end
+            || range.start < offset_range.end && offset_range.start < range.end
+        {
+            return Err(unsupported("invalid promoted central source ranges"));
+        }
+        previous_end = range.end;
+    }
+    Ok(())
+}
+
+enum PreparedLocal {
+    Copy(Range<u64>),
+    Generated(Vec<u8>),
+    /// A range into the same finished archive buffer retained by the central
+    /// record. This keeps generated-member publication forward-only without
+    /// copying the central directory bytes.
+    Shared {
+        bytes: Arc<Vec<u8>>,
+        range: Range<usize>,
+    },
+    /// Sized local framing retained separately from a shared payload. This is
+    /// used only for verified precompressed payloads and already-shared Store
+    /// payloads, whose bytes can be written directly to the destination
+    /// without staging another complete one-entry archive.
+    FramedPayload {
+        framing: Vec<u8>,
+        payload: PreparedPayload,
+        range: Range<usize>,
+    },
+    /// Sized local framing for a replayable generated member. The logical
+    /// payload is emitted by the replay callback after layout preflight.
+    Replay {
+        framing: Vec<u8>,
+        compressed_len: u64,
+    },
+}
+
+enum PreparedPayload {
+    Shared(Arc<Vec<u8>>),
+    Precompressed(VerifiedPrecompressedEntry),
+}
+
+impl PreparedPayload {
+    fn bytes(&self) -> &[u8] {
+        match self {
+            Self::Shared(bytes) => bytes,
+            Self::Precompressed(entry) => entry.compressed_payload(),
+        }
+    }
+}
+
+impl PreparedLocal {
+    fn len(&self) -> Result<u64, Error> {
+        match self {
+            Self::Copy(range) => range
+                .end
+                .checked_sub(range.start)
+                .ok_or_else(|| unsupported("invalid prepared local range")),
+            Self::Generated(bytes) => usize_to_u64(bytes.len(), "generated local bytes"),
+            Self::Shared { bytes, range } => {
+                if bytes.get(range.clone()).is_none() {
+                    return Err(unsupported("invalid prepared local range"));
+                }
+                usize_to_u64(
+                    range
+                        .end
+                        .checked_sub(range.start)
+                        .ok_or_else(|| unsupported("invalid prepared local range"))?,
+                    "prepared local range",
+                )
+            },
+            Self::FramedPayload {
+                framing,
+                payload,
+                range,
+            } => {
+                if payload.bytes().get(range.clone()).is_none() {
+                    return Err(unsupported("invalid prepared payload range"));
+                }
+                usize_to_u64(framing.len(), "generated local framing")?
+                    .checked_add(usize_to_u64(
+                        range
+                            .end
+                            .checked_sub(range.start)
+                            .ok_or_else(|| unsupported("invalid prepared payload range"))?,
+                        "prepared payload range",
+                    )?)
+                    .ok_or_else(|| unsupported("generated local length overflow"))
+            },
+            Self::Replay {
+                framing,
+                compressed_len,
+            } => usize_to_u64(framing.len(), "generated replay local framing")?
+                .checked_add(*compressed_len)
+                .ok_or_else(|| unsupported("generated replay local length overflow")),
+        }
+    }
+}
+
+fn validate_prepared_local(entry: &PreparedEntry, source_end: u64) -> Result<(), Error> {
+    match (&entry.local, &entry.generated_payload) {
+        (PreparedLocal::Copy(range), None) => {
+            if range.end < range.start || range.end > source_end {
+                return Err(unsupported("invalid prepared source range"));
+            }
+            Ok(())
+        },
+        (PreparedLocal::Generated(_), None) => Ok(()),
+        (
+            PreparedLocal::Shared { bytes, range },
+            Some(GeneratedPayload {
+                range: payload_range,
+                ..
+            }),
+        ) => {
+            if bytes.get(range.clone()).is_none()
+                || bytes.get(payload_range.clone()).is_none()
+                || payload_range.start < range.start
+                || payload_range.end > range.end
+                || payload_range.start > payload_range.end
+            {
+                return Err(unsupported("generated payload outside local member"));
+            }
+            Ok(())
+        },
+        (PreparedLocal::Shared { bytes, range }, None) => {
+            if bytes.get(range.clone()).is_none() {
+                return Err(unsupported("invalid prepared local range"));
+            }
+            Ok(())
+        },
+        (
+            PreparedLocal::FramedPayload { payload, range, .. },
+            Some(GeneratedPayload {
+                range: payload_range,
+                ..
+            }),
+        ) => {
+            if payload.bytes().get(range.clone()).is_none()
+                || payload_range != range
+                || payload_range.start > payload_range.end
+            {
+                return Err(unsupported("invalid prepared payload range"));
+            }
+            Ok(())
+        },
+        (PreparedLocal::FramedPayload { .. }, None) => {
+            Err(unsupported("generated payload metadata missing"))
+        },
+        (PreparedLocal::Replay { .. }, None) => Ok(()),
+        (PreparedLocal::Replay { .. }, Some(_)) => {
+            Err(unsupported("generated payload metadata on replay member"))
+        },
+        (PreparedLocal::Copy(_), Some(_)) => Err(unsupported("generated payload on copied member")),
+        (PreparedLocal::Generated(_), Some(_)) => {
+            Err(unsupported("generated payload metadata on owned local"))
+        },
+    }
+}
+
+/// Select ZIP64 framing before a one-pass Deflate stream emits its local header.
+///
+/// At the current lockfile versions (`flate2` 1.1.10 and `zlib-rs` 0.6.7), the
+/// selected backend uses raw Deflate. The formula below mirrors zlib-rs's
+/// `compress_bound_help` (source:
+/// <https://github.com/trifectatechfoundation/zlib-rs/blob/734b2c1f42e2efaafe04cbab9c61cfaa5dead9ad/zlib-rs/src/deflate.rs#L2979-L2990>),
+/// which is the source length plus `ceil(source_len / 8)` and three
+/// block-overhead bytes, with two small input corrections. If those dependency
+/// versions or the backend change, this selector must be revalidated. Include
+/// the ZIP32 local header, the largest streaming descriptor, and the source
+/// name when checking the central-directory offset boundary so the decision
+/// remains valid without a second pass or a payload copy. The candidate bound
+/// intentionally uses the ordinary ZIP32 local layout; when it reaches the
+/// boundary, `.zip64(true)` selects the writer's explicit ZIP64 framing before
+/// any payload bytes are emitted. The known-size 20-byte ZIP64 local-size extra
+/// is therefore intentionally not part of this ZIP32 candidate bound. The
+/// bound may select ZIP64 slightly before a concrete stream requires it, while
+/// ordinary small generated entries retain their existing ZIP32 framing.
+fn generated_deflate_needs_zip64(payload_len: usize, name_len: usize) -> Result<bool, Error> {
+    let payload_len = usize_to_u64(payload_len, "generated Deflate input length")?;
+    let name_len = usize_to_u64(name_len, "generated Deflate name length")?;
+    let zip32_boundary = u32::MAX as u64;
+    if payload_len >= zip32_boundary {
+        return Ok(true);
+    }
+
+    let compressed_bound = payload_len
+        .checked_add(if payload_len == 0 { 1 } else { 0 })
+        .and_then(|size| size.checked_add(if payload_len < 9 { 1 } else { 0 }))
+        .and_then(|size| size.checked_add(payload_len / 8))
+        .and_then(|size| size.checked_add(if payload_len % 8 == 0 { 0 } else { 1 }))
+        .and_then(|size| size.checked_add(3))
+        .ok_or_else(|| unsupported("generated Deflate size bound"))?;
+    let local_header_size = usize_to_u64(
+        ZipLocalFileHeaderFixed::SIZE,
+        "generated Deflate local header size",
+    )?;
+    let member_bound = local_header_size
+        .checked_add(name_len)
+        // Account for the signed ZIP64 descriptor selected by the opt-in mode.
+        .and_then(|size| size.checked_add(24))
+        .and_then(|size| size.checked_add(compressed_bound))
+        .ok_or_else(|| unsupported("generated Deflate member bound"))?;
+    Ok(member_bound >= zip32_boundary)
+}
+
+/// An explicit compression wave handed to [`PreservationIndex::write_to_with_session`].
+struct ScheduledWave<'a> {
+    session: &'a ParallelWriteSession,
+    wave: DeflateWave,
+    cancellation: &'a dyn CancellationProbe,
+}
+
+/// Compressed members waiting to be placed, in plan order.
+struct CompressedWave {
+    results: Vec<Option<Result<PreparedEntry, Error>>>,
+    next: usize,
+}
+
+impl CompressedWave {
+    fn take_next(&mut self) -> Option<Result<PreparedEntry, Error>> {
+        let result = self.results.get_mut(self.next).and_then(Option::take);
+        self.next = self.next.saturating_add(1);
+        result
+    }
+}
+
+/// Places one regenerated member, taking the scheduled result when the member
+/// was a compression task and compressing it here when it was not.
+///
+/// The cursor advances in plan order, which is the order the wave collected
+/// its tasks in, so a member always receives its own compressed bytes.
+fn take_prepared_entry(
+    compressed: Option<&mut CompressedWave>,
+    entry: &RegeneratedEntry,
+) -> Result<PreparedEntry, Error> {
+    if deflate_task_len(entry).is_some() {
+        if let Some(compressed) = compressed {
+            if let Some(result) = compressed.take_next() {
+                return result;
+            }
+        }
+    }
+    generated_entry(entry)
+}
+
+/// Compresses every regenerated deflate member of `plan` on the scheduled
+/// session, in an unspecified order, into a plan-ordered result list.
+///
+/// `generated_entry` is a pure function of one member: it borrows nothing from
+/// the index, touches no shared state and returns an owned mini-archive. That
+/// is what makes the order it runs in unobservable in the published bytes.
+fn compress_deflate_wave(
+    plan: &PreservationPlan,
+    scheduled: &ScheduledWave<'_>,
+) -> Result<CompressedWave, Error> {
+    let mut entries: Vec<&RegeneratedEntry> = Vec::new();
+    entries
+        .try_reserve_exact(scheduled.wave.tasks())
+        .map_err(|source| allocation("scheduled deflate wave", source))?;
+    entries.extend(plan_deflate_tasks(plan));
+
+    let mut results: Vec<Option<Result<PreparedEntry, Error>>> = Vec::new();
+    results
+        .try_reserve_exact(entries.len())
+        .map_err(|source| allocation("scheduled deflate wave results", source))?;
+    results.resize_with(entries.len(), || None);
+
+    let mut pairs: Vec<(
+        usize,
+        &RegeneratedEntry,
+        &mut Option<Result<PreparedEntry, Error>>,
+    )> = Vec::new();
+    pairs
+        .try_reserve_exact(entries.len())
+        .map_err(|source| allocation("scheduled deflate wave tasks", source))?;
+    pairs.extend(
+        entries
+            .iter()
+            .copied()
+            .zip(results.iter_mut())
+            .enumerate()
+            .map(|(ordinal, (entry, slot))| (ordinal, entry, slot)),
+    );
+    // Longest pole first. The time a split can remove is bounded by the
+    // largest member, so a worker must never pick that member up last.
+    pairs.sort_by_key(|(_, entry, _)| {
+        std::cmp::Reverse(deflate_task_len(entry).unwrap_or_default())
+    });
+
+    let cancellation = scheduled.cancellation;
+    let mut closures: Vec<_> = Vec::new();
+    closures
+        .try_reserve_exact(pairs.len())
+        .map_err(|source| allocation("scheduled deflate wave workers", source))?;
+    closures.extend(pairs.into_iter().map(|(ordinal, entry, slot)| {
+        move || {
+            // Cancellation is observed between members, never inside one: a
+            // member that has started is always finished, so no partially
+            // compressed member can reach the plan.
+            if cancellation.is_cancelled() {
+                *slot = Some(Err(crate::office::cancelled_error()));
+                return;
+            }
+            let prepared = catch_unwind(AssertUnwindSafe(|| generated_entry(entry)))
+                .unwrap_or_else(|_| Err(ErrorKind::ParallelWriteWorkerPanic { ordinal }.into()));
+            *slot = Some(prepared);
+        }
+    }));
+
+    let mut tasks: Vec<&mut (dyn FnMut() + Send)> = Vec::new();
+    tasks
+        .try_reserve_exact(closures.len())
+        .map_err(|source| allocation("scheduled deflate wave schedule", source))?;
+    tasks.extend(
+        closures
+            .iter_mut()
+            .map(|task| task as &mut (dyn FnMut() + Send)),
+    );
+    let outcome = scheduled
+        .session
+        .run_tasks(scheduled.wave.width(), &mut tasks);
+    drop(tasks);
+    drop(closures);
+    outcome?;
+    Ok(CompressedWave { results, next: 0 })
+}
+
+fn generated_entry(entry: &RegeneratedEntry) -> Result<PreparedEntry, Error> {
+    // Sized members already have their final CRC and sizes. Prepare only the
+    // local/central framing at offset zero and retain the verified/shared
+    // payload itself for the forward publication pass. This is the bounded
+    // passthrough path; generated Deflate below remains fully buffered.
+    let direct = match &entry.data {
+        RegeneratedPayload::Precompressed(data) => {
+            let kind = match data.compression_method() {
+                CompressionMethod::Store => AccountingWriteKind::Stored,
+                CompressionMethod::Deflate => AccountingWriteKind::Precompressed,
+                _ => return Err(unsupported("generated compression method")),
+            };
+            let payload = PreparedPayload::Precompressed(data.clone());
+            let compressed_size = usize_to_u64(payload.bytes().len(), "generated payload length")?;
+            let prepared = crate::writer::prepare_sized_member(
+                &entry.name,
+                data.compression_method(),
+                data.crc32(),
+                compressed_size,
+                data.uncompressed_size(),
+                0,
+            )?;
+            Some((payload, prepared, kind))
+        },
+        RegeneratedPayload::Shared(data) if entry.compression == CompressionMethod::Store => {
+            let prepared = crate::writer::prepare_stored_member(&entry.name, data, 0)?;
+            Some((
+                PreparedPayload::Shared(Arc::clone(data)),
+                prepared,
+                AccountingWriteKind::Stored,
+            ))
+        },
+        RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => None,
+    };
+    if let Some((payload, mut prepared, kind)) = direct {
+        let payload_len = payload.bytes().len();
+        let framing = prepared.local_bytes()?;
+        let central = prepared.central_bytes()?;
+        let payload_range = 0..payload_len;
+        return Ok(PreparedEntry {
+            local: PreparedLocal::FramedPayload {
+                framing,
+                payload,
+                range: payload_range.clone(),
+            },
+            central: PreparedCentral::Generated(central),
+            generated_payload: Some(GeneratedPayload {
+                range: payload_range,
+                kind,
+            }),
+            omitted: false,
+        });
+    }
+
+    let payload_len = match &entry.data {
+        RegeneratedPayload::Owned(data) => data.len(),
+        RegeneratedPayload::Shared(data) => data.len(),
+        RegeneratedPayload::Precompressed(_) => {
+            unreachable!("verified precompressed payload uses direct framing")
+        },
+    };
+    let name_bytes = entry
+        .name
+        .len()
+        .checked_mul(2)
+        .ok_or_else(|| unsupported("generated member allocation size"))?;
+    let capacity = match &entry.data {
+        RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => payload_len
+            .checked_add(payload_len / 8)
+            .and_then(|size| size.checked_add(name_bytes))
+            .and_then(|size| size.checked_add(4 * 1024))
+            .ok_or_else(|| unsupported("generated member allocation size"))?,
+        RegeneratedPayload::Precompressed(_) => {
+            unreachable!("verified precompressed payload uses direct framing")
+        },
+    };
+    let mut generated = Vec::new();
+    generated
+        .try_reserve_exact(capacity)
+        .map_err(|source| allocation("generated member", source))?;
+    let mut writer = ZipArchiveWriter::new(generated);
+    match &entry.data {
+        RegeneratedPayload::Owned(_) | RegeneratedPayload::Shared(_) => match entry.compression {
+            CompressionMethod::Store => {
+                writer.write_stored_file(&entry.name, entry.data.as_slice())?
+            },
+            CompressionMethod::Deflate => {
+                // This helper remains fully buffered; the selector only establishes
+                // valid ZIP framing before the one-pass compressor starts.
+                let zip64 = generated_deflate_needs_zip64(payload_len, entry.name.len())?;
+                // One compressor per regenerated member, constructed and
+                // freed inside it. Carrying one across the members of a plan
+                // was measured and rejected: the plan retains one buffer per
+                // regenerated member, so a compressor held across them cannot
+                // be recycled by the allocator and costs 271 minor page faults
+                // per publish.
+                let mut state = ReusableDeflateState::new();
+                let (mut file, config) = writer
+                    .new_file(&entry.name)
+                    .compression_method(CompressionMethod::Deflate)
+                    .zip64(zip64)
+                    .start()?;
+                let encoder = ReusedDeflateEncoder::new(&mut state, &mut file);
+                let mut data_writer = config.wrap(encoder);
+                data_writer.write_all(entry.data.as_slice())?;
+                let (encoder, descriptor) = data_writer.finish()?;
+                encoder.finish()?;
+                file.finish(descriptor)?;
+            },
+            _ => return Err(unsupported("generated compression method")),
+        },
+        RegeneratedPayload::Precompressed(_) => {
+            unreachable!("verified precompressed payload uses direct framing")
+        },
+    }
+    let bytes = writer.finish()?;
+    let (directory_offset, central_end, payload_start, payload_end) = {
+        let archive = ZipArchive::from_slice(&bytes)?;
+        if archive.entries_hint() != 1 {
+            return Err(unsupported("generated archive entry count"));
+        }
+        let directory_offset = usize::try_from(archive.directory_offset())
+            .map_err(|_| unsupported("generated archive layout"))?;
+        let central_end = usize::try_from(archive.head_eocd_offset())
+            .map_err(|_| unsupported("generated archive layout"))?;
+        let tail_eocd_offset = usize::try_from(archive.eocd_offset())
+            .map_err(|_| unsupported("generated archive layout"))?;
+        if directory_offset > central_end
+            || central_end > tail_eocd_offset
+            || tail_eocd_offset > bytes.len()
+        {
+            return Err(unsupported("generated archive layout"));
+        }
+        let mut entries = archive.entries();
+        let record = entries
+            .next_entry()?
+            .ok_or_else(|| unsupported("generated archive entry"))?;
+        if entries.next_entry()?.is_some() {
+            return Err(unsupported("generated archive layout"));
+        }
+        let record_start = usize::try_from(record.central_directory_offset())
+            .map_err(|_| unsupported("generated central record"))?;
+        let record_len = ZipFileHeaderFixed::SIZE
+            .checked_add(
+                usize::try_from(record.metadata_size_hint())
+                    .map_err(|_| unsupported("generated central record"))?,
+            )
+            .ok_or_else(|| unsupported("generated central record"))?;
+        let record_end = record_start
+            .checked_add(record_len)
+            .ok_or_else(|| unsupported("generated central record"))?;
+        if record_start != directory_offset || record_end != central_end {
+            return Err(unsupported("generated central record framing"));
+        }
+        let entry = archive.get_entry(record.wayfinder())?;
+        let (payload_start, payload_end) = entry.compressed_data_range();
+        let payload_start =
+            usize::try_from(payload_start).map_err(|_| unsupported("generated payload range"))?;
+        let payload_end =
+            usize::try_from(payload_end).map_err(|_| unsupported("generated payload range"))?;
+        if payload_start > payload_end || payload_end > directory_offset {
+            return Err(unsupported("generated payload range"));
+        }
+        (directory_offset, central_end, payload_start, payload_end)
+    };
+    // Retain one owned archive buffer and publish disjoint ranges from it.
+    // The previous implementation copied the central record into another
+    // `Vec`, even though the finished one-entry archive already contained the
+    // exact bytes needed for both forward-only output phases.
+    let bytes = Arc::new(bytes);
+    Ok(PreparedEntry {
+        local: PreparedLocal::Shared {
+            bytes: Arc::clone(&bytes),
+            range: 0..directory_offset,
+        },
+        central: PreparedCentral::Shared {
+            bytes,
+            range: directory_offset..central_end,
+        },
+        generated_payload: Some(GeneratedPayload {
+            range: payload_start..payload_end,
+            kind: match (&entry.data, entry.compression) {
+                (RegeneratedPayload::Owned(_), CompressionMethod::Store)
+                | (RegeneratedPayload::Shared(_), CompressionMethod::Store) => {
+                    AccountingWriteKind::Stored
+                },
+                (RegeneratedPayload::Owned(_), CompressionMethod::Deflate)
+                | (RegeneratedPayload::Shared(_), CompressionMethod::Deflate) => {
+                    AccountingWriteKind::GeneratedDeflate
+                },
+                _ => return Err(unsupported("generated compression method")),
+            },
+        }),
+        omitted: false,
+    })
+}
+
+fn validate_local_span<R: ReaderAt>(
+    archive: &ZipArchive<R>,
+    entry: &PreservedEntry,
+    local_end: u64,
+    policy: PreservationPolicy,
+) -> Result<bool, Error> {
+    // `local_end` is the next member's local start, or the central-directory
+    // offset for the last member.  It bounds the prover's speculative header
+    // read so that indexing still reads only framing bytes.
+    let (layout, local_central_name_mismatch) = archive
+        .validate_preservation_entry_layout(entry.wayfinder, entry.raw_name_bytes(), local_end)
+        .map_err(map_local_layout_error)?;
+    if layout.local_header_offset != entry.local_span.start {
+        return Err(unsupported("local header offset mismatch"));
+    }
+    if policy == PreservationPolicy::Zip32Only && layout.local_zip64 {
+        return Err(unsupported(
+            "ZIP64 local-header preservation is not enabled",
+        ));
+    }
+    if layout.span_end > local_end {
+        return Err(unsupported("truncated or overlapping local member"));
+    }
+    Ok(local_central_name_mismatch)
+}
+
+fn map_local_layout_error(error: Error) -> Error {
+    match error.kind() {
+        ErrorKind::Allocation { .. } | ErrorKind::IO(_) | ErrorKind::LimitExceeded { .. } => error,
+        _ => unsupported("invalid local member framing"),
+    }
+}
+
+fn write_prepared_local<R, W>(
+    local: &PreparedLocal,
+    generated_payload: Option<&GeneratedPayload>,
+    source: &R,
+    sink: &mut W,
+    buffer: &mut [u8],
+    accounting: &mut ZipOperationAccounting,
+) -> Result<(), Error>
+where
+    R: ReaderAt,
+    W: Write,
+{
+    match (local, generated_payload) {
+        (PreparedLocal::Copy(range), None) => {
+            copy_range(source, range, sink, buffer, accounting)?;
+            Ok(())
+        },
+        (PreparedLocal::Generated(bytes), None) => {
+            sink.write_all(bytes)?;
+            Ok(())
+        },
+        (PreparedLocal::Shared { bytes, range }, Some(payload)) => {
+            let local_bytes = &bytes[range.start..range.end];
+            let payload_start = payload
+                .range
+                .start
+                .checked_sub(range.start)
+                .expect("preflighted generated payload range is ordered");
+            let payload_end = payload
+                .range
+                .end
+                .checked_sub(range.start)
+                .expect("preflighted generated payload range is ordered");
+            sink.write_all(&local_bytes[..payload_start])?;
+            write_all_counted(
+                sink,
+                &local_bytes[payload_start..payload_end],
+                accounting,
+                payload.kind,
+            )?;
+            sink.write_all(&local_bytes[payload_end..])?;
+            Ok(())
+        },
+        (PreparedLocal::Shared { bytes, range }, None) => {
+            let local_bytes = &bytes[range.start..range.end];
+            sink.write_all(local_bytes)?;
+            Ok(())
+        },
+        (
+            PreparedLocal::FramedPayload {
+                framing,
+                payload,
+                range,
+            },
+            Some(generated),
+        ) => {
+            sink.write_all(framing)?;
+            write_all_counted(
+                sink,
+                &payload.bytes()[range.clone()],
+                accounting,
+                generated.kind,
+            )?;
+            Ok(())
+        },
+        (PreparedLocal::Replay { .. }, _) => {
+            Err(unsupported("replay local requires replay publication"))
+        },
+        (PreparedLocal::FramedPayload { .. }, None)
+        | (PreparedLocal::Copy(_), Some(_))
+        | (PreparedLocal::Generated(_), Some(_)) => {
+            unreachable!("invalid prepared local state was rejected during preflight")
+        },
+    }
+}
+
+fn copy_range<R, W>(
+    source: &R,
+    range: &Range<u64>,
+    sink: &mut W,
+    buffer: &mut [u8],
+    accounting: &mut ZipOperationAccounting,
+) -> Result<(), Error>
+where
+    R: ReaderAt,
+    W: Write,
+{
+    let mut offset = range.start;
+    while offset < range.end {
+        let remaining = range
+            .end
+            .checked_sub(offset)
+            .expect("preflighted copy range is ordered");
+        let buffer_len = u64::try_from(buffer.len()).expect("copy buffer length fits in u64");
+        let len =
+            usize::try_from(remaining.min(buffer_len)).expect("copy chunk length fits in usize");
+        source.read_exact_at(&mut buffer[..len], offset)?;
+        write_all_counted(
+            sink,
+            &buffer[..len],
+            accounting,
+            AccountingWriteKind::RawUnchangedSource,
+        )?;
+        offset = offset
+            .checked_add(u64::try_from(len).expect("copy chunk length fits in u64"))
+            .expect("preflighted copy range offset fits in u64");
+    }
+    Ok(())
+}
+
+fn read_vec<R: ReaderAt>(source: &R, offset: u64, len: usize) -> Result<Vec<u8>, Error> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(len)
+        .map_err(|source| allocation("preservation byte buffer", source))?;
+    bytes.resize(len, 0);
+    source.read_exact_at(&mut bytes, offset)?;
+    Ok(bytes)
+}
+
+fn central_record_span(
+    record: &crate::ZipFileHeaderRecord<'_>,
+    head_eocd_offset: u64,
+) -> Result<(u64, usize, u64), Error> {
+    let central_offset = record.central_directory_offset();
+    let central_len = ZipFileHeaderFixed::SIZE
+        .checked_add(
+            usize::try_from(record.metadata_size_hint())
+                .map_err(|_| unsupported("central-directory record length"))?,
+        )
+        .ok_or_else(|| unsupported("central-directory record length"))?;
+    let central_len_u64 = usize_to_u64(central_len, "central-directory record length")?;
+    let central_end = central_offset
+        .checked_add(central_len_u64)
+        .ok_or_else(|| unsupported("central-directory record range"))?;
+    if central_end > head_eocd_offset {
+        return Err(unsupported("truncated central-directory record"));
+    }
+    Ok((central_offset, central_len, central_end))
+}
+
+fn central_local_header_offset_patch(
+    record: &crate::ZipFileHeaderRecord<'_>,
+    central_fixed: &ZipFileHeaderFixed,
+    central_bytes: &[u8],
+    central_offset: u64,
+    central_end: u64,
+) -> Result<CentralLocalHeaderOffsetPatch, Error> {
+    if central_fixed.local_header_offset != u32::MAX
+        && u64::from(central_fixed.local_header_offset) != record.local_header_offset()
+    {
+        return Err(unsupported("local-header offset value mismatch"));
+    }
+    if let Some(range) = record.zip64_local_header_offset_range() {
+        if central_fixed.local_header_offset != u32::MAX
+            || range.end.checked_sub(range.start) != Some(8)
+            || range.start < central_offset
+            || range.end > central_end
+        {
+            return Err(unsupported("invalid ZIP64 local-header offset range"));
+        }
+        let start_offset = range
+            .start
+            .checked_sub(central_offset)
+            .ok_or_else(|| unsupported("ZIP64 local-header offset range"))?;
+        let end_offset = range
+            .end
+            .checked_sub(central_offset)
+            .ok_or_else(|| unsupported("ZIP64 local-header offset range"))?;
+        let start = usize::try_from(start_offset)
+            .map_err(|_| unsupported("ZIP64 local-header offset range"))?;
+        let end = usize::try_from(end_offset)
+            .map_err(|_| unsupported("ZIP64 local-header offset range"))?;
+        let expected = record.local_header_offset().to_le_bytes();
+        if central_bytes.get(start..end) != Some(expected.as_slice()) {
+            return Err(unsupported("ZIP64 local-header offset value mismatch"));
+        }
+        return Ok(CentralLocalHeaderOffsetPatch::Zip64(start..end));
+    }
+
+    if central_fixed.local_header_offset == u32::MAX {
+        return Err(unsupported("missing ZIP64 local-header offset range"));
+    }
+    Ok(CentralLocalHeaderOffsetPatch::Fixed32)
+}
+
+fn valid_classic_disk_fields(eocd: &EndOfCentralDirectoryRecordFixed, zip64: bool) -> bool {
+    if !zip64 {
+        return eocd.disk_number == 0 && eocd.eocd_disk == 0;
+    }
+    (eocd.disk_number == 0 || eocd.disk_number == u16::MAX)
+        && (eocd.eocd_disk == 0 || eocd.eocd_disk == u16::MAX)
+}
+
+fn valid_classic_zip64_fields(
+    eocd: &EndOfCentralDirectoryRecordFixed,
+    entries: u64,
+    central_size: u64,
+    central_offset: u64,
+) -> bool {
+    (eocd.num_entries == u16::MAX || u64::from(eocd.num_entries) == entries)
+        && (eocd.total_entries == u16::MAX || u64::from(eocd.total_entries) == entries)
+        && (eocd.central_dir_size == u32::MAX || u64::from(eocd.central_dir_size) == central_size)
+        && (eocd.central_dir_offset == u32::MAX
+            || u64::from(eocd.central_dir_offset) == central_offset)
+}
+
+fn read_zip64_tail<R: ReaderAt>(
+    source: &R,
+    head_eocd_offset: u64,
+    eocd_offset: u64,
+    entries: u64,
+    central_size: u64,
+    central_offset: u64,
+    max_extensible_data: u64,
+) -> Result<Zip64Tail, Error> {
+    let locator_size = usize_to_u64(ZIP64_LOCATOR_SIZE, "ZIP64 locator size")?;
+    let locator_offset = eocd_offset
+        .checked_sub(locator_size)
+        .ok_or_else(|| unsupported("ZIP64 locator offset"))?;
+    if head_eocd_offset > locator_offset {
+        return Err(unsupported("ZIP64 EOCD and locator bounds"));
+    }
+
+    let fixed = read_vec(source, head_eocd_offset, ZIP64_EOCD_FIXED_SIZE)?;
+    let record = crate::Zip64EndOfCentralDirectoryRecord::parse(&fixed)?;
+    if record.size < ZIP64_EOCD_FIXED_PAYLOAD_SIZE
+        || record.disk_number != 0
+        || record.cd_disk != 0
+        || record.num_entries != entries
+        || record.total_entries != entries
+        || record.central_dir_size != central_size
+        || record.central_dir_offset != central_offset
+    {
+        return Err(unsupported("invalid ZIP64 EOCD metadata"));
+    }
+    let extensible_data_len = record
+        .size
+        .checked_sub(ZIP64_EOCD_FIXED_PAYLOAD_SIZE)
+        .ok_or_else(|| unsupported("ZIP64 EOCD extensible data"))?;
+    if extensible_data_len > max_extensible_data {
+        return Err(limit_error(
+            LimitResource::MetadataBytes,
+            extensible_data_len,
+            max_extensible_data,
+        ));
+    }
+    let record_len = 12usize
+        .checked_add(
+            usize::try_from(record.size).map_err(|_| unsupported("ZIP64 EOCD record length"))?,
+        )
+        .ok_or_else(|| unsupported("ZIP64 EOCD record length"))?;
+    let record_len_u64 = usize_to_u64(record_len, "ZIP64 EOCD record length")?;
+    let record_end = head_eocd_offset
+        .checked_add(record_len_u64)
+        .ok_or_else(|| unsupported("ZIP64 EOCD record range"))?;
+    if record_end != locator_offset {
+        return Err(unsupported("ZIP64 EOCD is not adjacent to its locator"));
+    }
+    let eocd = read_vec(source, head_eocd_offset, record_len)?;
+
+    let locator = read_vec(source, locator_offset, ZIP64_LOCATOR_SIZE)?;
+    let locator_signature = u32::from_le_bytes(
+        locator
+            .get(0..4)
+            .ok_or_else(|| unsupported("invalid ZIP64 locator metadata"))?
+            .try_into()
+            .map_err(|_| unsupported("invalid ZIP64 locator metadata"))?,
+    );
+    let locator_disk = u32::from_le_bytes(
+        locator
+            .get(4..8)
+            .ok_or_else(|| unsupported("invalid ZIP64 locator metadata"))?
+            .try_into()
+            .map_err(|_| unsupported("invalid ZIP64 locator metadata"))?,
+    );
+    let locator_eocd_offset = u64::from_le_bytes(
+        locator
+            .get(8..16)
+            .ok_or_else(|| unsupported("invalid ZIP64 locator metadata"))?
+            .try_into()
+            .map_err(|_| unsupported("invalid ZIP64 locator metadata"))?,
+    );
+    let locator_disk_count = u32::from_le_bytes(
+        locator
+            .get(16..20)
+            .ok_or_else(|| unsupported("invalid ZIP64 locator metadata"))?
+            .try_into()
+            .map_err(|_| unsupported("invalid ZIP64 locator metadata"))?,
+    );
+    if locator_signature != ZIP64_LOCATOR_SIGNATURE
+        || locator_disk != 0
+        || locator_eocd_offset != head_eocd_offset
+        || locator_disk_count != 1
+    {
+        return Err(unsupported("invalid ZIP64 locator metadata"));
+    }
+
+    let classic_eocd = read_vec(source, eocd_offset, EndOfCentralDirectoryRecordFixed::SIZE)?;
+    Ok(Zip64Tail {
+        eocd,
+        locator,
+        classic_eocd,
+    })
+}
+
+fn map_metadata_limit_error(error: Error, metadata_prefix: u64, limits: ArchiveLimits) -> Error {
+    if let ErrorKind::LimitExceeded {
+        resource: LimitResource::MetadataBytes,
+        actual,
+        ..
+    } = error.kind()
+    {
+        let actual = metadata_prefix.saturating_add(*actual);
+        return limit_error(
+            LimitResource::MetadataBytes,
+            actual,
+            limits.max_metadata_bytes,
+        );
+    }
+    error
+}
+
+fn unsupported(reason: &'static str) -> Error {
+    Error::from(ErrorKind::UnsupportedPreservation { reason })
+}
+
+fn limit_error(resource: LimitResource, actual: u64, maximum: u64) -> Error {
+    Error::from(ErrorKind::LimitExceeded {
+        resource,
+        actual,
+        maximum,
+    })
+}
+
+fn allocation(resource: &'static str, source: std::collections::TryReserveError) -> Error {
+    Error::from(ErrorKind::Allocation { resource, source })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::office::{DEFAULT_MIN_PARALLELIZABLE_BYTES, StreamingArchiveLimits};
+    use flate2::{Compression, write::DeflateEncoder};
+    use std::{
+        cell::RefCell,
+        io::{self, Cursor},
+    };
+
+    #[derive(Debug)]
+    struct CountingReader {
+        data: Vec<u8>,
+        reads: RefCell<Vec<(u64, usize)>>,
+    }
+
+    #[derive(Debug)]
+    struct ShortCountingReader {
+        data: Vec<u8>,
+        reads: RefCell<Vec<(u64, usize, usize)>>,
+        max_return: usize,
+    }
+
+    impl ShortCountingReader {
+        fn new(data: Vec<u8>, max_return: usize) -> Self {
+            assert!(max_return > 0);
+            Self {
+                data,
+                reads: RefCell::new(Vec::new()),
+                max_return,
+            }
+        }
+
+        fn clear_reads(&self) {
+            self.reads.borrow_mut().clear();
+        }
+
+        fn reads(&self) -> Vec<(u64, usize, usize)> {
+            self.reads.borrow().clone()
+        }
+    }
+
+    impl ReaderAt for ShortCountingReader {
+        fn read_at(&self, buffer: &mut [u8], offset: u64) -> io::Result<usize> {
+            let requested = buffer.len();
+            let bytes = self.data.get(offset as usize..).unwrap_or_default();
+            let returned = bytes.len().min(requested).min(self.max_return);
+            buffer[..returned].copy_from_slice(&bytes[..returned]);
+            self.reads.borrow_mut().push((offset, requested, returned));
+            Ok(returned)
+        }
+    }
+
+    impl CountingReader {
+        fn new(data: Vec<u8>) -> Self {
+            Self {
+                data,
+                reads: RefCell::new(Vec::new()),
+            }
+        }
+
+        fn clear_reads(&self) {
+            self.reads.borrow_mut().clear();
+        }
+
+        fn reads(&self) -> Vec<(u64, usize)> {
+            self.reads.borrow().clone()
+        }
+    }
+
+    impl ReaderAt for CountingReader {
+        fn read_at(&self, buffer: &mut [u8], offset: u64) -> io::Result<usize> {
+            self.reads.borrow_mut().push((offset, buffer.len()));
+            let bytes = self.data.get(offset as usize..).unwrap_or_default();
+            let len = bytes.len().min(buffer.len());
+            buffer[..len].copy_from_slice(&bytes[..len]);
+            Ok(len)
+        }
+    }
+
+    fn deflated_file(writer: &mut ZipArchiveWriter<Vec<u8>>, name: &str, data: &[u8]) {
+        let (mut file, config) = writer
+            .new_file(name)
+            .compression_method(CompressionMethod::Deflate)
+            .start()
+            .unwrap();
+        let encoder = DeflateEncoder::new(&mut file, Compression::default());
+        let mut data_writer = config.wrap(encoder);
+        data_writer.write_all(data).unwrap();
+        let (encoder, descriptor) = data_writer.finish().unwrap();
+        encoder.finish().unwrap();
+        file.finish(descriptor).unwrap();
+    }
+
+    fn ordinary_archive() -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        writer
+            .write_stored_file("first.bin", b"stored data")
+            .unwrap();
+        deflated_file(&mut writer, "second.bin", b"deflated data");
+        writer.new_dir("folder/").create().unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn scheduled_limits(workers: usize) -> ParallelWriteLimits {
+        ParallelWriteLimits::with_default_thresholds(
+            NonZeroUsize::new(workers).unwrap(),
+            NonZeroUsize::new(workers.max(64)).unwrap(),
+        )
+        .unwrap()
+    }
+
+    #[derive(Debug)]
+    struct NeverCancelled;
+
+    impl CancellationProbe for NeverCancelled {
+        fn is_cancelled(&self) -> bool {
+            false
+        }
+    }
+
+    #[derive(Debug)]
+    struct AlwaysCancelled;
+
+    impl CancellationProbe for AlwaysCancelled {
+        fn is_cancelled(&self) -> bool {
+            true
+        }
+    }
+
+    #[derive(Debug, Default)]
+    struct CountingScopedWorkers {
+        waves: std::sync::atomic::AtomicUsize,
+        tasks: std::sync::atomic::AtomicUsize,
+    }
+
+    impl crate::office::ScopedWorkers for CountingScopedWorkers {
+        fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
+            self.waves
+                .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            self.tasks
+                .fetch_add(tasks.len(), std::sync::atomic::Ordering::Relaxed);
+            for task in tasks.iter_mut() {
+                task();
+            }
+        }
+    }
+
+    /// A source archive of `count` deflate members, each `bytes` long and
+    /// compressible but not trivially so.
+    fn deflate_member_archive(count: usize, bytes: usize) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        for index in 0..count {
+            deflated_file(
+                &mut writer,
+                &format!("member-{index:04}.xml"),
+                &payload(index, bytes),
+            );
+        }
+        writer.finish().unwrap()
+    }
+
+    fn payload(seed: usize, bytes: usize) -> Vec<u8> {
+        let mut data = Vec::with_capacity(bytes);
+        let mut state = (seed as u64).wrapping_mul(0x9e37_79b9_7f4a_7c15).max(1);
+        while data.len() < bytes {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            let word = format!("<c r=\"{}\" v=\"{}\"/>", state % 4096, state % 97);
+            data.extend_from_slice(word.as_bytes());
+        }
+        data.truncate(bytes);
+        data
+    }
+
+    fn regenerate_all(
+        index: &PreservationIndex<'_, impl ReaderAt>,
+        bytes: usize,
+    ) -> PreservationPlan {
+        let mut plan = PreservationPlan::copy_all(index);
+        for (ordinal, entry) in index.entries().iter().enumerate() {
+            plan.actions[ordinal] = PreservationAction::Regenerate {
+                id: entry.id(),
+                entry: RegeneratedEntry::new(
+                    String::from_utf8(entry.raw_name_bytes().to_vec()).unwrap(),
+                    payload(ordinal + 1_000, bytes),
+                )
+                .compression_method(CompressionMethod::Deflate),
+            };
+        }
+        plan
+    }
+
+    #[test]
+    fn a_scheduled_wave_publishes_the_sequential_bytes_at_every_width() {
+        let data = deflate_member_archive(24, 6 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 6 * 1024);
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+
+        for workers in [1_usize, 2, 4, 8] {
+            let limits = scheduled_limits(workers);
+            let session = ParallelWriteSession::new(limits);
+            let wave = plan.deflate_wave(limits);
+            assert_eq!(wave.tasks(), 24);
+            assert_eq!(wave.is_parallel(), workers > 1, "width {workers}");
+            let scheduled = index
+                .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+                .unwrap();
+            assert_eq!(scheduled, sequential, "width {workers} changed the bytes");
+            assert_eq!(
+                session.local_pool_worker_count(),
+                if workers > 1 { workers } else { 0 },
+                "width {workers} built the wrong pool",
+            );
+        }
+    }
+
+    #[test]
+    fn a_scheduled_wave_is_deterministic_across_repeated_publications() {
+        let data = deflate_member_archive(16, 9 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 9 * 1024);
+        let limits = scheduled_limits(8);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        let first = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+        for _ in 0..16 {
+            let again = index
+                .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+                .unwrap();
+            assert_eq!(again, first);
+        }
+        assert_eq!(session.local_pool_worker_count(), 8);
+    }
+
+    #[test]
+    fn a_caller_facility_replaces_the_local_pool_and_keeps_the_bytes() {
+        let data = deflate_member_archive(12, 5 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 5 * 1024);
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+
+        let limits = scheduled_limits(4);
+        let workers = Arc::new(CountingScopedWorkers::default());
+        let facility: Arc<dyn crate::office::ScopedWorkers> = workers.clone();
+        let session = ParallelWriteSession::with_scoped_workers(limits, facility);
+        let wave = plan.deflate_wave(limits);
+        let scheduled = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+
+        assert_eq!(scheduled, sequential);
+        assert_eq!(session.local_pool_worker_count(), 0);
+        assert_eq!(workers.waves.load(std::sync::atomic::Ordering::Relaxed), 1);
+        assert_eq!(workers.tasks.load(std::sync::atomic::Ordering::Relaxed), 12);
+    }
+
+    #[test]
+    fn a_cold_session_admits_a_wave_only_from_the_larger_remainder() {
+        let data = deflate_member_archive(16, 2 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 2 * 1024);
+        let limits = scheduled_limits(4);
+        // 15 * 2 KiB of remainder clears the warm threshold and not the pool one.
+        assert!(plan.deflate_wave(limits).is_parallel());
+
+        let cold = ParallelWriteSession::new(limits);
+        assert!(!cold.wave_for(&plan).is_parallel());
+
+        let facility: Arc<dyn crate::office::ScopedWorkers> =
+            Arc::new(crate::office::SerialScopedWorkers);
+        let warm = ParallelWriteSession::with_scoped_workers(limits, facility);
+        assert!(warm.wave_for(&plan).is_parallel());
+
+        // Once a pool exists, the session is warm and admits the same wave.
+        let wide = deflate_member_archive(40, 4 * 1024);
+        let (wide_archive, mut wide_buffer) = indexed(&wide);
+        let wide_index =
+            PreservationIndex::new(&wide_archive, &mut wide_buffer, ArchiveLimits::default())
+                .unwrap();
+        let wide_plan = regenerate_all(&wide_index, 4 * 1024);
+        assert!(cold.wave_for(&wide_plan).is_parallel());
+        wide_index
+            .write_to_with_session(
+                &wide_plan,
+                Vec::new(),
+                &cold,
+                cold.wave_for(&wide_plan),
+                &NeverCancelled,
+            )
+            .unwrap();
+        assert!(cold.local_pool_worker_count() > 0);
+        assert!(cold.wave_for(&plan).is_parallel());
+    }
+
+    #[test]
+    fn the_balance_rule_keeps_a_single_dominant_member_serial() {
+        let data = deflate_member_archive(2, 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("member-0000.xml", payload(7, 4 * 1024 * 1024))
+                .compression_method(CompressionMethod::Deflate),
+        };
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new("member-0001.xml", payload(8, 631))
+                .compression_method(CompressionMethod::Deflate),
+        };
+
+        let wave = plan.deflate_wave(scheduled_limits(8));
+        assert_eq!(wave.tasks(), 2);
+        assert_eq!(wave.largest_bytes(), 4 * 1024 * 1024);
+        assert_eq!(wave.remainder_bytes(), 631);
+        assert!(!wave.is_parallel(), "a single pole cannot be split");
+    }
+
+    #[test]
+    fn the_balance_rule_admits_many_small_members_and_narrows_by_the_task_floor() {
+        let data = deflate_member_archive(40, 871);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 871);
+
+        let wave = plan.deflate_wave(scheduled_limits(8));
+        assert_eq!(wave.tasks(), 40);
+        assert_eq!(wave.total_bytes(), 40 * 871);
+        // The default policy imposes no per-task floor, so the policy's own
+        // width of eight binds.
+        assert_eq!(wave.width().get(), 8);
+
+        let narrow = ParallelWriteLimits::new(
+            NonZeroUsize::new(8).unwrap(),
+            NonZeroUsize::new(64).unwrap(),
+            DEFAULT_MIN_PARALLELIZABLE_BYTES,
+            DEFAULT_MIN_PARALLELIZABLE_BYTES,
+            16 * 1024,
+        )
+        .unwrap();
+        assert_eq!(plan.deflate_wave(narrow).width().get(), 3);
+    }
+
+    #[test]
+    fn stored_and_precompressed_members_are_never_compression_tasks() {
+        let data = deflate_member_archive(3, 2048);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("member-0000.xml", payload(1, 64 * 1024)),
+        };
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new_precompressed_shared(
+                "member-0001.xml",
+                verified_precompressed_token(CompressionMethod::Deflate, &payload(2, 64 * 1024)),
+            ),
+        };
+        let wave = plan.deflate_wave(scheduled_limits(8));
+        assert_eq!(wave.tasks(), 0);
+        assert!(!wave.is_parallel());
+    }
+
+    #[test]
+    fn a_scheduled_wave_returns_the_sequential_error_in_plan_order() {
+        let data = deflate_member_archive(6, 4 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = regenerate_all(&index, 4 * 1024);
+        // Two members that the writer refuses, so the error returned is the
+        // one earliest in plan order rather than the one that failed first.
+        for ordinal in [2_usize, 4] {
+            plan.actions[ordinal] = PreservationAction::Regenerate {
+                id: index.entries()[ordinal].id(),
+                entry: RegeneratedEntry::new(
+                    format!("{}{}", "x".repeat(70_000), ordinal),
+                    payload(ordinal, 4 * 1024),
+                )
+                .compression_method(CompressionMethod::Deflate),
+            };
+        }
+
+        let sequential = index
+            .write_to(&plan, Vec::new())
+            .expect_err("an over-long member name is refused");
+        let limits = scheduled_limits(8);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        assert!(wave.is_parallel());
+        let mut sink = b"untouched".to_vec();
+        let scheduled = index
+            .write_to_with_session(&plan, &mut sink, &session, wave, &NeverCancelled)
+            .expect_err("an over-long member name is refused at every width");
+        assert_eq!(scheduled.to_string(), sequential.to_string());
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn a_cancelled_wave_publishes_nothing() {
+        let data = deflate_member_archive(12, 8 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 8 * 1024);
+        let limits = scheduled_limits(4);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to_with_session(&plan, &mut sink, &session, wave, &AlwaysCancelled)
+            .expect_err("a cancelled wave refuses");
+        assert!(matches!(error.kind(), ErrorKind::Cancelled));
+        assert_eq!(sink, b"untouched");
+        assert_eq!(session.local_pool_worker_count(), 0);
+    }
+
+    #[test]
+    fn a_scheduled_wave_preserves_physical_order_when_central_order_differs() {
+        let mut data = deflate_member_archive(8, 3 * 1024);
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let first_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&data[central..])
+                .unwrap()
+                .variable_length();
+        let first = data[central..central + first_len].to_vec();
+        let rest = data[central + first_len..eocd].to_vec();
+        data[central..eocd].copy_from_slice(&[rest, first].concat());
+
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = regenerate_all(&index, 3 * 1024);
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+        let limits = scheduled_limits(4);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        assert!(wave.is_parallel());
+        let scheduled = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+        assert_eq!(scheduled, sequential);
+    }
+
+    #[test]
+    fn an_appended_member_is_scheduled_with_the_regenerated_ones() {
+        let data = deflate_member_archive(6, 5 * 1024);
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = regenerate_all(&index, 5 * 1024);
+        plan.try_append(
+            RegeneratedEntry::new("appended.xml", payload(99, 5 * 1024))
+                .compression_method(CompressionMethod::Deflate),
+        )
+        .unwrap();
+        let sequential = index.write_to(&plan, Vec::new()).unwrap();
+        let limits = scheduled_limits(4);
+        let session = ParallelWriteSession::new(limits);
+        let wave = plan.deflate_wave(limits);
+        assert_eq!(wave.tasks(), 7);
+        let scheduled = index
+            .write_to_with_session(&plan, Vec::new(), &session, wave, &NeverCancelled)
+            .unwrap();
+        assert_eq!(scheduled, sequential);
+        let reader =
+            crate::office::ArchiveReader::new(&scheduled, ArchiveLimits::default()).unwrap();
+        assert_eq!(reader.read("appended.xml").unwrap(), payload(99, 5 * 1024));
+    }
+
+    fn verified_precompressed_token(
+        method: CompressionMethod,
+        payload: &[u8],
+    ) -> crate::office::VerifiedPrecompressedEntry {
+        let mut writer =
+            crate::office::StreamingArchiveWriter::new(StreamingArchiveLimits::default());
+        match method {
+            CompressionMethod::Store => writer.write_stored("source.bin", payload).unwrap(),
+            CompressionMethod::Deflate => writer.write_deflated("source.bin", payload).unwrap(),
+            _ => panic!("test helper only creates Store or Deflate members"),
+        }
+        let source_bytes = writer.finish_to_bytes().unwrap();
+        let source_len = source_bytes.len() as u64;
+        let source = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source_bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let source_id = source.entry_id("source.bin").unwrap();
+        source
+            .read_entry_precompressed_with_progress(source_id, payload, |_| Ok::<(), io::Error>(()))
+            .unwrap()
+    }
+
+    fn large_stored_archive() -> Vec<u8> {
+        let payload = (0..(192 * 1024 + 17))
+            .map(|index| u8::try_from(index % 251).unwrap())
+            .collect::<Vec<_>>();
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        writer.write_stored_file("large.bin", &payload).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn without_descriptor_signature(mut data: Vec<u8>) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = archive.directory_offset() as usize;
+        let mut records = archive.entries();
+        records.next().unwrap().unwrap();
+        let descriptor_record = records.next().unwrap().unwrap();
+        let next_local = records.next().unwrap().unwrap().local_header_offset() as usize;
+        let descriptor = usize::try_from(
+            archive
+                .get_entry(descriptor_record.wayfinder())
+                .unwrap()
+                .compressed_data_range()
+                .1,
+        )
+        .unwrap();
+        assert_eq!(next_local - descriptor, 16);
+        data.drain(descriptor..descriptor + 4);
+
+        let new_central = central - 4;
+        let eocd = data.len() - EndOfCentralDirectoryRecordFixed::SIZE;
+        data[eocd + 16..eocd + 20].copy_from_slice(&(new_central as u32).to_le_bytes());
+        let mut offset = new_central;
+        while offset < eocd {
+            let header = ZipFileHeaderFixed::parse(&data[offset..]).unwrap();
+            let length = ZipFileHeaderFixed::SIZE + header.variable_length();
+            let local_offset =
+                u32::from_le_bytes(data[offset + 42..offset + 46].try_into().unwrap());
+            if local_offset as usize > descriptor {
+                data[offset + 42..offset + 46].copy_from_slice(&(local_offset - 4).to_le_bytes());
+            }
+            offset += length;
+        }
+        data
+    }
+
+    fn zip64_archive() -> Vec<u8> {
+        include_bytes!("../assets/zip64.zip").to_vec()
+    }
+
+    fn prefixed_empty_archive() -> Vec<u8> {
+        let mut data = b"empty archive prelude".to_vec();
+        let empty = ZipArchiveWriter::new(Vec::new()).finish().unwrap();
+        data.extend_from_slice(&empty);
+        data
+    }
+
+    fn two_stored_archive() -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        writer
+            .write_stored_file("first.bin", b"first payload")
+            .unwrap();
+        writer
+            .write_stored_file("second.bin", b"second payload")
+            .unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn promote_to_zip64(mut source: Vec<u8>) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&source).unwrap();
+        assert!(!archive.is_zip64());
+        let central_start = usize::try_from(archive.directory_offset()).unwrap();
+        let old_eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let original_classic_eocd = source[old_eocd..].to_vec();
+        let mut central = Vec::new();
+        let mut offset = central_start;
+        while offset < old_eocd {
+            let fixed = ZipFileHeaderFixed::parse(&source[offset..]).unwrap();
+            let record_len = ZipFileHeaderFixed::SIZE + fixed.variable_length();
+            let record = &source[offset..offset + record_len];
+            let name_len = usize::from(fixed.file_name_len);
+            let old_extra_len = usize::from(fixed.extra_field_len);
+            let variable_start = ZipFileHeaderFixed::SIZE + name_len;
+            let old_extra_end = variable_start + old_extra_len;
+            let mut promoted = record[..variable_start].to_vec();
+            promoted[20..24].copy_from_slice(&u32::MAX.to_le_bytes());
+            promoted[24..28].copy_from_slice(&u32::MAX.to_le_bytes());
+            promoted[42..46].copy_from_slice(&u32::MAX.to_le_bytes());
+            let mut zip64_extra = Vec::with_capacity(28);
+            zip64_extra.extend_from_slice(&1u16.to_le_bytes());
+            zip64_extra.extend_from_slice(&24u16.to_le_bytes());
+            zip64_extra.extend_from_slice(&u64::from(fixed.uncompressed_size).to_le_bytes());
+            zip64_extra.extend_from_slice(&u64::from(fixed.compressed_size).to_le_bytes());
+            zip64_extra.extend_from_slice(&u64::from(fixed.local_header_offset).to_le_bytes());
+            let preceding_extra = [0xaa, 0xaa, 0x03, 0x00, 0x70, 0x72, 0x65];
+            promoted[30..32].copy_from_slice(
+                &(u16::try_from(old_extra_len + preceding_extra.len() + zip64_extra.len())
+                    .unwrap())
+                .to_le_bytes(),
+            );
+            promoted.extend_from_slice(&preceding_extra);
+            promoted.extend_from_slice(&zip64_extra);
+            promoted.extend_from_slice(&record[old_extra_end..]);
+            central.extend_from_slice(&promoted);
+            offset += record_len;
+        }
+
+        source.truncate(central_start);
+        source.extend_from_slice(&central);
+        let zip64_offset = source.len();
+        let mut zip64_eocd = Vec::new();
+        zip64_eocd.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
+        zip64_eocd.extend_from_slice(&47u64.to_le_bytes());
+        zip64_eocd.extend_from_slice(&45u16.to_le_bytes());
+        zip64_eocd.extend_from_slice(&45u16.to_le_bytes());
+        zip64_eocd.extend_from_slice(&0u32.to_le_bytes());
+        zip64_eocd.extend_from_slice(&0u32.to_le_bytes());
+        let entry_count = u64::from(u16::from_le_bytes(
+            original_classic_eocd[8..10].try_into().unwrap(),
+        ));
+        zip64_eocd.extend_from_slice(&entry_count.to_le_bytes());
+        zip64_eocd.extend_from_slice(&entry_count.to_le_bytes());
+        zip64_eocd.extend_from_slice(&(central.len() as u64).to_le_bytes());
+        zip64_eocd.extend_from_slice(&(central_start as u64).to_le_bytes());
+        zip64_eocd.extend_from_slice(&[0xa1, 0xb2, 0xc3]);
+        source.extend_from_slice(&zip64_eocd);
+        source.extend_from_slice(&0x0706_4b50u32.to_le_bytes());
+        source.extend_from_slice(&0u32.to_le_bytes());
+        source.extend_from_slice(&(zip64_offset as u64).to_le_bytes());
+        source.extend_from_slice(&1u32.to_le_bytes());
+        let classic_offset = source.len();
+        let mut classic = original_classic_eocd;
+        classic[8..10].copy_from_slice(&u16::MAX.to_le_bytes());
+        classic[10..12].copy_from_slice(&u16::MAX.to_le_bytes());
+        classic[12..16].copy_from_slice(&u32::MAX.to_le_bytes());
+        classic[16..20].copy_from_slice(&u32::MAX.to_le_bytes());
+        source.extend_from_slice(&classic);
+        assert_eq!(classic_offset + classic.len(), source.len());
+        source
+    }
+
+    fn zip64_tail_extensible_data(data: &[u8]) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(data).unwrap();
+        let start = usize::try_from(archive.head_eocd_offset()).unwrap() + ZIP64_EOCD_FIXED_SIZE;
+        let end = usize::try_from(archive.eocd_offset()).unwrap() - ZIP64_LOCATOR_SIZE;
+        data[start..end].to_vec()
+    }
+
+    fn ambiguous_zip64_tail() -> Vec<u8> {
+        let mut data = vec![0u8; ZipFileHeaderFixed::SIZE];
+        data[..4].copy_from_slice(&0x0201_4b50u32.to_le_bytes());
+        let record_start = data.len();
+        let mut extensible = vec![0xc7; 180];
+        let mut false_record = Vec::new();
+        false_record.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
+        false_record.extend_from_slice(&44u64.to_le_bytes());
+        false_record.extend_from_slice(&45u16.to_le_bytes());
+        false_record.extend_from_slice(&45u16.to_le_bytes());
+        false_record.extend_from_slice(&[0; 8]);
+        false_record.extend_from_slice(&1u64.to_le_bytes());
+        false_record.extend_from_slice(&1u64.to_le_bytes());
+        false_record.extend_from_slice(&(ZipFileHeaderFixed::SIZE as u64).to_le_bytes());
+        false_record.extend_from_slice(&0u64.to_le_bytes());
+        extensible[..false_record.len()].copy_from_slice(&false_record);
+        let mut second_record = false_record.clone();
+        second_record[4..12].copy_from_slice(&104u64.to_le_bytes());
+        let second_start = 64usize;
+        extensible[second_start..second_start + second_record.len()]
+            .copy_from_slice(&second_record);
+        data.extend_from_slice(&0x0606_4b50u32.to_le_bytes());
+        data.extend_from_slice(&224u64.to_le_bytes());
+        data.extend_from_slice(&45u16.to_le_bytes());
+        data.extend_from_slice(&45u16.to_le_bytes());
+        data.extend_from_slice(&[0; 8]);
+        data.extend_from_slice(&1u64.to_le_bytes());
+        data.extend_from_slice(&1u64.to_le_bytes());
+        data.extend_from_slice(&(ZipFileHeaderFixed::SIZE as u64).to_le_bytes());
+        data.extend_from_slice(&0u64.to_le_bytes());
+        data.extend_from_slice(&extensible);
+        let false_offset = record_start + ZIP64_EOCD_FIXED_SIZE;
+        data.extend_from_slice(&0x0706_4b50u32.to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&(false_offset as u64).to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+        data.extend_from_slice(&0x0605_4b50u32.to_le_bytes());
+        data.extend_from_slice(&[0; 4]);
+        data.extend_from_slice(&u16::MAX.to_le_bytes());
+        data.extend_from_slice(&u16::MAX.to_le_bytes());
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+        data.extend_from_slice(&0u16.to_le_bytes());
+        assert_eq!(
+            record_start + ZIP64_EOCD_FIXED_SIZE + second_start + 12 + 104,
+            data.len() - 22 - ZIP64_LOCATOR_SIZE
+        );
+        data
+    }
+
+    fn masked_central_record(data: &[u8], entry: &PreservedEntry) -> Vec<u8> {
+        let range = entry.central_record();
+        let mut record = data[range.start as usize..range.end as usize].to_vec();
+        record[CENTRAL_LOCAL_HEADER_OFFSET].fill(0);
+        if let Some(range) = ZipArchive::from_slice(data)
+            .unwrap()
+            .entries()
+            .find_map(|candidate| {
+                let candidate = candidate.unwrap();
+                (candidate.central_directory_offset() == entry.central_record.start)
+                    .then(|| candidate.zip64_local_header_offset_range())
+            })
+            .flatten()
+        {
+            let start = usize::try_from(range.start - entry.central_record.start).unwrap();
+            let end = usize::try_from(range.end - entry.central_record.start).unwrap();
+            record[start..end].fill(0);
+        }
+        record
+    }
+
+    fn indexed(data: &[u8]) -> (ZipArchive<Cursor<&[u8]>>, Vec<u8>) {
+        let archive = ZipArchive::from_slice(data).unwrap().into_zip_archive();
+        (archive, vec![0; crate::RECOMMENDED_BUFFER_SIZE])
+    }
+
+    fn central_records(data: &[u8]) -> Vec<Vec<u8>> {
+        let archive = ZipArchive::from_slice(data).unwrap();
+        archive
+            .entries()
+            .map(|entry| {
+                let entry = entry.unwrap();
+                let start = usize::try_from(entry.central_directory_offset()).unwrap();
+                let length =
+                    ZipFileHeaderFixed::SIZE + usize::try_from(entry.metadata_size_hint()).unwrap();
+                data[start..start + length].to_vec()
+            })
+            .collect()
+    }
+
+    fn central_record_without_offset(mut record: Vec<u8>) -> Vec<u8> {
+        record[CENTRAL_LOCAL_HEADER_OFFSET].fill(0);
+        record
+    }
+
+    fn with_comment(mut data: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        data[eocd + 20..eocd + 22].copy_from_slice(&(comment.len() as u16).to_le_bytes());
+        data.extend_from_slice(comment);
+        data
+    }
+
+    fn with_file_comment(mut data: Vec<u8>, comment: &[u8]) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let fixed = ZipFileHeaderFixed::parse(&data[central..]).unwrap();
+        let first_record_len = ZipFileHeaderFixed::SIZE + fixed.variable_length();
+        let comment_len = usize::from(fixed.file_comment_len)
+            .checked_add(comment.len())
+            .expect("file comment length must fit usize");
+        data[central + 32..central + 34]
+            .copy_from_slice(&(u16::try_from(comment_len).unwrap()).to_le_bytes());
+        let central_size = u32::from_le_bytes(data[eocd + 12..eocd + 16].try_into().unwrap());
+        data.splice(
+            central + first_record_len..central + first_record_len,
+            comment.iter().copied(),
+        );
+        let new_eocd = eocd + comment.len();
+        data[new_eocd + 12..new_eocd + 16]
+            .copy_from_slice(&(central_size + comment.len() as u32).to_le_bytes());
+        data
+    }
+
+    fn central_metadata_bytes(data: &[u8]) -> u64 {
+        let archive = ZipArchive::from_slice(data).unwrap();
+        archive
+            .entries()
+            .map(|entry| entry.unwrap().metadata_size_hint())
+            .sum::<u64>()
+            + archive.comment().as_bytes().len() as u64
+    }
+
+    fn stored_archive_with_metadata(name: &str, extra: &[u8]) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let (mut file, config) = writer
+            .new_file(name)
+            .extra_field(
+                crate::extra_fields::ExtraFieldId::new(0xaaaa),
+                extra,
+                crate::Header::CENTRAL,
+            )
+            .unwrap()
+            .start()
+            .unwrap();
+        let mut data_writer = config.wrap(&mut file);
+        data_writer.write_all(b"payload").unwrap();
+        let (_, descriptor) = data_writer.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn stored_descriptor_archive(payload: &[u8]) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let (mut file, config) = writer
+            .new_file("payload.bin")
+            .compression_method(CompressionMethod::Store)
+            .start()
+            .unwrap();
+        let mut data_writer = config.wrap(&mut file);
+        data_writer.write_all(payload).unwrap();
+        let (_, descriptor) = data_writer.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn descriptor_offsets(data: &[u8]) -> (usize, usize, usize) {
+        let archive = ZipArchive::from_slice(data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let record = archive
+            .entries()
+            .find(|record| {
+                record
+                    .as_ref()
+                    .is_ok_and(|record| record.has_data_descriptor())
+            })
+            .unwrap()
+            .unwrap();
+        let payload_end = usize::try_from(
+            archive
+                .get_entry(record.wayfinder())
+                .unwrap()
+                .compressed_data_range()
+                .1,
+        )
+        .unwrap();
+        (payload_end, central, eocd)
+    }
+
+    fn unsigned_descriptor_archive(mut data: Vec<u8>) -> Vec<u8> {
+        let (payload_end, central, eocd) = descriptor_offsets(&data);
+        assert_eq!(central - payload_end, 16);
+        data.drain(payload_end..payload_end + 4);
+        let central = central - 4;
+        let eocd = eocd - 4;
+        data[eocd + 16..eocd + 20].copy_from_slice(&u32::try_from(central).unwrap().to_le_bytes());
+        data
+    }
+
+    fn zip64_descriptor_archive(payload: &[u8], signed: bool) -> Vec<u8> {
+        let mut data = stored_descriptor_archive(payload);
+        let (payload_end, mut central, mut eocd) = descriptor_offsets(&data);
+        if !signed {
+            data.drain(payload_end..payload_end + 4);
+            central -= 4;
+            eocd -= 4;
+            data[eocd + 16..eocd + 20]
+                .copy_from_slice(&u32::try_from(central).unwrap().to_le_bytes());
+        }
+
+        let descriptor_len = if signed { 16 } else { 12 };
+        let crc_offset = payload_end + if signed { 4 } else { 0 };
+        let compressed_offset = crc_offset + 4;
+        let uncompressed_offset = compressed_offset + 4;
+        let crc = u32::from_le_bytes(data[crc_offset..crc_offset + 4].try_into().unwrap());
+        let compressed = u32::from_le_bytes(
+            data[compressed_offset..compressed_offset + 4]
+                .try_into()
+                .unwrap(),
+        );
+        let uncompressed = u32::from_le_bytes(
+            data[uncompressed_offset..uncompressed_offset + 4]
+                .try_into()
+                .unwrap(),
+        );
+        let mut descriptor = Vec::new();
+        if signed {
+            descriptor.extend_from_slice(&crate::DataDescriptor::SIGNATURE.to_le_bytes());
+        }
+        descriptor.extend_from_slice(&crc.to_le_bytes());
+        descriptor.extend_from_slice(&u64::from(compressed).to_le_bytes());
+        descriptor.extend_from_slice(&u64::from(uncompressed).to_le_bytes());
+        assert_eq!(descriptor.len(), descriptor_len + 8);
+        data.splice(
+            payload_end..payload_end + descriptor_len,
+            descriptor.iter().copied(),
+        );
+        central += 8;
+        eocd += 8;
+
+        let fixed = ZipFileHeaderFixed::parse(&data[central..]).unwrap();
+        let record_len = ZipFileHeaderFixed::SIZE + fixed.variable_length();
+        let record = &data[central..central + record_len];
+        let name_len = usize::from(fixed.file_name_len);
+        let old_extra_len = usize::from(fixed.extra_field_len);
+        let variable_start = ZipFileHeaderFixed::SIZE + name_len;
+        let old_extra_end = variable_start + old_extra_len;
+        let mut promoted = record[..variable_start].to_vec();
+        promoted[20..24].copy_from_slice(&u32::MAX.to_le_bytes());
+        promoted[24..28].copy_from_slice(&u32::MAX.to_le_bytes());
+        let mut zip64_extra = Vec::new();
+        zip64_extra.extend_from_slice(&1u16.to_le_bytes());
+        zip64_extra.extend_from_slice(&16u16.to_le_bytes());
+        zip64_extra.extend_from_slice(&u64::from(uncompressed).to_le_bytes());
+        zip64_extra.extend_from_slice(&u64::from(compressed).to_le_bytes());
+        promoted[30..32].copy_from_slice(
+            &u16::try_from(old_extra_len + zip64_extra.len())
+                .unwrap()
+                .to_le_bytes(),
+        );
+        promoted.extend_from_slice(&record[variable_start..old_extra_end]);
+        promoted.extend_from_slice(&zip64_extra);
+        promoted.extend_from_slice(&record[old_extra_end..]);
+        data.splice(central..eocd, promoted.iter().copied());
+        eocd += 20;
+        data[eocd + 12..eocd + 16]
+            .copy_from_slice(&u32::try_from(promoted.len()).unwrap().to_le_bytes());
+        data[eocd + 16..eocd + 20].copy_from_slice(&u32::try_from(central).unwrap().to_le_bytes());
+        data
+    }
+
+    fn local_only_zip64_archive() -> Vec<u8> {
+        let mut data = ordinary_archive();
+        let (central, eocd, name_len, compressed_size, uncompressed_size) = {
+            let archive = ZipArchive::from_slice(&data).unwrap();
+            let central = usize::try_from(archive.directory_offset()).unwrap();
+            let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+            let local = archive
+                .entries()
+                .next()
+                .unwrap()
+                .unwrap()
+                .local_header_offset();
+            let local = usize::try_from(local).unwrap();
+            let local_header = ZipLocalFileHeaderFixed::parse(&data[local..]).unwrap();
+            (
+                central,
+                eocd,
+                usize::from(local_header.file_name_len),
+                u64::from(local_header.compressed_size),
+                u64::from(local_header.uncompressed_size),
+            )
+        };
+
+        let mut local_extra = Vec::new();
+        local_extra.extend_from_slice(&ExtraFieldId::ZIP64.as_u16().to_le_bytes());
+        local_extra.extend_from_slice(&16u16.to_le_bytes());
+        local_extra.extend_from_slice(&uncompressed_size.to_le_bytes());
+        local_extra.extend_from_slice(&compressed_size.to_le_bytes());
+        let insertion = ZipLocalFileHeaderFixed::SIZE + name_len;
+        data[4..6].copy_from_slice(&45u16.to_le_bytes());
+        data[18..22].copy_from_slice(&u32::MAX.to_le_bytes());
+        data[22..26].copy_from_slice(&u32::MAX.to_le_bytes());
+        data[28..30].copy_from_slice(&20u16.to_le_bytes());
+        data.splice(insertion..insertion, local_extra.iter().copied());
+
+        let shift = local_extra.len();
+        let central = central + shift;
+        let eocd = eocd + shift;
+        data[eocd + 16..eocd + 20].copy_from_slice(&u32::try_from(central).unwrap().to_le_bytes());
+        let mut central_cursor = central;
+        while central_cursor < eocd {
+            let fixed = ZipFileHeaderFixed::parse(&data[central_cursor..]).unwrap();
+            if fixed.local_header_offset != 0 {
+                let shifted = fixed.local_header_offset + u32::try_from(shift).unwrap();
+                data[central_cursor + 42..central_cursor + 46]
+                    .copy_from_slice(&shifted.to_le_bytes());
+            }
+            central_cursor += ZipFileHeaderFixed::SIZE + fixed.variable_length();
+        }
+        assert_eq!(central_cursor, eocd);
+        data
+    }
+
+    fn many_small_archive(count: usize) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        for index in 0..count {
+            let name = format!("f{index}");
+            writer.write_stored_file(&name, &[]).unwrap();
+        }
+        writer.finish().unwrap()
+    }
+
+    fn with_reordered_central(mut data: Vec<u8>) -> Vec<u8> {
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = usize::try_from(archive.directory_offset()).unwrap();
+        let eocd = usize::try_from(archive.eocd_offset()).unwrap();
+        let first_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&data[central..])
+                .unwrap()
+                .variable_length();
+        let first = data[central..central + first_len].to_vec();
+        let rest = data[central + first_len..eocd].to_vec();
+        data[central..eocd].copy_from_slice(&[rest, first].concat());
+        data
+    }
+
+    #[test]
+    fn copies_store_deflate_descriptor_and_directory_members_byte_for_byte() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+
+        assert_eq!(output, data);
+    }
+
+    #[test]
+    fn admission_profile_is_exact_and_rejection_writes_zero_bytes() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let plan = PreservationPlan::copy_all(&index);
+        let mut observed = None;
+        let output = index
+            .write_to_with_admission(&plan, Vec::new(), |profile| {
+                observed = Some((
+                    profile.prefix_bytes(),
+                    profile.entry_count(),
+                    profile.local_bytes(),
+                    profile.central_directory_bytes(),
+                    profile.central_metadata_bytes(),
+                    profile.tail_bytes(),
+                    profile.archive_comment_bytes(),
+                    profile.archive_bytes(),
+                    profile.entries().to_vec(),
+                ));
+                Ok::<(), io::Error>(())
+            })
+            .unwrap();
+        let (
+            prefix,
+            entry_count,
+            local_bytes,
+            central_bytes,
+            metadata_bytes,
+            tail_bytes,
+            comment_bytes,
+            archive_bytes,
+            entries,
+        ) = observed.expect("admission callback must run");
+        assert_eq!(prefix, 0);
+        assert_eq!(entry_count, entries.len() as u64);
+        assert_eq!(archive_bytes, output.len() as u64);
+        assert_eq!(
+            archive_bytes,
+            local_bytes + central_bytes + tail_bytes + comment_bytes
+        );
+        assert_eq!(
+            metadata_bytes,
+            entries.iter().map(|entry| entry.metadata_len()).sum()
+        );
+        assert!(entries.iter().all(|entry| {
+            entry.metadata_len() == entry.raw_name_len() + entry.extra_len() + entry.comment_len()
+        }));
+
+        let mut sink = Vec::new();
+        let one_under = archive_bytes
+            .checked_sub(1)
+            .expect("ordinary archive is non-empty");
+        let error = index
+            .write_to_with_admission(&plan, &mut sink, |profile| {
+                assert!(profile.archive_bytes() > one_under);
+                Err::<(), _>(io::Error::new(
+                    io::ErrorKind::PermissionDenied,
+                    "secret policy",
+                ))
+            })
+            .expect_err("one-under admission must refuse");
+        assert!(sink.is_empty(), "admission runs before the first sink byte");
+        assert!(matches!(error, PreservationAdmissionError::Admission(_)));
+        assert_eq!(error.to_string(), "preservation output admission failed");
+        assert_eq!(
+            format!("{error:?}"),
+            "PreservationAdmissionError::Admission"
+        );
+    }
+
+    #[test]
+    fn bounded_preservation_counts_files_not_directory_records() {
+        let data = with_comment(ordinary_archive(), b"preserved comment");
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_files = 2;
+
+        let index = PreservationIndex::new(&archive, &mut buffer, limits).unwrap();
+        assert_eq!(index.entries().len(), 3);
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+    }
+
+    #[test]
+    fn bounded_preservation_reports_member_and_metadata_limits_before_ownership() {
+        let data = stored_archive_with_metadata("payload.bin", b"metadata");
+        let metadata_bytes = central_metadata_bytes(&data);
+
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_member_name_bytes = b"payload.bi".len() as u64;
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("member-name limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MemberNameBytes,
+                actual,
+                maximum,
+            } if *actual == b"payload.bin".len() as u64 && *maximum == b"payload.bi".len() as u64
+        ));
+
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_metadata_bytes = metadata_bytes - 1;
+        let (archive, mut buffer) = indexed(&data);
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("metadata limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MetadataBytes,
+                actual,
+                maximum,
+            } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+        ));
+    }
+
+    #[test]
+    fn preservation_index_spills_records_larger_than_stack_workspace() {
+        for extra_len in [4 * 1024 + 32, 65_530] {
+            let extra = vec![0x5a; extra_len];
+            let data = stored_archive_with_metadata("payload.bin", &extra);
+            let metadata_bytes = central_metadata_bytes(&data);
+            assert!(metadata_bytes > 4 * 1024);
+            if extra_len > 65_000 {
+                assert!(metadata_bytes > 64 * 1024);
+            }
+
+            let (archive, _) = indexed(&data);
+            let mut scratch = [0_u8; 4 * 1024];
+            let mut limits = ArchiveLimits::UNBOUNDED;
+            limits.max_metadata_bytes = metadata_bytes;
+            let index = PreservationIndex::new(&archive, &mut scratch, limits)
+                .expect("large central metadata should spill under its exact limit");
+            let output = index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap();
+            assert_eq!(output, data);
+
+            if extra_len > 65_000 {
+                let (archive, _) = indexed(&data);
+                let mut larger_scratch = vec![0_u8; 128 * 1024];
+                let index = PreservationIndex::new(&archive, &mut larger_scratch, limits)
+                    .expect("a larger caller workspace must remain supported");
+                assert_eq!(
+                    index
+                        .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                        .unwrap(),
+                    data
+                );
+            }
+
+            let (archive, _) = indexed(&data);
+            let mut scratch = [0_u8; 4 * 1024];
+            limits.max_metadata_bytes = metadata_bytes - 1;
+            let error = match PreservationIndex::new(&archive, &mut scratch, limits) {
+                Ok(_) => panic!("metadata one byte over the finite limit must refuse"),
+                Err(error) => error,
+            };
+            assert!(matches!(
+                error.kind(),
+                ErrorKind::LimitExceeded {
+                    resource: LimitResource::MetadataBytes,
+                    actual,
+                    maximum,
+                } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+            ));
+        }
+    }
+
+    #[test]
+    fn bounded_preservation_includes_eocd_comment_in_metadata_and_unbounded_is_exact() {
+        let data = with_file_comment(
+            with_comment(
+                stored_archive_with_metadata("payload.bin", b"metadata"),
+                b"eocd",
+            ),
+            b"file",
+        );
+        let metadata_bytes = central_metadata_bytes(&data);
+
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_metadata_bytes = metadata_bytes - 1;
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("EOCD/comment metadata limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MetadataBytes,
+                actual,
+                maximum,
+            } if *actual == metadata_bytes && *maximum == metadata_bytes - 1
+        ));
+
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::UNBOUNDED).unwrap();
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+    }
+
+    #[test]
+    fn bounded_preservation_rejects_file_count_before_owned_entry_reservation() {
+        let data = many_small_archive(4);
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_files = 0;
+        let error = match PreservationIndex::new(&archive, &mut buffer, limits) {
+            Ok(_) => panic!("file-count limit should reject the source"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::FileCount,
+                actual: 1,
+                maximum: 0,
+            }
+        ));
+    }
+
+    #[test]
+    fn bounded_preservation_keeps_non_metadata_error_identity() {
+        let original = Error::from(io::Error::new(io::ErrorKind::BrokenPipe, "central read"));
+        let mapped = map_metadata_limit_error(original, 7, ArchiveLimits::UNBOUNDED);
+        assert!(matches!(
+            mapped.kind(),
+            ErrorKind::IO(error)
+                if error.kind() == io::ErrorKind::BrokenPipe && error.to_string() == "central read"
+        ));
+    }
+
+    #[test]
+    fn exposes_compression_methods_and_excludes_trailing_source_suffix() {
+        let archive_bytes = ordinary_archive();
+        let mut source_bytes = archive_bytes.clone();
+        source_bytes.extend_from_slice(b"source suffix");
+
+        let (archive, mut buffer) = indexed(&source_bytes);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        assert_eq!(index.archive_end_offset(), archive_bytes.len() as u64);
+        assert_eq!(
+            index
+                .entries()
+                .iter()
+                .map(PreservedEntry::compression_method)
+                .collect::<Vec<_>>(),
+            vec![
+                CompressionMethod::Store,
+                CompressionMethod::Deflate,
+                CompressionMethod::Store,
+            ]
+        );
+
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+        assert_eq!(output, archive_bytes);
+    }
+
+    #[test]
+    fn copy_all_reads_each_local_span_once_during_write() {
+        let data = ordinary_archive();
+        let end_offset = data.len() as u64;
+        let archive = crate::ZipLocator::new()
+            .locate_in_reader(CountingReader::new(data.clone()), &mut [0; 64], end_offset)
+            .unwrap();
+        let mut buffer = vec![0; crate::RECOMMENDED_BUFFER_SIZE];
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let expected: Vec<_> = index
+            .entries
+            .iter()
+            .map(|entry| entry.local_span())
+            .collect();
+        archive.get_ref().clear_reads();
+
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+        let reads = archive.get_ref().reads();
+
+        assert_eq!(output, data);
+        assert_eq!(reads.len(), expected.len());
+        for (read, span) in reads.iter().zip(expected) {
+            assert_eq!(*read, (span.start, (span.end - span.start) as usize));
+        }
+    }
+
+    #[test]
+    fn copy_all_handles_short_reads_and_partial_sink_at_chunk_boundary() {
+        let data = large_stored_archive();
+        let end_offset = data.len() as u64;
+        let archive = crate::ZipLocator::new()
+            .locate_in_reader(
+                ShortCountingReader::new(data.clone(), 4096),
+                &mut [0; 64],
+                end_offset,
+            )
+            .unwrap();
+        let mut buffer = vec![0; crate::RECOMMENDED_BUFFER_SIZE];
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let local_span = index.entries()[0].local_span();
+        let local_span_len = usize::try_from(local_span.end - local_span.start).unwrap();
+        assert!(local_span_len > 128 * 1024);
+        archive.get_ref().clear_reads();
+
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                Vec::new(),
+                &mut accounting,
+            )
+            .unwrap();
+        let reads = archive.get_ref().reads();
+        assert_eq!(output, data);
+        assert!(
+            reads
+                .iter()
+                .any(|(_, requested, returned)| { *requested > *returned && *returned > 0 })
+        );
+        assert!(reads.iter().all(|(_, requested, returned)| {
+            *requested <= COPY_CHUNK_SIZE && *returned > 0 && *returned <= *requested
+        }));
+        assert_eq!(
+            reads
+                .iter()
+                .filter(|(_, requested, _)| *requested == COPY_CHUNK_SIZE)
+                .count(),
+            local_span_len / COPY_CHUNK_SIZE
+        );
+        let expected_raw = local_span_len as u64
+            + index
+                .entries()
+                .iter()
+                .map(|entry| {
+                    (entry.central_record().end - entry.central_record().start)
+                        - CENTRAL_LOCAL_HEADER_OFFSET.len() as u64
+                })
+                .sum::<u64>();
+        assert_eq!(
+            accounting.raw_unchanged_source_bytes_accepted(),
+            expected_raw
+        );
+
+        let fail_after = COPY_CHUNK_SIZE + 3;
+        let mut sink = PartialFailingSink::new(fail_after, 4096);
+        let mut partial_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                &mut sink,
+                &mut partial_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+        assert_eq!(sink.bytes, data[..fail_after]);
+        assert_eq!(
+            partial_accounting.raw_unchanged_source_bytes_accepted(),
+            sink.bytes.len() as u64
+        );
+    }
+
+    #[test]
+    fn preserves_unsigned_data_descriptors() {
+        let data = without_descriptor_signature(ordinary_archive());
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+
+        assert_eq!(output, data);
+    }
+
+    #[test]
+    fn validates_signed_and_unsigned_32_and_64_descriptors_at_payload_end_with_decoy() {
+        let payload = [
+            crate::DataDescriptor::SIGNATURE.to_le_bytes().as_slice(),
+            b"payload bytes".as_slice(),
+        ]
+        .concat();
+        for (data, zip64) in [
+            (stored_descriptor_archive(&payload), false),
+            (
+                unsigned_descriptor_archive(stored_descriptor_archive(&payload)),
+                false,
+            ),
+            (zip64_descriptor_archive(&payload, true), true),
+            (zip64_descriptor_archive(&payload, false), true),
+        ] {
+            let (archive, mut buffer) = indexed(&data);
+            assert!(!archive.is_zip64());
+            let index = if zip64 {
+                PreservationIndex::new_with_policy(
+                    &archive,
+                    &mut buffer,
+                    ArchiveLimits::default(),
+                    PreservationPolicy::AllowZip64,
+                )
+                .unwrap()
+            } else {
+                PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap()
+            };
+            assert_eq!(
+                index
+                    .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                    .unwrap(),
+                data
+            );
+        }
+    }
+
+    #[test]
+    fn public_policy_preserves_projected_zip64_descriptor_before_publication() {
+        let payload = [
+            crate::DataDescriptor::SIGNATURE.to_le_bytes().as_slice(),
+            b"payload bytes".as_slice(),
+        ]
+        .concat();
+        for signed in [true, false] {
+            let data = zip64_descriptor_archive(&payload, signed);
+            let (archive, mut buffer) = indexed(&data);
+            assert!(!archive.is_zip64());
+            let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default())
+                .expect("public policy preserves projected ZIP64 entries");
+            assert_eq!(
+                index
+                    .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                    .unwrap(),
+                data
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_malformed_descriptor_at_exact_payload_end_before_writing() {
+        let mut data = stored_descriptor_archive(b"payload");
+        let (payload_end, _, _) = descriptor_offsets(&data);
+        data[payload_end + 8..payload_end + 12].copy_from_slice(&999u32.to_le_bytes());
+
+        let (archive, mut buffer) = indexed(&data);
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
+            Ok(_) => panic!("malformed data descriptor must be rejected"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+    }
+
+    #[test]
+    fn preserves_archive_comments_and_different_local_central_metadata() {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let (mut file, config) = writer
+            .new_file("central-a")
+            .extra_field(
+                crate::extra_fields::ExtraFieldId::new(0xaaaa),
+                b"local",
+                crate::Header::LOCAL,
+            )
+            .unwrap()
+            .extra_field(
+                crate::extra_fields::ExtraFieldId::new(0xbbbb),
+                b"central",
+                crate::Header::CENTRAL,
+            )
+            .unwrap()
+            .start()
+            .unwrap();
+        let mut data_writer = config.wrap(&mut file);
+        data_writer.write_all(b"payload").unwrap();
+        let (_, descriptor) = data_writer.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        let mut data = writer.finish().unwrap();
+
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let eocd = archive.eocd_offset() as usize;
+        data[eocd + 20..eocd + 22].copy_from_slice(&2u16.to_le_bytes());
+        data.extend_from_slice(b"ok");
+        data[30..39].copy_from_slice(b"local-nam");
+
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+
+        assert_eq!(output, data);
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.try_append(RegeneratedEntry::new("appended.bin", b"payload".to_vec()))
+            .unwrap();
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to(&plan, &mut sink)
+            .expect_err("new members must reject mismatched source provenance");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn preserves_physical_local_order_when_central_order_differs() {
+        let mut data = ordinary_archive();
+        let archive = ZipArchive::from_slice(&data).unwrap();
+        let central = archive.directory_offset() as usize;
+        let eocd = archive.eocd_offset() as usize;
+        let first_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&data[central..])
+                .unwrap()
+                .variable_length();
+        let first = data[central..central + first_len].to_vec();
+        let rest = data[central + first_len..eocd].to_vec();
+        data[central..eocd].copy_from_slice(&[rest, first].concat());
+
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+
+        assert_eq!(output, data);
+    }
+
+    #[test]
+    fn regenerates_a_selected_member_with_writer_semantics() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new("replacement.bin", b"new content".as_slice())
+                .compression_method(CompressionMethod::Deflate),
+        };
+
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let names: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                b"first.bin".to_vec(),
+                b"replacement.bin".to_vec(),
+                b"folder/".to_vec(),
+            ]
+        );
+
+        let replacement = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .find(|entry| entry.file_path().as_ref() == b"replacement.bin")
+            .unwrap();
+        assert_eq!(replacement.compression_method(), CompressionMethod::Deflate);
+        assert!(replacement.has_data_descriptor());
+    }
+
+    #[test]
+    fn accounting_distinguishes_changed_store_and_deflate_members() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        let store = b"replacement store";
+        let deflate = b"replacement deflate payload";
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("changed-store", store.as_slice()),
+        };
+        plan.actions[1] = PreservationAction::Regenerate {
+            id: index.entries()[1].id(),
+            entry: RegeneratedEntry::new("changed-deflate", deflate.as_slice())
+                .compression_method(CompressionMethod::Deflate),
+        };
+
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
+            .unwrap();
+        let reader = crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
+        assert_eq!(reader.read("changed-store").unwrap(), store);
+        assert_eq!(reader.read("changed-deflate").unwrap(), deflate);
+        assert_eq!(
+            accounting.stored_payload_bytes_emitted(),
+            store.len() as u64
+        );
+        assert!(accounting.generated_deflate_payload_bytes_emitted() > 0);
+        assert_eq!(accounting.precompressed_payload_bytes_emitted(), 0);
+
+        let unchanged = &index.entries()[2];
+        let unchanged_local = unchanged.local_span();
+        let unchanged_central = unchanged.central_record();
+        let expected_raw = unchanged_local.end - unchanged_local.start + unchanged_central.end
+            - unchanged_central.start
+            - CENTRAL_LOCAL_HEADER_OFFSET.len() as u64;
+        assert_eq!(
+            accounting.raw_unchanged_source_bytes_accepted(),
+            expected_raw
+        );
+    }
+
+    #[test]
+    fn accounting_charges_generated_payloads_on_partial_publication() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        let store = b"partial store payload";
+        let mut store_plan = PreservationPlan::copy_all(&index);
+        store_plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("partial-store", store.as_slice()),
+        };
+        let store_payload_start = ZipLocalFileHeaderFixed::SIZE + b"partial-store".len();
+        let mut store_sink = PartialFailingSink::new(store_payload_start + 3, usize::MAX);
+        let mut store_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(&store_plan, &mut store_sink, &mut store_accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+        assert_eq!(store_accounting.stored_payload_bytes_emitted(), 3);
+
+        let deflate = b"partial deflate payload with repeated repeated repeated bytes";
+        let mut deflate_plan = PreservationPlan::copy_all(&index);
+        deflate_plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("partial-deflate", deflate.as_slice())
+                .compression_method(CompressionMethod::Deflate),
+        };
+        let deflate_payload_start = ZipLocalFileHeaderFixed::SIZE + b"partial-deflate".len();
+        let mut deflate_sink = PartialFailingSink::new(deflate_payload_start + 3, usize::MAX);
+        let mut deflate_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(&deflate_plan, &mut deflate_sink, &mut deflate_accounting)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+        assert_eq!(
+            deflate_accounting.generated_deflate_payload_bytes_emitted(),
+            3
+        );
+
+        let mut source_writer =
+            crate::office::StreamingArchiveWriter::new(StreamingArchiveLimits::default());
+        source_writer.write_deflated("source.bin", deflate).unwrap();
+        let source_bytes = source_writer.finish_to_bytes().unwrap();
+        let source_len = source_bytes.len() as u64;
+        let source = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source_bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let source_id = source.entry_id("source.bin").unwrap();
+        let token = source
+            .read_entry_precompressed_with_progress(source_id, deflate, |_| Ok::<(), io::Error>(()))
+            .unwrap();
+        let mut precompressed_plan = PreservationPlan::copy_all(&index);
+        precompressed_plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new_precompressed_shared("partial-precompressed", token),
+        };
+        let precompressed_payload_start =
+            ZipLocalFileHeaderFixed::SIZE + b"partial-precompressed".len();
+        let mut precompressed_sink =
+            PartialFailingSink::new(precompressed_payload_start + 3, usize::MAX);
+        let mut precompressed_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(
+                &precompressed_plan,
+                &mut precompressed_sink,
+                &mut precompressed_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+        assert_eq!(
+            precompressed_accounting.precompressed_payload_bytes_emitted(),
+            3
+        );
+        assert_eq!(
+            precompressed_accounting.generated_deflate_payload_bytes_emitted(),
+            0
+        );
+    }
+
+    /// A regenerated Deflate member must be exactly the bytes a freshly
+    /// constructed `flate2` encoder produced before the writer drove the
+    /// compressor itself: same framing, same payload, same central record.
+    #[test]
+    fn a_regenerated_deflate_member_matches_a_fresh_flate2_encoder() {
+        fn payload(seed: u64, length: usize) -> Vec<u8> {
+            let mut xml = String::from("<?xml version=\"1.0\"?><r>");
+            let mut value = seed.wrapping_mul(0x9e37_79b9_7f4a_7c15) | 1;
+            while xml.len() < length {
+                value ^= value << 13;
+                value ^= value >> 7;
+                value ^= value << 17;
+                xml.push_str(&format!(
+                    "<e id=\"{}\">text {}</e>",
+                    value % 9973,
+                    value % 101
+                ));
+            }
+            xml.push_str("</r>");
+            xml.into_bytes()
+        }
+
+        fn fresh_mini_archive(name: &str, data: &[u8]) -> Vec<u8> {
+            let zip64 = generated_deflate_needs_zip64(data.len(), name.len()).unwrap();
+            let mut writer = ZipArchiveWriter::new(Vec::new());
+            let (mut file, config) = writer
+                .new_file(name)
+                .compression_method(CompressionMethod::Deflate)
+                .zip64(zip64)
+                .start()
+                .unwrap();
+            let encoder = DeflateEncoder::new(&mut file, Compression::default());
+            let mut data_writer = config.wrap(encoder);
+            data_writer.write_all(data).unwrap();
+            let (encoder, descriptor) = data_writer.finish().unwrap();
+            encoder.finish().unwrap();
+            file.finish(descriptor).unwrap();
+            writer.finish().unwrap()
+        }
+
+        for (index, length) in [0usize, 37, 3_800, 64 * 1024 + 11, 91, 12_289]
+            .into_iter()
+            .enumerate()
+        {
+            let name = format!("word/part{index}.xml");
+            let data = payload(index as u64 + 1, length);
+            let entry = RegeneratedEntry::new(name.clone(), data.clone())
+                .compression_method(CompressionMethod::Deflate);
+            let prepared = generated_entry(&entry).unwrap();
+
+            let local = match &prepared.local {
+                PreparedLocal::Shared { bytes, range } => bytes[range.clone()].to_vec(),
+                _ => panic!("generated Deflate must publish shared local bytes"),
+            };
+            let central = match &prepared.central {
+                PreparedCentral::Shared { bytes, range } => bytes[range.clone()].to_vec(),
+                _ => panic!("generated Deflate must publish a shared central record"),
+            };
+            assert!(
+                prepared.generated_payload.is_some(),
+                "member {index} did not report its payload range"
+            );
+
+            let reference = fresh_mini_archive(&name, &data);
+            let central_end = local.len() + central.len();
+            assert!(reference.len() >= central_end);
+            assert_eq!(
+                local,
+                reference[..local.len()],
+                "member {index} local framing and payload differ from a fresh encoder"
+            );
+            assert_eq!(
+                central,
+                reference[local.len()..central_end],
+                "member {index} central record differs from a fresh encoder"
+            );
+        }
+    }
+
+    fn fresh_generated_deflate_archive(name: &str, data: &[u8]) -> Vec<u8> {
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        let zip64 = generated_deflate_needs_zip64(data.len(), name.len()).unwrap();
+        let (mut file, config) = writer
+            .new_file(name)
+            .compression_method(CompressionMethod::Deflate)
+            .zip64(zip64)
+            .start()
+            .unwrap();
+        let encoder = DeflateEncoder::new(&mut file, Compression::default());
+        let mut data_writer = config.wrap(encoder);
+        data_writer.write_all(data).unwrap();
+        let (encoder, descriptor) = data_writer.finish().unwrap();
+        encoder.finish().unwrap();
+        file.finish(descriptor).unwrap();
+        writer.finish().unwrap()
+    }
+
+    fn generated_archive(prepared: &PreparedEntry) -> &[u8] {
+        let PreparedLocal::Shared { bytes, .. } = &prepared.local else {
+            panic!("generated Deflate entry should retain one archive buffer");
+        };
+        bytes
+    }
+
+    /// Written for a plan-wide Deflate workspace, which was not adopted:
+    /// each member keeps its own compressor so that parallel waves stay a
+    /// pure function of the member. The byte-identity oracle still applies,
+    /// here across 32 KiB output-buffer boundaries and empty members.
+    #[test]
+    fn reused_deflate_state_matches_fresh_streams_for_mixed_payloads() {
+        let mut payloads = vec![
+            Vec::new(),
+            vec![0x5a],
+            b"small repeated payload".repeat(17),
+            (0..256 * 1024)
+                .map(|index| u8::try_from(index % 251).unwrap())
+                .collect(),
+        ];
+        let mut state = 0x1234_5678_u32;
+        for length in [
+            32 * 1024 - 1,
+            32 * 1024,
+            32 * 1024 + 1,
+            64 * 1024 - 1,
+            64 * 1024,
+            64 * 1024 + 1,
+        ] {
+            let mut payload = Vec::with_capacity(length);
+            for _ in 0..length {
+                state = state.wrapping_mul(1_664_525).wrapping_add(1_013_904_223);
+                payload.push((state >> 24) as u8);
+            }
+            payloads.push(payload);
+        }
+        // Exercise a member after a large member and the empty-stream path.
+        payloads.extend([Vec::new(), Vec::new()]);
+        for (index, payload) in payloads.iter().enumerate() {
+            let name = format!("mixed-{index}.bin");
+            let entry = RegeneratedEntry::new_shared(&name, Arc::new(payload.clone()))
+                .compression_method(CompressionMethod::Deflate);
+            let prepared = generated_entry(&entry).unwrap();
+            let fresh = fresh_generated_deflate_archive(&name, payload);
+            assert_eq!(
+                generated_archive(&prepared),
+                fresh.as_slice(),
+                "regenerated Deflate output changed for payload {index}"
+            );
+        }
+    }
+
+    #[test]
+    fn reused_deflate_empty_flush_before_finish_matches_fresh_stream() {
+        let mut reused = Vec::new();
+        let mut state = ReusableDeflateState::new();
+        state.begin_member();
+        {
+            let mut encoder = ReusedDeflateEncoder::new(&mut state, &mut reused);
+            encoder.flush().unwrap();
+            encoder.finish().unwrap();
+        }
+
+        let mut fresh = Vec::new();
+        let mut encoder = DeflateEncoder::new(&mut fresh, Compression::default());
+        encoder.flush().unwrap();
+        encoder.finish().unwrap();
+        assert_eq!(reused, fresh);
+    }
+
+    #[test]
+    fn regenerated_entry_can_retain_a_shared_payload() {
+        let data = Arc::new(b"shared generated content".to_vec());
+        let entry = RegeneratedEntry::new_shared("shared.bin", Arc::clone(&data));
+
+        assert_eq!(Arc::strong_count(&data), 2);
+
+        let prepared = generated_entry(&entry).unwrap();
+        drop(entry);
+        let PreparedLocal::FramedPayload {
+            payload: PreparedPayload::Shared(local_bytes),
+            range,
+            ..
+        } = &prepared.local
+        else {
+            panic!("shared Store must retain the original payload directly");
+        };
+        assert!(Arc::ptr_eq(local_bytes, &data));
+        assert_eq!(&local_bytes[range.clone()], data.as_slice());
+        assert!(matches!(&prepared.central, PreparedCentral::Generated(_)));
+        assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn direct_shared_store_rejects_oversized_name_before_publication() {
+        let source = ordinary_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        let oversized_name = "n".repeat(usize::from(u16::MAX) + 1);
+        plan.try_append(RegeneratedEntry::new_shared(
+            oversized_name,
+            Arc::new(b"payload".to_vec()),
+        ))
+        .unwrap();
+
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to(&plan, &mut sink)
+            .expect_err("oversized direct Store names must fail before output");
+        assert!(matches!(error.kind(), ErrorKind::InvalidInput { .. }));
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn verified_precompressed_payloads_retain_source_storage_after_handles_drop() {
+        let payload = b"verified payload with repeated repeated bytes";
+        for method in [CompressionMethod::Store, CompressionMethod::Deflate] {
+            let token = verified_precompressed_token(method, payload);
+            let compressed_ptr = token.compressed_payload().as_ptr();
+            let compressed_len = token.compressed_payload().len();
+            let entry = RegeneratedEntry::new_precompressed_shared("verified.bin", token);
+            let prepared = generated_entry(&entry).unwrap();
+            drop(entry);
+
+            let PreparedLocal::FramedPayload {
+                payload: PreparedPayload::Precompressed(retained),
+                range,
+                ..
+            } = &prepared.local
+            else {
+                panic!("verified payload must retain direct framing and storage");
+            };
+            assert_eq!(retained.compression_method(), method);
+            assert_eq!(retained.compressed_payload().len(), compressed_len);
+            assert_eq!(retained.compressed_payload().as_ptr(), compressed_ptr);
+            assert_eq!(range.end - range.start, compressed_len);
+            assert!(matches!(&prepared.central, PreparedCentral::Generated(_)));
+        }
+    }
+
+    #[test]
+    fn generated_entry_splits_large_local_and_central_spans() {
+        let data = Arc::new(
+            (0..256 * 1024)
+                .map(|index| u8::try_from(index % 251).unwrap())
+                .collect::<Vec<_>>(),
+        );
+        let entry = RegeneratedEntry::new_shared("large.bin", Arc::clone(&data))
+            .compression_method(CompressionMethod::Deflate);
+
+        let prepared = generated_entry(&entry).unwrap();
+        let PreparedLocal::Shared {
+            bytes: local_bytes,
+            range: local_range,
+        } = &prepared.local
+        else {
+            panic!("generated entry must retain the shared archive buffer");
+        };
+        let local = &local_bytes[local_range.clone()];
+        let local_header = ZipLocalFileHeaderFixed::parse(local).unwrap();
+        let central = prepared.central.bytes(&[]);
+        let central_header = ZipFileHeaderFixed::parse(central).unwrap();
+
+        assert_eq!(local_header.version_needed, 20);
+        assert_eq!(central_header.version_needed, 20);
+        assert_eq!(local_header.file_name_len as usize, b"large.bin".len());
+        assert_eq!(
+            &local
+                [ZipLocalFileHeaderFixed::SIZE..ZipLocalFileHeaderFixed::SIZE + b"large.bin".len()],
+            b"large.bin"
+        );
+        assert_eq!(
+            central.len(),
+            ZipFileHeaderFixed::SIZE + central_header.variable_length()
+        );
+        assert_eq!(central_header.local_header_offset, 0);
+        assert_eq!(central_header.uncompressed_size as usize, data.len());
+        assert_eq!(Arc::strong_count(&data), 2);
+    }
+
+    #[test]
+    fn generated_deflate_zip64_selector_covers_compression_boundaries() {
+        let zip32_boundary = u64::from(u32::MAX);
+        let source_bound_crossing = usize::try_from(zip32_boundary * 8 / 9 + 1024).unwrap();
+        let source_bound_below = usize::try_from(zip32_boundary * 8 / 9 - 1024).unwrap();
+        let zip32_boundary = usize::try_from(zip32_boundary).unwrap();
+
+        assert!(!generated_deflate_needs_zip64(256 * 1024, u16::MAX as usize).unwrap());
+        assert!(!generated_deflate_needs_zip64(source_bound_below, 0).unwrap());
+        assert!(generated_deflate_needs_zip64(source_bound_below, u16::MAX as usize).unwrap());
+        assert!(generated_deflate_needs_zip64(source_bound_crossing, 0).unwrap());
+        assert!(generated_deflate_needs_zip64(zip32_boundary - 1, 0).unwrap());
+        assert!(generated_deflate_needs_zip64(zip32_boundary, 0).unwrap());
+    }
+
+    #[cfg(target_pointer_width = "64")]
+    #[test]
+    fn generated_deflate_zip64_selector_handles_usize_max_without_bound_overflow() {
+        assert!(generated_deflate_needs_zip64(usize::MAX, 0).unwrap());
+    }
+
+    #[test]
+    fn generated_entry_reserves_both_long_member_name_copies() {
+        let name = "n".repeat(u16::MAX as usize);
+        let entry = RegeneratedEntry::new(name.clone(), Vec::new());
+        let prepared = generated_entry(&entry).unwrap();
+        let PreparedLocal::Shared { bytes, range } = &prepared.local else {
+            panic!("generated entry must retain the shared archive buffer");
+        };
+        let expected_capacity = name
+            .len()
+            .checked_mul(2)
+            .and_then(|size| size.checked_add(4 * 1024))
+            .unwrap();
+        assert!(bytes.capacity() >= expected_capacity);
+        assert!(range.end - range.start <= expected_capacity);
+    }
+
+    #[test]
+    fn appends_store_and_deflate_members_after_preserved_source_order() {
+        let source = with_comment(
+            with_reordered_central(ordinary_archive()),
+            b"append comment",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let source_local_spans: Vec<_> = index
+            .entries()
+            .iter()
+            .map(|entry| {
+                let span = entry.local_span();
+                (
+                    span.clone(),
+                    source[span.start as usize..span.end as usize].to_vec(),
+                )
+            })
+            .collect();
+        let source_central = central_records(&source)
+            .into_iter()
+            .map(central_record_without_offset)
+            .collect::<Vec<_>>();
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.try_reserve_appended(2).unwrap();
+        plan.try_append(RegeneratedEntry::new(
+            "appended-store.bin",
+            b"stored".to_vec(),
+        ))
+        .unwrap();
+        plan.try_append(
+            RegeneratedEntry::new("appended-deflate.bin", b"deflated".to_vec())
+                .compression_method(CompressionMethod::Deflate),
+        )
+        .unwrap();
+        assert_eq!(plan.appended().len(), 2);
+        let shared = Arc::clone(&plan.appended()[1]);
+        let mut repeated = PreservationPlan::copy_all(&index);
+        repeated
+            .try_append_shared(Arc::clone(&plan.appended()[0]))
+            .unwrap();
+        repeated.try_append_shared(Arc::clone(&shared)).unwrap();
+        assert!(Arc::ptr_eq(&shared, &repeated.appended()[1]));
+        let cloned = plan.clone();
+        assert!(Arc::ptr_eq(&shared, &cloned.appended()[1]));
+
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        assert_eq!(output, index.write_to(&repeated, Vec::new()).unwrap());
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let output_names: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        let mut expected_names: Vec<_> = ZipArchive::from_slice(&source)
+            .unwrap()
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        expected_names.extend([
+            b"appended-store.bin".to_vec(),
+            b"appended-deflate.bin".to_vec(),
+        ]);
+        assert_eq!(output_names, expected_names);
+
+        for (span, bytes) in source_local_spans {
+            assert_eq!(&output[span.start as usize..span.end as usize], bytes);
+        }
+        let output_central = central_records(&output);
+        assert_eq!(
+            output_central[..source_central.len()]
+                .iter()
+                .cloned()
+                .map(central_record_without_offset)
+                .collect::<Vec<_>>(),
+            source_central
+        );
+        assert_eq!(output_archive.comment().as_bytes(), b"append comment");
+
+        let output_entries: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .collect();
+        let appended_start = output_entries.len() - 2;
+        let source_local_end = index
+            .entries()
+            .iter()
+            .map(|entry| entry.local_span().end)
+            .max()
+            .unwrap_or_default();
+        assert!(
+            output_entries[appended_start].local_header_offset()
+                < output_entries[appended_start + 1].local_header_offset()
+        );
+        assert!(output_entries[appended_start].local_header_offset() >= source_local_end);
+        let output_reader =
+            crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
+        assert_eq!(
+            output_reader
+                .read(
+                    std::str::from_utf8(output_entries[appended_start].file_path().as_ref())
+                        .unwrap()
+                )
+                .unwrap(),
+            b"stored"
+        );
+        assert_eq!(
+            output_reader
+                .read(
+                    std::str::from_utf8(output_entries[appended_start + 1].file_path().as_ref(),)
+                        .unwrap(),
+                )
+                .unwrap(),
+            b"deflated"
+        );
+    }
+
+    #[test]
+    fn omitting_an_appended_suffix_restores_the_exact_source_archive() {
+        let source = with_comment(
+            with_reordered_central(ordinary_archive()),
+            b"append then omit",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        let mut append_plan = PreservationPlan::copy_all(&index);
+        append_plan
+            .try_append(RegeneratedEntry::new(
+                "appended-store.bin",
+                b"stored".to_vec(),
+            ))
+            .unwrap();
+        append_plan
+            .try_append(
+                RegeneratedEntry::new("appended-deflate.bin", b"deflated".to_vec())
+                    .compression_method(CompressionMethod::Deflate),
+            )
+            .unwrap();
+        let appended = index.write_to(&append_plan, Vec::new()).unwrap();
+
+        let (appended_archive, mut appended_buffer) = indexed(&appended);
+        let appended_index = PreservationIndex::new(
+            &appended_archive,
+            &mut appended_buffer,
+            ArchiveLimits::default(),
+        )
+        .expect("appended archive remains preservable");
+        let mut restore_plan = PreservationPlan::copy_all(&appended_index);
+        for entry in appended_index.entries() {
+            if matches!(
+                entry.raw_name_bytes(),
+                b"appended-store.bin" | b"appended-deflate.bin"
+            ) {
+                let id = entry.id();
+                restore_plan.actions[usize::try_from(id.0).unwrap()] = PreservationAction::Omit(id);
+            }
+        }
+
+        let restored = appended_index.write_to(&restore_plan, Vec::new()).unwrap();
+        assert_eq!(restored, source);
+    }
+
+    #[test]
+    fn omitting_a_middle_source_member_reopens_and_preserves_retained_raw_records() {
+        let source = with_comment(ordinary_archive(), b"middle omit");
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let omitted_id = index.entries()[1].id();
+        let omitted_name = index.entries()[1].raw_name_bytes().to_vec();
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[1] = PreservationAction::Omit(omitted_id);
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let output_names: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap().file_path().as_ref().to_vec())
+            .collect();
+        assert!(!output_names.iter().any(|name| name == &omitted_name));
+        assert_eq!(output_archive.comment().as_bytes(), b"middle omit");
+
+        let (output_archive, mut output_buffer) = indexed(&output);
+        let output_index = PreservationIndex::new(
+            &output_archive,
+            &mut output_buffer,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        for source_entry in index
+            .entries()
+            .iter()
+            .filter(|entry| entry.id() != omitted_id)
+        {
+            let output_entry = output_index
+                .entries()
+                .iter()
+                .find(|entry| entry.raw_name_bytes() == source_entry.raw_name_bytes())
+                .expect("retained member remains present");
+            let source_span = source_entry.local_span();
+            let output_span = output_entry.local_span();
+            assert_eq!(
+                &source[usize::try_from(source_span.start).unwrap()
+                    ..usize::try_from(source_span.end).unwrap()],
+                &output[usize::try_from(output_span.start).unwrap()
+                    ..usize::try_from(output_span.end).unwrap()]
+            );
+            assert_eq!(
+                central_record_without_offset(
+                    source[usize::try_from(source_entry.central_record().start).unwrap()
+                        ..usize::try_from(source_entry.central_record().end).unwrap()]
+                        .to_vec()
+                ),
+                central_record_without_offset(
+                    output[usize::try_from(output_entry.central_record().start).unwrap()
+                        ..usize::try_from(output_entry.central_record().end).unwrap()]
+                        .to_vec()
+                )
+            );
+        }
+        let output_reader =
+            crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
+        assert_eq!(output_reader.read("first.bin").unwrap(), b"stored data");
+    }
+
+    #[test]
+    fn replacement_then_append_patches_source_and_appended_offsets() {
+        let source = ordinary_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id: index.entries()[0].id(),
+            entry: RegeneratedEntry::new("replaced.bin", vec![b'x'; 128 * 1024])
+                .compression_method(CompressionMethod::Deflate),
+        };
+        plan.try_append(RegeneratedEntry::new("tail.bin", b"tail".to_vec()))
+            .unwrap();
+
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        let entries: Vec<_> = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .collect();
+        let names: Vec<_> = entries
+            .iter()
+            .map(|entry| entry.file_path().as_ref().to_vec())
+            .collect();
+        assert_eq!(
+            names,
+            vec![
+                b"replaced.bin".to_vec(),
+                b"second.bin".to_vec(),
+                b"folder/".to_vec(),
+                b"tail.bin".to_vec(),
+            ]
+        );
+        assert!(entries[1].local_header_offset() > entries[0].local_header_offset());
+        assert!(entries[3].local_header_offset() > entries[2].local_header_offset());
+
+        let reader = crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
+        assert_eq!(reader.read("replaced.bin").unwrap(), vec![b'x'; 128 * 1024]);
+        assert_eq!(reader.read("tail.bin").unwrap(), b"tail");
+    }
+
+    #[test]
+    fn incomplete_or_unrepresentable_append_plan_leaves_sink_untouched() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        let mut incomplete_sink = b"untouched".to_vec();
+        let incomplete = PreservationPlan::new();
+        let error = index
+            .write_to(&incomplete, &mut incomplete_sink)
+            .expect_err("incomplete source coverage must fail before output");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(incomplete_sink, b"untouched");
+
+        let mut unsupported_sink = b"untouched".to_vec();
+        let mut unsupported = PreservationPlan::copy_all(&index);
+        unsupported
+            .try_append(
+                RegeneratedEntry::new("unsupported.bin", b"payload".to_vec())
+                    .compression_method(CompressionMethod::Bzip2),
+            )
+            .unwrap();
+        let error = index
+            .write_to(&unsupported, &mut unsupported_sink)
+            .expect_err("unsupported generated compression must fail before output");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(unsupported_sink, b"untouched");
+    }
+
+    #[test]
+    fn fallible_plan_reservations_and_preparation_errors_leave_sink_untouched() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        let mut plan = PreservationPlan::new();
+        assert!(plan.try_reserve_exact(usize::MAX).is_err());
+        assert!(plan.try_reserve_appended(usize::MAX).is_err());
+
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to(&plan, &mut sink)
+            .expect_err("preparation must reject incomplete coverage before output");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn rejects_the_zip32_entry_count_sentinel() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+
+        let mut prepared = Vec::with_capacity(u16::MAX as usize);
+        prepared.resize_with(u16::MAX as usize, || PreparedEntry {
+            local: PreparedLocal::Generated(Vec::new()),
+            central: PreparedCentral::Generated(Vec::new()),
+            generated_payload: None,
+            omitted: false,
+        });
+        let error = index
+            .validate_output_layout(&mut prepared)
+            .expect_err("0xffff entries require ZIP64");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+    }
+
+    #[test]
+    fn rejects_fixed32_offsets_after_zip64_output_grows_past_their_range() {
+        let source = promote_to_zip64(two_stored_archive());
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .unwrap();
+
+        // A Range is enough to model a layout past the ZIP32 limit; no large
+        // allocation or write is needed.  The first source record retains an
+        // existing ZIP64 offset field, while the second generated record
+        // would still need a fixed-width central offset.
+        let mut prepared = vec![
+            PreparedEntry {
+                local: PreparedLocal::Copy(0..u64::from(u32::MAX) + 1),
+                central: PreparedCentral::Copy(0),
+                generated_payload: None,
+                omitted: false,
+            },
+            PreparedEntry {
+                local: PreparedLocal::Generated(Vec::new()),
+                central: PreparedCentral::Generated(vec![0; ZipFileHeaderFixed::SIZE]),
+                generated_payload: None,
+                omitted: false,
+            },
+        ];
+        let error = index
+            .validate_output_layout(&mut prepared)
+            .expect_err("fixed-width offsets cannot represent the ZIP64 layout");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        prepared.clear();
+    }
+
+    #[test]
+    fn promotes_fixed32_central_offsets_before_tail_and_retains_metadata() {
+        let source = with_file_comment(
+            stored_archive_with_metadata("payload.bin", &[0x70, 0x72, 0x65]),
+            b"central comment",
+        );
+        let source_archive = ZipArchive::from_slice(&source).unwrap();
+        let central_start = usize::try_from(source_archive.directory_offset()).unwrap();
+        let central_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&source[central_start..])
+                .unwrap()
+                .variable_length();
+        let central = &source[central_start..central_start + central_len];
+        let promoted = promote_central_record(central, u64::from(u32::MAX) + 7, true).unwrap();
+        let fixed = ZipFileHeaderFixed::parse(&promoted.bytes).unwrap();
+
+        assert_eq!(fixed.local_header_offset, u32::MAX);
+        assert!(fixed.version_needed >= 45);
+        assert_eq!(
+            &promoted.bytes[promoted.offset_range.clone()],
+            (u64::from(u32::MAX) + 7).to_le_bytes().as_slice()
+        );
+        assert_eq!(
+            &promoted.bytes[promoted.bytes.len() - b"central comment".len()..],
+            b"central comment"
+        );
+        let extra_start = ZipFileHeaderFixed::SIZE + usize::from(fixed.file_name_len);
+        let extra_end = extra_start + usize::from(fixed.extra_field_len);
+        let fields: Vec<_> = ExtraFields::new(&promoted.bytes[extra_start..extra_end]).collect();
+        assert_eq!(fields.len(), 2);
+        assert_eq!(fields[0].0, ExtraFieldId::new(0xaaaa));
+        assert_eq!(fields[0].1, &[0x70, 0x72, 0x65]);
+        assert_eq!(fields[1].0, ExtraFieldId::ZIP64);
+        assert_eq!(
+            fields[1].1,
+            (u64::from(u32::MAX) + 7).to_le_bytes().as_slice()
+        );
+        assert!(promoted.source_ranges.is_some());
+        validate_source_ranges(
+            promoted.bytes.len(),
+            &promoted.offset_range,
+            promoted.source_ranges.as_ref().unwrap(),
+        )
+        .unwrap();
+
+        let mut patch_bytes = [0u8; 8];
+        patch_bytes.copy_from_slice(&(u64::from(u32::MAX) + 7).to_le_bytes());
+        let patch = CentralOffsetPatch {
+            start: promoted.offset_range.start,
+            end: promoted.offset_range.end,
+            bytes: patch_bytes,
+            len: 8,
+        };
+        let source_ranges = promoted.source_ranges.as_ref().unwrap();
+        let expected_raw = source_ranges
+            .iter()
+            .map(|range| range.end - range.start)
+            .sum::<usize>();
+        assert_eq!(expected_raw, central.len() - 8);
+        let mut output = Vec::new();
+        let mut accounting = ZipOperationAccounting::default();
+        write_prepared_central(
+            &mut output,
+            &promoted.bytes,
+            &patch,
+            false,
+            Some(source_ranges),
+            &mut accounting,
+        )
+        .unwrap();
+        assert_eq!(output, promoted.bytes);
+        assert_eq!(
+            accounting.raw_unchanged_source_bytes_accepted(),
+            expected_raw as u64
+        );
+
+        let mut sink = PartialFailingSink::new(8, 5);
+        let mut partial_accounting = ZipOperationAccounting::default();
+        let error = write_prepared_central(
+            &mut sink,
+            &promoted.bytes,
+            &patch,
+            false,
+            Some(source_ranges),
+            &mut partial_accounting,
+        )
+        .expect_err("partial central sink must fail");
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+        assert_eq!(sink.bytes.len(), 8);
+        assert_eq!(partial_accounting.raw_unchanged_source_bytes_accepted(), 6);
+    }
+
+    #[test]
+    fn layout_promotion_synthesizes_zip64_tail_without_sink_output() {
+        let source = two_stored_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let synthetic = PreservationIndex {
+            source: index.source,
+            entries: index.entries.clone(),
+            local_order: index.local_order.clone(),
+            archive_comment: index.archive_comment.clone(),
+            zip64_tail: index.zip64_tail.clone(),
+            archive_end_offset: u64::MAX,
+        };
+        let mut prepared = Vec::new();
+        prepared.resize_with(index.entries.len(), || PreparedEntry {
+            local: PreparedLocal::Generated(Vec::new()),
+            central: PreparedCentral::Generated(Vec::new()),
+            generated_payload: None,
+            omitted: true,
+        });
+        prepared[0] = PreparedEntry {
+            local: PreparedLocal::Copy(0..u64::from(u32::MAX) + 1),
+            central: PreparedCentral::Copy(0),
+            generated_payload: None,
+            omitted: false,
+        };
+        let second_local = index.entries[1].local_span.clone();
+        prepared[1] = PreparedEntry {
+            local: PreparedLocal::Copy(second_local),
+            central: PreparedCentral::Copy(1),
+            generated_payload: None,
+            omitted: false,
+        };
+
+        let layout = synthetic.validate_output_layout(&mut prepared).unwrap();
+        let central = prepared[1]
+            .central
+            .checked_bytes(&synthetic.entries)
+            .unwrap();
+        let fixed = ZipFileHeaderFixed::parse(central).unwrap();
+        assert_eq!(fixed.local_header_offset, u32::MAX);
+        assert!(fixed.version_needed >= 45);
+        assert_eq!(layout.central_patches.len(), 2);
+        assert_eq!(layout.central_patches[0].len, 4);
+        assert_eq!(
+            layout.central_patches[1].bytes,
+            (u64::from(u32::MAX) + 1).to_le_bytes()
+        );
+        match layout.tail {
+            PreparedTail::Zip64(tail) => {
+                assert!(!tail.source_backed);
+                assert_eq!(tail.eocd.len(), ZIP64_EOCD_FIXED_SIZE);
+                assert_eq!(&tail.locator[..4], &ZIP64_LOCATOR_SIGNATURE.to_le_bytes());
+                assert_eq!(&tail.classic_eocd[..4], &0x0605_4b50u32.to_le_bytes());
+            },
+            PreparedTail::Zip32(_) => panic!("ZIP64 geometry needs a synthesized tail"),
+        }
+    }
+
+    #[test]
+    fn admission_profile_reports_exact_zip64_tail_and_comment_geometry() {
+        let source = with_comment(
+            with_file_comment(two_stored_archive(), b"entry comment"),
+            b"archive comment",
+        );
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let synthetic = PreservationIndex {
+            source: index.source,
+            entries: index.entries.clone(),
+            local_order: index.local_order.clone(),
+            archive_comment: index.archive_comment.clone(),
+            zip64_tail: index.zip64_tail.clone(),
+            archive_end_offset: u64::MAX,
+        };
+        let mut prepared = vec![
+            PreparedEntry {
+                local: PreparedLocal::Copy(0..u64::from(u32::MAX) + 1),
+                central: PreparedCentral::Copy(0),
+                generated_payload: None,
+                omitted: false,
+            },
+            PreparedEntry {
+                local: PreparedLocal::Copy(index.entries[1].local_span.clone()),
+                central: PreparedCentral::Copy(1),
+                generated_payload: None,
+                omitted: false,
+            },
+        ];
+
+        let layout = synthetic.validate_output_layout(&mut prepared).unwrap();
+        let profile = build_output_profile(&prepared, &layout, &synthetic.entries).unwrap();
+        let profile = profile.view();
+        let entries = profile.entries();
+        let expected_tail = u64::try_from(
+            ZIP64_EOCD_FIXED_SIZE + ZIP64_LOCATOR_SIZE + EndOfCentralDirectoryRecordFixed::SIZE,
+        )
+        .unwrap();
+        let second_local_bytes = index.entries[1]
+            .local_span
+            .end
+            .checked_sub(index.entries[1].local_span.start)
+            .unwrap();
+
+        assert_eq!(profile.prefix_bytes(), 0);
+        assert_eq!(profile.entry_count(), 2);
+        assert_eq!(profile.tail_bytes(), expected_tail);
+        assert_eq!(
+            profile.archive_comment_bytes(),
+            b"archive comment".len() as u64
+        );
+        assert_eq!(
+            profile.local_bytes(),
+            u64::from(u32::MAX) + 1 + second_local_bytes
+        );
+        assert_eq!(entries.len(), 2);
+        assert_eq!(entries[0].comment_len(), b"entry comment".len() as u64);
+        assert_eq!(entries[1].comment_len(), 0);
+        assert_eq!(
+            entries[0].central_record_len(),
+            u64::try_from(index.entries[0].central_bytes.len()).unwrap()
+        );
+        assert_eq!(
+            entries[1].central_record_len(),
+            u64::try_from(index.entries[1].central_bytes.len()).unwrap() + 12
+        );
+        assert!(entries[1].extra_len() > entries[0].extra_len());
+        assert_eq!(
+            profile.central_directory_bytes(),
+            entries
+                .iter()
+                .map(|entry| entry.central_record_len())
+                .sum::<u64>()
+        );
+        assert_eq!(
+            profile.central_metadata_bytes(),
+            entries
+                .iter()
+                .map(|entry| entry.metadata_len())
+                .sum::<u64>()
+        );
+        assert_eq!(
+            profile.archive_bytes(),
+            profile.prefix_bytes()
+                + profile.local_bytes()
+                + profile.central_directory_bytes()
+                + profile.tail_bytes()
+                + profile.archive_comment_bytes()
+        );
+        assert_eq!(
+            profile.archive_bytes(),
+            layout.output_size,
+            "the admission profile must report the preflight output size exactly"
+        );
+    }
+
+    #[test]
+    fn central_offset_promotion_rejects_ambiguous_or_unrepresentable_extras() {
+        let source = stored_archive_with_metadata("payload.bin", &[0x70, 0x72, 0x65]);
+        let archive = ZipArchive::from_slice(&source).unwrap();
+        let central_start = usize::try_from(archive.directory_offset()).unwrap();
+        let central_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&source[central_start..])
+                .unwrap()
+                .variable_length();
+        let central = source[central_start..central_start + central_len].to_vec();
+
+        let with_extra = |extra: &[u8]| {
+            let fixed = ZipFileHeaderFixed::parse(&central).unwrap();
+            let name_end = ZipFileHeaderFixed::SIZE + usize::from(fixed.file_name_len);
+            let extra_end = name_end + usize::from(fixed.extra_field_len);
+            let mut result = central.clone();
+            result[30..32].copy_from_slice(
+                &u16::try_from(usize::from(fixed.extra_field_len) + extra.len())
+                    .unwrap()
+                    .to_le_bytes(),
+            );
+            result.splice(extra_end..extra_end, extra.iter().copied());
+            result
+        };
+
+        let duplicate = with_extra(&[1, 0, 0, 0, 1, 0, 0, 0]);
+        let error = promote_central_record(&duplicate, u64::from(u32::MAX) + 1, false)
+            .expect_err("duplicate ZIP64 fields must remain unsupported");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+
+        let malformed = with_extra(&[0x99]);
+        let error = promote_central_record(&malformed, u64::from(u32::MAX) + 1, false)
+            .expect_err("trailing malformed extra bytes must remain unsupported");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+
+        let huge_body = vec![0u8; 65_520];
+        let mut huge_extra = Vec::with_capacity(65_524);
+        huge_extra.extend_from_slice(&0xaaaa_u16.to_le_bytes());
+        huge_extra.extend_from_slice(&65_520u16.to_le_bytes());
+        huge_extra.extend_from_slice(&huge_body);
+        let oversized = with_extra(&huge_extra);
+        let error = promote_central_record(&oversized, u64::from(u32::MAX) + 1, false)
+            .expect_err("ZIP64 insertion past the u16 extra length must fail");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+
+        let source = zip64_descriptor_archive(b"payload", false);
+        let archive = ZipArchive::from_slice(&source).unwrap();
+        let central_start = usize::try_from(archive.directory_offset()).unwrap();
+        let central_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&source[central_start..])
+                .unwrap()
+                .variable_length();
+        let fixed = ZipFileHeaderFixed::parse(&source[central_start..]).unwrap();
+        let name_end = ZipFileHeaderFixed::SIZE + usize::from(fixed.file_name_len);
+        let extra_end = name_end + usize::from(fixed.extra_field_len);
+        let mut disk_zip64 = source[central_start..central_start + central_len].to_vec();
+        disk_zip64[34..36].copy_from_slice(&u16::MAX.to_le_bytes());
+        disk_zip64[name_end + 2..name_end + 4].copy_from_slice(&20u16.to_le_bytes());
+        let new_extra_len = u16::try_from(usize::from(fixed.extra_field_len) + 4).unwrap();
+        disk_zip64[30..32].copy_from_slice(&new_extra_len.to_le_bytes());
+        disk_zip64.splice(extra_end..extra_end, 0u32.to_le_bytes());
+        let promoted = promote_central_record(&disk_zip64, u64::from(u32::MAX) + 3, false)
+            .expect("offset must precede an existing ZIP64 disk-start value");
+        let promoted_fixed = ZipFileHeaderFixed::parse(&promoted.bytes).unwrap();
+        let promoted_extra_start =
+            ZipFileHeaderFixed::SIZE + usize::from(promoted_fixed.file_name_len);
+        let promoted_extra_end = promoted_extra_start + usize::from(promoted_fixed.extra_field_len);
+        let fields: Vec<_> =
+            ExtraFields::new(&promoted.bytes[promoted_extra_start..promoted_extra_end]).collect();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, ExtraFieldId::ZIP64);
+        assert_eq!(fields[0].1.len(), 28);
+        assert_eq!(
+            &fields[0].1[16..24],
+            (u64::from(u32::MAX) + 3).to_le_bytes().as_slice()
+        );
+        assert_eq!(&fields[0].1[24..], &[0, 0, 0, 0]);
+    }
+
+    #[test]
+    fn rejects_reader_valid_zip64_local_and_disk_malformed_sources() {
+        let source = promote_to_zip64(two_stored_archive());
+        let source_archive = ZipArchive::from_slice(&source).unwrap();
+        let first_local = source_archive
+            .entries()
+            .next_entry()
+            .unwrap()
+            .unwrap()
+            .local_header_offset() as usize;
+        let central_start = source_archive.directory_offset() as usize;
+        let first_central = source_archive
+            .entries()
+            .next_entry()
+            .unwrap()
+            .unwrap()
+            .central_directory_offset() as usize;
+
+        let mut malformed_local = source.clone();
+        malformed_local[first_local + 18..first_local + 22].copy_from_slice(&1000u32.to_le_bytes());
+        let (archive, mut buffer) = indexed(&malformed_local);
+        let error = match PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        ) {
+            Ok(_) => panic!("mismatched local sizes must be rejected"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+
+        let mut malformed_disk = source.clone();
+        malformed_disk[first_central + 34..first_central + 36].copy_from_slice(&1u16.to_le_bytes());
+        let (archive, mut buffer) = indexed(&malformed_disk);
+        let error = match PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        ) {
+            Ok(_) => panic!("nonzero disk-start metadata must be rejected"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(central_start, source_archive.directory_offset() as usize);
+        assert_eq!(source, promote_to_zip64(two_stored_archive()));
+    }
+
+    #[test]
+    fn rejects_overlapping_and_truncated_source_spans_before_writing() {
+        let mut overlapping = ordinary_archive();
+        let archive = ZipArchive::from_slice(&overlapping).unwrap();
+        let central = archive.directory_offset() as usize;
+        let first_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&overlapping[central..])
+                .unwrap()
+                .variable_length();
+        overlapping[central + first_len + 42..central + first_len + 46]
+            .copy_from_slice(&0u32.to_le_bytes());
+        let (archive, mut buffer) = indexed(&overlapping);
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
+            Ok(_) => panic!("overlapping spans must be rejected"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+
+        let mut truncated = ordinary_archive();
+        let archive = ZipArchive::from_slice(&truncated).unwrap();
+        let central = archive.directory_offset() as usize;
+        truncated.remove(30 + b"first.bin".len() + b"stored data".len() - 1);
+        // Reconstruct an EOCD whose central-directory offset follows the removed byte.
+        let old_eocd = truncated.len() - 22;
+        truncated[old_eocd + 16..old_eocd + 20]
+            .copy_from_slice(&((central - 1) as u32).to_le_bytes());
+        let first_central_len = ZipFileHeaderFixed::SIZE
+            + ZipFileHeaderFixed::parse(&truncated[central - 1..])
+                .unwrap()
+                .variable_length();
+        truncated[central - 1 + first_central_len + 42..central - 1 + first_central_len + 46]
+            .copy_from_slice(&(49u32).to_le_bytes());
+        let (archive, mut buffer) = indexed(&truncated);
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
+            Ok(_) => panic!("truncated spans must be rejected"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+    }
+
+    #[derive(Debug, Default)]
+    struct FailingSink;
+
+    impl Write for FailingSink {
+        fn write(&mut self, _buf: &[u8]) -> io::Result<usize> {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "sink failed"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[derive(Debug)]
+    struct PartialFailingSink {
+        bytes: Vec<u8>,
+        fail_after: usize,
+        max_write: usize,
+    }
+
+    impl PartialFailingSink {
+        fn new(fail_after: usize, max_write: usize) -> Self {
+            Self {
+                bytes: Vec::new(),
+                fail_after,
+                max_write,
+            }
+        }
+    }
+
+    impl Write for PartialFailingSink {
+        fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+            if self.bytes.len() >= self.fail_after {
+                return Err(io::Error::new(io::ErrorKind::BrokenPipe, "sink failed"));
+            }
+            let available = self.fail_after - self.bytes.len();
+            let written = buffer.len().min(self.max_write).min(available);
+            self.bytes.extend_from_slice(&buffer[..written]);
+            Ok(written)
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn accounting_counts_exact_raw_preservation_and_partial_sink_progress() {
+        let data = with_comment(ordinary_archive(), b"raw comment");
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                Vec::new(),
+                &mut accounting,
+            )
+            .unwrap();
+        let expected = index
+            .entries()
+            .iter()
+            .map(|entry| entry.local_span().end - entry.local_span().start)
+            .sum::<u64>()
+            + index
+                .entries()
+                .iter()
+                .map(|entry| {
+                    (entry.central_record().end - entry.central_record().start)
+                        - CENTRAL_LOCAL_HEADER_OFFSET.len() as u64
+                })
+                .sum::<u64>();
+        let expected = expected + b"raw comment".len() as u64;
+        assert_eq!(output, data);
+        assert_eq!(accounting.raw_unchanged_source_bytes_accepted(), expected);
+
+        let mut sink = PartialFailingSink::new(8, 5);
+        let mut partial_accounting = ZipOperationAccounting::default();
+        let error = index
+            .write_to_with_accounting(
+                &PreservationPlan::copy_all(&index),
+                &mut sink,
+                &mut partial_accounting,
+            )
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+        assert_eq!(
+            partial_accounting.raw_unchanged_source_bytes_accepted(),
+            sink.bytes.len() as u64
+        );
+    }
+
+    #[test]
+    fn propagates_sink_failure_after_preflight() {
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let error = index
+            .write_to(&PreservationPlan::copy_all(&index), FailingSink)
+            .unwrap_err();
+        assert!(matches!(error.kind(), ErrorKind::IO(_)));
+    }
+
+    #[test]
+    fn public_policy_preserves_zip64_while_internal_zip32_policy_refuses_it() {
+        let data = zip64_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default())
+            .expect("public preservation must accept validated ZIP64");
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+
+        let (archive, mut buffer) = indexed(&data);
+        let error = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::Zip32Only,
+        );
+        assert!(matches!(
+            error,
+            Err(error) if matches!(error.kind(), ErrorKind::UnsupportedPreservation { .. })
+        ));
+    }
+
+    #[test]
+    fn zip32_only_refuses_local_only_zip64_framing() {
+        let data = local_only_zip64_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .expect("public policy must preserve local-only ZIP64 framing");
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+
+        let (archive, mut buffer) = indexed(&data);
+        let error = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::Zip32Only,
+        );
+        assert!(matches!(
+            error,
+            Err(error) if matches!(error.kind(), ErrorKind::UnsupportedPreservation { .. })
+        ));
+    }
+
+    #[test]
+    fn empty_archive_prefix_is_refused_before_publication() {
+        let data = prefixed_empty_archive();
+        let (archive, mut buffer) = indexed(&data);
+        assert_eq!(archive.entries_hint(), 0);
+        let error = match PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()) {
+            Ok(_) => panic!("prefixed empty archive must be refused"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+
+        let data = ZipArchiveWriter::new(Vec::new()).finish().unwrap();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        assert_eq!(
+            index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap(),
+            data
+        );
+    }
+
+    #[test]
+    fn zip64_metadata_limit_reports_aggregate_comment_and_extension() {
+        let data = with_comment(promote_to_zip64(two_stored_archive()), b"abcd");
+        let (archive, mut buffer) = indexed(&data);
+        let mut limits = ArchiveLimits::UNBOUNDED;
+        limits.max_metadata_bytes = 6;
+        let error = match PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            limits,
+            PreservationPolicy::AllowZip64,
+        ) {
+            Ok(_) => panic!("metadata limit must reject the ZIP64 tail"),
+            Err(error) => error,
+        };
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::LimitExceeded {
+                resource: LimitResource::MetadataBytes,
+                actual: 7,
+                maximum: 6,
+            }
+        ));
+    }
+
+    #[test]
+    fn non_sentinel_classic_zip64_fields_must_match_resolved_values() {
+        let source = zip64_archive();
+        let source_archive = ZipArchive::from_slice(&source).unwrap();
+        let eocd = usize::try_from(source_archive.eocd_offset()).unwrap();
+        let cases: &[(usize, &[u8])] = &[
+            (8, &2u16.to_le_bytes()),
+            (10, &2u16.to_le_bytes()),
+            (12, &73u32.to_le_bytes()),
+            (16, &1u32.to_le_bytes()),
+        ];
+
+        for &(field_offset, replacement) in cases {
+            let mut malformed = source.clone();
+            malformed[eocd + field_offset..eocd + field_offset + replacement.len()]
+                .copy_from_slice(replacement);
+            let (archive, mut buffer) = indexed(&malformed);
+            let error = match PreservationIndex::new_with_policy(
+                &archive,
+                &mut buffer,
+                ArchiveLimits::default(),
+                PreservationPolicy::AllowZip64,
+            ) {
+                Ok(_) => panic!("classic ZIP64 field mismatch must be rejected"),
+                Err(error) => error,
+            };
+            assert!(matches!(
+                error.kind(),
+                ErrorKind::UnsupportedPreservation { .. }
+            ));
+        }
+    }
+
+    #[test]
+    fn copies_zip64_sources_byte_for_byte_including_tail() {
+        let data = zip64_archive();
+        let (archive, mut buffer) = indexed(&data);
+        assert!(archive.is_zip64());
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .unwrap();
+        let output = index
+            .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+            .unwrap();
+        assert_eq!(output, data);
+    }
+
+    #[test]
+    fn copies_zip64_central_extras_and_tail_extensible_data_byte_for_byte() {
+        for data in [
+            zip64_archive(),
+            include_bytes!("../assets/zip64-2.zip").to_vec(),
+        ] {
+            let source_tail_extension = zip64_tail_extensible_data(&data);
+            let (archive, mut buffer) = indexed(&data);
+            let index = PreservationIndex::new_with_policy(
+                &archive,
+                &mut buffer,
+                ArchiveLimits::default(),
+                PreservationPolicy::AllowZip64,
+            )
+            .unwrap();
+            let output = index
+                .write_to(&PreservationPlan::copy_all(&index), Vec::new())
+                .unwrap();
+            assert_eq!(output, data);
+            assert_eq!(zip64_tail_extensible_data(&output), source_tail_extension);
+        }
+    }
+
+    #[test]
+    fn shifted_zip64_local_offsets_patch_only_existing_zip64_values() {
+        let source = promote_to_zip64(two_stored_archive());
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .unwrap();
+        let omitted_id = index.entries()[0].id();
+        let retained = index.entries()[1].clone();
+        let source_local = retained.local_span();
+        let source_central = masked_central_record(&source, &retained);
+
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Omit(omitted_id);
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        let output_entry = output_archive
+            .entries()
+            .map(|entry| entry.unwrap())
+            .next()
+            .unwrap();
+        assert_eq!(output_entry.local_header_offset(), 0);
+        assert_eq!(
+            &output[..(source_local.end - source_local.start) as usize],
+            &source[source_local.start as usize..source_local.end as usize]
+        );
+
+        let (output_archive, mut output_buffer) = indexed(&output);
+        let output_index = PreservationIndex::new_with_policy(
+            &output_archive,
+            &mut output_buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .unwrap();
+        assert_eq!(
+            masked_central_record(&output, &output_index.entries()[0]),
+            source_central
+        );
+        assert_eq!(zip64_tail_extensible_data(&output), vec![0xa1, 0xb2, 0xc3]);
+    }
+
+    #[test]
+    fn regenerating_a_zip64_member_keeps_zip64_framing() {
+        let data = promote_to_zip64(two_stored_archive());
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .unwrap();
+        let id = index.entries()[0].id();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id,
+            entry: RegeneratedEntry::new("replacement.bin", b"replacement".to_vec()),
+        };
+
+        let output = index.write_to(&plan, Vec::new()).unwrap();
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(zip64_tail_extensible_data(&output), vec![0xa1, 0xb2, 0xc3]);
+        assert_eq!(
+            output_archive.comment().as_bytes().len(),
+            archive.comment().remaining() as usize
+        );
+        assert_eq!(
+            crate::office::ArchiveReader::new(&output, ArchiveLimits::default())
+                .unwrap()
+                .read("replacement.bin")
+                .unwrap(),
+            b"replacement"
+        );
+    }
+
+    #[test]
+    fn preservation_bound_covers_long_name_zip64_replacement_layout() {
+        let name = "n".repeat(60_000);
+        let mut writer = ZipArchiveWriter::new(Vec::new());
+        writer.write_stored_file(&name, b"source").unwrap();
+        let source = promote_to_zip64(writer.finish().unwrap());
+        let limits = ArchiveLimits {
+            max_member_name_bytes: name.len() as u64,
+            ..ArchiveLimits::default()
+        };
+        let (archive, mut buffer) = indexed(&source);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            limits,
+            PreservationPolicy::AllowZip64,
+        )
+        .expect("long-name ZIP64 source must be indexable");
+        assert!(archive.is_zip64());
+        let indexed_archive = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source.clone()),
+            source.len() as u64,
+            limits,
+        )
+        .expect("long-name ZIP64 source must be indexable by the owner");
+        let metadata_bytes = indexed_archive.preservation_metadata_bytes();
+        assert!(metadata_bytes >= name.len() as u64);
+        let bound = indexed_archive
+            .preservation_memory_upper_bound()
+            .expect("preservation bound must not overflow");
+        assert!(bound >= metadata_bytes.saturating_mul(4));
+
+        let id = index.entries()[0].id();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.actions[0] = PreservationAction::Regenerate {
+            id,
+            entry: RegeneratedEntry::new(name.clone(), b"replacement".to_vec()),
+        };
+        let output = index
+            .write_to(&plan, Vec::new())
+            .expect("long-name ZIP64 replacement must fit the preservation path");
+        let output_archive = ZipArchive::from_slice(&output).unwrap();
+        assert!(output_archive.is_zip64());
+        assert_eq!(
+            crate::office::ArchiveReader::new(&output, limits)
+                .unwrap()
+                .read(&name)
+                .unwrap(),
+            b"replacement"
+        );
+    }
+
+    #[test]
+    fn zip64_incomplete_plan_leaves_sink_untouched() {
+        let data = zip64_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index = PreservationIndex::new_with_policy(
+            &archive,
+            &mut buffer,
+            ArchiveLimits::default(),
+            PreservationPolicy::AllowZip64,
+        )
+        .unwrap();
+        let mut sink = b"untouched".to_vec();
+        let error = index
+            .write_to(&PreservationPlan::new(), &mut sink)
+            .expect_err("incomplete ZIP64 plan must fail before output");
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::UnsupportedPreservation { .. }
+        ));
+        assert_eq!(sink, b"untouched");
+    }
+
+    #[test]
+    fn rejects_ambiguous_malformed_multidisk_and_truncated_zip64_sources() {
+        assert!(ZipArchive::from_slice(ambiguous_zip64_tail()).is_err());
+
+        let source = zip64_archive();
+        let archive = ZipArchive::from_slice(&source).unwrap();
+        let head = usize::try_from(archive.head_eocd_offset()).unwrap();
+        let locator = usize::try_from(archive.eocd_offset()).unwrap() - ZIP64_LOCATOR_SIZE;
+
+        let mut malformed = source.clone();
+        malformed[head + 4..head + 12].copy_from_slice(&43u64.to_le_bytes());
+        assert!(ZipArchive::from_slice(&malformed).is_err());
+
+        let mut multidisk = source.clone();
+        multidisk[locator + 4..locator + 8].copy_from_slice(&1u32.to_le_bytes());
+        assert!(ZipArchive::from_slice(&multidisk).is_err());
+
+        let mut truncated = source.clone();
+        truncated.pop();
+        assert!(ZipArchive::from_slice(&truncated).is_err());
+        assert_eq!(source, zip64_archive());
+    }
+
+    #[test]
+    fn regenerated_precompressed_entry_reopens_and_charges_precompressed_bytes() {
+        let payload = b"precompressed preservation payload repeated repeated";
+        let mut source_writer =
+            crate::office::StreamingArchiveWriter::new(StreamingArchiveLimits::default());
+        source_writer.write_deflated("source.bin", payload).unwrap();
+        let source_bytes = source_writer.finish_to_bytes().unwrap();
+        let source_len = source_bytes.len() as u64;
+        let source = crate::office::IndexedArchive::from_reader(
+            Cursor::new(source_bytes),
+            source_len,
+            ArchiveLimits::default(),
+        )
+        .unwrap();
+        let source_id = source.entry_id("source.bin").unwrap();
+        let token = source
+            .read_entry_precompressed_with_progress(source_id, payload, |_| Ok::<(), io::Error>(()))
+            .unwrap();
+        let compressed_size = token.compressed_size();
+
+        let data = ordinary_archive();
+        let (archive, mut buffer) = indexed(&data);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let mut plan = PreservationPlan::copy_all(&index);
+        plan.try_append(RegeneratedEntry::new_precompressed_shared(
+            "copied.bin",
+            token,
+        ))
+        .unwrap();
+
+        let mut accounting = ZipOperationAccounting::default();
+        let output = index
+            .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
+            .unwrap();
+        let reader = crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
+        assert_eq!(reader.read("copied.bin").unwrap(), payload);
+        assert_eq!(
+            accounting.precompressed_payload_bytes_emitted(),
+            compressed_size
+        );
+        assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+    }
+
+    #[test]
+    fn precompressed_regeneration_matches_writer_framing_and_partial_boundaries() {
+        let payload = b"precompressed preservation payload repeated repeated bytes";
+        let name = "copied-direct.bin";
+
+        for method in [CompressionMethod::Store, CompressionMethod::Deflate] {
+            let token = verified_precompressed_token(method, payload);
+            let compressed = token.compressed_payload().to_vec();
+            let crc32 = token.crc32();
+            let uncompressed_size = token.uncompressed_size();
+
+            let source = ordinary_archive();
+            let (archive, mut buffer) = indexed(&source);
+            let index =
+                PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+            let mut plan = PreservationPlan::copy_all(&index);
+            plan.try_append(RegeneratedEntry::new_precompressed_shared(name, token))
+                .unwrap();
+
+            let mut accounting = ZipOperationAccounting::default();
+            let output = index
+                .write_to_with_accounting(&plan, Vec::new(), &mut accounting)
+                .unwrap();
+            let output_reader =
+                crate::office::ArchiveReader::new(&output, ArchiveLimits::default()).unwrap();
+            assert_eq!(output_reader.read(name).unwrap(), payload);
+            assert_eq!(
+                accounting.stored_payload_bytes_emitted(),
+                if method == CompressionMethod::Store {
+                    compressed.len() as u64
+                } else {
+                    0
+                }
+            );
+            assert_eq!(
+                accounting.precompressed_payload_bytes_emitted(),
+                if method == CompressionMethod::Deflate {
+                    compressed.len() as u64
+                } else {
+                    0
+                }
+            );
+            assert_eq!(accounting.generated_deflate_payload_bytes_emitted(), 0);
+
+            let mut writer = ZipArchiveWriter::new(Vec::new());
+            writer
+                .write_precompressed_file(name, method, crc32, uncompressed_size, &compressed)
+                .unwrap();
+            let expected = writer.finish().unwrap();
+            let output_archive = ZipArchive::from_slice(&output).unwrap();
+            let output_record = output_archive
+                .entries()
+                .map(|entry| entry.unwrap())
+                .find(|entry| entry.file_path().as_ref() == name.as_bytes())
+                .unwrap();
+            let output_entry = output_archive.get_entry(output_record.wayfinder()).unwrap();
+            let output_local_start = usize::try_from(output_record.local_header_offset()).unwrap();
+            let output_local_end = usize::try_from(output_archive.directory_offset()).unwrap();
+
+            let expected_archive = ZipArchive::from_slice(&expected).unwrap();
+            let expected_record = expected_archive
+                .entries()
+                .map(|entry| entry.unwrap())
+                .next()
+                .unwrap();
+            let expected_local_end = usize::try_from(expected_archive.directory_offset()).unwrap();
+            assert_eq!(
+                &output[output_local_start..output_local_end],
+                &expected[..expected_local_end],
+                "direct framing and payload must match ZipArchiveWriter"
+            );
+
+            let output_central_start =
+                usize::try_from(output_record.central_directory_offset()).unwrap();
+            let output_central_len = ZipFileHeaderFixed::SIZE
+                + usize::try_from(output_record.metadata_size_hint()).unwrap();
+            let expected_central_start =
+                usize::try_from(expected_record.central_directory_offset()).unwrap();
+            let expected_central_len = ZipFileHeaderFixed::SIZE
+                + usize::try_from(expected_record.metadata_size_hint()).unwrap();
+            assert_eq!(
+                central_record_without_offset(
+                    output[output_central_start..output_central_start + output_central_len]
+                        .to_vec()
+                ),
+                central_record_without_offset(
+                    expected[expected_central_start..expected_central_start + expected_central_len]
+                        .to_vec()
+                ),
+                "direct central framing must match ZipArchiveWriter"
+            );
+
+            let (payload_start, payload_end) = output_entry.compressed_data_range();
+            let payload_start = usize::try_from(payload_start).unwrap();
+            let payload_end = usize::try_from(payload_end).unwrap();
+            let central_start = usize::try_from(output_archive.directory_offset()).unwrap();
+            let mut failure_points = vec![
+                payload_start,
+                payload_start + 3,
+                central_start,
+                central_start + 3,
+            ];
+            failure_points.sort_unstable();
+            failure_points.dedup();
+
+            for fail_after in failure_points {
+                if fail_after >= output.len() {
+                    continue;
+                }
+                let mut sink = PartialFailingSink::new(fail_after, usize::MAX);
+                let mut partial_accounting = ZipOperationAccounting::default();
+                let error = index
+                    .write_to_with_accounting(&plan, &mut sink, &mut partial_accounting)
+                    .unwrap_err();
+                assert!(matches!(error.kind(), ErrorKind::IO(_)));
+                assert_eq!(sink.bytes, output[..fail_after]);
+
+                let accepted_payload = fail_after
+                    .saturating_sub(payload_start)
+                    .min(payload_end - payload_start) as u64;
+                assert_eq!(
+                    partial_accounting.stored_payload_bytes_emitted(),
+                    if method == CompressionMethod::Store {
+                        accepted_payload
+                    } else {
+                        0
+                    }
+                );
+                assert_eq!(
+                    partial_accounting.precompressed_payload_bytes_emitted(),
+                    if method == CompressionMethod::Deflate {
+                        accepted_payload
+                    } else {
+                        0
+                    }
+                );
+                assert_eq!(
+                    partial_accounting.generated_deflate_payload_bytes_emitted(),
+                    0
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn direct_precompressed_central_offset_promotes_to_zip64_before_publication() {
+        let source = two_stored_archive();
+        let (archive, mut buffer) = indexed(&source);
+        let index =
+            PreservationIndex::new(&archive, &mut buffer, ArchiveLimits::default()).unwrap();
+        let synthetic = PreservationIndex {
+            source: index.source,
+            entries: index.entries.clone(),
+            local_order: index.local_order.clone(),
+            archive_comment: index.archive_comment.clone(),
+            zip64_tail: index.zip64_tail.clone(),
+            archive_end_offset: u64::MAX,
+        };
+
+        let token = verified_precompressed_token(CompressionMethod::Store, b"direct ZIP64 payload");
+        let generated = generated_entry(&RegeneratedEntry::new_precompressed_shared(
+            "direct.bin",
+            token,
+        ))
+        .unwrap();
+        assert!(matches!(
+            &generated.local,
+            PreparedLocal::FramedPayload {
+                payload: PreparedPayload::Precompressed(_),
+                ..
+            }
+        ));
+
+        let mut prepared = vec![
+            PreparedEntry {
+                local: PreparedLocal::Copy(0..u64::from(u32::MAX)),
+                central: PreparedCentral::Copy(0),
+                generated_payload: None,
+                omitted: false,
+            },
+            generated,
+        ];
+        let layout = synthetic.validate_output_layout(&mut prepared).unwrap();
+        let central = prepared[1]
+            .central
+            .checked_bytes(&synthetic.entries)
+            .unwrap();
+        let fixed = ZipFileHeaderFixed::parse(central).unwrap();
+        assert_eq!(fixed.local_header_offset, u32::MAX);
+        assert!(fixed.version_needed >= 45);
+        let extra_start = ZipFileHeaderFixed::SIZE + usize::from(fixed.file_name_len);
+        let extra_end = extra_start + usize::from(fixed.extra_field_len);
+        let fields: Vec<_> = ExtraFields::new(&central[extra_start..extra_end]).collect();
+        assert_eq!(fields.len(), 1);
+        assert_eq!(fields[0].0, ExtraFieldId::ZIP64);
+        assert_eq!(fields[0].1, u64::from(u32::MAX).to_le_bytes().as_slice());
+        match layout.tail {
+            PreparedTail::Zip64(_) => {},
+            PreparedTail::Zip32(_) => panic!("ZIP64 tail required after direct offset promotion"),
+        }
+    }
+}

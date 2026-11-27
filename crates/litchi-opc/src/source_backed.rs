@@ -1,0 +1,17650 @@
+//! Immutable, source-backed access to an OPC package.
+//!
+//! This module intentionally exposes a smaller surface than [`OpcPackage`].
+//! The latter owns mutable parts, while this type keeps ordinary payloads in a
+//! positional source until a caller explicitly asks for one.
+
+use crate::accounting::OpcOperationAccounting;
+use crate::constants::{content_type, namespace, relationship_type};
+use crate::content_type::{ContentType, ContentTypeMap};
+use crate::error::{OpcError, Result};
+use crate::leniency::ToleranceReport;
+use crate::limits::{SourceLimitKind, SourceLimits};
+use crate::members::{NonPartMember, PartNameIndex};
+use crate::package::OpcPackage;
+use crate::packuri::{PACKAGE_URI, PackURI};
+use crate::part::PartFactory;
+use crate::phys_pkg::read_limited;
+use crate::pkgreader::{
+    PackageReader, RelationshipXmlMetrics, SerializedRelationship, SessionedArchive, SourceCatalog,
+    ValidationCatalogError, ValidationCatalogPhase, indexed_archive_with_limits, is_xml_id,
+};
+use crate::rel::{Relationship, Relationships, TargetMode};
+use crate::xml_attributes::BytesStartExt as _;
+use crate::xml_splice::SourceXmlPart;
+#[cfg(any(unix, windows))]
+use litchi_core::FileSource;
+use litchi_core::xml::ReaderOrigin;
+use litchi_core::{
+    ExecutionContext, ExecutionError, OwnedSource, ReadAt, Reservation, Resource, SourceVersion,
+};
+use quick_xml::XmlVersion;
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use sha2::{Digest as _, Sha256};
+use soapberry_zip::ReaderAt as ZipReaderAt;
+use soapberry_zip::ZipOperationAccounting as LowLevelZipOperationAccounting;
+use soapberry_zip::office::{EntryId, IndexedArchive, ParallelWriteLimits, ParallelWriteSession};
+use std::collections::{HashMap, HashSet};
+use std::io::{BufRead, Read, Write};
+use std::mem::size_of;
+use std::num::NonZeroUsize;
+use std::ops::Range;
+#[cfg(any(unix, windows))]
+use std::path::Path;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+use std::sync::{Arc, Condvar, Mutex, OnceLock, Weak};
+use std::time::Duration;
+
+mod artifact_restore;
+mod materialize;
+mod revision;
+mod view;
+pub use artifact_restore::SourceArtifactRestoreProof;
+pub use artifact_restore::{
+    ArtifactStream, ArtifactStreamError, ArtifactStreamGuard, ArtifactStreamPolicy,
+    ArtifactStreamReport, ArtifactStreamTarget,
+};
+pub use view::{PreparedMetadataData, PreparedPartData, PreparedPartView};
+mod read_ahead;
+use read_ahead::{ArchiveReadAhead, StructuralPrefetch};
+pub use read_ahead::{SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError};
+mod splice;
+pub use splice::{
+    SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
+    SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
+    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
+};
+pub use xml_minifier::audit::ReplacementSpan;
+mod batch;
+pub use batch::PartBatch;
+pub(crate) mod content_types_plan;
+mod read_session;
+mod relationships_plan;
+pub use read_session::PartReadSession;
+#[cfg(test)]
+mod shared_clone_tests;
+#[cfg(test)]
+mod xml_envelope_tests;
+
+const SOURCE_PUBLICATION_CHUNK_BYTES: usize = 64 * 1024;
+// Central-directory records that exceed this caller-owned workspace spill into
+// the ZIP reader's bounded per-record buffer.  Keeping the hot-path workspace
+// on the stack avoids retaining a 64 KiB heap allocation for every publication;
+// the archive metadata limit still bounds the spill path.
+const PRESERVATION_INDEX_STACK_BYTES: usize = 4 * 1024;
+
+#[cfg(test)]
+#[path = "source_xml_hint_tests.rs"]
+mod source_xml_hint_tests;
+/// Fixed part of the ZIP preservation writer's bounded generated-member
+/// capacity. The payload and target-name terms are charged separately using
+/// the same checked formula as `soapberry_zip::preserve::generated_entry`.
+const PRECOMPRESSED_WRITER_FIXED_OVERHEAD: u64 = 4096;
+/// Conservative measured tuning boundary for retaining the casefold order
+/// index. This is a performance threshold, not a semantic part-count limit.
+const SOURCE_CASEFOLD_INDEX_MIN_PARTS: usize = 2_048;
+const MAX_SOURCE_OVERLAY_PARTS: usize = 64;
+const MAX_SOURCE_RELATIONSHIP_REMOVALS: usize = 4096;
+const MAX_SOURCE_TOPOLOGY_PARTS: usize = 64;
+const MAX_SOURCE_TOPOLOGY_RELATIONSHIPS: usize = 4096;
+const MAX_SOURCE_RELATIONSHIP_FIELD_BYTES: usize = 64 * 1024;
+const MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES: usize = 8 * 1024 * 1024;
+const MAX_SOURCE_RAW_METADATA_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SOURCE_REPLACEMENT_SPANS: usize = 4096;
+const MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT: usize = 4096;
+const MAX_SOURCE_RELATIONSHIP_NAMESPACE_DECLARATIONS_PER_ELEMENT: usize = 256;
+const QUICK_XML_MAX_SAFE_DEPTH: usize = (u16::MAX as usize) - 1;
+
+#[cfg(test)]
+#[derive(Debug)]
+struct TestPublicationHook {
+    entered: Arc<std::sync::Barrier>,
+    release: Arc<std::sync::Barrier>,
+    waiter_joined: Arc<std::sync::Barrier>,
+}
+
+#[cfg(test)]
+impl TestPublicationHook {
+    fn new() -> Self {
+        Self {
+            entered: Arc::new(std::sync::Barrier::new(2)),
+            release: Arc::new(std::sync::Barrier::new(2)),
+            waiter_joined: Arc::new(std::sync::Barrier::new(2)),
+        }
+    }
+
+    fn pause(&self) {
+        self.entered.wait();
+        self.release.wait();
+    }
+
+    fn wait_until_entered(&self) {
+        self.entered.wait();
+    }
+
+    fn release(&self) {
+        self.release.wait();
+    }
+
+    fn signal_waiter_joined(&self) {
+        self.waiter_joined.wait();
+    }
+
+    fn wait_until_waiter_joined(&self) {
+        self.waiter_joined.wait();
+    }
+}
+
+#[cfg(test)]
+struct TestPublicationHookGuard<'cache> {
+    cache: &'cache PartCache,
+}
+
+#[cfg(test)]
+impl Drop for TestPublicationHookGuard<'_> {
+    fn drop(&mut self) {
+        *self
+            .cache
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner()) = None;
+    }
+}
+
+#[cfg(test)]
+struct TestCacheAdmissionBypassGuard<'cache> {
+    cache: &'cache PartCache,
+}
+
+#[cfg(test)]
+impl Drop for TestCacheAdmissionBypassGuard<'_> {
+    fn drop(&mut self) {
+        self.cache
+            .force_allocation_bypass
+            .store(false, Ordering::Release);
+    }
+}
+
+struct PendingOverlay {
+    target: usize,
+    replacement: Arc<Vec<u8>>,
+    source_xml: Option<SourceXmlPart>,
+    replacement_spans: Option<Arc<[ReplacementSpan]>>,
+    /// The source audit's proof for `replacement`, when its producer holds one.
+    proof: Option<xml_minifier::audit::VerifiedSource>,
+}
+
+/// A bounded source-backed OPC publication plan.
+///
+/// The plan is deliberately opaque: callers describe logical Part payload and
+/// relationship changes while the consuming publisher retains ownership of
+/// ZIP preservation, content-types lexical preservation, and relationship
+/// member placement. Building a plan never reads or mutates a source package.
+#[derive(Debug, Default)]
+pub struct SourceTopologyPlan {
+    replacements: Vec<TopologyReplacement>,
+    additions: Vec<TopologyPartAddition>,
+    removals: Vec<PackURI>,
+    relationships: Vec<TopologyRelationshipChange>,
+    raw_relationships: Vec<RawRelationshipsRestore>,
+    raw_content_types: Option<RawContentTypesRestore>,
+    relationship_bytes: usize,
+    raw_metadata_bytes: usize,
+}
+
+#[derive(Debug)]
+struct RawRelationshipsRestore {
+    owner: PackURI,
+    expected: Option<Arc<Vec<u8>>>,
+    replacement: Option<Arc<Vec<u8>>>,
+}
+
+#[derive(Debug)]
+struct RawContentTypesRestore {
+    expected: Arc<Vec<u8>>,
+    replacement: Arc<Vec<u8>>,
+}
+
+#[derive(Debug)]
+struct TopologyReplacement {
+    partname: PackURI,
+    replacement: Arc<Vec<u8>>,
+    source_xml: Option<SourceXmlPart>,
+    replacement_spans: Option<Arc<[ReplacementSpan]>>,
+    /// The source audit's proof for `replacement`
+    /// ([`SourceTopologyPlan::try_replace_part_verified`]).
+    proof: Option<xml_minifier::audit::VerifiedSource>,
+}
+
+#[derive(Debug)]
+struct TopologyPartAddition {
+    partname: PackURI,
+    content_type: ContentType,
+    payload: TopologyPartPayload,
+    /// The payload imports or restores producer bytes, so XML is held to
+    /// the source policy instead of the authored compact contract.
+    producer_bytes: bool,
+}
+
+#[derive(Debug)]
+enum TopologyPartPayload {
+    Decoded(Arc<Vec<u8>>),
+    SourceXml(Arc<SourceXmlPart>),
+    Precompressed(Box<AuthorizedPrecompressedPart>),
+}
+
+impl TopologyPartPayload {
+    fn effective_bytes_arc(&self) -> Arc<Vec<u8>> {
+        match self {
+            Self::Decoded(payload) => Arc::clone(payload),
+            Self::SourceXml(payload) => payload.payload_arc(),
+            Self::Precompressed(payload) => Arc::clone(&payload.expected_decoded),
+        }
+    }
+}
+
+/// An OPC-authorized wrapper around a ZIP-reader-issued verified compressed
+/// payload.
+///
+/// This value has no public constructor. It can only be issued by a
+/// [`PartView`] after strict ZIP verification against the exact decoded
+/// allocation supplied by or returned to the semantic caller. The source lineage, revision,
+/// Part URI, content type, and managed reservation remain attached until the
+/// topology publication has finished.
+pub struct AuthorizedPrecompressedPart {
+    physical: soapberry_zip::office::VerifiedPrecompressedEntry,
+    source_artifact: SourceArtifact,
+    source_lineage: SourceLineage,
+    source_version: SourceVersion,
+    source_partname: PackURI,
+    source_content_type: ContentType,
+    expected_decoded: Arc<Vec<u8>>,
+    // Combined reads must pin the cache's decoded memory/object reservations
+    // for as long as the token owns the same allocation.
+    decoded_payload: Option<CachedPayload>,
+    memory_reservation: Option<Arc<Reservation>>,
+    writer_memory_reservation: Option<Arc<Reservation>>,
+    fixed_memory_reservation: Option<Arc<Reservation>>,
+    writer_name_reservation: Option<Arc<Reservation>>,
+}
+
+impl std::fmt::Debug for AuthorizedPrecompressedPart {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("AuthorizedPrecompressedPart")
+            .field("source_lineage", &self.source_lineage)
+            .field("source_version", &self.source_version)
+            .field("source_partname", &self.source_partname)
+            .field("source_content_type", &self.source_content_type)
+            .field("compressed_size", &self.physical.compressed_size())
+            .field("uncompressed_size", &self.physical.uncompressed_size())
+            .field("crc32", &self.physical.crc32())
+            .field("pins_decoded_payload", &self.decoded_payload.is_some())
+            .field(
+                "memory_reservation",
+                &self
+                    .memory_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .field(
+                "writer_memory_reservation",
+                &self
+                    .writer_memory_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .field(
+                "fixed_memory_reservation",
+                &self.fixed_memory_reservation.as_ref().map(|r| r.amount()),
+            )
+            .field(
+                "writer_name_reservation",
+                &self
+                    .writer_name_reservation
+                    .as_ref()
+                    .map(|reservation| reservation.amount()),
+            )
+            .finish()
+    }
+}
+
+/// A shareable source-authorized compressed capture for repeated publication.
+///
+/// Capture and decoded reservations remain pinned. Each call to
+/// [`Self::authorize_for_publication`] reserves independent writer staging and
+/// checks source freshness; cloning this handle does not authorize a writer.
+#[derive(Debug, Clone)]
+pub struct RetainedPrecompressedPart {
+    payload: Arc<AuthorizedPrecompressedPart>,
+}
+
+impl RetainedPrecompressedPart {
+    /// Authorize one publication using this immutable capture without rereading
+    /// or decoding the source. Source identity and execution checks remain active.
+    pub fn authorize_for_publication(&self) -> Result<AuthorizedPrecompressedPart> {
+        let payload = &self.payload;
+        payload.check_for_publication(payload.source_content_type.as_str())?;
+        let reserve = |bytes| {
+            if bytes == 0 {
+                return Ok(None);
+            }
+            payload
+                .source_artifact
+                .snapshot
+                .context
+                .as_ref()
+                .map(|context| {
+                    context
+                        .reserve(Resource::Memory, bytes)
+                        .map(Arc::new)
+                        .map_err(map_execution_error)
+                })
+                .transpose()
+        };
+        let writer_memory_reservation = reserve(payload.compressed_size())?;
+        let fixed_memory_reservation = reserve(AuthorizedPrecompressedPart::fixed_memory_bytes(
+            &payload.source_partname,
+            payload.source_content_type.as_str(),
+        )?)?;
+        payload.check_for_publication(payload.source_content_type.as_str())?;
+        Ok(AuthorizedPrecompressedPart {
+            physical: payload.physical.clone(),
+            source_artifact: payload.source_artifact.clone(),
+            source_lineage: payload.source_lineage.clone(),
+            source_version: payload.source_version,
+            source_partname: payload.source_partname.clone(),
+            source_content_type: payload.source_content_type.clone(),
+            expected_decoded: Arc::clone(&payload.expected_decoded),
+            decoded_payload: payload.decoded_payload.clone(),
+            memory_reservation: payload.memory_reservation.clone(),
+            writer_memory_reservation,
+            fixed_memory_reservation,
+            writer_name_reservation: None,
+        })
+    }
+}
+
+impl AuthorizedPrecompressedPart {
+    fn fixed_memory_bytes(partname: &PackURI, content_type: &str) -> Result<u64> {
+        let metadata = size_of::<Self>()
+            .checked_add(partname.as_str().len())
+            .and_then(|bytes| bytes.checked_add(content_type.len()))
+            .and_then(|bytes| bytes.checked_add(256))
+            .ok_or_else(|| overlay_unavailable("precompressed token metadata size overflows"))?;
+        let metadata = u64::try_from(metadata)
+            .map_err(|_| overlay_unavailable("precompressed token metadata size exceeds u64"))?;
+        Ok(metadata.max(PRECOMPRESSED_WRITER_FIXED_OVERHEAD))
+    }
+
+    /// Retain this immutable capture for repeated publication, releasing this
+    /// token's payload staging. A fixed overhead reservation remains pinned
+    /// for the retained token metadata, including zero-length captures and
+    /// long Part names/content types. New
+    /// publication tokens each reserve their own payload and fixed overhead.
+    #[must_use]
+    pub fn into_retained(mut self) -> RetainedPrecompressedPart {
+        self.writer_memory_reservation = None;
+        self.writer_name_reservation = None;
+        RetainedPrecompressedPart {
+            payload: Arc::new(self),
+        }
+    }
+    fn logical_size(&self) -> u64 {
+        self.physical.uncompressed_size()
+    }
+
+    fn compressed_size(&self) -> u64 {
+        self.physical.compressed_size()
+    }
+
+    fn expected_decoded(&self) -> &[u8] {
+        self.expected_decoded.as_slice()
+    }
+
+    fn reserve_writer_name(&mut self, target_member_name: &str) -> Result<()> {
+        let Some(context) = self.source_artifact.snapshot.context.as_ref() else {
+            return Ok(());
+        };
+        let name_bytes = u64::try_from(target_member_name.len())
+            .map_err(|_| overlay_unavailable("precompressed target member name exceeds u64"))?;
+        let name_bytes = name_bytes.checked_mul(2).ok_or_else(|| {
+            overlay_unavailable("precompressed target member name bound overflows")
+        })?;
+        if name_bytes == 0 {
+            return Ok(());
+        }
+        let reservation = context
+            .reserve(Resource::Memory, name_bytes)
+            .map_err(map_execution_error)?;
+        self.writer_name_reservation = Some(Arc::new(reservation));
+        Ok(())
+    }
+
+    fn check_for_publication(&self, destination_content_type: &str) -> Result<()> {
+        if self.source_content_type.as_str() != destination_content_type {
+            return Err(overlay_unavailable(
+                "authorized precompressed content type differs from destination content type",
+            ));
+        }
+        if self.source_artifact.snapshot.lineage != self.source_lineage {
+            return Err(overlay_unavailable(
+                "authorized precompressed source lineage authority is inconsistent",
+            ));
+        }
+        self.source_artifact.snapshot.ensure_current()?;
+        if let Some(context) = self.source_artifact.snapshot.context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let current = self.source_artifact.snapshot.version;
+        if current != self.source_version {
+            return Err(OpcError::SourceChanged {
+                expected: self.source_version,
+                actual: current,
+            });
+        }
+        let expected_size = u64::try_from(self.expected_decoded.len())
+            .map_err(|_| overlay_unavailable("authorized decoded size exceeds u64"))?;
+        if expected_size != self.logical_size() {
+            return Err(OpcError::ZipError(
+                "authorized precompressed decoded size changed".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// The target requested for a source-backed relationship operation.
+///
+/// Internal targets are validated against the source/new Part graph and are
+/// serialized as owner-relative references. External targets are retained as
+/// URI references exactly as supplied, including query and fragment text.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum SourceRelationshipTarget {
+    /// A target Part in the OPC package.
+    Internal(PackURI),
+    /// An external URI reference, preserved without package resolution.
+    External(String),
+}
+
+impl SourceRelationshipTarget {
+    fn mode(&self) -> TargetMode {
+        match self {
+            Self::Internal(_) => TargetMode::Internal,
+            Self::External(_) => TargetMode::External,
+        }
+    }
+}
+
+pub(crate) fn escaped_xml_attribute_len(value: &str) -> Result<usize> {
+    value.chars().try_fold(0usize, |length, character| {
+        let encoded = match character {
+            '&' => 5,
+            '<' | '>' => 4,
+            '\"' | '\'' => 6,
+            _ => character.len_utf8(),
+        };
+        length
+            .checked_add(encoded)
+            .ok_or_else(|| overlay_unavailable("escaped XML attribute length overflows usize"))
+    })
+}
+
+fn relationship_xml_event_count(xml: &[u8], limits: SourceLimits) -> Result<u64> {
+    let mut reader = NsReader::from_reader(xml);
+    // Keep aggregate event accounting identical to the source catalog's
+    // relationship parser.  Its ingress parser trims whitespace text events;
+    // using the same mode here makes replacement deltas subtract from the
+    // retained source gauge without underflowing.  Overlay validation still
+    // performs the strict XML/content checks separately.
+    reader.config_mut().trim_text(true);
+    reader.config_mut().check_end_names = true;
+    let mut events = 0_u64;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("relationship XML event count overflows u64"))?;
+        limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
+        if matches!(reader.read_event()?, Event::Eof) {
+            return Ok(events);
+        }
+    }
+}
+
+#[derive(Debug)]
+enum TopologyRelationshipOperation {
+    Add {
+        reltype: String,
+        target: SourceRelationshipTarget,
+    },
+    Replace {
+        reltype: String,
+        target: SourceRelationshipTarget,
+        required_mode: Option<TargetMode>,
+    },
+    Remove {
+        required_mode: Option<TargetMode>,
+    },
+}
+
+#[derive(Debug)]
+struct TopologyRelationshipChange {
+    owner: PackURI,
+    r_id: String,
+    operation: TopologyRelationshipOperation,
+}
+
+#[derive(Debug)]
+struct ParsedSourceRelationshipDocument {
+    /// In a non-empty root this is the byte offset of `</Relationships>`;
+    /// for a self-closing root it is the slash in the final `/>` pair.
+    root_close_start: usize,
+    root_empty_end: Option<usize>,
+    root_name: Vec<u8>,
+    root_prefix: Vec<u8>,
+    relationship_ranges: HashMap<String, Range<usize>>,
+    relationship_event_counts: HashMap<String, u64>,
+    event_count: u64,
+}
+
+fn relationship_manifest_append_error(member_name: &str, detail: &str) -> OpcError {
+    OpcError::InvalidRelationshipsManifest(format!(
+        "relationships member '{member_name}' cannot be appended safely: {detail}"
+    ))
+}
+
+fn relationship_xml_whitespace(bytes: &[u8]) -> bool {
+    bytes
+        .iter()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+}
+
+fn relationship_namespace_declaration_name(name: &str) -> bool {
+    name == "xmlns" || name.strip_prefix("xmlns:").is_some_and(is_xml_id)
+}
+
+fn decode_relationship_attribute(
+    attribute: &quick_xml::events::attributes::Attribute<'_>,
+    decoder: quick_xml::Decoder,
+    limits: SourceLimits,
+    member_name: &str,
+) -> Result<String> {
+    let raw_attribute_bytes = attribute
+        .key
+        .0
+        .len()
+        .checked_add(attribute.value.as_ref().len())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "relationship attribute byte length overflows",
+            )
+        })?;
+    limits.check(
+        SourceLimitKind::XmlAttributeBytes,
+        raw_attribute_bytes as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    if attribute.value.as_ref().contains(&b'<') {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "relationship attribute contains a literal '<'",
+        ));
+    }
+    limits.check(
+        SourceLimitKind::XmlAttributeBytes,
+        attribute.value.as_ref().len() as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    let value = attribute
+        .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+        .map(|value| value.to_string())
+        .map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid relationship attribute value: {error}"),
+            )
+        })?;
+    limits.check(
+        SourceLimitKind::XmlAttributeBytes,
+        value.len() as u64,
+        limits.max_xml_attribute_bytes() as u64,
+    )?;
+    if !value.chars().all(relationship_xml10_character) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "relationship attribute contains a forbidden XML character",
+        ));
+    }
+    Ok(value)
+}
+
+fn validate_relationship_namespace_declaration(
+    key: &[u8],
+    raw_value: &[u8],
+    value: &str,
+    decoder: quick_xml::Decoder,
+    member_name: &str,
+) -> Result<()> {
+    let name = decoder.decode(key).map_err(|error| {
+        relationship_manifest_append_error(
+            member_name,
+            &format!("invalid namespace declaration name: {error}"),
+        )
+    })?;
+    if !relationship_namespace_declaration_name(&name) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "namespace declaration name is not a valid NCName",
+        ));
+    }
+    if raw_value != value.as_bytes() {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "namespace declaration requires a literal URI value",
+        ));
+    }
+    crate::xml_splice::validate_namespace_binding(&name, value).map_err(|error| {
+        relationship_manifest_append_error(
+            member_name,
+            &format!("namespace declaration uses a reserved or empty binding: {error}"),
+        )
+    })
+}
+
+fn validate_relationship_qname(
+    raw: &[u8],
+    decoder: quick_xml::Decoder,
+    kind: &str,
+    member_name: &str,
+) -> Result<String> {
+    let name = decoder.decode(raw).map_err(|error| {
+        relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName is not valid UTF-8: {error}"),
+        )
+    })?;
+    let mut parts = name.split(':');
+    let Some(prefix_or_local) = parts.next() else {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName is empty"),
+        ));
+    };
+    let valid = if !is_xml_id(prefix_or_local) {
+        false
+    } else {
+        match parts.next() {
+            None => true,
+            Some(local) => is_xml_id(local) && parts.next().is_none(),
+        }
+    };
+    if !valid {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName is not a valid XML QName"),
+        ));
+    }
+    if name
+        .split_once(':')
+        .is_some_and(|(prefix, _)| prefix == "xmlns")
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            &format!("{kind} QName uses the reserved xmlns prefix"),
+        ));
+    }
+    Ok(name.into_owned())
+}
+
+fn relationship_xml10_character(value: char) -> bool {
+    matches!(value, '\u{9}' | '\u{a}' | '\u{d}')
+        || ('\u{20}'..='\u{d7ff}').contains(&value)
+        || ('\u{e000}'..='\u{fffd}').contains(&value)
+        || ('\u{10000}'..='\u{10ffff}').contains(&value)
+}
+
+fn validate_relationship_comment(
+    comment: &quick_xml::events::BytesText<'_>,
+    member_name: &str,
+) -> Result<()> {
+    let bytes = comment.as_ref();
+    if bytes.windows(2).any(|pair| pair == b"--") || bytes.last() == Some(&b'-') {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "comments containing '--' are not well-formed",
+        ));
+    }
+    let value = comment.decode().map_err(|error| {
+        relationship_manifest_append_error(member_name, &format!("invalid comment: {error}"))
+    })?;
+    if !value.chars().all(relationship_xml10_character) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "comment contains a forbidden XML character",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_relationship_pi(
+    instruction: &quick_xml::events::BytesPI<'_>,
+    decoder: quick_xml::Decoder,
+    member_name: &str,
+) -> Result<()> {
+    let target = validate_relationship_qname(
+        instruction.target(),
+        decoder,
+        "processing-instruction target",
+        member_name,
+    )?;
+    if target.eq_ignore_ascii_case("xml") {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "processing-instruction target 'xml' is reserved",
+        ));
+    }
+    let content = decoder.decode(instruction.content()).map_err(|error| {
+        relationship_manifest_append_error(member_name, &format!("invalid PI content: {error}"))
+    })?;
+    if !content.chars().all(relationship_xml10_character) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "processing-instruction contains a forbidden XML character",
+        ));
+    }
+    Ok(())
+}
+
+fn inspect_relationship_append_root_attributes(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+    limits: SourceLimits,
+    member_name: &str,
+) -> Result<()> {
+    let mut attribute_count = 0usize;
+    // A keyed set: a list scanned per attribute costs time quadratic in
+    // the element's attributes.
+    let mut seen_keys: HashSet<&[u8]> = HashSet::new();
+    let mut seen_expanded: HashSet<(Option<&[u8]>, &[u8])> = HashSet::new();
+    for attribute_result in element.checked_attributes() {
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationships root attribute count overflows",
+            )
+        })?;
+        if attribute_count > MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "Relationships root has too many attributes",
+            ));
+        }
+        let attribute = attribute_result.map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid root attribute: {error}"),
+            )
+        })?;
+        let value = decode_relationship_attribute(&attribute, decoder, limits, member_name)?;
+        let key = attribute.key.0;
+        if seen_keys.contains(key) {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "the Relationships root repeats an attribute",
+            ));
+        }
+        seen_keys
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship root attributes",
+                source,
+            })?;
+        seen_keys.insert(key);
+        let key_name = decoder.decode(key).map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid root attribute name: {error}"),
+            )
+        })?;
+        crate::xml_splice::validate_source_attribute_key(reader, quick_xml::name::QName(key))
+            .map_err(|error| {
+                relationship_manifest_append_error(
+                    member_name,
+                    &format!("invalid root attribute name: {error}"),
+                )
+            })?;
+        // Root attributes are source-owned metadata.  The OPC reader admits
+        // them as opaque XML, so a topology splice must validate their XML
+        // value and namespace declarations while retaining every unknown
+        // attribute byte-for-byte.  Canonicalizing the root here would lose
+        // producer metadata unrelated to the selected relationship.
+        if relationship_namespace_declaration_name(&key_name) {
+            validate_relationship_namespace_declaration(
+                key,
+                attribute.value.as_ref(),
+                &value,
+                decoder,
+                member_name,
+            )?;
+        } else {
+            let (namespace, local) = reader
+                .resolver()
+                .resolve_attribute(quick_xml::name::QName(key));
+            let namespace = match namespace {
+                ResolveResult::Bound(Namespace(uri)) => Some(uri),
+                ResolveResult::Unbound => None,
+                ResolveResult::Unknown(_) => {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "root attribute uses an unbound namespace prefix",
+                    ));
+                },
+            };
+            if seen_expanded.contains(&(namespace, local.as_ref())) {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "the Relationships root repeats an expanded attribute",
+                ));
+            }
+            seen_expanded
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC expanded root attributes",
+                    source,
+                })?;
+            seen_expanded.insert((namespace, local.into_inner()));
+        }
+    }
+    Ok(())
+}
+
+fn inspect_relationship_append_child(
+    element: &quick_xml::events::BytesStart<'_>,
+    opc_namespace: bool,
+    decoder: quick_xml::Decoder,
+    limits: SourceLimits,
+    member_name: &str,
+) -> Result<(String, String, String, TargetMode)> {
+    if !opc_namespace || element.local_name().as_ref() != b"Relationship" {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "only direct Relationship children in the OPC namespace are supported",
+        ));
+    }
+    validate_relationship_qname(
+        element.name().as_ref(),
+        decoder,
+        "Relationship element",
+        member_name,
+    )?;
+
+    let mut id_attribute = None;
+    let mut type_attribute = None;
+    let mut target_attribute = None;
+    let mut target_mode = TargetMode::Internal;
+    let mut target_mode_seen = false;
+    let mut attribute_count = 0usize;
+    // A keyed set: a list scanned per attribute costs time quadratic in
+    // the element's attributes.
+    let mut seen_keys: HashSet<&[u8]> = HashSet::new();
+    for attribute_result in element.checked_attributes() {
+        attribute_count = attribute_count.checked_add(1).ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationship attribute count overflows",
+            )
+        })?;
+        if attribute_count > MAX_SOURCE_RELATIONSHIP_ATTRIBUTES_PER_ELEMENT {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "Relationship has too many attributes",
+            ));
+        }
+        let attribute = attribute_result.map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid Relationship attribute: {error}"),
+            )
+        })?;
+        let key = attribute.key.0;
+        if seen_keys.contains(key) {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "a Relationship repeats an attribute",
+            ));
+        }
+        seen_keys
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC Relationship attributes",
+                source,
+            })?;
+        seen_keys.insert(key);
+        let value = decode_relationship_attribute(&attribute, decoder, limits, member_name)?;
+        match key {
+            b"Id" if id_attribute.is_none() => id_attribute = Some(value),
+            b"Type" if type_attribute.is_none() => type_attribute = Some(value),
+            b"Target" if target_attribute.is_none() => target_attribute = Some(value),
+            b"TargetMode" if !target_mode_seen => {
+                // Read exactly as package ingress read it, so the source
+                // manifest still matches its catalog.
+                target_mode = TargetMode::parse_tolerant(&value).0;
+                target_mode_seen = true;
+            },
+            name if decoder
+                .decode(name)
+                .ok()
+                .is_some_and(|name| relationship_namespace_declaration_name(&name)) =>
+            {
+                validate_relationship_namespace_declaration(
+                    key,
+                    attribute.value.as_ref(),
+                    &value,
+                    decoder,
+                    member_name,
+                )?;
+            },
+            _ => {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "a Relationship has an unsupported or duplicate attribute",
+                ));
+            },
+        }
+    }
+    let id = id_attribute
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(member_name, "Relationship requires a non-empty Id")
+        })?;
+    let relationship_type = type_attribute
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationship requires a non-empty Type",
+            )
+        })?;
+    let target = target_attribute
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| {
+            relationship_manifest_append_error(
+                member_name,
+                "Relationship requires a non-empty Target",
+            )
+        })?;
+    // Read exactly as package ingress read it: a
+    // non-XML-ID source Id was admitted verbatim and recorded at open.
+    if !crate::pkgreader::admissible_source_relationship_id(&id) {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "Relationship Id contains control characters",
+        ));
+    }
+    limits.check(
+        SourceLimitKind::RelationshipTargetBytes,
+        target.len() as u64,
+        limits.max_relationship_target_bytes() as u64,
+    )?;
+    if relationship_type.chars().any(char::is_whitespace)
+        || relationship_type.chars().any(char::is_control)
+        || target.chars().any(char::is_control)
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "Relationship Type or Target is not a valid URI reference",
+        ));
+    }
+    Ok((id, relationship_type, target, target_mode))
+}
+
+fn validate_source_relationship_identity(
+    member_name: &str,
+    expected: &Relationships,
+    relationship_ids: &mut HashSet<String>,
+    relationship_count: &mut usize,
+    id: String,
+    relationship_type: String,
+    target: String,
+    target_mode: TargetMode,
+    limits: SourceLimits,
+) -> Result<()> {
+    let Some(original) = expected.get(&id) else {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship set differs from the opened catalog",
+        ));
+    };
+    if relationship_ids.contains(&id) {
+        return Err(OpcError::DuplicateRelationshipId(id));
+    }
+    if *relationship_count >= expected.len() {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship count differs from the opened catalog",
+        ));
+    }
+    if original.reltype() != relationship_type
+        || original.target_ref() != target
+        || original.target_mode() != target_mode
+    {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship set differs from the opened catalog",
+        ));
+    }
+    *relationship_count = (*relationship_count).checked_add(1).ok_or_else(|| {
+        overlay_unavailable("relationship append relationship count overflows usize")
+    })?;
+    limits.check(
+        SourceLimitKind::RelationshipsPerPart,
+        *relationship_count as u64,
+        limits.max_relationships_per_part() as u64,
+    )?;
+    // The parser reserves the full expected catalog size before reading any
+    // child. The count guard above proves this insertion cannot grow beyond
+    // that checked capacity.
+    relationship_ids.insert(id);
+    Ok(())
+}
+
+fn relationship_xml_working_memory_bound(
+    declared_bytes: u64,
+    relationship_slots: usize,
+) -> Result<u64> {
+    // The first source_bytes term below is the retained source payload and
+    // the second is the quick-xml input/transient buffer. Keeping both terms
+    // explicit is important: read_entry does not have a separate payload
+    // reservation on this path. The remaining terms cover the resolver's
+    // namespace binding Vec, opened-element state Vec, decoded attribute
+    // scratch, and the HashSet/HashMap bucket storage used to compare the
+    // source catalog and retain direct Relationship source ranges. quick-xml
+    // keeps the first two namespace bindings even for a namespace-free
+    // `<a/>`, so the fixed term covers that minimum state; each input-derived
+    // slot uses a conservative private-type footprint.
+    const FIXED_BYTES: usize = 4096;
+    const NAMESPACE_BINDING_BYTES: usize = 64;
+    const OPEN_ELEMENT_BYTES: usize = 2 * size_of::<usize>();
+    // Raw attribute keys (2 * usize), expanded-name bookkeeping
+    // (4 * usize), and quick-xml attribute ranges/positions (2 * usize),
+    // doubled for Vec growth/transient coexistence.
+    const ATTRIBUTE_BYTES: usize =
+        2 * (2 * size_of::<usize>() + 4 * size_of::<usize>() + 2 * size_of::<usize>());
+    const HASH_BUCKET_BYTES: usize = 64;
+    const SOURCE_RANGE_BYTES: usize = size_of::<String>() + size_of::<Range<usize>>();
+    const EVENT_COUNT_BYTES: usize = size_of::<String>() + size_of::<u64>() + HASH_BUCKET_BYTES;
+    const MIN_NAMESPACE_DECLARATION_BYTES: usize = 7;
+    const MIN_OPEN_ELEMENT_BYTES: usize = 3;
+    const MIN_ATTRIBUTE_BYTES: usize = 4;
+    // The ZIP reader allocates one sentinel byte beyond the declared payload
+    // while it materializes an entry. Keep that byte in the admission bound so
+    // the managed reservation covers the complete source Vec at peak.
+    let source_bytes = usize::try_from(
+        declared_bytes
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("relationship XML memory bound overflows"))?,
+    )
+    .map_err(|_| overlay_unavailable("relationship XML memory bound exceeds usize"))?
+    .max(1);
+    let namespace_slots = source_bytes
+        .checked_div(MIN_NAMESPACE_DECLARATION_BYTES)
+        .and_then(|slots| slots.checked_add(1))
+        .ok_or_else(|| overlay_unavailable("relationship namespace bound overflows"))?;
+    let open_element_slots = source_bytes
+        .checked_div(MIN_OPEN_ELEMENT_BYTES)
+        .and_then(|slots| slots.checked_add(1))
+        .ok_or_else(|| overlay_unavailable("relationship depth bound overflows"))?;
+    let attribute_slots = source_bytes
+        .checked_div(MIN_ATTRIBUTE_BYTES)
+        .and_then(|slots| slots.checked_add(1))
+        .ok_or_else(|| overlay_unavailable("relationship attribute bound overflows"))?;
+    let amount = FIXED_BYTES
+        // Retained source payload: read_entry is performed after this
+        // reservation and no other source-payload charge covers it.
+        .checked_add(source_bytes)
+        // quick-xml's input/transient buffer, which may coexist with the
+        // retained source Vec while the source is audited.
+        .and_then(|amount| amount.checked_add(source_bytes))
+        .and_then(|amount| {
+            namespace_slots
+                .checked_mul(NAMESPACE_BINDING_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            open_element_slots
+                .checked_mul(OPEN_ELEMENT_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            attribute_slots
+                .checked_mul(ATTRIBUTE_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            relationship_slots
+                .checked_add(1)
+                .and_then(|slots| slots.checked_mul(2 * HASH_BUCKET_BYTES))
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            relationship_slots
+                .checked_mul(SOURCE_RANGE_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .and_then(|amount| {
+            relationship_slots
+                .checked_mul(EVENT_COUNT_BYTES)
+                .and_then(|bound| amount.checked_add(bound))
+        })
+        .ok_or_else(|| overlay_unavailable("relationship XML memory bound overflows"))?;
+    u64::try_from(amount)
+        .map_err(|_| overlay_unavailable("relationship XML memory bound exceeds u64"))
+}
+
+/// Bound the transient and retained allocations made while applying one
+/// topology owner's relationship edits.  Grouping starts from a cloned source
+/// [`Relationships`] value and retains a second clone in the effective
+/// override map; reserve both maps before the first clone so managed callers
+/// cannot be surprised by an uncharged deep-copy peak.
+fn relationship_clone_memory_bound(
+    source: Option<&Relationships>,
+    owner: &PackURI,
+    additional_relationships: usize,
+    additional_string_bytes: usize,
+) -> Result<u64> {
+    const HASH_ENTRY_OVERHEAD: usize = 64;
+    const RELATIONSHIP_ALLOCATION_OVERHEAD: usize = 64;
+
+    let base_uri_len = source.map_or_else(|| owner.base_uri().len(), |rels| rels.base_uri().len());
+    let source_uri_len = source.map_or_else(
+        || owner.as_str().len(),
+        |value| value.source_uri().map_or(0, str::len),
+    );
+    let mut string_bytes = base_uri_len
+        .checked_add(source_uri_len)
+        .and_then(|bytes| bytes.checked_add(additional_string_bytes))
+        .ok_or_else(|| overlay_unavailable("relationship clone string bound overflows"))?;
+    if let Some(source) = source {
+        for relationship in source.iter() {
+            string_bytes = string_bytes
+                .checked_add(relationship.r_id().len())
+                .and_then(|bytes| bytes.checked_add(relationship.reltype().len()))
+                .and_then(|bytes| bytes.checked_add(relationship.target_ref().len()))
+                .and_then(|bytes| bytes.checked_add(relationship.base_uri().len()))
+                .and_then(|bytes| bytes.checked_add(relationship.source_uri().map_or(0, str::len)))
+                .ok_or_else(|| overlay_unavailable("relationship clone string bound overflows"))?;
+        }
+    }
+    // A newly added/replaced relationship owns the source/base strings too.
+    let relationship_slots = source
+        .map_or(0, Relationships::len)
+        .checked_add(additional_relationships)
+        .ok_or_else(|| overlay_unavailable("relationship clone slot bound overflows"))?;
+    let per_added_metadata = base_uri_len
+        .checked_add(source_uri_len)
+        .ok_or_else(|| overlay_unavailable("relationship clone metadata bound overflows"))?;
+    string_bytes = string_bytes
+        .checked_add(
+            additional_relationships
+                .checked_mul(per_added_metadata)
+                .ok_or_else(|| {
+                    overlay_unavailable("relationship clone metadata bound overflows")
+                })?,
+        )
+        .ok_or_else(|| overlay_unavailable("relationship clone string bound overflows"))?;
+
+    let map_bytes = relationship_slots
+        .checked_mul(
+            size_of::<Relationship>()
+                .checked_add(size_of::<String>())
+                .and_then(|bytes| bytes.checked_add(HASH_ENTRY_OVERHEAD))
+                .and_then(|bytes| bytes.checked_add(RELATIONSHIP_ALLOCATION_OVERHEAD))
+                .ok_or_else(|| overlay_unavailable("relationship clone map bound overflows"))?,
+        )
+        .and_then(|bytes| bytes.checked_add(size_of::<Relationships>()))
+        .ok_or_else(|| overlay_unavailable("relationship clone map bound overflows"))?;
+    // The source clone and retained override clone coexist while the override
+    // is inserted. Charge both fixed map state and string allocations.
+    let total = map_bytes
+        .checked_add(string_bytes)
+        .and_then(|bytes| bytes.checked_mul(2))
+        .ok_or_else(|| overlay_unavailable("relationship clone memory bound overflows"))?;
+    u64::try_from(total)
+        .map_err(|_| overlay_unavailable("relationship clone memory bound exceeds u64"))
+}
+
+fn content_types_xml_working_memory_bound(
+    declared_bytes: usize,
+    mapping_count: usize,
+) -> Result<u64> {
+    let amount = declared_bytes
+        .checked_mul(3)
+        .and_then(|bytes| bytes.checked_add(mapping_count.checked_mul(512)?))
+        .and_then(|bytes| bytes.checked_add(4096))
+        .ok_or_else(|| {
+            overlay_unavailable("content-types raw restoration memory bound overflows")
+        })?;
+    u64::try_from(amount)
+        .map_err(|_| overlay_unavailable("content-types raw restoration memory bound exceeds u64"))
+}
+
+/// Where the relationship source reader is relative to the `Relationships`
+/// root element. Nesting inside the root is not part of it: the depth
+/// counter holds that.
+///
+/// ```text
+/// Prolog --XML declaration, as the first event only--> Prolog
+/// Prolog --comment, PI or whitespace-----------------> Prolog
+/// Prolog --root start tag----------------------------> Open
+/// Prolog --root empty-element tag--------------------> Closed
+/// Open   --nested content----------------------------> Open
+/// Open   --root end tag------------------------------> Closed
+/// Closed --comment, PI or whitespace-----------------> Closed
+/// ```
+///
+/// Refused: an XML declaration that is not the first event; any element
+/// after the root ("content appears after the Relationships root"); text
+/// other than whitespace, CDATA, references and a DTD anywhere; and the end
+/// of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RelationshipsRootPhase {
+    /// No root tag has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
+fn parse_noncanonical_relationship_source<F>(
+    bytes: &[u8],
+    member_name: &str,
+    expected: &Relationships,
+    limits: SourceLimits,
+    mut check_progress: F,
+) -> Result<ParsedSourceRelationshipDocument>
+where
+    F: FnMut() -> Result<()>,
+{
+    std::str::from_utf8(bytes).map_err(|_| {
+        relationship_manifest_append_error(member_name, "relationships XML is not UTF-8")
+    })?;
+
+    let mut reader = NsReader::from_reader(bytes);
+    // Raw splice boundaries are byte offsets into `bytes`, whose leading
+    // byte-order mark precedes reader position zero.
+    let origin = ReaderOrigin::of(bytes);
+    // Keep lexical source positions stable while parsing ranges.  The source
+    // catalog's retained event gauge trims whitespace Text events, so that
+    // gauge is counted separately below rather than changing the parser mode
+    // used for raw splice boundaries.
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    reader.config_mut().trim_markup_names_in_closing_tags = false;
+    reader.resolver_mut().set_max_declarations_per_element(
+        MAX_SOURCE_RELATIONSHIP_NAMESPACE_DECLARATIONS_PER_ELEMENT,
+    );
+    // NsReader's resolver increments a u16 nesting counter before returning
+    // each start event. Keep one slot below its maximum so a deeper event is
+    // refused by our policy check before that counter can wrap.
+    let xml_depth_limit = limits.max_depth().min(QUICK_XML_MAX_SAFE_DEPTH);
+    let mut depth = 0usize;
+    let mut phase = RelationshipsRootPhase::Prolog;
+    let mut relationship_ids = HashSet::new();
+    relationship_ids
+        .try_reserve(expected.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC relationship append IDs",
+            source,
+        })?;
+    // Keep the complete source span of each admitted direct Relationship.
+    // Topology removal uses these parser-derived ranges so the selected
+    // element can be deleted without reparsing or reconstructing the root,
+    // declaration, comments, processing instructions, attributes, or the
+    // remaining relationship elements.
+    let mut relationship_ranges = HashMap::new();
+    relationship_ranges
+        .try_reserve(expected.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC relationship source ranges",
+            source,
+        })?;
+    let mut relationship_event_counts = HashMap::new();
+    relationship_event_counts
+        .try_reserve(expected.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC relationship event counts",
+            source,
+        })?;
+    let mut relationship_count = 0usize;
+    let mut root_close_start = None;
+    let mut root_empty_end = None;
+    let mut root_name = Vec::new();
+    let mut root_prefix = Vec::new();
+    let mut open_relationship = None;
+    let mut events = 0u64;
+    let mut retained_events = 0u64;
+
+    loop {
+        check_progress()?;
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("relationship XML event count overflows u64"))?;
+        limits.check(SourceLimitKind::Events, events, limits.max_events() as u64)?;
+        let event_start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| overlay_unavailable("relationship XML event position exceeds usize"))?;
+        let decoder = reader.decoder();
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
+        if !matches!(&event, Event::Text(text) if relationship_xml_whitespace(text.as_ref())) {
+            retained_events = retained_events.checked_add(1).ok_or_else(|| {
+                overlay_unavailable("retained relationship XML event count overflows u64")
+            })?;
+        }
+        let opc_namespace = matches!(resolved_namespace,
+            ResolveResult::Bound(Namespace(value))
+                if value == namespace::OPC_RELATIONSHIPS.as_bytes());
+        let event_end = origin.offset(reader.buffer_position()).ok_or_else(|| {
+            overlay_unavailable("relationship XML event end position exceeds usize")
+        })?;
+        if event_end < event_start || event_end > bytes.len() {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "the relationships XML event range is invalid",
+            ));
+        }
+        if matches!(event, Event::Empty(_)) {
+            let element_depth = depth
+                .checked_add(1)
+                .ok_or_else(|| overlay_unavailable("relationship XML depth overflows"))?;
+            limits.check(
+                SourceLimitKind::Depth,
+                element_depth as u64,
+                xml_depth_limit as u64,
+            )?;
+        }
+        match event {
+            Event::Start(element) => {
+                if phase == RelationshipsRootPhase::Closed {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "content appears after the Relationships root",
+                    ));
+                }
+                if depth == 0 {
+                    if phase == RelationshipsRootPhase::Open {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "multiple root elements are not supported",
+                        ));
+                    }
+                    if element.local_name().as_ref() != b"Relationships" || !opc_namespace {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "root must be Relationships in the OPC namespace",
+                        ));
+                    }
+                    let validated_root_name = validate_relationship_qname(
+                        element.name().as_ref(),
+                        decoder,
+                        "Relationships root",
+                        member_name,
+                    )?;
+                    root_name
+                        .try_reserve_exact(validated_root_name.len())
+                        .map_err(|source| OpcError::Allocation {
+                            resource: "source-backed OPC relationship root name",
+                            source,
+                        })?;
+                    root_name.extend_from_slice(element.name().as_ref());
+                    inspect_relationship_append_root_attributes(
+                        &reader,
+                        &element,
+                        decoder,
+                        limits,
+                        member_name,
+                    )?;
+                    let name = root_name.as_slice();
+                    if let Some(colon) = name.iter().position(|byte| *byte == b':') {
+                        root_prefix
+                            .try_reserve_exact(colon.checked_add(1).ok_or_else(|| {
+                                overlay_unavailable(
+                                    "the Relationships root QName prefix length overflows",
+                                )
+                            })?)
+                            .map_err(|source| OpcError::Allocation {
+                                resource: "source-backed OPC relationship append prefix",
+                                source,
+                            })?;
+                        root_prefix.extend_from_slice(&name[..=colon]);
+                    }
+                    phase = RelationshipsRootPhase::Open;
+                    depth = 1;
+                    limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
+                } else if depth == 1 {
+                    let (id, relationship_type, target, target_mode) =
+                        inspect_relationship_append_child(
+                            &element,
+                            opc_namespace,
+                            decoder,
+                            limits,
+                            member_name,
+                        )?;
+                    validate_source_relationship_identity(
+                        member_name,
+                        expected,
+                        &mut relationship_ids,
+                        &mut relationship_count,
+                        id.clone(),
+                        relationship_type,
+                        target,
+                        target_mode,
+                        limits,
+                    )?;
+                    open_relationship = Some((id, event_start));
+                    depth = 2;
+                    limits.check(SourceLimitKind::Depth, depth as u64, xml_depth_limit as u64)?;
+                } else {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "nested relationship content is not supported",
+                    ));
+                }
+            },
+            Event::Empty(element) => {
+                if phase == RelationshipsRootPhase::Closed {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "content appears after the Relationships root",
+                    ));
+                }
+                if depth == 0 {
+                    if phase == RelationshipsRootPhase::Open {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "multiple root elements are not supported",
+                        ));
+                    }
+                    if element.local_name().as_ref() != b"Relationships" || !opc_namespace {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "root must be Relationships in the OPC namespace",
+                        ));
+                    }
+                    let validated_name = validate_relationship_qname(
+                        element.name().as_ref(),
+                        decoder,
+                        "Relationships root",
+                        member_name,
+                    )?;
+                    root_name
+                        .try_reserve_exact(validated_name.len())
+                        .map_err(|source| OpcError::Allocation {
+                            resource: "source-backed OPC relationship root name",
+                            source,
+                        })?;
+                    root_name.extend_from_slice(element.name().as_ref());
+                    if let Some(colon) = validated_name
+                        .as_bytes()
+                        .iter()
+                        .position(|byte| *byte == b':')
+                    {
+                        root_prefix
+                            .try_reserve_exact(colon.checked_add(1).ok_or_else(|| {
+                                overlay_unavailable(
+                                    "the Relationships root QName prefix length overflows",
+                                )
+                            })?)
+                            .map_err(|source| OpcError::Allocation {
+                                resource: "source-backed OPC relationship append prefix",
+                                source,
+                            })?;
+                        root_prefix.extend_from_slice(&validated_name.as_bytes()[..=colon]);
+                    }
+                    inspect_relationship_append_root_attributes(
+                        &reader,
+                        &element,
+                        decoder,
+                        limits,
+                        member_name,
+                    )?;
+                    if bytes.get(event_start..event_end).is_none_or(|raw| {
+                        raw.len() < 2 || !raw.starts_with(b"<") || !raw.ends_with(b"/>")
+                    }) {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "self-closing Relationships root has no stable close boundary",
+                        ));
+                    }
+                    let slash = event_end.checked_sub(2).ok_or_else(|| {
+                        relationship_manifest_append_error(
+                            member_name,
+                            "self-closing Relationships root range underflows",
+                        )
+                    })?;
+                    root_close_start = Some(slash);
+                    root_empty_end = Some(event_end);
+                    phase = RelationshipsRootPhase::Closed;
+                    continue;
+                }
+                if depth != 1 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "nested relationship content is not supported",
+                    ));
+                }
+                let (id, relationship_type, target, target_mode) =
+                    inspect_relationship_append_child(
+                        &element,
+                        opc_namespace,
+                        decoder,
+                        limits,
+                        member_name,
+                    )?;
+                validate_source_relationship_identity(
+                    member_name,
+                    expected,
+                    &mut relationship_ids,
+                    &mut relationship_count,
+                    id.clone(),
+                    relationship_type,
+                    target,
+                    target_mode,
+                    limits,
+                )?;
+                if relationship_ranges
+                    .insert(id.clone(), event_start..event_end)
+                    .is_some()
+                {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "the source Relationship range set contains a duplicate ID",
+                    ));
+                }
+                relationship_event_counts.insert(id, 1);
+            },
+            Event::End(element) => {
+                validate_relationship_qname(
+                    element.name().as_ref(),
+                    decoder,
+                    "Relationships closing",
+                    member_name,
+                )?;
+                match depth {
+                    2 => {
+                        if !opc_namespace || element.local_name().as_ref() != b"Relationship" {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "Relationship closing element is outside the OPC namespace",
+                            ));
+                        }
+                        let (relationship_id, relationship_start) =
+                            open_relationship.take().ok_or_else(|| {
+                                relationship_manifest_append_error(
+                                    member_name,
+                                    "Relationship closing element has no source start",
+                                )
+                            })?;
+                        if relationship_ranges
+                            .insert(relationship_id.clone(), relationship_start..event_end)
+                            .is_some()
+                        {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "the source Relationship range set contains a duplicate ID",
+                            ));
+                        }
+                        relationship_event_counts.insert(relationship_id, 2);
+                        depth = 1;
+                    },
+                    1 => {
+                        if !opc_namespace || element.local_name().as_ref() != b"Relationships" {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "Relationships closing element is outside the OPC namespace",
+                            ));
+                        }
+                        if bytes
+                            .get(event_start..event_end)
+                            .is_none_or(|closing| !closing.starts_with(b"</"))
+                        {
+                            return Err(relationship_manifest_append_error(
+                                member_name,
+                                "the Relationships root close boundary is ambiguous",
+                            ));
+                        }
+                        root_close_start = Some(event_start);
+                        phase = RelationshipsRootPhase::Closed;
+                        depth = 0;
+                    },
+                    _ => {
+                        return Err(relationship_manifest_append_error(
+                            member_name,
+                            "an XML closing element is out of place",
+                        ));
+                    },
+                }
+            },
+            Event::Text(text) => {
+                if text.as_ref().windows(3).any(|window| window == b"]]>") {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "relationships text contains the forbidden ']]>' sequence",
+                    ));
+                }
+                let decoded = text.decode().map_err(|error| {
+                    relationship_manifest_append_error(
+                        member_name,
+                        &format!("invalid relationships text: {error}"),
+                    )
+                })?;
+                if !decoded.chars().all(relationship_xml10_character) {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "relationships text contains a forbidden XML character",
+                    ));
+                }
+                if !relationship_xml_whitespace(text.as_ref()) {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "non-whitespace text is not supported in a relationships member",
+                    ));
+                }
+            },
+            Event::Comment(comment) => {
+                validate_relationship_comment(&comment, member_name)?;
+            },
+            Event::PI(instruction) => {
+                validate_relationship_pi(&instruction, decoder, member_name)?;
+            },
+            Event::Decl(declaration) => {
+                // Only the first event can be the declaration, so it comes
+                // before the root and at most once.
+                if events != 1 {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "the XML declaration is out of place",
+                    ));
+                }
+                crate::xml_splice::validate_source_declaration(&declaration, member_name)?;
+            },
+            Event::DocType(_) => {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "DTDs are not permitted in relationships members",
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) => {
+                return Err(relationship_manifest_append_error(
+                    member_name,
+                    "unsupported XML content is not safe to append",
+                ));
+            },
+            // Every element after the root is refused above, so once the
+            // root is closed the depth is zero and no Relationship is open.
+            Event::Eof => match phase {
+                RelationshipsRootPhase::Closed => break,
+                RelationshipsRootPhase::Prolog | RelationshipsRootPhase::Open => {
+                    return Err(relationship_manifest_append_error(
+                        member_name,
+                        "missing or unclosed Relationships root",
+                    ));
+                },
+            },
+        }
+    }
+
+    if relationship_count != expected.len() {
+        return Err(relationship_manifest_append_error(
+            member_name,
+            "the source Relationship count differs from the opened catalog",
+        ));
+    }
+    let root_close_start = root_close_start.ok_or_else(|| {
+        relationship_manifest_append_error(
+            member_name,
+            "the Relationships root close boundary is unavailable",
+        )
+    })?;
+    Ok(ParsedSourceRelationshipDocument {
+        root_close_start,
+        root_empty_end,
+        root_name,
+        root_prefix,
+        relationship_ranges,
+        relationship_event_counts,
+        event_count: retained_events,
+    })
+}
+
+/// Replacing an empty relationship may rewrite that selected edge. Preserve
+/// all surrounding source bytes, and refuse children whose opaque contents
+/// a generated relationship would discard. The parser has already rejected
+/// unknown relationship attributes and validated the element namespace.
+fn replaceable_relationship_range(
+    parsed: &ParsedSourceRelationshipDocument,
+    source: &[u8],
+    id: &str,
+) -> Result<Range<usize>> {
+    let range = parsed.relationship_ranges.get(id).cloned().ok_or_else(|| {
+        overlay_unavailable("replacement relationship source range is unavailable")
+    })?;
+    let fragment = source.get(range.clone()).ok_or_else(|| {
+        overlay_unavailable("replacement relationship range is outside the source")
+    })?;
+    let mut reader = quick_xml::Reader::from_reader(fragment);
+    loop {
+        match reader.read_event()? {
+            Event::Start(_) | Event::Empty(_) | Event::End(_) => {},
+            Event::Text(text) if relationship_xml_whitespace(text.as_ref()) => {},
+            Event::Eof => return Ok(range),
+            _ => {
+                return Err(overlay_unavailable(
+                    "noncanonical relationship replacement contains opaque child content",
+                ));
+            },
+        }
+    }
+}
+
+/// Parse a relationship image with the source-splice grammar and reject the
+/// small set of ingress repairs that would otherwise be invisible in the
+/// typed [`Relationships`] value.  The ordinary package reader intentionally
+/// accepts those repairs for compatibility; raw restoration must prove that
+/// both images have an unambiguous OPC meaning before it retains their bytes.
+fn parse_strict_raw_relationship_source<F>(
+    bytes: &[u8],
+    member_name: &str,
+    expected: &Relationships,
+    limits: SourceLimits,
+    check_progress: F,
+) -> Result<ParsedSourceRelationshipDocument>
+where
+    F: FnMut() -> Result<()>,
+{
+    let parsed = parse_noncanonical_relationship_source(
+        bytes,
+        member_name,
+        expected,
+        limits,
+        check_progress,
+    )?;
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    loop {
+        let decoder = reader.decoder();
+        let event = reader.read_event()?;
+        match event {
+            Event::Start(element) => {
+                if depth == 0 {
+                    reject_unknown_relationship_root_attributes(&element, decoder, member_name)?;
+                } else if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                    reject_noncanonical_target_mode(&element, decoder, member_name)?;
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("raw relationship XML depth overflows"))?;
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    reject_unknown_relationship_root_attributes(&element, decoder, member_name)?;
+                } else if depth == 1 && element.local_name().as_ref() == b"Relationship" {
+                    reject_noncanonical_target_mode(&element, decoder, member_name)?;
+                }
+            },
+            Event::End(_) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    relationship_manifest_append_error(
+                        member_name,
+                        "raw relationship XML has an unmatched closing tag",
+                    )
+                })?;
+            },
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(parsed)
+}
+
+fn reject_unknown_relationship_root_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+    member_name: &str,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid Relationships root attribute: {error}"),
+            )
+        })?;
+        let key = decoder.decode(attribute.key.as_ref()).map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid Relationships root attribute name: {error}"),
+            )
+        })?;
+        if !relationship_namespace_declaration_name(&key) {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "raw restoration does not admit opaque Relationships root attributes",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn reject_noncanonical_target_mode(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+    member_name: &str,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| {
+            relationship_manifest_append_error(
+                member_name,
+                &format!("invalid Relationship attribute: {error}"),
+            )
+        })?;
+        if attribute.key.as_ref() != b"TargetMode" {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(|error| {
+                relationship_manifest_append_error(
+                    member_name,
+                    &format!("invalid TargetMode attribute: {error}"),
+                )
+            })?;
+        if value.as_ref() != "Internal" && value.as_ref() != "External" {
+            return Err(relationship_manifest_append_error(
+                member_name,
+                "raw restoration requires canonical TargetMode spelling",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn relationship_append_fragment_len(
+    root_prefix_len: usize,
+    r_id: &str,
+    reltype: &str,
+    target_ref: &str,
+    target_mode: TargetMode,
+) -> Result<usize> {
+    let escaped_id_len = escaped_xml_attribute_len(r_id)?;
+    let escaped_type_len = escaped_xml_attribute_len(reltype)?;
+    let escaped_target_len = escaped_xml_attribute_len(target_ref)?;
+    let mut length = 1usize
+        .checked_add(root_prefix_len)
+        .and_then(|value| value.checked_add(b"Relationship Id=\"".len()))
+        .and_then(|value| value.checked_add(escaped_id_len))
+        .and_then(|value| value.checked_add(b"\" Type=\"".len()))
+        .and_then(|value| value.checked_add(escaped_type_len))
+        .and_then(|value| value.checked_add(b"\" Target=\"".len()))
+        .and_then(|value| value.checked_add(escaped_target_len))
+        .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))?;
+    length = if target_mode == TargetMode::External {
+        length
+            .checked_add(b"\" TargetMode=\"External\"/>".len())
+            .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))?
+    } else {
+        length
+            .checked_add(b"\"/>".len())
+            .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))?
+    };
+    Ok(length)
+}
+
+pub(crate) fn relationship_source_append_output_len(
+    source_len: usize,
+    root_empty: bool,
+    root_name_len: usize,
+    append_len: usize,
+) -> Result<usize> {
+    if !root_empty {
+        return source_len
+            .checked_add(append_len)
+            .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"));
+    }
+    // A self-closing root replaces its final `/>` with `>`, the generated
+    // children, and a matching `</QName>` close.  Preserve every byte after
+    // the root event (comments, PI, and trailing whitespace) verbatim.
+    source_len
+        .checked_sub(2)
+        .and_then(|length| length.checked_add(1))
+        .and_then(|length| length.checked_add(append_len))
+        .and_then(|length| {
+            root_name_len
+                .checked_add(3)
+                .and_then(|close_len| length.checked_add(close_len))
+        })
+        .ok_or_else(|| overlay_unavailable("relationship append XML length overflows usize"))
+}
+
+const CANONICAL_RELATIONSHIPS_HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
+const CANONICAL_RELATIONSHIPS_FOOTER: &[u8] = b"</Relationships>";
+const CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES: usize = 4096;
+
+pub(crate) fn canonical_relationship_xml_len(relationships: &Relationships) -> Result<usize> {
+    relationships.iter().try_fold(
+        CANONICAL_RELATIONSHIPS_HEADER
+            .len()
+            .checked_add(CANONICAL_RELATIONSHIPS_FOOTER.len())
+            .ok_or_else(|| {
+                overlay_unavailable("canonical relationship XML length overflows usize")
+            })?,
+        |length, relationship| {
+            length
+                .checked_add(relationship_append_fragment_len(
+                    0,
+                    relationship.r_id(),
+                    relationship.reltype(),
+                    relationship.target_ref(),
+                    relationship.target_mode(),
+                )?)
+                .ok_or_else(|| {
+                    overlay_unavailable("canonical relationship XML length overflows usize")
+                })
+        },
+    )
+}
+
+pub(crate) fn canonical_relationship_comparison_memory_bound(
+    relationship_count: usize,
+) -> Result<u64> {
+    let bytes = relationship_count
+        .checked_mul(size_of::<&Relationship>())
+        .and_then(|bytes| bytes.checked_add(CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES))
+        .ok_or_else(|| overlay_unavailable("canonical relationship comparison bound overflows"))?;
+    u64::try_from(bytes)
+        .map_err(|_| overlay_unavailable("canonical relationship comparison bound exceeds u64"))
+}
+
+pub(crate) fn canonical_relationship_source_matches(
+    source: &[u8],
+    relationships: &Relationships,
+) -> Result<bool> {
+    let mut offset = 0usize;
+    let mut matches = true;
+    relationships.for_each_canonical_xml_chunk(|chunk| {
+        if !matches {
+            return Ok(());
+        }
+        let end = offset
+            .checked_add(chunk.len())
+            .ok_or_else(|| overlay_unavailable("canonical relationship comparison overflows"))?;
+        if source.get(offset..end) != Some(chunk) {
+            matches = false;
+            return Ok(());
+        }
+        offset = end;
+        Ok(())
+    })?;
+    Ok(matches && offset == source.len())
+}
+
+fn canonical_relationship_serializer_memory_bound(
+    relationships: &Relationships,
+    serialized_len: usize,
+) -> Result<u64> {
+    // try_to_xml_bytes reserves the checked final XML size and materializes
+    // one pointer per relationship for sorting. Retain the conservative
+    // second XML-sized transient allowance, the sorted reference Vec, and a
+    // fixed allocator/state allowance before invoking that serializer. A
+    // source relationship payload is charged separately by
+    // relationship_xml_working_memory_bound before this helper is called.
+    let reference_bytes = relationships
+        .len()
+        .checked_mul(size_of::<&Relationship>())
+        .ok_or_else(|| {
+            overlay_unavailable("canonical relationship reference storage overflows usize")
+        })?;
+    let amount = CANONICAL_RELATIONSHIP_FIXED_MEMORY_BYTES
+        .checked_add(serialized_len)
+        .and_then(|amount| amount.checked_add(serialized_len))
+        .and_then(|amount| amount.checked_add(reference_bytes))
+        .and_then(|amount| amount.checked_add(size_of::<Vec<&Relationship>>()))
+        .ok_or_else(|| {
+            overlay_unavailable("canonical relationship serializer memory overflows usize")
+        })?;
+    u64::try_from(amount)
+        .map_err(|_| overlay_unavailable("canonical relationship serializer memory exceeds u64"))
+}
+
+fn append_relationship_fragment(
+    output: &mut Vec<u8>,
+    root_prefix: &[u8],
+    r_id: &str,
+    reltype: &str,
+    target_ref: &str,
+    target_mode: TargetMode,
+) -> Result<()> {
+    append_relationship_xml_bytes(output, b"<")?;
+    append_relationship_xml_bytes(output, root_prefix)?;
+    append_relationship_xml_bytes(output, b"Relationship Id=\"")?;
+    push_xml_escaped(output, r_id)?;
+    append_relationship_xml_bytes(output, b"\" Type=\"")?;
+    push_xml_escaped(output, reltype)?;
+    append_relationship_xml_bytes(output, b"\" Target=\"")?;
+    push_xml_escaped(output, target_ref)?;
+    if target_mode == TargetMode::External {
+        append_relationship_xml_bytes(output, b"\" TargetMode=\"External\"/>")?;
+    } else {
+        append_relationship_xml_bytes(output, b"\"/>")?;
+    }
+    Ok(())
+}
+
+/// Return the source XML length after deleting complete parser-derived
+/// Relationship element ranges.
+///
+/// Ranges are measured against the original source and must be sorted and
+/// disjoint.  Keeping this validation separate lets the caller check all
+/// output and archive limits before mutating or allocating the publication
+/// payload.
+fn relationship_source_output_len(source_len: usize, ranges: &[Range<usize>]) -> Result<usize> {
+    if ranges.is_empty() {
+        return Err(overlay_unavailable(
+            "source relationship removal has no selected element ranges",
+        ));
+    }
+    let mut cursor = 0usize;
+    let mut removed = 0usize;
+    for range in ranges {
+        if range.start > range.end || range.end > source_len || range.start < cursor {
+            return Err(overlay_unavailable(
+                "source relationship removal ranges overlap or exceed the source",
+            ));
+        }
+        removed = removed
+            .checked_add(range.end - range.start)
+            .ok_or_else(|| overlay_unavailable("source relationship removal length overflows"))?;
+        cursor = range.end;
+    }
+    source_len
+        .checked_sub(removed)
+        .ok_or_else(|| overlay_unavailable("source relationship removal length underflows"))
+}
+
+/// Remove complete source Relationship elements in place.
+///
+/// The source Vec is already retained by the publication planner.  An
+/// in-place compaction avoids a second source-sized allocation while retaining
+/// every byte outside the selected parser-derived ranges, including XML
+/// declarations, root attributes, comments, processing instructions,
+/// whitespace, and remaining Relationship elements.
+fn remove_relationship_source_ranges(xml: &mut Vec<u8>, ranges: &[Range<usize>]) -> Result<()> {
+    let source_len = xml.len();
+    let output_len = relationship_source_output_len(source_len, ranges)?;
+    let mut cursor = 0usize;
+    let mut write = 0usize;
+    for range in ranges {
+        let retained = range.start - cursor;
+        if retained != 0 {
+            xml.copy_within(cursor..range.start, write);
+            write = write
+                .checked_add(retained)
+                .ok_or_else(|| overlay_unavailable("source relationship compaction overflows"))?;
+        }
+        cursor = range.end;
+    }
+    if cursor < source_len {
+        let retained = source_len - cursor;
+        xml.copy_within(cursor..source_len, write);
+        write = write
+            .checked_add(retained)
+            .ok_or_else(|| overlay_unavailable("source relationship compaction overflows"))?;
+    }
+    debug_assert_eq!(write, output_len);
+    xml.truncate(output_len);
+    Ok(())
+}
+
+impl SourceTopologyPlan {
+    /// Construct an empty topology plan.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Replace the payload of one existing Part.
+    ///
+    /// The source-backed publisher verifies that the Part exists and that the
+    /// replacement remains within the package read policy before output.
+    pub fn try_replace_part(&mut self, partname: PackURI, replacement: Vec<u8>) -> Result<()> {
+        self.try_replace_part_with_payload(partname, || Arc::new(replacement))
+    }
+
+    /// Replace the payload of one existing Part while retaining the caller's
+    /// immutable byte allocation.
+    ///
+    /// The URI, operation-count, duplicate-name, and fallible reservation
+    /// checks run before the shared payload is installed. The source XML
+    /// authorization path remains separate, so this is still the ordinary
+    /// replacement route and stores no source proof.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, duplicate-name, operation-bound, and
+    /// allocation errors as [`Self::try_replace_part`].
+    pub fn try_replace_part_shared(
+        &mut self,
+        partname: PackURI,
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_replace_part_with_payload(partname, || replacement)
+    }
+
+    /// Replace the payload of one existing Part while retaining caller-owned
+    /// replacement bytes and bounded, untrusted source-window hints.
+    ///
+    /// The hints are only used by the source XML audit during topology
+    /// publication. They never authorize a replacement and are discarded when
+    /// their count is outside the bounded multi-window range. A zero or one
+    /// hint therefore follows the historical complete replacement audit.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, operation-count, duplicate-name, and
+    /// allocation errors as [`Self::try_replace_part_shared`].
+    pub fn try_replace_part_shared_with_spans(
+        &mut self,
+        partname: PackURI,
+        replacement: Arc<Vec<u8>>,
+        spans: Arc<[ReplacementSpan]>,
+    ) -> Result<()> {
+        let spans =
+            (spans.len() > 1 && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS).then_some(spans);
+        self.try_replace_part_with_payload_and_spans(partname, || replacement, spans)
+    }
+
+    /// Replace the payload of one existing Part with bytes the source XML
+    /// audit has already passed, retaining the proof's allocation.
+    ///
+    /// Publication accepts the proof in place of auditing the replacement
+    /// again when it covers exactly these bytes under the default limits; the
+    /// replaced Part's original bytes are still audited. Without such a proof
+    /// this is [`Self::try_replace_part_shared`].
+    pub(crate) fn try_replace_part_verified(
+        &mut self,
+        partname: PackURI,
+        proof: xml_minifier::audit::VerifiedSource,
+    ) -> Result<()> {
+        let replacement = Arc::clone(proof.bytes());
+        self.try_replace_part_with_payload(partname, || replacement)?;
+        if let Some(entry) = self.replacements.last_mut() {
+            entry.proof = Some(proof);
+        }
+        Ok(())
+    }
+
+    /// Replace one existing XML Part with a source-authorized payload.
+    ///
+    /// The source payload may be an exact copy or a checked splice assembled
+    /// from exact source ranges and compact generated fragments.  The target
+    /// URI must be the same Part identity that issued the proof; ordinary
+    /// [`Self::try_replace_part`] remains the strict authored-byte path.
+    pub fn try_replace_source_xml_part(
+        &mut self,
+        partname: PackURI,
+        source_xml: SourceXmlPart,
+    ) -> Result<()> {
+        if !source_xml.partname().is_equivalent_to(&partname) {
+            return Err(overlay_unavailable(
+                "source XML replacement Part identity differs from target",
+            ));
+        }
+        if !xml_minifier::audit::package::is_xml_part(partname.as_str(), source_xml.content_type())
+        {
+            return Err(overlay_unavailable(
+                "source XML replacement is not an XML-classified Part",
+            ));
+        }
+        self.validate_replacement_name(&partname)?;
+        self.replacements
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology replacements",
+                source,
+            })?;
+        let replacement = source_xml.payload_arc();
+        self.replacements.push(TopologyReplacement {
+            partname,
+            replacement,
+            source_xml: Some(source_xml),
+            replacement_spans: None,
+            proof: None,
+        });
+        Ok(())
+    }
+
+    fn try_replace_part_with_payload<F>(&mut self, partname: PackURI, replacement: F) -> Result<()>
+    where
+        F: FnOnce() -> Arc<Vec<u8>>,
+    {
+        self.try_replace_part_with_payload_and_spans(partname, replacement, None)
+    }
+
+    fn try_replace_part_with_payload_and_spans<F>(
+        &mut self,
+        partname: PackURI,
+        replacement: F,
+        replacement_spans: Option<Arc<[ReplacementSpan]>>,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Arc<Vec<u8>>,
+    {
+        self.validate_replacement_name(&partname)?;
+        self.replacements
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology replacements",
+                source,
+            })?;
+        self.replacements.push(TopologyReplacement {
+            partname,
+            replacement: replacement(),
+            source_xml: None,
+            replacement_spans,
+            proof: None,
+        });
+        Ok(())
+    }
+
+    fn validate_replacement_name(&self, partname: &PackURI) -> Result<()> {
+        if partname.as_str() == PACKAGE_URI {
+            return Err(OpcError::InvalidPackUri(
+                "the package root is not a Part URI".to_string(),
+            ));
+        }
+        let operation_count = self
+            .replacements
+            .len()
+            .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
+            .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
+        if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "topology replacement set exceeds the {MAX_SOURCE_TOPOLOGY_PARTS}-Part bound"
+            )));
+        }
+        if self
+            .replacements
+            .iter()
+            .any(|candidate| candidate.partname.is_equivalent_to(partname))
+            || self
+                .additions
+                .iter()
+                .any(|candidate| candidate.partname.is_equivalent_to(partname))
+            || self
+                .removals
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(partname))
+        {
+            return Err(OpcError::DuplicatePartName(partname.to_string()));
+        }
+        Ok(())
+    }
+
+    /// Add a new typed Part payload.
+    pub fn try_add_part(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Vec<u8>,
+    ) -> Result<()> {
+        self.try_add_part_with_payload(partname, content_type, || Arc::new(payload))
+    }
+
+    /// Add a new typed Part while reusing an already owned immutable payload
+    /// allocation.
+    ///
+    /// The payload is copied into the topology plan by reference-counted
+    /// ownership. All URI, content-type, duplicate-name, operation-count, and
+    /// fallible reservation checks are performed before the payload is
+    /// installed. The caller may retain its own handle by cloning the Arc
+    /// before this call.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, content-type, duplicate-name, operation
+    /// bound, and allocation errors as [`Self::try_add_part`].
+    pub fn try_add_part_shared(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_add_part_with_payload(partname, content_type, || payload)
+    }
+
+    /// Add an XML Part whose bytes were issued by another source-backed
+    /// package, preserving its exact source lexical form or checked splice.
+    ///
+    /// The source content type is retained.  The destination publisher
+    /// rechecks source freshness, context, and destination limits. XML validity
+    /// reuses the immutable proof under identical limits, or is fully checked
+    /// under different limits. The ordinary authored compactness audit is
+    /// skipped for this source-authorized payload.
+    pub fn try_add_source_xml_part(
+        &mut self,
+        partname: PackURI,
+        source_xml: SourceXmlPart,
+    ) -> Result<()> {
+        self.validate_addition_name(&partname)?;
+        if !xml_minifier::audit::package::is_xml_part(partname.as_str(), source_xml.content_type())
+        {
+            return Err(overlay_unavailable(
+                "source XML addition is not an XML-classified Part",
+            ));
+        }
+        let content_type = ContentType::new(source_xml.content_type().to_string())?;
+        self.additions
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part additions",
+                source,
+            })?;
+        self.additions.push(TopologyPartAddition {
+            partname,
+            content_type,
+            payload: TopologyPartPayload::SourceXml(Arc::new(source_xml)),
+            producer_bytes: false,
+        });
+        Ok(())
+    }
+
+    /// Add a new Part using a source-authorized, strictly verified compressed
+    /// payload. The destination member receives a fresh canonical ZIP wrapper;
+    /// only the verified Store/Deflate payload crosses the OPC boundary.
+    ///
+    /// The token is intentionally consumed by the topology. Its source
+    /// lineage, revision, content type, and managed reservation are checked
+    /// again by [`SourceBackedPackage::write_topology_to_stream`] before any
+    /// output is accepted.
+    pub fn try_add_precompressed_part(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        mut payload: AuthorizedPrecompressedPart,
+    ) -> Result<()> {
+        self.validate_addition_name(&partname)?;
+        let content_type = ContentType::new(content_type.into())?;
+        if payload.source_content_type.as_str() != content_type.as_str() {
+            return Err(overlay_unavailable(
+                "authorized precompressed content type differs from destination content type",
+            ));
+        }
+        payload.reserve_writer_name(partname.membername())?;
+        self.additions
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part additions",
+                source,
+            })?;
+        self.additions.push(TopologyPartAddition {
+            partname,
+            content_type,
+            payload: TopologyPartPayload::Precompressed(Box::new(payload)),
+            producer_bytes: false,
+        });
+        Ok(())
+    }
+
+    /// Add a Part that restores the exact bytes of a Part a producer wrote,
+    /// such as one a durable inverse brings back after a removal.
+    ///
+    /// The bytes were not authored by this library, so an XML payload is
+    /// audited with the source policy that source-backed replacements use:
+    /// it must be well-formed, bounded XML with one document element, but
+    /// the producer's indentation and spacing are kept as written. Every
+    /// other check is the one [`Self::try_add_part_shared`] applies.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same typed URI, content-type, duplicate-name, operation
+    /// bound, and allocation errors as [`Self::try_add_part`].
+    pub fn try_add_restored_part_shared(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_add_imported_part_shared(partname, content_type, payload)
+    }
+
+    /// Add exact caller-supplied producer bytes, such as an imported SVG.
+    ///
+    /// This route does not serialize or normalize the payload. At publication,
+    /// XML-classified parts receive the same source audit as restored parts:
+    /// bounded, well-formed UTF-8 XML with one root and no DTD or DOCTYPE.
+    /// Producer indentation is preserved. Use [`Self::try_add_part_shared`]
+    /// for library-authored XML, which must satisfy the compactness contract.
+    /// Every other URI, content-type, topology and publication check remains.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::try_add_part_shared`]. XML validation
+    /// is deferred until the plan is validated or published.
+    pub fn try_add_imported_part_shared(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.try_add_part_with_payload(partname, content_type, || payload)?;
+        if let Some(addition) = self.additions.last_mut() {
+            addition.producer_bytes = true;
+        }
+        Ok(())
+    }
+
+    fn try_add_part_with_payload<F>(
+        &mut self,
+        partname: PackURI,
+        content_type: impl Into<String>,
+        payload: F,
+    ) -> Result<()>
+    where
+        F: FnOnce() -> Arc<Vec<u8>>,
+    {
+        self.validate_addition_name(&partname)?;
+        let content_type = ContentType::new(content_type.into())?;
+        self.additions
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part additions",
+                source,
+            })?;
+        self.additions.push(TopologyPartAddition {
+            partname,
+            content_type,
+            payload: TopologyPartPayload::Decoded(payload()),
+            producer_bytes: false,
+        });
+        Ok(())
+    }
+
+    fn validate_addition_name(&self, partname: &PackURI) -> Result<()> {
+        if partname.as_str() == PACKAGE_URI {
+            return Err(OpcError::InvalidPackUri(
+                "the package root is not a Part URI".to_string(),
+            ));
+        }
+        let operation_count = self
+            .replacements
+            .len()
+            .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
+            .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
+        if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "topology addition set exceeds the {MAX_SOURCE_TOPOLOGY_PARTS}-Part bound"
+            )));
+        }
+        if self
+            .additions
+            .iter()
+            .any(|candidate| candidate.partname.is_equivalent_to(partname))
+            || self
+                .replacements
+                .iter()
+                .any(|candidate| candidate.partname.is_equivalent_to(partname))
+            || self
+                .removals
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(partname))
+        {
+            return Err(OpcError::DuplicatePartName(partname.to_string()));
+        }
+        Ok(())
+    }
+
+    /// Remove one existing Part from the source-backed topology.
+    ///
+    /// Every inbound relationship owned by a retained Part or by the package
+    /// must also be removed or retargeted by this plan. The publisher removes
+    /// the Part's exact content-type Override when present and omits its owned
+    /// relationships member together with the physical Part member.
+    pub fn try_remove_part(&mut self, partname: PackURI) -> Result<()> {
+        if partname.as_str() == PACKAGE_URI {
+            return Err(OpcError::InvalidPackUri(
+                "the package root is not a Part URI".to_string(),
+            ));
+        }
+        let operation_count = self
+            .replacements
+            .len()
+            .checked_add(self.additions.len())
+            .and_then(|count| count.checked_add(self.removals.len()))
+            .ok_or_else(|| overlay_unavailable("topology Part operation count overflows usize"))?;
+        if operation_count >= MAX_SOURCE_TOPOLOGY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "topology Part operation set exceeds the {MAX_SOURCE_TOPOLOGY_PARTS}-Part bound"
+            )));
+        }
+        if self
+            .replacements
+            .iter()
+            .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+            || self
+                .additions
+                .iter()
+                .any(|candidate| candidate.partname.is_equivalent_to(&partname))
+            || self
+                .removals
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(&partname))
+        {
+            return Err(OpcError::DuplicatePartName(partname.to_string()));
+        }
+        self.removals
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology Part removals",
+                source,
+            })?;
+        self.removals.push(partname);
+        Ok(())
+    }
+
+    /// Add a typed relationship owned by the package (`/`), an existing Part,
+    /// or a Part added by this plan.
+    pub fn try_add_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: SourceRelationshipTarget,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Add {
+                reltype: reltype.into(),
+                target,
+            },
+        })
+    }
+
+    /// Add an internal relationship owned by the package (`/`), an existing
+    /// Part, or a Part added by this plan. The target must be an absolute OPC
+    /// Part URI and is serialized as the owner-relative target reference.
+    pub fn try_add_internal_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: PackURI,
+    ) -> Result<()> {
+        self.try_add_relationship(
+            owner,
+            r_id,
+            reltype,
+            SourceRelationshipTarget::Internal(target),
+        )
+    }
+
+    /// Add an external relationship while preserving the exact URI reference.
+    pub fn try_add_external_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: impl Into<String>,
+    ) -> Result<()> {
+        self.try_add_relationship(
+            owner,
+            r_id,
+            reltype,
+            SourceRelationshipTarget::External(target.into()),
+        )
+    }
+
+    /// Replace an existing typed relationship without changing its rId.
+    pub fn try_replace_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: SourceRelationshipTarget,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Replace {
+                reltype: reltype.into(),
+                target,
+                required_mode: None,
+            },
+        })
+    }
+
+    /// Replace an existing internal relationship without changing its rId.
+    pub fn try_replace_internal_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: PackURI,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Replace {
+                reltype: reltype.into(),
+                target: SourceRelationshipTarget::Internal(target),
+                required_mode: Some(TargetMode::Internal),
+            },
+        })
+    }
+
+    /// Replace an existing external relationship while preserving the exact
+    /// URI reference. The publisher requires the current relationship to be
+    /// external before applying the replacement.
+    pub fn try_replace_external_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+        reltype: impl Into<String>,
+        target: impl Into<String>,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Replace {
+                reltype: reltype.into(),
+                target: SourceRelationshipTarget::External(target.into()),
+                required_mode: Some(TargetMode::External),
+            },
+        })
+    }
+
+    /// Remove an existing relationship by owner and rId.
+    pub fn try_remove_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Remove {
+                required_mode: None,
+            },
+        })
+    }
+
+    /// Remove an existing external relationship by owner and rId.
+    pub fn try_remove_external_relationship(
+        &mut self,
+        owner: PackURI,
+        r_id: impl Into<String>,
+    ) -> Result<()> {
+        self.try_push_relationship_change(TopologyRelationshipChange {
+            owner,
+            r_id: r_id.into(),
+            operation: TopologyRelationshipOperation::Remove {
+                required_mode: Some(TargetMode::External),
+            },
+        })
+    }
+
+    /// Restore one relationship member's exact decoded XML image behind a
+    /// source and semantic guard.
+    ///
+    /// `expected` describes the physical source member: `None` means that the
+    /// member is absent.  `replacement` uses the same convention for the
+    /// candidate member.  The source-backed publisher checks both presence and
+    /// bytes before it uses either image.  The parsed replacement must describe
+    /// the effective typed relationship graph produced by this plan; this
+    /// method only supplies lexical preservation.
+    pub fn try_restore_relationships_xml(
+        &mut self,
+        owner: PackURI,
+        expected: Option<Arc<Vec<u8>>>,
+        replacement: Option<Arc<Vec<u8>>>,
+    ) -> Result<()> {
+        if owner.as_str() == PACKAGE_URI && replacement.is_none() {
+            return Err(overlay_unavailable(
+                "package-root relationship member cannot be absent",
+            ));
+        }
+        if self
+            .raw_relationships
+            .iter()
+            .any(|candidate| candidate.owner.is_equivalent_to(&owner))
+        {
+            return Err(overlay_unavailable(format!(
+                "raw relationship restore already staged for owner '{owner}'"
+            )));
+        }
+        if self.raw_relationships.len() >= MAX_SOURCE_TOPOLOGY_RELATIONSHIPS {
+            return Err(overlay_unavailable(format!(
+                "raw relationship restore set exceeds the {MAX_SOURCE_TOPOLOGY_RELATIONSHIPS}-owner bound"
+            )));
+        }
+        let bytes = owner
+            .as_str()
+            .len()
+            .checked_add(expected.as_ref().map_or(0, |value| value.len()))
+            .and_then(|bytes| {
+                bytes.checked_add(replacement.as_ref().map_or(0, |value| value.len()))
+            })
+            .ok_or_else(|| overlay_unavailable("raw relationship metadata length overflows"))?;
+        let next = self
+            .raw_metadata_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| overlay_unavailable("raw metadata length overflows"))?;
+        if next > MAX_SOURCE_RAW_METADATA_BYTES {
+            return Err(overlay_unavailable(format!(
+                "raw metadata exceeds the {MAX_SOURCE_RAW_METADATA_BYTES}-byte bound"
+            )));
+        }
+        self.raw_relationships
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC raw relationship restores",
+                source,
+            })?;
+        self.raw_metadata_bytes = next;
+        self.raw_relationships.push(RawRelationshipsRestore {
+            owner,
+            expected,
+            replacement,
+        });
+        Ok(())
+    }
+
+    /// Restore the exact decoded `[Content_Types].xml` image behind a source
+    /// and effective mapping guard.  Content-types is a required package
+    /// member, so both arguments are always present.
+    pub fn try_restore_content_types_xml(
+        &mut self,
+        expected: Arc<Vec<u8>>,
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        if self.raw_content_types.is_some() {
+            return Err(overlay_unavailable(
+                "raw content-types restore is already staged",
+            ));
+        }
+        let bytes = expected
+            .len()
+            .checked_add(replacement.len())
+            .ok_or_else(|| overlay_unavailable("raw content-types length overflows"))?;
+        let next = self
+            .raw_metadata_bytes
+            .checked_add(bytes)
+            .ok_or_else(|| overlay_unavailable("raw metadata length overflows"))?;
+        if next > MAX_SOURCE_RAW_METADATA_BYTES {
+            return Err(overlay_unavailable(format!(
+                "raw metadata exceeds the {MAX_SOURCE_RAW_METADATA_BYTES}-byte bound"
+            )));
+        }
+        self.raw_metadata_bytes = next;
+        self.raw_content_types = Some(RawContentTypesRestore {
+            expected,
+            replacement,
+        });
+        Ok(())
+    }
+
+    fn try_push_relationship_change(&mut self, change: TopologyRelationshipChange) -> Result<()> {
+        if self.relationships.len() >= MAX_SOURCE_TOPOLOGY_RELATIONSHIPS {
+            return Err(overlay_unavailable(format!(
+                "topology relationship set exceeds the {MAX_SOURCE_TOPOLOGY_RELATIONSHIPS}-relationship bound"
+            )));
+        }
+        let TopologyRelationshipChange {
+            ref owner,
+            ref r_id,
+            ref operation,
+        } = change;
+        let mut field_bytes = owner.as_str().len();
+        field_bytes = field_bytes
+            .checked_add(r_id.len())
+            .ok_or_else(|| overlay_unavailable("topology relationship field bytes overflow"))?;
+        // An added relationship's Id is authored and must be an XML ID. A
+        // replacement or removal names an existing relationship, whose
+        // source Id may have been admitted verbatim.
+        let id_valid = match operation {
+            TopologyRelationshipOperation::Add { .. } => is_xml_id(r_id),
+            TopologyRelationshipOperation::Replace { .. }
+            | TopologyRelationshipOperation::Remove { .. } => {
+                crate::pkgreader::admissible_source_relationship_id(r_id)
+            },
+        };
+        if r_id.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES || !id_valid {
+            return Err(OpcError::InvalidRelationship(format!(
+                "relationship Id '{r_id}' is not a bounded XML ID"
+            )));
+        }
+        match operation {
+            TopologyRelationshipOperation::Add { reltype, target }
+            | TopologyRelationshipOperation::Replace {
+                reltype, target, ..
+            } => {
+                if reltype.is_empty()
+                    || reltype.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES
+                    || reltype.chars().any(char::is_whitespace)
+                    || reltype.chars().any(char::is_control)
+                {
+                    return Err(OpcError::InvalidRelationship(
+                        "relationship Type is not a bounded URI reference".to_string(),
+                    ));
+                }
+                field_bytes = field_bytes.checked_add(reltype.len()).ok_or_else(|| {
+                    overlay_unavailable("topology relationship field bytes overflow")
+                })?;
+                let target_bytes = match target {
+                    SourceRelationshipTarget::Internal(target) => target.as_str().len(),
+                    SourceRelationshipTarget::External(target) => {
+                        if target.is_empty()
+                            || target.len() > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES
+                            || target.chars().any(char::is_control)
+                        {
+                            return Err(OpcError::InvalidRelationship(
+                                "relationship Target is not a bounded URI reference".to_string(),
+                            ));
+                        }
+                        target.len()
+                    },
+                };
+                if target_bytes > MAX_SOURCE_RELATIONSHIP_FIELD_BYTES {
+                    return Err(OpcError::InvalidRelationship(
+                        "relationship Target is not a bounded URI reference".to_string(),
+                    ));
+                }
+                field_bytes = field_bytes.checked_add(target_bytes).ok_or_else(|| {
+                    overlay_unavailable("topology relationship field bytes overflow")
+                })?;
+            },
+            TopologyRelationshipOperation::Remove { .. } => {},
+        }
+        let next_bytes = self
+            .relationship_bytes
+            .checked_add(field_bytes)
+            .ok_or_else(|| overlay_unavailable("topology relationship bytes overflow"))?;
+        if next_bytes > MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES {
+            return Err(overlay_unavailable(format!(
+                "topology relationship fields exceed the {MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES}-byte bound"
+            )));
+        }
+        if self.relationships.iter().any(|candidate| {
+            candidate.owner.is_equivalent_to(owner) && candidate.r_id.as_str() == r_id.as_str()
+        }) {
+            return Err(OpcError::DuplicateRelationshipId(r_id.clone()));
+        }
+        self.relationships
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology relationships",
+                source,
+            })?;
+        self.relationship_bytes = next_bytes;
+        self.relationships.push(change);
+        Ok(())
+    }
+
+    fn is_empty(&self) -> bool {
+        self.replacements.is_empty()
+            && self.additions.is_empty()
+            && self.removals.is_empty()
+            && self.relationships.is_empty()
+            && self.raw_relationships.is_empty()
+            && self.raw_content_types.is_none()
+    }
+
+    fn introduces_signature_infrastructure(&self) -> bool {
+        self.replacements
+            .iter()
+            .any(|replacement| is_signature_member_path(replacement.partname.as_str()))
+            || self.additions.iter().any(|addition| {
+                is_signature_member_path(addition.partname.as_str())
+                    || is_signature_content_type(addition.content_type.as_str())
+            })
+            || self.relationships.iter().any(|change| {
+                let (reltype, target) = match &change.operation {
+                    TopologyRelationshipOperation::Add { reltype, target }
+                    | TopologyRelationshipOperation::Replace {
+                        reltype, target, ..
+                    } => (reltype.as_str(), Some(target)),
+                    TopologyRelationshipOperation::Remove { .. } => ("", None),
+                };
+                is_signature_relationship(reltype)
+                    || target.is_some_and(|target| {
+                        matches!(target, SourceRelationshipTarget::Internal(partname)
+                            if is_signature_member_path(partname.as_str()))
+                    })
+            })
+    }
+}
+
+#[derive(Debug)]
+struct TopologyRelationshipPublication {
+    owner: PackURI,
+    member_name: String,
+    xml: Vec<u8>,
+    raw_xml: Option<Arc<Vec<u8>>>,
+    existing_entry: Option<EntryId>,
+    relationship_count: usize,
+    source_event_count: Option<u64>,
+    memory_reservations: Vec<Arc<Reservation>>,
+}
+
+#[derive(Debug)]
+struct PreparedRawRelationship {
+    owner: PackURI,
+    member_name: String,
+    existing_entry: Option<EntryId>,
+    replacement: Option<Arc<Vec<u8>>>,
+    source_event_count: Option<u64>,
+    changed: bool,
+}
+
+trait RelationshipPublicationSummary {
+    fn owner(&self) -> &PackURI;
+    fn member_name(&self) -> &str;
+    fn existing_entry(&self) -> Option<EntryId>;
+    fn relationship_count(&self) -> usize;
+    fn source_event_count(&self) -> Option<u64>;
+    fn output_bytes(&self) -> Result<u64>;
+    fn output_events(&self, limits: SourceLimits) -> Result<u64>;
+}
+
+#[derive(Clone, Copy)]
+struct ContentTypesPublicationSummary {
+    bytes: u64,
+    mappings: u64,
+}
+
+impl RelationshipPublicationSummary for TopologyRelationshipPublication {
+    fn owner(&self) -> &PackURI {
+        &self.owner
+    }
+
+    fn member_name(&self) -> &str {
+        &self.member_name
+    }
+
+    fn existing_entry(&self) -> Option<EntryId> {
+        self.existing_entry
+    }
+
+    fn relationship_count(&self) -> usize {
+        self.relationship_count
+    }
+
+    fn source_event_count(&self) -> Option<u64> {
+        self.source_event_count
+    }
+
+    fn output_bytes(&self) -> Result<u64> {
+        u64::try_from(
+            self.raw_xml
+                .as_ref()
+                .map_or(self.xml.len(), |xml| xml.len()),
+        )
+        .map_err(|_| overlay_unavailable("relationship XML length overflows u64"))
+    }
+
+    fn output_events(&self, limits: SourceLimits) -> Result<u64> {
+        relationship_xml_event_count(
+            self.raw_xml
+                .as_ref()
+                .map_or(self.xml.as_slice(), |xml| xml.as_slice()),
+            limits,
+        )
+    }
+}
+
+impl TopologyRelationshipPublication {
+    fn take_shared_xml(&mut self) -> Arc<Vec<u8>> {
+        self.raw_xml
+            .as_ref()
+            .map_or_else(|| Arc::new(std::mem::take(&mut self.xml)), Arc::clone)
+    }
+
+    fn raw_or_owned_xml(&mut self) -> (String, Arc<Vec<u8>>) {
+        (self.member_name.clone(), self.take_shared_xml())
+    }
+}
+
+#[derive(Clone, Copy)]
+struct PhysicalMemberInfo {
+    entry_id: EntryId,
+    count: usize,
+}
+
+struct PhysicalMemberLookup {
+    by_folded_name: HashMap<String, PhysicalMemberInfo>,
+}
+
+#[derive(Clone)]
+struct ChangedOverlay {
+    target: ChangedOverlayTarget,
+    replacement: ChangedOverlayPayload,
+}
+
+#[derive(Debug, Clone)]
+enum ChangedOverlayPayload {
+    Shared(Arc<Vec<u8>>),
+    Owned(Vec<u8>),
+}
+
+impl ChangedOverlayPayload {
+    fn as_slice(&self) -> &[u8] {
+        match self {
+            Self::Shared(bytes) => bytes.as_slice(),
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        self.as_slice().len()
+    }
+}
+
+#[derive(Clone)]
+enum ChangedOverlayTarget {
+    Part(usize),
+    Member(String),
+}
+
+/// One appended member whose OPC admission facts and ZIP payload are minted
+/// from the same immutable bytes. Policy-aware direct publication keeps this
+/// bundle through admission and then hands the derived ZIP entry to the
+/// preservation writer; callers cannot provide a name/semantic payload that
+/// disagrees with the emitted member.
+struct PolicyAppendedEntry {
+    entry: Arc<soapberry_zip::RegeneratedEntry>,
+    name: String,
+    payload: Arc<Vec<u8>>,
+}
+
+impl PolicyAppendedEntry {
+    fn new_shared(
+        name: impl Into<String>,
+        payload: Arc<Vec<u8>>,
+        compression: soapberry_zip::CompressionMethod,
+    ) -> Self {
+        let name = name.into();
+        let entry = soapberry_zip::RegeneratedEntry::new_shared(name.clone(), Arc::clone(&payload))
+            .compression_method(compression);
+        Self {
+            entry: Arc::new(entry),
+            name,
+            payload,
+        }
+    }
+
+    fn new_precompressed(name: impl Into<String>, payload: &AuthorizedPrecompressedPart) -> Self {
+        let name = name.into();
+        let entry = soapberry_zip::RegeneratedEntry::new_precompressed_shared(
+            name.clone(),
+            payload.physical.clone(),
+        );
+        Self {
+            entry: Arc::new(entry),
+            name,
+            payload: Arc::clone(&payload.expected_decoded),
+        }
+    }
+}
+
+/// A source-backed topology after bounded preflight and overlay construction.
+///
+/// Preparation owns every generated overlay and source authorization needed by
+/// publication.  Callers may inspect the effective logical candidate through
+/// [`Self::with_candidate`] before or after the value is borrowed by
+/// [`Self::publish_to_stream`].  Unchanged Part payloads remain lazy source
+/// reads; the prepared value never materializes a replacement ZIP archive.
+/// Clones retain the same candidate and reservations. Publication borrows the
+/// candidate, so retry and repeated output do not require another preparation.
+///
+/// ```
+/// use litchi_opc::{
+///     OpcPackage, PackageWriter, SourceBackedPackage, SourceCacheLimits, SourceLimits,
+///     SourceTopologyPlan,
+/// };
+/// # fn main() -> litchi_opc::Result<()> {
+/// let bytes = PackageWriter::to_bytes(&OpcPackage::new())?;
+/// let source = SourceBackedPackage::from_vec(bytes.clone(), SourceLimits::default(), SourceCacheLimits::default(), None)?;
+/// let prepared = source.prepare_topology(SourceTopologyPlan::new())?;
+/// let shared = prepared.clone();
+/// let mut first = Vec::new();
+/// prepared.publish_to_stream(&mut first)?;
+/// drop(prepared);
+/// let mut second = Vec::new();
+/// shared.publish_to_stream(&mut second)?;
+/// assert_eq!(first, bytes);
+/// assert_eq!(second, bytes);
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone)]
+pub struct PreparedTopology {
+    package: SourceBackedPackage,
+    state: Arc<PreparedTopologyState>,
+    _state_reservation: Option<Arc<Reservation>>,
+}
+
+// Shared by owning publication and borrowed commit-time validation. Every
+// overlay and reservation stays alive until the candidate callback finishes.
+struct PreparedTopologyState {
+    changed: Vec<ChangedOverlay>,
+    retained: Option<Arc<PreparedTopologyRetention>>,
+    effective: Option<EffectiveTopologyData>,
+    totals: Option<PreparedTopologyTotals>,
+    _catalog_reservation: Option<Arc<Reservation>>,
+    no_op: bool,
+}
+
+#[derive(Clone, Copy)]
+struct PreparedTopologyTotals {
+    parts: u64,
+    archive: u64,
+    output_bound: u64,
+}
+
+struct PreparedTopologyRetention {
+    _metadata_reservation: Option<Arc<Reservation>>,
+    omitted_members: Vec<String>,
+    appended: Vec<Arc<soapberry_zip::RegeneratedEntry>>,
+    policy_appended: Vec<PolicyAppendedEntry>,
+    _additions: Vec<TopologyPartAddition>,
+    transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
+    /// One monitored-read scope per transfer source (counted scopes). They
+    /// live exactly as long as the prepared state, so every read of a transfer
+    /// source during candidate readback and publication re-observes that
+    /// source, and a source shared with another package stops paying the
+    /// per-read observation once this preparation is dropped.
+    _transfer_monitors: Vec<MonitoredReads>,
+    _relationship_memory_reservations: Vec<Arc<Reservation>>,
+    _content_type_memory_reservations: Vec<Arc<Reservation>>,
+    _effective_memory_reservations: Vec<Arc<Reservation>>,
+}
+
+struct EffectiveTopologyData {
+    package_relationships: Option<Arc<Relationships>>,
+    parts: Vec<Arc<PreparedPart>>,
+    // The source catalog already carries the validated content type for every
+    // retained Part.  Keep the parsed manifest only when additions/removals
+    // can change the effective mapping; replacement-only and relationship-only
+    // candidates resolve retained Parts through that source catalog lazily.
+    content_types: Option<Arc<ContentTypeMap>>,
+    added_member_names: Arc<Vec<String>>,
+}
+
+#[derive(Clone)]
+struct PreparedPart {
+    source_index: Option<usize>,
+    partname: Option<PackURI>,
+    content_type: Option<ContentType>,
+    replacement: Option<Arc<Vec<u8>>>,
+    relationships: Option<Arc<Relationships>>,
+    source_xml: Option<SourceXmlPart>,
+    /// The source XML audit's proof of `replacement`, with the boundaries
+    /// its audit recorded or derived, kept on unmanaged packages only so the
+    /// next edit of this effective revision is proved from it. At most
+    /// [`RETAINED_EFFECTIVE_XML_PROOFS`] Parts of one revision keep one.
+    xml_proof: Option<xml_minifier::audit::VerifiedSource>,
+    _metadata_reservation: Option<Arc<Reservation>>,
+}
+
+impl PreparedPart {
+    fn partname<'prepared>(
+        &'prepared self,
+        package: &'prepared SourceBackedPackage,
+    ) -> &'prepared PackURI {
+        self.source_index
+            .and_then(|index| package.catalog.parts.get(index))
+            .map(|part| &part.partname)
+            .or(self.partname.as_ref())
+            .expect("prepared Part must retain source index or owned name")
+    }
+
+    fn content_type<'prepared>(
+        &'prepared self,
+        package: &'prepared SourceBackedPackage,
+    ) -> &'prepared str {
+        self.source_index
+            .and_then(|index| package.catalog.parts.get(index))
+            .map(|part| part.content_type.as_str())
+            .or_else(|| self.content_type.as_ref().map(ContentType::as_str))
+            .expect("prepared Part must retain source index or owned content type")
+    }
+
+    fn relationships<'prepared>(
+        &'prepared self,
+        package: &'prepared SourceBackedPackage,
+    ) -> &'prepared Relationships {
+        self.relationships
+            .as_deref()
+            .or_else(|| {
+                self.source_index
+                    .and_then(|index| package.catalog.parts.get(index))
+                    .map(|part| &part.relationships)
+            })
+            .expect("prepared Part must retain source relationship source or overlay")
+    }
+}
+
+/// Read-only effective logical topology exposed between preparation and
+/// publication.  It borrows the prepared overlays and source-backed catalog.
+pub struct EffectiveTopology<'prepared> {
+    package: &'prepared SourceBackedPackage,
+    prepared: &'prepared PreparedTopologyState,
+}
+
+/// One effective Part in a prepared topology.
+pub struct EffectivePart<'prepared> {
+    topology: &'prepared EffectiveTopology<'prepared>,
+    index: usize,
+}
+
+/// A managed payload read from an effective Part.
+///
+/// Source-backed payloads retain their normal cache/execution reservation via
+/// [`PartData`].  Prepared replacement/addition bytes remain owned by the
+/// [`PreparedTopology`] and are exposed only through this borrowed byte view.
+pub struct EffectivePartData<'prepared> {
+    payload: EffectivePartPayload<'prepared>,
+}
+
+/// A borrowed effective Part content type.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EffectiveContentType<'prepared> {
+    value: &'prepared str,
+}
+
+impl<'prepared> EffectiveContentType<'prepared> {
+    /// Return the serialized MIME content type.
+    #[must_use]
+    pub fn as_str(self) -> &'prepared str {
+        self.value
+    }
+}
+
+enum EffectivePartPayload<'prepared> {
+    Source(PartData),
+    Prepared(&'prepared [u8]),
+}
+
+impl EffectivePartData<'_> {
+    /// Borrow the effective decoded Part bytes.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        match &self.payload {
+            EffectivePartPayload::Source(data) => data.as_bytes(),
+            EffectivePartPayload::Prepared(data) => data,
+        }
+    }
+}
+
+impl PreparedTopology {
+    /// Run a read-only semantic callback over the complete effective OPC
+    /// catalog before any external output is accepted.
+    ///
+    /// The callback receives package relationships, every retained/added Part,
+    /// effective content-type bindings, and lazy effective payload access. A
+    /// source or execution-context fence is checked on both sides of the
+    /// callback. Exact no-op preparations intentionally do not expose a
+    /// candidate: their publication remains the source byte-for-byte fast
+    /// path.
+    pub fn with_candidate<T, F>(&self, callback: F) -> Result<T>
+    where
+        F: FnOnce(&EffectiveTopology<'_>) -> Result<T>,
+    {
+        self.state.with_candidate(&self.package, callback)
+    }
+
+    /// Publish this retained topology through the source-preserving writer.
+    ///
+    /// The candidate and its reservations remain alive after success or sink
+    /// failure. Every publication checks the base and transfer sources again.
+    /// Cloned handles share the candidate without copying payloads or names.
+    pub fn publish_to_stream<W: Write>(&self, writer: W) -> Result<()> {
+        self.state.check_readback_sources(&self.package)?;
+        if self.state.no_op {
+            return self.package.clone().write_exact_source(writer);
+        }
+        publish_prepared_topology(
+            self.package.clone(),
+            writer,
+            &self.state.changed,
+            &self.state.retained().omitted_members,
+            &self.state.retained().appended,
+            self.state.retained().transfer_sources.clone(),
+        )
+    }
+
+    /// Publish this topology through a recipient-owned artifact stream
+    /// policy. Producer source/work checks remain attached to this package;
+    /// the policy controls the recipient output allowance.
+    pub fn publish_to_stream_with_policy<W: Write>(
+        &self,
+        writer: W,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_prepared_topology(&self.package, &self.state)?;
+        self.state.check_readback_sources(&self.package)?;
+        if self.state.no_op {
+            let package = self.package.clone();
+            package.disable_read_ahead_for_publication()?;
+            return artifact_restore::write_exact_snapshot_with_policy(
+                &package.source,
+                writer,
+                policy,
+            );
+        }
+        publish_prepared_topology_with_policy(
+            self.package.clone(),
+            writer,
+            &self.state.changed,
+            &self.state.retained().omitted_members,
+            &self.state.retained().appended,
+            self.state.retained().transfer_sources.clone(),
+            policy,
+        )
+    }
+}
+
+impl PreparedTopologyState {
+    fn retained(&self) -> &PreparedTopologyRetention {
+        self.retained
+            .as_deref()
+            .expect("changed topology has retained metadata")
+    }
+
+    fn effective_data(&self) -> &EffectiveTopologyData {
+        self.effective
+            .as_ref()
+            .expect("non-no-op prepared topology must carry effective data")
+    }
+
+    fn check_readback_sources(&self, package: &SourceBackedPackage) -> Result<()> {
+        package.source.ensure_current()?;
+        package.cache.check_context().map_err(map_execution_error)?;
+        if let Some(sources) = self
+            .retained
+            .as_ref()
+            .and_then(|retained| retained.transfer_sources.as_ref())
+        {
+            for source in sources.iter() {
+                source.ensure_current()?;
+                if let Some(context) = &source.context {
+                    context.check().map_err(map_execution_error)?;
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn with_candidate<T, F>(&self, package: &SourceBackedPackage, callback: F) -> Result<T>
+    where
+        F: FnOnce(&EffectiveTopology<'_>) -> Result<T>,
+    {
+        if self.no_op {
+            return Err(overlay_unavailable(
+                "exact source no-op has no prepared candidate readback",
+            ));
+        }
+        self.check_readback_sources(package)?;
+        let candidate = EffectiveTopology {
+            package,
+            prepared: self,
+        };
+        let result = callback(&candidate);
+        self.check_readback_sources(package)?;
+        result
+    }
+}
+
+fn publish_prepared_topology<W: Write>(
+    package: SourceBackedPackage,
+    writer: W,
+    changed: &[ChangedOverlay],
+    omitted_members: &[String],
+    appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+    transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
+) -> Result<()> {
+    let Some(transfer_sources) = transfer_sources else {
+        return package.write_changed_overlays_with_omissions_and_appended(
+            writer,
+            changed,
+            omitted_members,
+            appended,
+        );
+    };
+    let transfer_state = Arc::new(Mutex::new(TransferSourceState::default()));
+    let checked_writer = TransferSourceCheckedSink {
+        inner: writer,
+        sources: Arc::clone(&transfer_sources),
+        state: Arc::clone(&transfer_state),
+        pending_failure: None,
+    };
+    let publication = package.write_changed_overlays_with_omissions_and_appended(
+        checked_writer,
+        changed,
+        omitted_members,
+        appended,
+    );
+    let transfer_error = transfer_sources.iter().find_map(|source| {
+        source.ensure_current().err().or_else(|| {
+            source
+                .context
+                .as_ref()?
+                .check()
+                .err()
+                .map(map_execution_error)
+        })
+    });
+    let transfer_accepted = transfer_state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .accepted;
+    match (publication, transfer_error) {
+        // The preservation writer already classifies sink failures with its
+        // exact Counted byte total. Keep that typed result intact; the final
+        // source fence must not erase an IncompleteOutput written count.
+        (Err(publication), _) => Err(publication),
+        (Ok(()), Some(error)) if transfer_accepted != 0 => Err(OpcError::IncompleteOutput {
+            written: transfer_accepted,
+            source: Box::new(error),
+        }),
+        (Ok(()), Some(error)) => Err(error),
+        (Ok(()), None) => Ok(()),
+    }
+}
+
+fn publish_prepared_topology_with_policy<W: Write>(
+    package: SourceBackedPackage,
+    writer: W,
+    changed: &[ChangedOverlay],
+    omitted_members: &[String],
+    appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+    transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
+    policy: &ArtifactStreamPolicy<'_>,
+) -> Result<()> {
+    let Some(transfer_sources) = transfer_sources else {
+        return package.write_changed_overlays_with_appended_inner(
+            writer,
+            changed,
+            omitted_members,
+            appended,
+            None,
+            Some(policy),
+        );
+    };
+    let transfer_state = Arc::new(Mutex::new(TransferSourceState::default()));
+    let checked_writer = TransferSourceCheckedSink {
+        inner: writer,
+        sources: Arc::clone(&transfer_sources),
+        state: Arc::clone(&transfer_state),
+        pending_failure: None,
+    };
+    let publication = package.write_changed_overlays_with_appended_inner(
+        checked_writer,
+        changed,
+        omitted_members,
+        appended,
+        None,
+        Some(policy),
+    );
+    let transfer_error = transfer_sources.iter().find_map(|source| {
+        source.ensure_current().err().or_else(|| {
+            source
+                .context
+                .as_ref()?
+                .check()
+                .err()
+                .map(map_execution_error)
+        })
+    });
+    let transfer_accepted = transfer_state
+        .lock()
+        .unwrap_or_else(|poisoned| poisoned.into_inner())
+        .accepted;
+    match (publication, transfer_error) {
+        (Err(publication), _) => Err(publication),
+        (Ok(()), Some(error)) if transfer_accepted != 0 => Err(OpcError::IncompleteOutput {
+            written: transfer_accepted,
+            source: Box::new(error),
+        }),
+        (Ok(()), Some(error)) => Err(error),
+        (Ok(()), None) => Ok(()),
+    }
+}
+
+impl<'prepared> EffectiveTopology<'prepared> {
+    /// Return the read and semantic limits captured by the source package.
+    #[must_use]
+    pub const fn read_limits(&self) -> SourceLimits {
+        self.package.limits
+    }
+
+    /// Return the package-root relationships in the effective candidate.
+    #[must_use]
+    pub fn package_relationships(&self) -> &Relationships {
+        self.prepared
+            .effective_data()
+            .package_relationships
+            .as_deref()
+            .unwrap_or(&self.package.catalog.package_relationships)
+    }
+
+    /// Return the effective Part catalog in deterministic source/addition
+    /// order.  Part payloads are read only when [`EffectivePart::data`] is
+    /// called.
+    pub fn parts(&self) -> impl ExactSizeIterator<Item = EffectivePart<'_>> {
+        (0..self.prepared.effective_data().parts.len()).map(|index| EffectivePart {
+            topology: self,
+            index,
+        })
+    }
+
+    /// Resolve one effective Part by OPC URI equivalence.
+    pub fn part(&self, partname: &PackURI) -> Result<EffectivePart<'_>> {
+        let index = self.part_index(partname)?;
+        Ok(EffectivePart {
+            topology: self,
+            index,
+        })
+    }
+
+    fn part_index(&self, partname: &PackURI) -> Result<usize> {
+        let parts = &self.prepared.effective_data().parts;
+        // Preparation keeps surviving source records in source-index order,
+        // followed by the bounded addition batch. Reuse the source catalog's
+        // URI index without duplicating names or retaining another index.
+        let source_count = parts.partition_point(|part| part.source_index.is_some());
+        if let Some(source_index) = self.package.part_index(partname)
+            && let Ok(index) = parts[..source_count].binary_search_by_key(&source_index, |part| {
+                part.source_index.unwrap_or(usize::MAX)
+            })
+        {
+            return Ok(index);
+        }
+        parts[source_count..]
+            .iter()
+            .position(|part| part.partname(self.package).is_equivalent_to(partname))
+            .map(|index| source_count + index)
+            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
+    }
+
+    /// Return effective relationships for the package root or a retained Part.
+    pub fn relationships(&self, owner: &PackURI) -> Result<&Relationships> {
+        if owner.as_str() == PACKAGE_URI {
+            return Ok(self.package_relationships());
+        }
+        let data = self.prepared.effective_data();
+        let index = self.part_index(owner)?;
+        Ok(data.parts[index].relationships(self.package))
+    }
+
+    /// Resolve the effective content type for a retained or added Part.
+    ///
+    /// Removed or absent Parts return [`OpcError::PartNotFound`], even when
+    /// their extension still has a default content-type mapping.
+    pub fn content_type(&self, partname: &PackURI) -> Result<&ContentType> {
+        let index = self.part_index(partname)?;
+        let data = self.prepared.effective_data();
+        if let Some(content_types) = data.content_types.as_ref() {
+            return content_types
+                .lookup(partname)
+                .ok_or_else(|| OpcError::ContentTypeNotFound(partname.to_string()));
+        }
+
+        // No manifest rewrite is possible for a replacement-only or
+        // relationship-only plan.  The immutable source catalog (or an added
+        // Part's staged content type) is the already validated effective
+        // mapping, so avoid rereading and reparsing [Content_Types].xml while
+        // preserving the candidate API.
+        let part = &data.parts[index];
+        part.source_index
+            .and_then(|source_index| self.package.catalog.parts.get(source_index))
+            .map(|source_part| &source_part.content_type)
+            .or(part.content_type.as_ref())
+            .ok_or_else(|| OpcError::ContentTypeNotFound(partname.to_string()))
+    }
+
+    /// Test effective physical-member presence without reading unchanged ZIP
+    /// payloads.  The source central directory remains authoritative for
+    /// unchanged members; prepared additions and omissions are applied by
+    /// name.
+    pub fn has_physical_member(&self, member_name: &str) -> Result<bool> {
+        self.package.source.ensure_current()?;
+        let data = self.prepared.effective_data();
+        if data
+            .added_member_names
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(member_name))
+        {
+            return Ok(true);
+        }
+        if self
+            .prepared
+            .retained()
+            .omitted_members
+            .iter()
+            .any(|name| name.eq_ignore_ascii_case(member_name))
+        {
+            return Ok(false);
+        }
+        if self.package.archive.entry_id(member_name).is_some() {
+            return Ok(true);
+        }
+        Ok(self
+            .package
+            .archive
+            .file_names()
+            .any(|name| name.eq_ignore_ascii_case(member_name)))
+    }
+}
+
+impl<'prepared> EffectivePart<'prepared> {
+    /// The effective Part URI.
+    #[must_use]
+    pub fn partname(&self) -> &PackURI {
+        self.topology.prepared.effective_data().parts[self.index].partname(self.topology.package)
+    }
+
+    /// The effective content type.
+    #[must_use]
+    pub fn content_type(&self) -> EffectiveContentType<'_> {
+        EffectiveContentType {
+            value: self.topology.prepared.effective_data().parts[self.index]
+                .content_type(self.topology.package),
+        }
+    }
+
+    /// The effective typed relationships owned by this Part.
+    #[must_use]
+    pub fn relationships(&self) -> &Relationships {
+        self.topology.prepared.effective_data().parts[self.index]
+            .relationships(self.topology.package)
+    }
+
+    /// Lazily read the effective decoded payload.
+    pub fn data(&self) -> Result<EffectivePartData<'_>> {
+        let part = &self.topology.prepared.effective_data().parts[self.index];
+        if let Some(replacement) = part.replacement.as_ref() {
+            return Ok(EffectivePartData {
+                payload: EffectivePartPayload::Prepared(replacement.as_slice()),
+            });
+        }
+        let source_index = part.source_index.ok_or_else(|| {
+            overlay_unavailable("effective Part has no source or prepared payload")
+        })?;
+        Ok(EffectivePartData {
+            payload: EffectivePartPayload::Source(self.topology.package.read_part(source_index)?),
+        })
+    }
+}
+
+/// Validation failure returned by [`SourceCacheLimits::new`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SourceCacheLimitError {
+    /// A cache needs a positive byte capacity to retain any payload.
+    ZeroMaximumBytes,
+    /// A cache needs a positive entry capacity to retain any payload.
+    ZeroMaximumEntries,
+}
+
+impl std::fmt::Display for SourceCacheLimitError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::ZeroMaximumBytes => "source cache maximum bytes must be greater than zero",
+            Self::ZeroMaximumEntries => "source cache maximum entries must be greater than zero",
+        })
+    }
+}
+
+impl std::error::Error for SourceCacheLimitError {}
+
+/// Finite retention policy for source-backed part payloads.
+///
+/// Both limits are enforced: a part is retained only when it fits in
+/// [`Self::max_bytes`] and the cache can make room below [`Self::max_entries`].
+/// Larger requested parts are returned to the caller but are never cached.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct SourceCacheLimits {
+    max_bytes: usize,
+    max_entries: usize,
+}
+
+impl SourceCacheLimits {
+    /// Construct a validated finite cache policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when either bound is zero.
+    pub const fn new(
+        max_bytes: usize,
+        max_entries: usize,
+    ) -> std::result::Result<Self, SourceCacheLimitError> {
+        if max_bytes == 0 {
+            return Err(SourceCacheLimitError::ZeroMaximumBytes);
+        }
+        if max_entries == 0 {
+            return Err(SourceCacheLimitError::ZeroMaximumEntries);
+        }
+        Ok(Self {
+            max_bytes,
+            max_entries,
+        })
+    }
+
+    /// Maximum total retained payload bytes.
+    #[must_use]
+    pub const fn max_bytes(self) -> usize {
+        self.max_bytes
+    }
+
+    /// Maximum retained payload entries.
+    #[must_use]
+    pub const fn max_entries(self) -> usize {
+        self.max_entries
+    }
+}
+
+impl Default for SourceCacheLimits {
+    fn default() -> Self {
+        // Both values are literal non-zero constants, so this cannot fail.
+        Self {
+            max_bytes: 8 * 1024 * 1024,
+            max_entries: 128,
+        }
+    }
+}
+
+/// Content-free point-in-time diagnostics for a source-backed payload cache.
+///
+/// Counters are monotonically increasing for the package lifetime and use
+/// checked relaxed atomic CAS updates, so a snapshot is observational rather
+/// than a globally linearized transaction. The checked CAS is intentional
+/// instrumentation overhead: event recording must never wrap silently.
+/// `retained_entries`, `retained_bytes`, and `in_flight_loads` are captured
+/// together while the cache takes its existing short lock. No member names,
+/// part URIs, or ZIP entry IDs are exposed.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SourceCacheDiagnostics {
+    /// Requests satisfied directly from a retained payload entry.
+    pub hits: u64,
+    /// Requests that became the loader for a cold payload read.
+    pub cold_loads: u64,
+    /// Requests that found an existing same-part cold load and waited for it.
+    pub waiter_joins: u64,
+    /// Cold reads that completed successfully, whether retained or uncached.
+    pub successful_loads: u64,
+    /// Cold reads that failed before a payload could be published.
+    pub failed_loads: u64,
+    /// Retained entries removed to satisfy byte or entry capacity.
+    pub evictions: u64,
+    /// Successful cold reads returned without retention for any bypass reason.
+    pub bypasses: u64,
+    /// Successful cold reads returned without retention because their payload
+    /// exceeded the configured byte limit.
+    pub oversized_bypasses: u64,
+    /// Requests or successful loads that could not be coordinated or retained
+    /// because cache bookkeeping allocation failed.
+    pub allocation_bypasses: u64,
+    /// Payload entries currently retained by the cache.
+    pub retained_entries: usize,
+    /// Payload bytes currently retained by the cache.
+    pub retained_bytes: usize,
+    /// Same-part cold loads currently coordinated by a flight.
+    pub in_flight_loads: usize,
+    /// Whether this cache charges retained and in-flight payloads to a caller
+    /// supplied hierarchical memory budget.
+    pub budget_managed: bool,
+    /// Managed budget reservations rejected by the hierarchical budget. A
+    /// final `InputBytes` or managed direct-publication `OutputBytes` refusal
+    /// is counted; a temporary oversized read window that is shrunk to the
+    /// remaining capacity is not.
+    pub budget_reservation_failures: u64,
+    /// Current memory usage observed on the managed context's local budget.
+    /// This is content-free and may include sibling operations sharing the
+    /// same budget.
+    pub budget_memory_used: u64,
+    /// Bytes reserved by retained cache entries and active cold-load flights.
+    /// This deliberately excludes ordinary caller-owned [`PartData`] handles
+    /// that were returned after a cache entry was evicted or bypassed.
+    pub budget_cache_reserved_bytes: u64,
+    /// Local memory limit observed on the managed context's budget. `None`
+    /// means that the compatibility, unmanaged cache path is active.
+    pub budget_memory_limit: Option<u64>,
+    /// Cumulative physical bytes accepted from positional reads charged to
+    /// this context. Shared contexts may include sibling operations. This is
+    /// never released when a package, cache entry, or payload handle is
+    /// dropped.
+    pub budget_input_bytes_used: u64,
+    /// Local cumulative input-byte limit, or `None` for an unmanaged cache.
+    pub budget_input_bytes_limit: Option<u64>,
+    /// Cumulative physical bytes accepted by managed source-backed publication
+    /// sinks. Shared contexts may include sibling operations. This is never
+    /// released after acceptance, including an incomplete publication.
+    pub budget_output_bytes_used: u64,
+    /// Local cumulative output-byte limit, or `None` for an unmanaged cache.
+    pub budget_output_bytes_limit: Option<u64>,
+    /// Cumulative declared cold-load work charged before payload I/O. A
+    /// successful ZIP read proves that the declared uncompressed size is also
+    /// the actual materialized size; hits and waiters add no work. Shared
+    /// contexts may include sibling operations.
+    pub budget_work_used: u64,
+    /// Local cumulative work limit, or `None` for an unmanaged cache.
+    pub budget_work_limit: Option<u64>,
+    /// Current retained object usage observed on the managed context's local
+    /// budget. Shared contexts may include sibling operations. Unlike input
+    /// bytes and work, this usage is released when the package catalog or a
+    /// payload object is dropped.
+    pub budget_objects_used: u64,
+    /// Local retained-object limit, or `None` for an unmanaged cache.
+    pub budget_objects_limit: Option<u64>,
+    /// Object units retained by the package catalog itself.
+    pub budget_catalog_reserved_objects: u64,
+    /// Object units retained by cache entries and active flights. Returned
+    /// handles that outlive eviction are reflected in `budget_objects_used`
+    /// but deliberately excluded here, matching the retained-byte diagnostic.
+    /// Shared reservations are counted once.
+    pub budget_cache_reserved_objects: u64,
+}
+
+/// The event-counter portion of a source-cache diagnostic interval.
+///
+/// This deliberately excludes point-in-time gauges such as retained bytes and
+/// in-flight loads. Use [`SourceCacheDiagnostics::checked_counter_delta`] to
+/// construct one from two snapshots; a counter regression is rejected rather
+/// than interpreted as a wrapped interval.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct SourceCacheCounterDelta {
+    /// Requests satisfied directly from a retained payload entry.
+    pub hits: u64,
+    /// Requests that became the loader for a cold payload read.
+    pub cold_loads: u64,
+    /// Requests that found an existing same-part cold load and waited for it.
+    pub waiter_joins: u64,
+    /// Cold reads that completed successfully.
+    pub successful_loads: u64,
+    /// Cold reads that failed before publication.
+    pub failed_loads: u64,
+    /// Retained entries removed to satisfy cache capacity.
+    pub evictions: u64,
+    /// Successful cold reads returned without retention.
+    pub bypasses: u64,
+    /// Successful cold reads bypassed because their payload was oversized.
+    pub oversized_bypasses: u64,
+    /// Requests or successful loads bypassed after cache bookkeeping
+    /// allocation failed.
+    pub allocation_bypasses: u64,
+    /// Managed budget reservation refusals attributed to the cache or its
+    /// source-backed publication counters.
+    pub budget_reservation_failures: u64,
+}
+
+/// The cache-state lock scope exposed by the optional diagnostics seam.
+///
+/// The enum intentionally carries no cache identity, member name, or other
+/// payload. A [`DiagnosticSnapshot`] pair for this operation covers only the
+/// immediate `Mutex::lock` call on the cache state; it does not cover the
+/// critical section that follows it. The observer's `Finished` callback runs
+/// while that guard remains live and must obey the callback contract on the
+/// profiled entry point.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum CacheState {
+    /// The package's payload-cache state mutex.
+    Lock,
+}
+
+/// The same-Part flight-state lock scope exposed by the optional diagnostics
+/// seam.
+///
+/// A [`DiagnosticSnapshot`] pair for this operation covers only the
+/// immediate `Mutex::lock` call on a flight state. In particular, it does not
+/// cover a subsequent `Condvar::wait_timeout`, its duration, or its
+/// reacquisition of the mutex. The observer's `Finished` callback runs while
+/// the flight guard remains live and must obey the callback contract on the
+/// profiled entry point.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum FlightState {
+    /// One same-Part single-flight state mutex.
+    Lock,
+}
+
+/// One content-free lock operation observed by the diagnostics seam.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Operation {
+    /// A lock acquisition on payload-cache state.
+    Cache(CacheState),
+    /// A lock acquisition on same-Part flight state.
+    Flight(FlightState),
+}
+
+/// One boundary of an operation-local cache/flight lock observation.
+///
+/// Callbacks are invoked synchronously and are borrowed only for the duration
+/// of the profiled call. They are never retained by the package or cache. The
+/// `Finished` callback runs while the corresponding acquired guard is still
+/// live so the pair measures acquisition only; public entry-point docs state
+/// the required nonblocking/nonreentrant contract and panic behavior.
+#[cfg(feature = "performance-diagnostics")]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DiagnosticSnapshot {
+    /// Emitted immediately before the corresponding direct `Mutex::lock`.
+    Started { operation: Operation },
+    /// Emitted immediately after the corresponding direct `Mutex::lock`.
+    Finished { operation: Operation },
+}
+
+#[cfg(feature = "performance-diagnostics")]
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+
+    assert_send_sync::<CacheState>();
+    assert_send_sync::<FlightState>();
+    assert_send_sync::<Operation>();
+    assert_send_sync::<DiagnosticSnapshot>();
+};
+
+#[derive(Clone, Copy)]
+enum LockOperation {
+    Cache,
+    Flight,
+}
+
+trait DiagnosticObserver {
+    #[inline(always)]
+    fn started(&mut self, _operation: LockOperation) {}
+
+    /// Emit the post-acquisition callback. Implementations must not let a
+    /// callback panic unwind while the acquired guard is still live.
+    fn finished_after_lock(&mut self, _operation: LockOperation);
+}
+
+struct NoopDiagnosticObserver;
+
+impl DiagnosticObserver for NoopDiagnosticObserver {
+    #[inline(always)]
+    fn finished_after_lock(&mut self, _operation: LockOperation) {}
+}
+
+#[cfg(feature = "performance-diagnostics")]
+struct CallbackDiagnosticObserver<'observer, F> {
+    callback: &'observer mut F,
+    panic: Option<Box<dyn std::any::Any + Send>>,
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<F> CallbackDiagnosticObserver<'_, F>
+where
+    F: FnMut(DiagnosticSnapshot),
+{
+    fn new(callback: &mut F) -> CallbackDiagnosticObserver<'_, F> {
+        CallbackDiagnosticObserver {
+            callback,
+            panic: None,
+        }
+    }
+
+    /// Resume an observer panic only after the profiled operation has
+    /// released every cache/flight guard it owns.
+    #[inline(always)]
+    fn resume_if_panicked(&mut self) {
+        if let Some(panic) = self.panic.take() {
+            std::panic::resume_unwind(panic);
+        }
+    }
+}
+
+#[cfg(feature = "performance-diagnostics")]
+impl<F> DiagnosticObserver for CallbackDiagnosticObserver<'_, F>
+where
+    F: FnMut(DiagnosticSnapshot),
+{
+    #[inline(always)]
+    fn started(&mut self, operation: LockOperation) {
+        if self.panic.is_some() {
+            return;
+        }
+        if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            (self.callback)(DiagnosticSnapshot::Started {
+                operation: public_lock_operation(operation),
+            });
+        })) {
+            self.panic = Some(panic);
+        }
+    }
+
+    #[inline(always)]
+    fn finished_after_lock(&mut self, operation: LockOperation) {
+        if self.panic.is_some() {
+            return;
+        }
+        if let Err(panic) = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            (self.callback)(DiagnosticSnapshot::Finished {
+                operation: public_lock_operation(operation),
+            });
+        })) {
+            self.panic = Some(panic);
+        }
+    }
+}
+
+#[cfg(feature = "performance-diagnostics")]
+#[inline]
+const fn public_lock_operation(operation: LockOperation) -> Operation {
+    match operation {
+        LockOperation::Cache => Operation::Cache(CacheState::Lock),
+        LockOperation::Flight => Operation::Flight(FlightState::Lock),
+    }
+}
+
+/// Lock a cache/flight mutex while giving a stack-borrowed observer the two
+/// direct-lock boundaries. `Finished` executes while the acquired guard is
+/// still live so the event measures lock acquisition only; the callback must
+/// therefore be nonblocking, nonreentrant, and must not acquire a lock. A
+/// panicking `Started` or `Finished` callback is caught at this boundary; the
+/// observer suppresses later notifications, lets the operation release all of
+/// its guards, and the public entry point resumes the panic. `Started` runs
+/// before the lock, so a panicking callback does not receive a matching
+/// `Finished`, although the lock and the enclosing operation still complete
+/// normally. No observer callback is emitted for condition-variable
+/// reacquisition because that happens inside `Condvar::wait_timeout`, outside
+/// this helper.
+#[inline(always)]
+fn lock_with_observer<'mutex, T, O>(
+    mutex: &'mutex Mutex<T>,
+    observer: &mut O,
+    operation: LockOperation,
+) -> std::sync::LockResult<std::sync::MutexGuard<'mutex, T>>
+where
+    O: DiagnosticObserver,
+{
+    observer.started(operation);
+    let result = mutex.lock();
+    observer.finished_after_lock(operation);
+    result
+}
+
+/// Failure returned by a fail-closed source-cache diagnostic operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum SourceCacheDiagnosticsError {
+    /// A checked diagnostic counter could not be incremented without wrapping.
+    CounterOverflow,
+    /// The cache state mutex was poisoned by a panic while it was held.
+    StatePoisoned,
+    /// A supposedly monotonic counter decreased between two snapshots.
+    CounterMovedBackwards {
+        /// Counter whose interval was invalid.
+        counter: &'static str,
+    },
+}
+
+impl std::fmt::Display for SourceCacheDiagnosticsError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::CounterOverflow => formatter
+                .write_str("source-cache diagnostic counter overflowed; metrics are unavailable"),
+            Self::StatePoisoned => formatter
+                .write_str("source-cache diagnostic state is poisoned; metrics are unavailable"),
+            Self::CounterMovedBackwards { counter } => {
+                write!(formatter, "source-cache counter {counter} moved backwards")
+            },
+        }
+    }
+}
+
+impl std::error::Error for SourceCacheDiagnosticsError {}
+
+impl SourceCacheDiagnostics {
+    /// Compute a checked interval for the monotonic event counters.
+    ///
+    /// The returned delta contains event counters only; current cache gauges
+    /// are intentionally not subtracted. A counter regression is an invalid
+    /// or wrapped interval and returns an error. Callers collecting metrics
+    /// should obtain both snapshots through
+    /// [`SourceBackedPackage::try_cache_diagnostics`].
+    pub fn checked_counter_delta(
+        before: Self,
+        after: Self,
+    ) -> std::result::Result<SourceCacheCounterDelta, SourceCacheDiagnosticsError> {
+        let subtract = |counter: &'static str, after: u64, before: u64| {
+            after
+                .checked_sub(before)
+                .ok_or(SourceCacheDiagnosticsError::CounterMovedBackwards { counter })
+        };
+        Ok(SourceCacheCounterDelta {
+            hits: subtract("hits", after.hits, before.hits)?,
+            cold_loads: subtract("cold_loads", after.cold_loads, before.cold_loads)?,
+            waiter_joins: subtract("waiter_joins", after.waiter_joins, before.waiter_joins)?,
+            successful_loads: subtract(
+                "successful_loads",
+                after.successful_loads,
+                before.successful_loads,
+            )?,
+            failed_loads: subtract("failed_loads", after.failed_loads, before.failed_loads)?,
+            evictions: subtract("evictions", after.evictions, before.evictions)?,
+            bypasses: subtract("bypasses", after.bypasses, before.bypasses)?,
+            oversized_bypasses: subtract(
+                "oversized_bypasses",
+                after.oversized_bypasses,
+                before.oversized_bypasses,
+            )?,
+            allocation_bypasses: subtract(
+                "allocation_bypasses",
+                after.allocation_bypasses,
+                before.allocation_bypasses,
+            )?,
+            budget_reservation_failures: subtract(
+                "budget_reservation_failures",
+                after.budget_reservation_failures,
+                before.budget_reservation_failures,
+            )?,
+        })
+    }
+}
+
+#[derive(Debug, Default)]
+struct DiagnosticState {
+    overflowed: AtomicBool,
+}
+
+#[derive(Debug)]
+struct DiagnosticCounter {
+    value: AtomicU64,
+    state: Arc<DiagnosticState>,
+}
+
+impl DiagnosticCounter {
+    fn new(state: Arc<DiagnosticState>) -> Self {
+        Self {
+            value: AtomicU64::new(0),
+            state,
+        }
+    }
+
+    fn increment(&self) {
+        if self
+            .value
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| {
+                value.checked_add(1)
+            })
+            .is_err()
+        {
+            self.state.overflowed.store(true, Ordering::Release);
+        }
+    }
+
+    fn load(&self) -> u64 {
+        self.value.load(Ordering::Relaxed)
+    }
+}
+
+#[derive(Debug)]
+struct CacheCounters {
+    hits: DiagnosticCounter,
+    cold_loads: DiagnosticCounter,
+    waiter_joins: DiagnosticCounter,
+    successful_loads: DiagnosticCounter,
+    failed_loads: DiagnosticCounter,
+    evictions: DiagnosticCounter,
+    bypasses: DiagnosticCounter,
+    oversized_bypasses: DiagnosticCounter,
+    allocation_bypasses: DiagnosticCounter,
+    budget_reservation_failures: DiagnosticCounter,
+}
+
+impl CacheCounters {
+    fn new(state: Arc<DiagnosticState>) -> Self {
+        Self {
+            hits: DiagnosticCounter::new(Arc::clone(&state)),
+            cold_loads: DiagnosticCounter::new(Arc::clone(&state)),
+            waiter_joins: DiagnosticCounter::new(Arc::clone(&state)),
+            successful_loads: DiagnosticCounter::new(Arc::clone(&state)),
+            failed_loads: DiagnosticCounter::new(Arc::clone(&state)),
+            evictions: DiagnosticCounter::new(Arc::clone(&state)),
+            bypasses: DiagnosticCounter::new(Arc::clone(&state)),
+            oversized_bypasses: DiagnosticCounter::new(Arc::clone(&state)),
+            allocation_bypasses: DiagnosticCounter::new(Arc::clone(&state)),
+            budget_reservation_failures: DiagnosticCounter::new(state),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct SourceReader {
+    snapshot: SourceSnapshot,
+    /// The package owns the strong read-ahead handle. Keeping only a weak link
+    /// here lets an exact [`SourceArtifact`] share the immutable archive index
+    /// without retaining the bounded window after its package owner is
+    /// dropped; reads then fall back to the checked exact source path.
+    read_ahead: Option<Weak<ArchiveReadAhead>>,
+    /// Bytes the open already fetched for the structural members it is about
+    /// to read. Present only for an ordinary unmanaged, exact-policy open, and
+    /// released as soon as the catalog has been read.
+    prefetch: Option<Arc<StructuralPrefetch>>,
+}
+
+/// Typed marker used while a positional source reports a version change
+/// through the `std::io::Read` boundary owned by the ZIP substrate.
+///
+/// The low-level callback reader intentionally reports transport failures as
+/// `io::Error`. Keeping the source versions in the error's source chain lets
+/// this crate restore its typed [`OpcError::SourceChanged`] variant instead
+/// of reducing the failure to a diagnostic string.
+#[derive(Debug)]
+struct SourceChangedIoError {
+    expected: SourceVersion,
+    actual: SourceVersion,
+}
+
+impl std::fmt::Display for SourceChangedIoError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            formatter,
+            "source-backed OPC source changed from {:?} to {:?}",
+            self.expected, self.actual
+        )
+    }
+}
+
+impl std::error::Error for SourceChangedIoError {}
+
+/// Shared depth of the monitored-read scopes open on one source snapshot.
+type MonitoredReadDepth = AtomicUsize;
+
+/// A bounded monitored-read scope on one source snapshot.
+///
+/// While at least one scope is alive, every positional source read and every
+/// publication sink write re-observes the source version through
+/// [`SourceSnapshot::ensure_current_io_if_monitored`]. A scope covers exactly
+/// the operation that needs per-read freshness: a stream, a verified read, or
+/// a publication that copies source bytes into an output. When the last scope
+/// on a snapshot ends the snapshot returns to the unmonitored state a freshly
+/// opened package is in, where bracketing observations fence a read instead.
+///
+/// It counts rather than latches so that concurrent operations on the same
+/// snapshot, a nested scope, and a scope taken on a clone of the snapshot
+/// cannot end one another's monitoring.
+#[must_use = "monitoring ends when the returned scope is dropped"]
+struct MonitoredReads {
+    depth: Arc<MonitoredReadDepth>,
+}
+
+impl MonitoredReads {
+    fn enter(depth: &Arc<MonitoredReadDepth>) -> Self {
+        depth.fetch_add(1, Ordering::AcqRel);
+        Self {
+            depth: Arc::clone(depth),
+        }
+    }
+}
+
+impl Drop for MonitoredReads {
+    fn drop(&mut self) {
+        self.depth.fetch_sub(1, Ordering::AcqRel);
+    }
+}
+
+impl ZipReaderAt for SourceReader {
+    fn read_at(&self, output: &mut [u8], offset: u64) -> std::io::Result<usize> {
+        // A read the structural prefetch holds in full is answered from bytes
+        // this package already fetched from the source. Everything else —
+        // every partly covered read, every zero-length read, and every read at
+        // all once the catalog is built — takes exactly the path below.
+        if let Some(prefetch) = &self.prefetch {
+            if let Some(count) = prefetch.serve(offset, output) {
+                return Ok(count);
+            }
+        }
+        let result = match self.read_ahead.as_ref().and_then(Weak::upgrade) {
+            Some(read_ahead) => read_ahead.read_at(&self.snapshot, offset, output),
+            None => read_source_at_with_context(
+                &self.snapshot,
+                self.snapshot.context.as_ref(),
+                offset,
+                output,
+                "archive",
+            ),
+        };
+        result.map_err(|error| match error {
+            OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
+            OpcError::Execution(error) => execution_io_error(error),
+            OpcError::SourceChanged { expected, actual } => {
+                std::io::Error::other(SourceChangedIoError { expected, actual })
+            },
+            OpcError::IoError(error) => error,
+            error => std::io::Error::other(error.to_string()),
+        })
+    }
+}
+
+#[derive(Clone)]
+pub(crate) struct SourceSnapshot {
+    source: Arc<dyn ReadAt>,
+    version: SourceVersion,
+    length: u64,
+    monitor_reads: Arc<MonitoredReadDepth>,
+    lineage: SourceLineage,
+    context: Option<ExecutionContext>,
+    input_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    output_reservation_failures: Option<Arc<DiagnosticCounter>>,
+}
+
+/// One private memo owned by one immutable `Vec` ingress.
+///
+/// The source is retained strongly with the memo so the cached digest can
+/// only be reused for the allocation whose bytes were scanned. The one-entry
+/// table is reserved fallibly before it is wrapped in an `Arc`; cloning this
+/// value shares that bounded table, while every new owned ingress constructs a
+/// fresh one.
+struct OwnedSourceFingerprintMemo {
+    source: Arc<OwnedSource>,
+    values: Vec<OnceLock<[u8; 32]>>,
+}
+
+impl OwnedSourceFingerprintMemo {
+    fn new(source: Arc<OwnedSource>) -> Result<Self> {
+        Self::new_with_entries(source, 1)
+    }
+
+    fn new_with_entries(source: Arc<OwnedSource>, entries: usize) -> Result<Self> {
+        let mut values = Vec::new();
+        values
+            .try_reserve_exact(entries)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source artifact fingerprint memo",
+                source,
+            })?;
+        if values.capacity() != entries {
+            return Err(overlay_unavailable(
+                "source artifact fingerprint memo allocation exceeded its reservation",
+            ));
+        }
+        for _ in 0..entries {
+            values.push(OnceLock::new());
+        }
+        if values.is_empty() {
+            return Err(overlay_unavailable(
+                "source artifact fingerprint memo has no value cell",
+            ));
+        }
+        Ok(Self { source, values })
+    }
+
+    fn cached(&self, expected_length: u64) -> Option<SourceArtifactFingerprint> {
+        let source_length = u64::try_from(self.source.as_slice().len()).ok()?;
+        if source_length != expected_length {
+            return None;
+        }
+        let digest = self.values.first()?.get().copied()?;
+        #[cfg(debug_assertions)]
+        {
+            let actual: [u8; 32] = Sha256::digest(self.source.as_slice()).into();
+            debug_assert_eq!(actual, digest, "owned source fingerprint memo diverged");
+        }
+        Some(SourceArtifactFingerprint(digest))
+    }
+
+    fn store(&self, fingerprint: SourceArtifactFingerprint) {
+        let _ = self.values[0].set(fingerprint.into_sha256());
+    }
+
+    #[cfg(test)]
+    fn is_initialized(&self) -> bool {
+        self.values[0].get().is_some()
+    }
+}
+
+enum SourceInput {
+    Generic(Arc<dyn ReadAt>),
+    Owned(Arc<OwnedSource>),
+}
+
+impl SourceInput {
+    fn into_parts(self) -> (Arc<dyn ReadAt>, Option<Arc<OwnedSource>>) {
+        match self {
+            Self::Generic(source) => (source, None),
+            Self::Owned(source) => {
+                let read_at: Arc<dyn ReadAt> = source.clone();
+                (read_at, Some(source))
+            },
+        }
+    }
+}
+
+/// Process-local identity for one opened source-backed package lineage.
+///
+/// A lineage is intentionally distinct from [`SourceVersion`]. Two source
+/// adapters may report the same caller-chosen version token while still being
+/// different opened packages; patches must never cross that boundary. Clones
+/// of one opened [`SourceBackedPackage`] share its lineage.
+#[derive(Clone, Debug)]
+pub struct SourceLineage(Arc<()>);
+
+impl PartialEq for SourceLineage {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for SourceLineage {}
+
+/// Exact immutable source artifact retained for a later reversible restore.
+///
+/// The archive index and admitted catalog travel with the artifact as a
+/// shared final-output profile. A recipient policy can therefore re-admit an
+/// exact artifact's ZIP and OPC dimensions after its original package owner
+/// has been dropped, without materializing or reopening the source bytes.
+#[derive(Clone)]
+pub struct SourceArtifact {
+    snapshot: SourceSnapshot,
+    fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
+    archive: Arc<IndexedArchive<SourceReader>>,
+    catalog: Arc<AdmittedCatalog>,
+}
+
+/// SHA-256 identity of an exact source artifact.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct SourceArtifactFingerprint([u8; 32]);
+
+impl SourceArtifactFingerprint {
+    /// Construct from a completed SHA-256 digest.
+    #[must_use]
+    pub const fn from_sha256(digest: [u8; 32]) -> Self {
+        Self(digest)
+    }
+
+    /// Borrow the digest bytes without exposing the source-artifact owner.
+    #[must_use]
+    pub const fn as_sha256(&self) -> &[u8; 32] {
+        &self.0
+    }
+
+    /// Return the digest bytes by value.
+    #[must_use]
+    pub const fn into_sha256(self) -> [u8; 32] {
+        self.0
+    }
+}
+
+impl SourceArtifact {
+    /// Return the exact byte length captured by this artifact handle.
+    #[must_use]
+    pub const fn len(&self) -> u64 {
+        self.snapshot.length
+    }
+
+    /// Return whether this artifact has no bytes.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.snapshot.length == 0
+    }
+
+    /// Return whether this artifact can use its source-owned fingerprint
+    /// memo. Managed sources still authenticate through their execution
+    /// context, so their owner boundary supplies the version-keyed memo.
+    #[must_use]
+    pub const fn has_fingerprint_memo(&self) -> bool {
+        self.fingerprint_memo.is_some() && self.snapshot.context.is_none()
+    }
+
+    /// Hash the exact current artifact without materializing it.
+    pub fn fingerprint(&self) -> Result<SourceArtifactFingerprint> {
+        self.snapshot.ensure_current()?;
+        if self.snapshot.context.is_none() {
+            if let Some(fingerprint) = self
+                .fingerprint_memo
+                .as_ref()
+                .and_then(|memo| memo.cached(self.snapshot.length))
+            {
+                self.snapshot.ensure_current()?;
+                return Ok(fingerprint);
+            }
+        }
+        let chunk_bytes = usize::try_from(
+            self.snapshot
+                .length
+                .min(SOURCE_PUBLICATION_CHUNK_BYTES as u64),
+        )
+        .map_err(|_| overlay_unavailable("source length does not fit this platform"))?;
+        let _workspace_reservation = if chunk_bytes == 0 {
+            None
+        } else if let Some(context) = self.snapshot.context.as_ref() {
+            // A recipient may deliberately admit only a small source. Keep
+            // the normal publication chunk as the fast path and fall back to
+            // the fixed stack window only when the context has no free memory
+            // at all; a partially available heap window remains a typed
+            // refusal so the fixed workspace policy is preserved.
+            let requested = chunk_bytes;
+            match context.reserve(Resource::Memory, requested as u64) {
+                Ok(reservation) => Some(reservation),
+                Err(ExecutionError::ResourceLimit(limit)) if limit.resource == Resource::Memory => {
+                    let used = limit.observed.saturating_sub(requested as u64);
+                    let available = limit.limit.saturating_sub(used);
+                    if available == 0 {
+                        // A source package may already retain its entire
+                        // managed memory allowance in its catalog. Keep
+                        // authentication possible with a bounded stack
+                        // window rather than bypassing the budget with a
+                        // heap allocation or refusing an exact match.
+                        None
+                    } else {
+                        return Err(OpcError::Execution(ExecutionError::ResourceLimit(limit)));
+                    }
+                },
+                Err(error) => return Err(map_execution_error(error)),
+            }
+        } else {
+            None
+        };
+        let mut hasher = Sha256::new();
+        const FINGERPRINT_STACK_BYTES: usize = 4 * 1024;
+        let mut stack_buffer = [0_u8; FINGERPRINT_STACK_BYTES];
+        // The managed reservation above keeps the historical admission
+        // policy and refusal boundary. The bytes themselves live in a fixed
+        // stack window so repeated authentication does not retain a heap
+        // allocation for every deferred replay.
+        let buffer: &mut [u8] = &mut stack_buffer[..chunk_bytes.min(FINGERPRINT_STACK_BYTES)];
+        let mut offset = 0_u64;
+        while offset < self.snapshot.length {
+            let remaining =
+                usize::try_from((self.snapshot.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+            let read = read_source_at_with_context(
+                &self.snapshot,
+                self.snapshot.context.as_ref(),
+                offset,
+                &mut buffer[..remaining],
+                "fingerprinting",
+            )
+            .map_err(map_source_backed_error)?;
+            if read == 0 {
+                return Err(OpcError::IoError(std::io::Error::new(
+                    std::io::ErrorKind::UnexpectedEof,
+                    "source-backed OPC source ended during fingerprinting",
+                )));
+            }
+            self.snapshot.ensure_current()?;
+            if let Some(context) = self.snapshot.context.as_ref() {
+                context
+                    .consume(Resource::Work, read as u64)
+                    .map_err(map_execution_error)?;
+            }
+            hasher.update(&buffer[..read]);
+            offset = offset
+                .checked_add(read as u64)
+                .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+        }
+        self.snapshot.ensure_current()?;
+        let fingerprint = SourceArtifactFingerprint(hasher.finalize().into());
+        if self.snapshot.context.is_none() {
+            if let Some(memo) = self.fingerprint_memo.as_ref() {
+                memo.store(fingerprint);
+            }
+        }
+        Ok(fingerprint)
+    }
+
+    /// Copy the retained source artifact exactly to a sequential sink.
+    ///
+    /// A managed artifact reserves `Resource::OutputBytes` for each sink
+    /// write and commits only the accepted count. A refusal before any bytes
+    /// are accepted returns the typed output resource-limit error; a sink or
+    /// policy failure after accepted bytes returns [`OpcError::IncompleteOutput`].
+    pub fn write_to<W: Write>(&self, writer: W) -> Result<()> {
+        write_exact_snapshot(&self.snapshot, writer, self.snapshot.context.as_ref())
+    }
+
+    /// Copy this artifact under a recipient-owned stream policy.
+    ///
+    /// The source keeps its own input/work and freshness context. The policy
+    /// controls only whether the recipient output allowance is charged.
+    pub fn write_to_with_policy<W: Write>(
+        &self,
+        writer: W,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_source_artifact(self)?;
+        artifact_restore::write_exact_snapshot_with_policy(&self.snapshot, writer, policy)
+    }
+
+    /// Copy the retained source artifact while recording exact accepted output
+    /// and unchanged-source bytes in a caller-owned report.
+    ///
+    /// The report is updated as the sink accepts bytes, including a partial
+    /// prefix before a source, cancellation, policy, or sink error. The raw
+    /// unchanged counter equals the actual accepted source bytes for this
+    /// exact-copy operation; it is never inferred from the source length.
+    pub fn write_to_with_accounting<W: Write>(
+        &self,
+        writer: W,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        write_exact_snapshot_with_accounting(
+            &self.snapshot,
+            writer,
+            self.snapshot.context.as_ref(),
+            accounting,
+        )
+    }
+}
+
+impl SourceSnapshot {
+    fn ensure_current(&self) -> Result<()> {
+        let actual = self.source.version()?;
+        if actual == self.version {
+            Ok(())
+        } else {
+            Err(OpcError::SourceChanged {
+                expected: self.version,
+                actual,
+            })
+        }
+    }
+
+    fn ensure_current_io_if_monitored(&self) -> std::io::Result<()> {
+        if self.monitor_reads.load(Ordering::Acquire) == 0 {
+            return Ok(());
+        }
+        let actual = self.source.version()?;
+        if actual == self.version {
+            Ok(())
+        } else {
+            Err(std::io::Error::other(SourceChangedIoError {
+                expected: self.version,
+                actual,
+            }))
+        }
+    }
+
+    /// Open a monitored-read scope over this snapshot for the caller's
+    /// operation. Every positional read and publication sink write taken
+    /// while the returned scope is alive re-observes the source version.
+    fn monitor_publication(&self) -> MonitoredReads {
+        MonitoredReads::enter(&self.monitor_reads)
+    }
+
+    pub(crate) fn ensure_current_public(&self) -> Result<()> {
+        self.ensure_current()
+    }
+
+    pub(crate) fn context_ref(&self) -> Option<&ExecutionContext> {
+        self.context.as_ref()
+    }
+
+    pub(crate) fn lineage(&self) -> &SourceLineage {
+        &self.lineage
+    }
+
+    pub(crate) fn snapshot_lineage(&self) -> SourceLineage {
+        self.lineage.clone()
+    }
+
+    pub(crate) const fn version(&self) -> SourceVersion {
+        self.version
+    }
+}
+
+struct Counted<'count, W> {
+    inner: W,
+    written: &'count mut u64,
+    accounting: Option<AccountingCounter<'count>>,
+}
+
+struct AccountingCounter<'count> {
+    report: &'count mut OpcOperationAccounting,
+    error: &'count mut Option<OpcError>,
+    raw_source: bool,
+}
+
+impl AccountingCounter<'_> {
+    fn record(&mut self, bytes: usize) {
+        let Ok(bytes) = u64::try_from(bytes) else {
+            record_accounting_error(
+                self.error,
+                accounting_overflow("accepted output byte count exceeds u64"),
+            );
+            return;
+        };
+        if let Err(error) = self.report.add_output_bytes_accepted(bytes) {
+            record_accounting_error(self.error, error);
+        }
+        if self.raw_source {
+            if let Err(error) = self.report.add_raw_unchanged_source_bytes_accepted(bytes) {
+                record_accounting_error(self.error, error);
+            }
+        }
+    }
+}
+
+impl<'count, W> Counted<'count, W> {
+    fn new(inner: W, written: &'count mut u64) -> Self {
+        Self {
+            inner,
+            written,
+            accounting: None,
+        }
+    }
+
+    fn with_accounting(
+        inner: W,
+        written: &'count mut u64,
+        report: &'count mut OpcOperationAccounting,
+        error: &'count mut Option<OpcError>,
+        raw_source: bool,
+    ) -> Self {
+        Self {
+            inner,
+            written,
+            accounting: Some(AccountingCounter {
+                report,
+                error,
+                raw_source,
+            }),
+        }
+    }
+}
+
+impl<W: Write> Write for Counted<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "source-backed OPC sink reported {written} bytes for a {}-byte write",
+                    bytes.len()
+                ),
+            ));
+        }
+        *self.written = self.written.saturating_add(written as u64);
+        if let Some(accounting) = self.accounting.as_mut() {
+            accounting.record(written);
+        }
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+struct SourceCheckedSink<W> {
+    inner: W,
+    snapshot: SourceSnapshot,
+}
+
+struct ContextCheckedSink<W> {
+    inner: W,
+    context: Option<ExecutionContext>,
+    failure: Arc<Mutex<Option<ExecutionError>>>,
+}
+
+impl<W: Write> ContextCheckedSink<W> {
+    fn record_failure(&self, error: ExecutionError) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check_before_write(&self) -> std::io::Result<()> {
+        let Some(context) = self.context.as_ref() else {
+            return Ok(());
+        };
+        context.check().map_err(|error| {
+            let message = error.to_string();
+            self.record_failure(error);
+            // `Write::write_all` retries `Interrupted` indefinitely. Use a
+            // terminal I/O classification; the shared failure slot below
+            // restores the typed execution error after ZIP writing returns.
+            std::io::Error::other(message)
+        })
+    }
+}
+
+impl<W: Write> Write for ContextCheckedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check_before_write()?;
+        let result = self.inner.write(bytes);
+        if result.is_ok() {
+            // Check after each bounded Chunked write as well. If a sink
+            // cancels from inside its first write, the accepted byte count is
+            // preserved and the next write/flush returns the typed failure.
+            if let Some(context) = self.context.as_ref() {
+                if let Err(error) = context.check() {
+                    self.record_failure(error);
+                }
+            }
+        }
+        result
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check_before_write()?;
+        let result = self.inner.flush();
+        if result.is_ok() {
+            if let Some(context) = self.context.as_ref() {
+                if let Err(error) = context.check() {
+                    self.record_failure(error);
+                }
+            }
+        }
+        result
+    }
+}
+
+/// Managed-only output-budget adapter. The compatibility path deliberately
+/// stays on [`ContextCheckedSink`] and does not instantiate this wrapper.
+struct OutputBudgetedSink<W> {
+    inner: W,
+    context: ExecutionContext,
+    failure: Arc<Mutex<Option<ExecutionError>>>,
+    output_reservation_failures: Arc<DiagnosticCounter>,
+}
+
+impl<W: Write> OutputBudgetedSink<W> {
+    fn record_failure(&self, error: ExecutionError) {
+        let mut failure = self
+            .failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if failure.is_none() {
+            *failure = Some(error);
+        }
+    }
+
+    fn check_before_write(&self) -> std::io::Result<()> {
+        self.context.check().map_err(|error| {
+            let message = error.to_string();
+            self.record_failure(error);
+            // `Write::write_all` retries `Interrupted` indefinitely. Use a
+            // terminal I/O classification; the shared failure slot below
+            // restores the typed execution error after ZIP writing returns.
+            std::io::Error::other(message)
+        })
+    }
+
+    fn reserve_output(&self, requested: usize) -> std::io::Result<Option<Reservation>> {
+        if requested == 0 {
+            return Ok(None);
+        }
+        let requested = u64::try_from(requested).map_err(|_| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "source-backed OPC output request exceeds u64",
+            )
+        })?;
+        self.context
+            .reserve(Resource::OutputBytes, requested)
+            .map(Some)
+            .map_err(|error| {
+                if matches!(
+                    &error,
+                    ExecutionError::ResourceLimit(limit)
+                        if limit.resource == Resource::OutputBytes
+                ) {
+                    self.output_reservation_failures.increment();
+                }
+                let message = error.to_string();
+                self.record_failure(error);
+                // The ZIP preservation layer communicates sink failures through
+                // std::io::Error. The shared failure slot restores the typed
+                // execution error after that adapter returns.
+                std::io::Error::other(message)
+            })
+    }
+}
+
+impl<W: Write> Write for OutputBudgetedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check_before_write()?;
+        let reservation = self.reserve_output(bytes.len())?;
+        let result = self.inner.write(bytes);
+        match result {
+            Ok(written) if written > bytes.len() => {
+                drop(reservation);
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    format!(
+                        "source-backed OPC sink reported {written} bytes for a {}-byte write",
+                        bytes.len()
+                    ),
+                ))
+            },
+            Ok(written) => {
+                let written = u64::try_from(written).map_err(|_| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        "source-backed OPC sink progress exceeds u64",
+                    )
+                })?;
+                if let Some(reservation) = reservation {
+                    if !reservation.commit(written) {
+                        return Err(std::io::Error::new(
+                            std::io::ErrorKind::InvalidData,
+                            "source-backed OPC output reservation underflow",
+                        ));
+                    }
+                }
+                Ok(usize::try_from(written).unwrap_or(usize::MAX))
+            },
+            Err(error) => {
+                drop(reservation);
+                Err(error)
+            },
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check_before_write()?;
+        self.inner.flush()
+    }
+}
+
+impl<W: Write> Write for SourceCheckedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.snapshot.ensure_current_io_if_monitored()?;
+        self.inner.write(bytes)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.snapshot.ensure_current_io_if_monitored()?;
+        self.inner.flush()
+    }
+}
+
+/// Source fence for compressed payloads captured from a package different
+/// from the destination package being rewritten. The token's source snapshot
+/// remains live through every destination sink write, so a later source
+/// mutation cannot turn an already captured payload into an authorized
+/// publication.
+struct TransferSourceCheckedSink<W> {
+    inner: W,
+    sources: Arc<Vec<SourceSnapshot>>,
+    state: Arc<Mutex<TransferSourceState>>,
+    pending_failure: Option<OpcError>,
+}
+
+#[derive(Default)]
+struct TransferSourceState {
+    accepted: u64,
+}
+
+impl<W> TransferSourceCheckedSink<W> {
+    fn check_sources(&self) -> Result<()> {
+        for source in self.sources.iter() {
+            source.ensure_current()?;
+            if let Some(context) = source.context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+        }
+        Ok(())
+    }
+
+    fn check_before_write(&mut self) -> std::io::Result<()> {
+        if let Some(error) = self.pending_failure.take() {
+            return Err(transfer_source_io_error(error));
+        }
+        match self.check_sources() {
+            Ok(()) => Ok(()),
+            Err(error) => Err(transfer_source_io_error(error)),
+        }
+    }
+
+    fn record_after_write(&mut self) {
+        if self.pending_failure.is_none() {
+            if let Err(error) = self.check_sources() {
+                self.pending_failure = Some(error);
+            }
+        }
+    }
+}
+
+impl<W: Write> Write for TransferSourceCheckedSink<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.check_before_write()?;
+        let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "source-backed OPC transfer sink reported more bytes than provided",
+            ));
+        }
+        if let Ok(mut state) = self.state.lock() {
+            state.accepted = state
+                .accepted
+                .saturating_add(u64::try_from(written).unwrap_or(u64::MAX));
+        }
+        self.record_after_write();
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.check_before_write()?;
+        self.inner.flush()?;
+        match self.check_sources() {
+            Ok(()) => Ok(()),
+            Err(error) => Err(transfer_source_io_error(error)),
+        }
+    }
+}
+
+fn transfer_source_io_error(error: OpcError) -> std::io::Error {
+    match error {
+        OpcError::SourceChanged { expected, actual } => {
+            std::io::Error::other(SourceChangedIoError { expected, actual })
+        },
+        OpcError::Cancelled => execution_io_error(ExecutionError::Cancelled),
+        OpcError::Execution(error) => execution_io_error(error),
+        OpcError::IoError(error) => error,
+        other => std::io::Error::other(other.to_string()),
+    }
+}
+
+struct Chunked<W> {
+    inner: W,
+}
+
+impl<W: Write> Write for Chunked<W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        self.inner
+            .write(&bytes[..bytes.len().min(SOURCE_PUBLICATION_CHUNK_BYTES)])
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.inner.flush()
+    }
+}
+
+#[derive(Debug)]
+struct CatalogPart {
+    partname: PackURI,
+    content_type: ContentType,
+    relationships: Relationships,
+    entry_id: EntryId,
+}
+
+/// Failure from a callback-scoped, verified decoded OPC Part read.
+///
+/// The ZIP/archive or source-transport failure is primary. If the callback
+/// had already returned an error, it is retained in `callback_error` so a
+/// caller can diagnose both failures without parsing display text. A callback
+/// error is returned directly only when the complete Part was drained and
+/// verified successfully.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum VerifiedDecodedReaderError<E> {
+    /// OPC validation, source, execution, or transport failure.
+    Opc {
+        /// Primary OPC failure.
+        error: OpcError,
+        /// Callback failure observed before the primary OPC failure.
+        callback_error: Option<E>,
+    },
+    /// The callback failed after OPC verification completed successfully.
+    Callback(E),
+}
+
+impl<E> VerifiedDecodedReaderError<E> {
+    /// Returns the primary OPC failure, when present.
+    #[must_use]
+    pub fn opc(&self) -> Option<&OpcError> {
+        match self {
+            Self::Opc { error, .. } => Some(error),
+            Self::Callback(_) => None,
+        }
+    }
+
+    /// Returns the callback failure, including one retained by a primary OPC
+    /// failure.
+    #[must_use]
+    pub fn callback(&self) -> Option<&E> {
+        match self {
+            Self::Opc { callback_error, .. } => callback_error.as_ref(),
+            Self::Callback(error) => Some(error),
+        }
+    }
+
+    /// Extracts the primary OPC failure, if present.
+    pub fn into_opc(self) -> Option<OpcError> {
+        match self {
+            Self::Opc { error, .. } => Some(error),
+            Self::Callback(_) => None,
+        }
+    }
+
+    /// Extracts the callback failure, if one was returned.
+    pub fn into_callback(self) -> Option<E> {
+        match self {
+            Self::Opc { callback_error, .. } => callback_error,
+            Self::Callback(error) => Some(error),
+        }
+    }
+}
+
+impl<E: std::fmt::Display> std::fmt::Display for VerifiedDecodedReaderError<E> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Opc {
+                error,
+                callback_error,
+            } => match callback_error {
+                Some(callback_error) => write!(
+                    formatter,
+                    "verified OPC decoded reader failed: {error} (callback also failed: {callback_error})"
+                ),
+                None => write!(formatter, "verified OPC decoded reader failed: {error}"),
+            },
+            Self::Callback(error) => {
+                write!(
+                    formatter,
+                    "verified OPC decoded reader callback failed: {error}"
+                )
+            },
+        }
+    }
+}
+
+impl<E: std::error::Error + 'static> std::error::Error for VerifiedDecodedReaderError<E> {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Opc { error, .. } => Some(error),
+            Self::Callback(error) => Some(error),
+        }
+    }
+}
+
+/// Immutable metadata and deferred payload access for one OPC package part.
+#[derive(Clone, Copy)]
+pub struct PartView<'package> {
+    package: &'package SourceBackedPackage,
+    index: usize,
+}
+
+impl<'package> PartView<'package> {
+    /// The part's absolute OPC URI.
+    #[must_use]
+    pub fn partname(&self) -> &'package PackURI {
+        &self.package.catalog.parts[self.index].partname
+    }
+
+    /// The content type declared by `[Content_Types].xml`.
+    #[must_use]
+    pub fn content_type(&self) -> &'package str {
+        self.package.catalog.parts[self.index].content_type.as_str()
+    }
+
+    /// The part's already-validated relationships.
+    #[must_use]
+    pub fn rels(&self) -> &'package Relationships {
+        &self.package.catalog.parts[self.index].relationships
+    }
+
+    /// Return the ZIP central-directory declaration for this part's
+    /// uncompressed size without loading its payload.
+    ///
+    /// The value is attacker-controlled central-directory metadata and is not
+    /// proof of the decoded length. [`PartView::data`] still verifies the
+    /// decoded length and closes the central-directory/local-header TOCTOU
+    /// boundary before publishing a payload. Source freshness and the
+    /// caller's cancellation policy are checked before and after this lookup.
+    pub fn declared_uncompressed_size(&self) -> Result<u64> {
+        self.package.source.ensure_current()?;
+        self.package
+            .cache
+            .check_context()
+            .map_err(map_execution_error)?;
+        let entry_id = self
+            .package
+            .catalog
+            .parts
+            .get(self.index)
+            .ok_or_else(|| OpcError::PartNotFound(self.index.to_string()))?
+            .entry_id;
+        let declared = self
+            .package
+            .archive
+            .metadata_for(entry_id)?
+            .uncompressed_size();
+        self.package.source.ensure_current()?;
+        self.package
+            .cache
+            .check_context()
+            .map_err(map_execution_error)?;
+        Ok(declared)
+    }
+
+    /// Read this part's payload, using the package's bounded cache when able.
+    pub fn data(&self) -> Result<PartData> {
+        self.package.read_part(self.index)
+    }
+
+    /// Capture this XML Part as an opaque source-preserving publication proof.
+    ///
+    /// Original whitespace and lexical forms remain exact.  Use
+    /// [`SourceXmlPart::into_publication`] when compact generated fragments
+    /// must be inserted at checked source ranges.
+    pub fn source_xml(&self) -> Result<SourceXmlPart> {
+        self.package.source_xml_part(self.index)
+    }
+
+    /// Capture this XML Part, optionally reusing an earlier original-source proof.
+    ///
+    /// The current Part is read through the normal bounded source path. The
+    /// hint is reused only when its original payload, source identity, Part,
+    /// content type, limits, and exact bytes match. Other hints, including
+    /// derived splice payloads, fall back to complete XML validation of that
+    /// same read. Source, cancellation, encryption, and signature checks still
+    /// apply; the hint never authorizes different current bytes.
+    ///
+    /// # Errors
+    /// Returns the same source, resource, package-policy, and XML errors as
+    /// [`Self::source_xml`]. Checking an eligible hint consumes a conservative
+    /// byte-length charge from the current execution context's work budget.
+    pub fn source_xml_with_hint(&self, hint: &SourceXmlPart) -> Result<SourceXmlPart> {
+        self.package
+            .source_xml_part_with_hint(self.index, Some(hint))
+    }
+
+    /// Capture this Part's verified Store/Deflate payload for a new OPC
+    /// member while proving it decodes to `expected_decoded`.
+    ///
+    /// The returned token is source-authorized and cannot be constructed from
+    /// caller-supplied compressed bytes or metadata. It retains the source
+    /// lineage/revision and a managed memory reservation until the topology
+    /// publication drops it. Callers must retain their decoded allocation for
+    /// semantic validation; this helper does not replace the normal decoded
+    /// read or XML checks.
+    pub fn authorize_precompressed(
+        &self,
+        expected_decoded: Arc<Vec<u8>>,
+    ) -> Result<AuthorizedPrecompressedPart> {
+        self.package
+            .authorize_precompressed(self.index, expected_decoded)
+    }
+
+    /// Read and authorize a leaf Part from one cold compressed capture.
+    ///
+    /// The elected cache loader decodes the verified capture and publishes the
+    /// same allocation through the ordinary cache/single-flight path. A warm
+    /// hit or joined loader reuses decoded bytes and verifies a fresh compressed
+    /// capture against them. The returned token pins decoded memory/object
+    /// reservations as well as compressed/writer staging. Neither output lets
+    /// a managed decoded allocation escape as an unreserved bare `Arc`.
+    ///
+    /// This proves OPC source/Part and physical transfer authority; callers
+    /// must still validate the returned bytes for their semantic operation.
+    pub fn data_and_authorize_precompressed(
+        &self,
+    ) -> Result<(PartData, AuthorizedPrecompressedPart)> {
+        let (data, token) = self
+            .package
+            .authorize_precompressed_inner(self.index, None)?;
+        data.map(|data| (data, token)).ok_or_else(|| {
+            overlay_unavailable("combined Part capture did not return its decoded payload")
+        })
+    }
+
+    /// Read this part's payload while observing the cache and same-Part
+    /// single-flight mutex lock boundaries.
+    ///
+    /// The callback is borrowed only for this call and is never retained. It
+    /// receives content-free [`DiagnosticSnapshot`] pairs immediately around
+    /// direct `Mutex::lock` calls. A pair does not include the cache critical
+    /// section, a `Condvar::wait_timeout` duration, or that condition
+    /// variable's mutex reacquisition.
+    ///
+    /// The callback runs synchronously while the corresponding mutex guard is
+    /// held for the `Finished` notification. It must return promptly, must
+    /// not block, re-enter this package or operation, or acquire any lock.
+    /// These preconditions keep the acquisition-only boundary observable
+    /// without retaining an observer or consulting ambient state.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate from this entry point. A panic from either
+    /// callback is caught at the lock boundary, later notifications are
+    /// suppressed, and the panic is resumed after the profiled operation has
+    /// released all cache/flight guards; observer code cannot poison those
+    /// mutexes. Because `Started` runs before lock acquisition, a panic there
+    /// has no matching `Finished` callback, and a caller-owned event log may
+    /// consequently be partial or unbalanced. Normal returns and errors keep
+    /// every emitted boundary in a balanced pair.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn data_with_observer(
+        &self,
+        mut observer: impl FnMut(DiagnosticSnapshot),
+    ) -> Result<PartData> {
+        let mut observer = CallbackDiagnosticObserver::new(&mut observer);
+        let result = self
+            .package
+            .read_part_with_observer(self.index, None, None, &mut observer);
+        observer.resume_if_panicked();
+        result
+    }
+
+    /// Read this part's payload while recording the cold ZIP work in a
+    /// caller-owned report.
+    ///
+    /// Cache hits and same-Part flight waiters return with no counter changes.
+    /// Only the loader or allocation-bypass path that performs the ZIP read
+    /// contributes to the report. A failed cold read retains the counters
+    /// observed before the failure, while a later retry owns its own work.
+    pub fn data_with_accounting(
+        &self,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<PartData> {
+        self.package
+            .read_part_with_accounting(self.index, Some(accounting))
+    }
+
+    /// Run a callback against this Part's verified decoded payload without
+    /// materializing or retaining the payload in the Part cache.
+    ///
+    /// The callback receives a fixed-buffer [`BufRead`] view. It may return a
+    /// valid prefix early; the reader still drains and verifies the complete
+    /// Part before returning success. Callback errors are returned directly
+    /// only after successful archive finalization. A callback panic unwinds
+    /// normally, and the temporary execution reservation is released by RAII.
+    pub fn with_verified_decoded_reader<T, E, F>(
+        &self,
+        callback: F,
+    ) -> std::result::Result<T, VerifiedDecodedReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        self.package
+            .with_verified_decoded_reader(self.index, callback, None)
+    }
+
+    /// Run a callback against this Part's verified decoded payload while
+    /// recording the low-level ZIP work in `accounting`.
+    ///
+    /// No `PartData` or cache entry is created. The callback's accepted bytes,
+    /// decoded bytes produced, and physical source traversal are accounted for
+    /// by the ZIP substrate, including bytes drained after an early callback
+    /// return. A callback error is retained when archive verification or source
+    /// transport becomes the primary failure.
+    pub fn with_verified_decoded_reader_with_accounting<T, E, F>(
+        &self,
+        callback: F,
+        accounting: &mut OpcOperationAccounting,
+    ) -> std::result::Result<T, VerifiedDecodedReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        self.package
+            .with_verified_decoded_reader(self.index, callback, Some(accounting))
+    }
+
+    /// Streams this part's decoded payload into `sink` without materializing or caching it.
+    ///
+    /// This bypasses the part cache, including warm entries and single-flight
+    /// loaders. The sink is not flushed or rolled back. On success, the
+    /// returned value is the exact number of decoded bytes accepted by the
+    /// sink. If a failure occurs after a prefix was accepted, the error is
+    /// [`OpcError::IncompleteOutput`]. Source-version changes, cancellation,
+    /// declared part limits, archive verification failures, and sink failures
+    /// are reported through the existing typed [`OpcError`] variants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source, execution context, archive validation, or sink fails.
+    pub fn stream_to<W: Write>(&self, sink: &mut W) -> Result<u64> {
+        self.package.stream_part_to(self.index, sink, None)
+    }
+
+    /// Streams this part's decoded payload and merges physical ZIP accounting into `accounting`.
+    ///
+    /// This bypasses the part cache, including warm entries and single-flight
+    /// loaders. The sink is not flushed or rolled back. On success, the
+    /// returned value is the exact number of decoded bytes accepted by the
+    /// sink. If a failure occurs after a prefix was accepted, the error is
+    /// [`OpcError::IncompleteOutput`]. Source-version changes, cancellation,
+    /// declared part limits, archive verification failures, and sink failures
+    /// are reported through the existing typed [`OpcError`] variants.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source, execution context, archive validation, or sink fails.
+    pub fn stream_to_with_accounting<W: Write>(
+        &self,
+        sink: &mut W,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<u64> {
+        self.package
+            .stream_part_to(self.index, sink, Some(accounting))
+    }
+}
+
+impl SourceBackedPackage {
+    fn with_verified_decoded_reader<T, E, F>(
+        &self,
+        index: usize,
+        callback: F,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+    ) -> std::result::Result<T, VerifiedDecodedReaderError<E>>
+    where
+        F: for<'reader> FnOnce(&'reader mut dyn BufRead) -> std::result::Result<T, E>,
+    {
+        let opc_error = |error| VerifiedDecodedReaderError::Opc {
+            error,
+            callback_error: None,
+        };
+
+        self.source.ensure_current().map_err(opc_error)?;
+        self.cache
+            .check_context()
+            .map_err(map_execution_error)
+            .map_err(opc_error)?;
+
+        let part = self
+            .catalog
+            .parts
+            .get(index)
+            .ok_or_else(|| opc_error(OpcError::PartNotFound(index.to_string())))?;
+        let entry_id = part.entry_id;
+        let declared_bytes = self
+            .archive
+            .metadata_for(entry_id)
+            .map_err(map_preservation_error)
+            .map_err(opc_error)?
+            .uncompressed_size();
+
+        let limit_result = self.limits.check(
+            SourceLimitKind::PartBytes,
+            declared_bytes,
+            self.limits.max_part_bytes(),
+        );
+        self.source.ensure_current().map_err(opc_error)?;
+        self.cache
+            .check_context()
+            .map_err(map_execution_error)
+            .map_err(opc_error)?;
+        limit_result.map_err(opc_error)?;
+
+        if let Some(context) = self.source.context.as_ref() {
+            let work_result = context
+                .consume(Resource::Work, declared_bytes)
+                .map_err(map_execution_error);
+            self.source.ensure_current().map_err(opc_error)?;
+            self.cache
+                .check_context()
+                .map_err(map_execution_error)
+                .map_err(opc_error)?;
+            work_result.map_err(opc_error)?;
+        }
+
+        // The low-level reader owns a fixed callback buffer. Deflated members
+        // additionally allocate flate2's compressed-input window and the
+        // backend inflater state. The ZIP owner supplies the scalar upper
+        // bound; no format layer guesses the backend object size. This
+        // reservation is held through verification finalization without
+        // reserving the declared decoded payload or creating a cache entry.
+        let reader_memory = self
+            .archive
+            .verified_entry_reader_memory_upper_bound(entry_id)
+            .map_err(map_preservation_error)
+            .map_err(opc_error)?;
+        let _memory_reservation = match self.source.context.as_ref() {
+            Some(context) => Some(
+                context
+                    .reserve(Resource::Memory, reader_memory)
+                    .map_err(map_execution_error)
+                    .map_err(opc_error)?,
+            ),
+            None => None,
+        };
+
+        self.source.ensure_current().map_err(opc_error)?;
+        self.cache
+            .check_context()
+            .map_err(map_execution_error)
+            .map_err(opc_error)?;
+        let _monitored = self.source.monitor_publication();
+
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let result = match accounting.as_deref_mut() {
+            Some(_) => self.archive.with_verified_entry_reader_with_accounting(
+                entry_id,
+                callback,
+                &mut zip_accounting,
+            ),
+            None => self.archive.with_verified_entry_reader(entry_id, callback),
+        }
+        .map_err(map_verified_decoded_reader_error);
+        let result = match accounting {
+            Some(accounting) => match accounting.merge_zip(&zip_accounting) {
+                Ok(()) => result,
+                Err(error) => match result {
+                    Err(existing @ VerifiedDecodedReaderError::Opc { .. }) => Err(existing),
+                    Err(existing @ VerifiedDecodedReaderError::Callback(_)) => Err(existing),
+                    Ok(_) => Err(VerifiedDecodedReaderError::Opc {
+                        error,
+                        callback_error: None,
+                    }),
+                },
+            },
+            None => result,
+        };
+
+        // A source change or cooperative cancellation observed after the
+        // low-level verifier returns remains authoritative. If the callback
+        // also failed, retain it as the secondary diagnostic rather than
+        // losing it while promoting the OPC error to primary.
+        let final_error = self
+            .source
+            .ensure_current()
+            .err()
+            .or_else(|| self.cache.check_context().err().map(map_execution_error));
+        match final_error {
+            Some(error) => Err(with_verified_primary_error(result, error)),
+            None => result,
+        }
+    }
+
+    fn stream_part_to<W: Write>(
+        &self,
+        index: usize,
+        sink: &mut W,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<u64> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+
+        let part = self.catalog.parts.get(index).ok_or_else(|| {
+            OpcError::IoError(std::io::Error::new(
+                std::io::ErrorKind::InvalidInput,
+                "invalid source-backed part view",
+            ))
+        })?;
+        let declared_bytes = self
+            .archive
+            .metadata_for(part.entry_id)?
+            .uncompressed_size();
+
+        let limit_result = self.limits.check(
+            SourceLimitKind::PartBytes,
+            declared_bytes,
+            self.limits.max_part_bytes(),
+        );
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        limit_result?;
+
+        if let Some(context) = self.source.context.as_ref() {
+            let work_result = context.consume(Resource::Work, declared_bytes);
+            self.source.ensure_current()?;
+            work_result.map_err(map_execution_error)?;
+        }
+
+        let _monitored = self.source.monitor_publication();
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let mut output = PartStreamSink::new(sink, &self.source);
+        let read_result = self.archive.read_entry_to_with_accounting(
+            part.entry_id,
+            &mut output,
+            &mut zip_accounting,
+        );
+        let accepted = output.accepted;
+        let pending_failure = output.pending_failure.take();
+        drop(output);
+
+        let source_error = self.source.ensure_current().err();
+        let execution_error = self.cache.check_context().err().map(map_execution_error);
+        let operation_error = read_result.err().map(map_preservation_error);
+        let accounting_error = accounting.map(|value| {
+            let mut error = value.merge_zip(&zip_accounting).err();
+            if let Err(output_error) = value.add_output_bytes_accepted(accepted)
+                && error.is_none()
+            {
+                error = Some(output_error);
+            }
+            error
+        });
+        let accounting_error = accounting_error.flatten();
+        let error = source_error
+            .or(pending_failure)
+            .or(execution_error)
+            .or(operation_error)
+            .or(accounting_error);
+
+        match error {
+            Some(error) if accepted != 0 => Err(OpcError::IncompleteOutput {
+                written: accepted,
+                source: Box::new(error),
+            }),
+            Some(error) => Err(error),
+            None => Ok(accepted),
+        }
+    }
+}
+
+struct PartStreamSink<'a, W: Write> {
+    inner: &'a mut W,
+    source: &'a SourceSnapshot,
+    pending_failure: Option<OpcError>,
+    accepted: u64,
+}
+
+impl<'a, W: Write> PartStreamSink<'a, W> {
+    fn new(inner: &'a mut W, source: &'a SourceSnapshot) -> Self {
+        Self {
+            inner,
+            source,
+            pending_failure: None,
+            accepted: 0,
+        }
+    }
+
+    fn check_context(&self) -> std::io::Result<()> {
+        let Some(context) = self.source.context.as_ref() else {
+            return Ok(());
+        };
+        if let Err(error) = context.check() {
+            return Err(execution_io_error(error));
+        }
+        Ok(())
+    }
+}
+
+impl<W: Write> Write for PartStreamSink<'_, W> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        if let Some(error) = self.pending_failure.as_ref() {
+            return Err(std::io::Error::other(error.to_string()));
+        }
+        self.source.ensure_current_io_if_monitored()?;
+        self.check_context()?;
+
+        let reservation = self
+            .source
+            .context
+            .as_ref()
+            .map(|context| {
+                context
+                    .reserve(Resource::OutputBytes, bytes.len() as u64)
+                    .map_err(execution_io_error)
+            })
+            .transpose()?;
+
+        let written = self.inner.write(bytes)?;
+        if written > bytes.len() {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "sink reported more bytes than supplied",
+            ));
+        }
+        let written_u64 = written as u64;
+        self.accepted = self.accepted.checked_add(written_u64).ok_or_else(|| {
+            std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "part stream byte count overflow",
+            )
+        })?;
+        if let Some(reservation) = reservation {
+            if !reservation.commit(written_u64) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "part stream output reservation over-committed",
+                ));
+            }
+        }
+        if let Err(error) = self.source.ensure_current() {
+            self.pending_failure = Some(error);
+            return Ok(written);
+        }
+        if let Some(context) = self.source.context.as_ref()
+            && let Err(error) = context.check()
+        {
+            self.pending_failure = Some(map_execution_error(error));
+            return Ok(written);
+        }
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        if let Some(error) = self.pending_failure.as_ref() {
+            return Err(std::io::Error::other(error.to_string()));
+        }
+        self.source.ensure_current_io_if_monitored()?;
+        self.check_context()?;
+        let result = self.inner.flush();
+        if result.is_ok() {
+            self.check_context()?;
+            self.source.ensure_current_io_if_monitored()?;
+        }
+        result
+    }
+}
+
+/// Shared immutable bytes returned by [`PartView::data`].
+#[derive(Clone, Debug)]
+pub struct PartData {
+    payload: CachedPayload,
+}
+
+impl PartData {
+    /// Borrow the part payload.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        self.payload.bytes.as_slice()
+    }
+
+    /// Share an unmanaged payload allocation with another owner.
+    ///
+    /// Managed payloads retain a hierarchical memory reservation for the
+    /// lifetime of this handle and cannot be detached as a bare `Arc`. Use
+    /// [`Self::as_bytes`] or clone the [`PartData`] handle instead. The
+    /// compatibility [`Self::into_arc`] helper is available for unmanaged
+    /// payloads.
+    #[allow(
+        clippy::wrong_self_convention,
+        reason = "this compatibility API borrows PartData while sharing its immutable allocation"
+    )]
+    pub fn into_arc(&self) -> Result<Arc<Vec<u8>>> {
+        if self.payload.reservation.is_some() {
+            return Err(OpcError::ManagedPartDataArcEscape);
+        }
+        Ok(Arc::clone(&self.payload.bytes))
+    }
+
+    /// Return whether both values pin the same payload allocation.
+    ///
+    /// This compares allocation identity only; equal bytes loaded separately
+    /// return `false`.
+    #[must_use]
+    pub fn shares_allocation_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.payload.bytes, &other.payload.bytes)
+    }
+
+    pub(crate) fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.payload.bytes)
+    }
+}
+
+/// One payload allocation and, for managed packages, the reservation retained
+/// by a cache entry or active same-Part flight.
+#[derive(Clone, Debug)]
+struct CachedPayload {
+    bytes: Arc<Vec<u8>>,
+    reservation: Option<Arc<Reservation>>,
+    object_reservation: Option<Arc<Reservation>>,
+}
+
+impl CachedPayload {
+    fn reserved_bytes(&self) -> u64 {
+        self.reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount())
+    }
+
+    fn reserved_objects(&self) -> u64 {
+        self.object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount())
+    }
+}
+
+#[derive(Debug)]
+struct CacheEntry {
+    payload: CachedPayload,
+    last_used: u64,
+}
+
+#[derive(Debug)]
+struct PendingPublication {
+    flight: Arc<LoadFlight>,
+    payload: Arc<Vec<u8>>,
+}
+
+#[derive(Debug, Default)]
+struct CacheStateInner {
+    entries: HashMap<EntryId, CacheEntry>,
+    pending: HashMap<EntryId, PendingPublication>,
+    flights: HashMap<EntryId, Arc<LoadFlight>>,
+    total_bytes: usize,
+    clock: u64,
+}
+
+/// Lifecycle of one single-flight payload load.
+///
+/// ```text
+/// Loading --finish_success--> Succeeded(payload)
+/// Loading --finish_failure--> Failed
+/// ```
+///
+/// Both terminal states are final: a later completion is ignored and reports
+/// that it did not transition. The flight owns its reservations only while
+/// `Loading`; leaving that state releases them before waiters are woken.
+#[derive(Debug)]
+enum FlightPhase {
+    Loading {
+        reservation: Option<Arc<Reservation>>,
+        flight_object_reservation: Option<Arc<Reservation>>,
+        payload_object_reservation: Option<Arc<Reservation>>,
+    },
+    Succeeded(CachedPayload),
+    Failed,
+}
+
+impl FlightPhase {
+    /// Enter the terminal state `outcome` and release the flight-owned
+    /// reservations. Returns `false`, dropping `outcome`, when the flight is
+    /// already complete.
+    fn complete(&mut self, outcome: Self) -> bool {
+        match std::mem::replace(self, Self::Failed) {
+            Self::Loading {
+                reservation,
+                flight_object_reservation,
+                payload_object_reservation,
+            } => {
+                drop(reservation);
+                drop(payload_object_reservation);
+                drop(flight_object_reservation);
+                *self = outcome;
+                true
+            },
+            terminal @ (Self::Succeeded(_) | Self::Failed) => {
+                *self = terminal;
+                false
+            },
+        }
+    }
+}
+
+#[derive(Debug)]
+struct LoadFlight {
+    state: Mutex<FlightPhase>,
+    completed: Condvar,
+}
+
+impl LoadFlight {
+    fn new(
+        reservation: Option<Arc<Reservation>>,
+        flight_object_reservation: Option<Arc<Reservation>>,
+        payload_object_reservation: Option<Arc<Reservation>>,
+    ) -> Self {
+        Self {
+            state: Mutex::new(FlightPhase::Loading {
+                reservation,
+                flight_object_reservation,
+                payload_object_reservation,
+            }),
+            completed: Condvar::new(),
+        }
+    }
+
+    fn reservation_with_observer<O>(&self, observer: &mut O) -> Option<Arc<Reservation>>
+    where
+        O: DiagnosticObserver,
+    {
+        match &*lock_with_observer(&self.state, observer, LockOperation::Flight)
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        {
+            FlightPhase::Loading { reservation, .. } => reservation.clone(),
+            FlightPhase::Succeeded(_) | FlightPhase::Failed => None,
+        }
+    }
+
+    fn payload_object_reservation_with_observer<O>(
+        &self,
+        observer: &mut O,
+    ) -> Option<Arc<Reservation>>
+    where
+        O: DiagnosticObserver,
+    {
+        match &*lock_with_observer(&self.state, observer, LockOperation::Flight)
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+        {
+            FlightPhase::Loading {
+                payload_object_reservation,
+                ..
+            } => payload_object_reservation.clone(),
+            FlightPhase::Succeeded(_) | FlightPhase::Failed => None,
+        }
+    }
+
+    fn diagnostic_reservations_with_observer<O>(
+        &self,
+        observer: &mut O,
+    ) -> (
+        Option<Arc<Reservation>>,
+        Option<Arc<Reservation>>,
+        Option<Arc<Reservation>>,
+    )
+    where
+        O: DiagnosticObserver,
+    {
+        let state = lock_with_observer(&self.state, observer, LockOperation::Flight)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        match &*state {
+            FlightPhase::Loading {
+                reservation,
+                flight_object_reservation,
+                payload_object_reservation,
+            } => (
+                reservation.clone(),
+                payload_object_reservation.clone(),
+                flight_object_reservation.clone(),
+            ),
+            FlightPhase::Succeeded(_) | FlightPhase::Failed => (None, None, None),
+        }
+    }
+
+    #[cfg(test)]
+    fn wait(
+        &self,
+        context: Option<&ExecutionContext>,
+    ) -> std::result::Result<Option<CachedPayload>, ExecutionError> {
+        let mut observer = NoopDiagnosticObserver;
+        self.wait_with_observer(context, &mut observer)
+    }
+
+    fn wait_with_observer<O>(
+        &self,
+        context: Option<&ExecutionContext>,
+        observer: &mut O,
+    ) -> std::result::Result<Option<CachedPayload>, ExecutionError>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        while matches!(*state, FlightPhase::Loading { .. }) {
+            if let Some(context) = context {
+                context.check()?;
+            }
+            state = match self
+                .completed
+                .wait_timeout(state, Duration::from_millis(10))
+            {
+                Ok((state, _)) => state,
+                Err(poisoned) => poisoned.into_inner().0,
+            };
+        }
+        if let Some(context) = context {
+            context.check()?;
+        }
+        Ok(match &*state {
+            FlightPhase::Succeeded(payload) => Some(payload.clone()),
+            FlightPhase::Loading { .. } | FlightPhase::Failed => None,
+        })
+    }
+
+    fn finish_success_with_observer<O>(&self, payload: CachedPayload, observer: &mut O) -> bool
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // The published payload carries the memory and payload-object
+        // reservations. The flight's ownership is dropped before waking
+        // waiters; the Arc clones retained by the payload prevent double
+        // release. The flight-object reservation represents only the
+        // coordination object, so it is released at terminal success too.
+        let transitioned = state.complete(FlightPhase::Succeeded(payload));
+        if transitioned {
+            self.completed.notify_all();
+        }
+        transitioned
+    }
+
+    fn finish_failure_with_observer<O>(&self, observer: &mut O) -> bool
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Flight)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        // A failed loader must release every flight-owned reservation before
+        // notifying waiters. Otherwise a tight-budget waiter can retry while
+        // the failed loader still holds the memory/object quota.
+        let transitioned = state.complete(FlightPhase::Failed);
+        if transitioned {
+            self.completed.notify_all();
+        }
+        transitioned
+    }
+}
+
+enum CacheAccess {
+    Hit(CachedPayload),
+    Loader(Arc<LoadFlight>),
+    Waiter(Arc<LoadFlight>),
+    Bypass(LoadResources),
+}
+
+/// Release a loader's flight if caller-provided source code unwinds before
+/// the ordinary result path can publish success or failure. This guard owns
+/// only another reference to the existing flight; it allocates no new payload
+/// or bookkeeping object. Normal completion disarms it without another lock.
+struct LoadFlightUnwindGuard<'cache> {
+    cache: &'cache PartCache,
+    entry_id: EntryId,
+    flight: Option<Arc<LoadFlight>>,
+}
+
+impl LoadFlightUnwindGuard<'_> {
+    fn disarm(mut self) {
+        drop(self.flight.take());
+    }
+}
+
+impl Drop for LoadFlightUnwindGuard<'_> {
+    fn drop(&mut self) {
+        if let Some(flight) = self.flight.take() {
+            let mut observer = NoopDiagnosticObserver;
+            self.cache
+                .complete_failure_with_observer(self.entry_id, &flight, &mut observer);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CachePublication {
+    Pending,
+    Uncached(CacheRetention),
+    NotCurrent,
+}
+
+struct LoadResources {
+    reservation: Option<Arc<Reservation>>,
+    payload_object_reservation: Option<Arc<Reservation>>,
+}
+
+/// Bridges a caller's [`litchi_core::ScopedWorkers`] facility to the ZIP
+/// crate's structurally identical trait.
+///
+/// `soapberry-zip` depends on no litchi crate and defines its own trait for
+/// the same reason it defines its own cancellation probe. This adapter is the
+/// only place the two meet, exactly as [`crate::OpenSession`] is the only
+/// place `ExecutionLimits` meets `ParallelReadLimits`.
+#[derive(Debug)]
+struct BridgedScopedWorkers(Arc<dyn litchi_core::ScopedWorkers>);
+
+impl soapberry_zip::office::ScopedWorkers for BridgedScopedWorkers {
+    fn run_all<'task>(&self, tasks: &mut [&mut (dyn FnMut() + Send + 'task)]) {
+        self.0.run_all(tasks);
+    }
+}
+
+/// Budget permits a package holds while its write session owns a worker pool.
+///
+/// The permits are released when the last clone of the package is dropped,
+/// which is also when the pool they admitted is dropped.
+#[derive(Debug)]
+struct WritePermits {
+    width: NonZeroUsize,
+    _workers: Reservation,
+    _memory: Option<Reservation>,
+}
+
+/// Derives the write-session policy from a caller's execution context.
+///
+/// `workers` and `max_in_flight_tasks` are the caller's own; the per-task
+/// floor is the caller's [`litchi_core::ExecutionLimits::min_task_bytes`],
+/// taken verbatim, so a caller that imposes no floor gets none. The remainder
+/// threshold that decides whether a changed set is worth splitting at all is
+/// the ZIP crate's measured default: it is a property of deflate, not of the
+/// caller's workload.
+fn write_limits(context: &ExecutionContext) -> Option<ParallelWriteLimits> {
+    let limits = context.limits();
+    ParallelWriteLimits::new(
+        limits.workers(),
+        limits.max_in_flight_tasks(),
+        soapberry_zip::office::DEFAULT_MIN_PARALLELIZABLE_BYTES,
+        soapberry_zip::office::DEFAULT_MIN_POOL_PARALLELIZABLE_BYTES,
+        limits.min_task_bytes(),
+    )
+    .ok()
+}
+
+#[derive(Debug)]
+struct PartCache {
+    limits: SourceCacheLimits,
+    state: Mutex<CacheStateInner>,
+    counters: CacheCounters,
+    diagnostics: Arc<DiagnosticState>,
+    budget: Option<ExecutionContext>,
+    /// Explicit write scheduler for this package's publications.
+    ///
+    /// Present only for a managed package and inert until a publication's
+    /// changed set earns a wave wider than one. Every clone of the package
+    /// shares it, so publications from different clones may run waves on it
+    /// concurrently: the session builds at most one pool behind its own lock,
+    /// concurrent waves share that pool's threads, and output bytes do not
+    /// depend on a wave's width. No other package ever shares it.
+    write_session: Option<ParallelWriteSession>,
+    /// Budget permits held for the lifetime of the write session's pool.
+    write_permits: Mutex<Option<WritePermits>>,
+    input_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    output_reservation_failures: Option<Arc<DiagnosticCounter>>,
+    /// Physical Parts whose source bytes passed the source XML audit under
+    /// the default limits, with the source revision they were read from (see
+    /// [`SourceBackedPackage::audit_physical_replacement_xml`]). At most one
+    /// entry per catalog Part, and at most [`RETAINED_SOURCE_XML_PROOFS`] of
+    /// them keep the audit's indexed proof.
+    audited_source_xml: Mutex<Vec<AuditedSourceXml>>,
+    #[cfg(test)]
+    publication_hook: Mutex<Option<Arc<TestPublicationHook>>>,
+    #[cfg(test)]
+    force_allocation_bypass: AtomicBool,
+}
+
+impl PartCache {
+    #[cfg(test)]
+    fn new(limits: SourceCacheLimits) -> Self {
+        Self::new_with_diagnostics(limits, Arc::new(DiagnosticState::default()))
+    }
+
+    #[cfg(test)]
+    fn insert_for_test(&self, entry_id: EntryId, payload: CachedPayload) -> CacheRetention {
+        let mut observer = NoopDiagnosticObserver;
+        let mut state = lock_with_observer(&self.state, &mut observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.insert_locked(&mut state, entry_id, payload)
+    }
+
+    #[cfg(test)]
+    fn install_test_publication_hook(
+        &self,
+        hook: Arc<TestPublicationHook>,
+    ) -> TestPublicationHookGuard<'_> {
+        let mut slot = self
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        assert!(
+            slot.replace(hook).is_none(),
+            "publication hook already installed"
+        );
+        drop(slot);
+        TestPublicationHookGuard { cache: self }
+    }
+
+    #[cfg(test)]
+    fn pause_test_publication(&self) {
+        let hook = self
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_ref()
+            .map(Arc::clone);
+        if let Some(hook) = hook {
+            hook.pause();
+        }
+    }
+
+    #[cfg(test)]
+    fn signal_test_waiter_joined(&self) {
+        let hook = self
+            .publication_hook
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .as_ref()
+            .map(Arc::clone);
+        if let Some(hook) = hook {
+            hook.signal_waiter_joined();
+        }
+    }
+
+    #[cfg(test)]
+    fn force_test_cache_admission_bypass(&self) -> TestCacheAdmissionBypassGuard<'_> {
+        assert!(
+            self.force_allocation_bypass
+                .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
+                .is_ok()
+        );
+        TestCacheAdmissionBypassGuard { cache: self }
+    }
+
+    fn new_with_diagnostics(limits: SourceCacheLimits, diagnostics: Arc<DiagnosticState>) -> Self {
+        Self {
+            limits,
+            state: Mutex::new(CacheStateInner::default()),
+            counters: CacheCounters::new(Arc::clone(&diagnostics)),
+            diagnostics,
+            budget: None,
+            write_session: None,
+            write_permits: Mutex::new(None),
+            input_reservation_failures: None,
+            output_reservation_failures: None,
+            audited_source_xml: Mutex::new(Vec::new()),
+            #[cfg(test)]
+            publication_hook: Mutex::new(None),
+            #[cfg(test)]
+            force_allocation_bypass: AtomicBool::new(false),
+        }
+    }
+
+    fn new_managed(
+        limits: SourceCacheLimits,
+        context: ExecutionContext,
+        diagnostics: Arc<DiagnosticState>,
+        input_reservation_failures: Arc<DiagnosticCounter>,
+        output_reservation_failures: Arc<DiagnosticCounter>,
+    ) -> Self {
+        // The session is built here and stays inert: it owns no thread until a
+        // publication's changed set earns a wave, and it is the only scheduler
+        // this package's publications may use.
+        let write_session = write_limits(&context).map(|limits| match context.scoped_workers() {
+            Some(workers) => ParallelWriteSession::with_scoped_workers(
+                limits,
+                Arc::new(BridgedScopedWorkers(Arc::clone(workers))),
+            ),
+            None => ParallelWriteSession::new(limits),
+        });
+        Self {
+            limits,
+            state: Mutex::new(CacheStateInner::default()),
+            counters: CacheCounters::new(Arc::clone(&diagnostics)),
+            diagnostics,
+            budget: Some(context),
+            write_session,
+            write_permits: Mutex::new(None),
+            input_reservation_failures: Some(input_reservation_failures),
+            output_reservation_failures: Some(output_reservation_failures),
+            audited_source_xml: Mutex::new(Vec::new()),
+            #[cfg(test)]
+            publication_hook: Mutex::new(None),
+            #[cfg(test)]
+            force_allocation_bypass: AtomicBool::new(false),
+        }
+    }
+
+    fn is_managed(&self) -> bool {
+        self.budget.is_some()
+    }
+
+    fn check_context(&self) -> std::result::Result<(), ExecutionError> {
+        if let Some(context) = self.budget.as_ref() {
+            context.check()?;
+        }
+        Ok(())
+    }
+
+    fn record_budget_reservation_failure(&self) {
+        self.counters.budget_reservation_failures.increment();
+    }
+
+    fn reservation_failure_counter(&self) -> Option<&DiagnosticCounter> {
+        self.budget
+            .as_ref()
+            .map(|_| &self.counters.budget_reservation_failures)
+    }
+
+    fn context(&self) -> Option<&ExecutionContext> {
+        self.budget.as_ref()
+    }
+
+    /// Return a read-only scheduling hint for a prepared request set.
+    ///
+    /// This deliberately observes only completed entries. Flights and
+    /// provisional publications make the hint conservative: a concurrent
+    /// loader or eviction may make a later request cold, and the ordinary
+    /// prepared read remains authoritative in that case. The check does not
+    /// advance LRU state, counters, reservations, or payload reference
+    /// counts, and it allocates no query or pinning state.
+    fn all_entries_ready<I>(&self, mut entry_ids: I) -> bool
+    where
+        I: Iterator<Item = EntryId>,
+    {
+        let mut observer = NoopDiagnosticObserver;
+        let state = lock_with_observer(&self.state, &mut observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        entry_ids.all(|entry_id| {
+            !state.flights.contains_key(&entry_id)
+                && !state.pending.contains_key(&entry_id)
+                && state.entries.contains_key(&entry_id)
+        })
+    }
+
+    fn write_session(&self) -> Option<&ParallelWriteSession> {
+        self.write_session.as_ref()
+    }
+
+    /// Charges a publication's compression wave against this package's budget
+    /// and returns the width the budget granted.
+    ///
+    /// Every wave charges one `CpuTasks` unit per regenerated member it would
+    /// compress, at every width, because the work units exist whoever runs
+    /// them. A wave wider than one also reserves `Workers` permits and the
+    /// memory its compressor states retain; those permits are held for the
+    /// life of the pool they admit, so a package that never earns a wave holds
+    /// none. A budget that grants fewer permits than the policy asked for
+    /// narrows the wave instead of failing it.
+    fn admit_deflate_wave(
+        &self,
+        wave: soapberry_zip::DeflateWave,
+    ) -> std::result::Result<(soapberry_zip::DeflateWave, Option<WritePermits>), ExecutionError>
+    {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok((wave.narrowed_to(NonZeroUsize::MIN), None));
+        };
+        context.check()?;
+        if wave.tasks() > 0 {
+            context.consume(Resource::CpuTasks, wave.tasks() as u64)?;
+        }
+        if !wave.is_parallel() {
+            return Ok((wave, None));
+        }
+        let mut held = self
+            .write_permits
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if let Some(permits) = held.as_ref() {
+            return Ok((wave.narrowed_to(permits.width), None));
+        }
+        let caller_workers = self
+            .write_session
+            .as_ref()
+            .is_some_and(|session| session.scoped_workers().is_some());
+        for width in (2..=wave.width().get()).rev() {
+            let Some(granted) = NonZeroUsize::new(width) else {
+                break;
+            };
+            match self.reserve_write_permits(context, granted) {
+                Ok(permits) => {
+                    if caller_workers {
+                        return Ok((wave.narrowed_to(granted), Some(permits)));
+                    }
+                    *held = Some(permits);
+                    return Ok((wave.narrowed_to(granted), None));
+                },
+                Err(ExecutionError::ResourceLimit(_)) => continue,
+                Err(error) => return Err(error),
+            }
+        }
+        Ok((wave.narrowed_to(NonZeroUsize::MIN), None))
+    }
+
+    fn reserve_write_permits(
+        &self,
+        context: &ExecutionContext,
+        width: NonZeroUsize,
+    ) -> std::result::Result<WritePermits, ExecutionError> {
+        let workers = context.reserve(Resource::Workers, width.get() as u64)?;
+        let memory = if self
+            .write_session
+            .as_ref()
+            .is_some_and(|session| session.scoped_workers().is_some())
+        {
+            None
+        } else {
+            let retained =
+                soapberry_zip::office::WORKER_STATE_BYTES.saturating_mul(width.get() as u64);
+            Some(context.reserve(Resource::Memory, retained)?)
+        };
+        Ok(WritePermits {
+            width,
+            _workers: workers,
+            _memory: memory,
+        })
+    }
+
+    #[cfg(test)]
+    fn enter(
+        &self,
+        entry_id: EntryId,
+        declared_bytes: u64,
+    ) -> std::result::Result<CacheAccess, ExecutionError> {
+        let mut observer = NoopDiagnosticObserver;
+        self.enter_with_observer(entry_id, declared_bytes, &mut observer)
+    }
+
+    fn enter_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        declared_bytes: u64,
+        observer: &mut O,
+    ) -> std::result::Result<CacheAccess, ExecutionError>
+    where
+        O: DiagnosticObserver,
+    {
+        self.check_context()?;
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        state.clock = state.clock.wrapping_add(1);
+        let clock = state.clock;
+        if let Some(flight) = state.flights.get(&entry_id) {
+            self.counters.waiter_joins.increment();
+            #[cfg(test)]
+            self.signal_test_waiter_joined();
+            return Ok(CacheAccess::Waiter(Arc::clone(flight)));
+        }
+        if let Some(entry) = state.entries.get_mut(&entry_id) {
+            entry.last_used = clock;
+            self.counters.hits.increment();
+            return Ok(CacheAccess::Hit(entry.payload.clone()));
+        }
+
+        let reservation = self.reserve_for_load(&mut state, declared_bytes)?;
+        let payload_object_reservation = self.reserve_object_for_load()?;
+        #[cfg(test)]
+        let force_allocation_bypass = self.force_allocation_bypass.load(Ordering::Acquire);
+        #[cfg(not(test))]
+        let force_allocation_bypass = false;
+        if force_allocation_bypass
+            || state.flights.try_reserve(1).is_err()
+            || state.pending.try_reserve(1).is_err()
+        {
+            self.charge_cold_work(declared_bytes)?;
+            self.counters.cold_loads.increment();
+            self.counters.allocation_bypasses.increment();
+            return Ok(CacheAccess::Bypass(LoadResources {
+                reservation,
+                payload_object_reservation,
+            }));
+        }
+        let flight_object_reservation = self.reserve_object_for_load()?;
+        self.charge_cold_work(declared_bytes)?;
+        let flight = Arc::new(LoadFlight::new(
+            reservation,
+            flight_object_reservation,
+            payload_object_reservation,
+        ));
+        state.flights.insert(entry_id, Arc::clone(&flight));
+        self.counters.cold_loads.increment();
+        Ok(CacheAccess::Loader(flight))
+    }
+
+    fn reserve_object_for_load(
+        &self,
+    ) -> std::result::Result<Option<Arc<Reservation>>, ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(None);
+        };
+        match context.reserve(Resource::Objects, 1) {
+            Ok(reservation) => Ok(Some(Arc::new(reservation))),
+            Err(error) => {
+                if matches!(error, ExecutionError::ResourceLimit(_)) {
+                    self.record_budget_reservation_failure();
+                }
+                Err(error)
+            },
+        }
+    }
+
+    fn charge_cold_work(&self, declared_bytes: u64) -> std::result::Result<(), ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(());
+        };
+        // Work is cumulative. Charge the declared decompression output before
+        // the archive reader starts; `load_part` later requires the actual
+        // verified output length to equal this declaration, so no guessed or
+        // second work charge is needed.
+        context.consume(Resource::Work, declared_bytes)
+    }
+
+    /// Reserve a source payload which is read outside the ordinary Part cache.
+    ///
+    /// Physical relationship members are indexed as metadata, but the owner
+    /// reader retains their exact bytes in a [`PartData`] handle.  Keep that
+    /// handle on the same memory/object/work accounting path as a cold Part
+    /// load so a managed caller cannot bypass its budget by asking for a
+    /// sidecar directly.
+    fn reserve_direct_payload(
+        &self,
+        declared_bytes: u64,
+    ) -> std::result::Result<LoadResources, ExecutionError> {
+        self.check_context()?;
+        let mut state = lock_with_observer(
+            &self.state,
+            &mut NoopDiagnosticObserver,
+            LockOperation::Cache,
+        )
+        .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let reservation = self.reserve_for_load(&mut state, declared_bytes)?;
+        drop(state);
+
+        let payload_object_reservation = match self.reserve_object_for_load() {
+            Ok(reservation) => reservation,
+            Err(error) => {
+                drop(reservation);
+                return Err(error);
+            },
+        };
+        if let Err(error) = self.charge_cold_work(declared_bytes) {
+            drop(payload_object_reservation);
+            drop(reservation);
+            return Err(error);
+        }
+        Ok(LoadResources {
+            reservation,
+            payload_object_reservation,
+        })
+    }
+
+    fn reserve_for_load(
+        &self,
+        state: &mut CacheStateInner,
+        declared_bytes: u64,
+    ) -> std::result::Result<Option<Arc<Reservation>>, ExecutionError> {
+        let Some(context) = self.budget.as_ref() else {
+            return Ok(None);
+        };
+
+        context.check()?;
+        self.make_room_for_load(state, declared_bytes);
+        match context.reserve(Resource::Memory, declared_bytes) {
+            Ok(reservation) => Ok(Some(Arc::new(reservation))),
+            Err(first_error) => {
+                if matches!(first_error, ExecutionError::ResourceLimit(_)) {
+                    self.record_budget_reservation_failure();
+                }
+                // Cache retention is best effort. If a shared ancestor is
+                // currently full, dropping all clean entries can make room
+                // without ever exceeding that ancestor's limit.
+                self.evict_all(state);
+                match context.reserve(Resource::Memory, declared_bytes) {
+                    Ok(reservation) => Ok(Some(Arc::new(reservation))),
+                    Err(error) => {
+                        if matches!(error, ExecutionError::ResourceLimit(_)) {
+                            self.record_budget_reservation_failure();
+                        }
+                        Err(error)
+                    },
+                }
+            },
+        }
+    }
+
+    fn make_room_for_load(&self, state: &mut CacheStateInner, declared_bytes: u64) {
+        let weight = usize::try_from(declared_bytes).unwrap_or(usize::MAX);
+        if weight > self.limits.max_bytes {
+            self.evict_all(state);
+            return;
+        }
+        while state.entries.len() >= self.limits.max_entries
+            || state.total_bytes.saturating_add(weight) > self.limits.max_bytes
+        {
+            if !self.evict_oldest(state) {
+                break;
+            }
+        }
+    }
+
+    fn evict_all(&self, state: &mut CacheStateInner) {
+        while self.evict_oldest(state) {}
+    }
+
+    fn evict_oldest(&self, state: &mut CacheStateInner) -> bool {
+        let Some((&oldest, _)) = state
+            .entries
+            .iter()
+            .filter(|(_, entry)| !payload_is_externally_pinned(&entry.payload))
+            .min_by_key(|(_, entry)| entry.last_used)
+        else {
+            return false;
+        };
+        if let Some(removed) = state.entries.remove(&oldest) {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(removed.payload.bytes.len());
+            self.counters.evictions.increment();
+            true
+        } else {
+            false
+        }
+    }
+
+    fn publish_pending_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        observer: &mut O,
+    ) -> std::result::Result<CachePublication, ExecutionError>
+    where
+        O: DiagnosticObserver,
+    {
+        self.check_context()?;
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            return Ok(CachePublication::NotCurrent);
+        }
+
+        // `enter` reserves this bookkeeping slot before the archive read. A
+        // second admission check keeps direct/internal callers fail-closed if
+        // the reservation was not made by that path.
+        if state.pending.try_reserve(1).is_err() {
+            return Ok(CachePublication::Uncached(
+                CacheRetention::AllocationFailure,
+            ));
+        }
+        let retention = self.insert_locked(&mut state, entry_id, payload.clone());
+        if !matches!(retention, CacheRetention::Retained) {
+            return Ok(CachePublication::Uncached(retention));
+        }
+        state.pending.insert(
+            entry_id,
+            PendingPublication {
+                flight: Arc::clone(flight),
+                payload: Arc::clone(&payload.bytes),
+            },
+        );
+        Ok(CachePublication::Pending)
+    }
+
+    #[cfg(test)]
+    fn complete_failure(&self, entry_id: EntryId, flight: &Arc<LoadFlight>) {
+        let mut observer = NoopDiagnosticObserver;
+        self.complete_failure_with_observer(entry_id, flight, &mut observer);
+    }
+
+    fn complete_failure_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        observer: &mut O,
+    ) where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            remove_pending_locked(&mut state, entry_id, flight, None);
+            let transitioned = flight.finish_failure_with_observer(observer);
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return;
+        }
+        remove_pending_locked(&mut state, entry_id, flight, None);
+        // Publish failure to current waiters before allowing a new retrying
+        // loader to install a replacement flight. The conditional transition
+        // prevents a late completion from resurrecting an already failed load.
+        let transitioned = flight.finish_failure_with_observer(observer);
+        remove_flight(&mut state, entry_id, flight);
+        if transitioned {
+            self.counters.failed_loads.increment();
+        }
+    }
+
+    fn complete_bypass_success(
+        &self,
+        _entry_id: EntryId,
+        _payload: CachedPayload,
+    ) -> std::result::Result<(), ExecutionError> {
+        // Allocation-admission fallback is deliberately uncached. The
+        // returned PartData still owns the reservations carried by its
+        // payload; no cache bookkeeping allocation is attempted here.
+        self.check_context()?;
+        self.counters.successful_loads.increment();
+        self.counters.bypasses.increment();
+        Ok(())
+    }
+
+    #[cfg(test)]
+    fn complete_uncached_success(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        retention: CacheRetention,
+    ) -> Option<CachedPayload> {
+        let mut observer = NoopDiagnosticObserver;
+        self.complete_uncached_success_with_observer(
+            entry_id,
+            flight,
+            payload,
+            retention,
+            &mut observer,
+        )
+    }
+
+    fn complete_uncached_success_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        retention: CacheRetention,
+        observer: &mut O,
+    ) -> Option<CachedPayload>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            drop(payload);
+            let transitioned = flight.finish_failure_with_observer(observer);
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return None;
+        }
+        let delivered = payload.clone();
+        let transitioned = flight.finish_success_with_observer(delivered, observer);
+        remove_flight(&mut state, entry_id, flight);
+        if transitioned {
+            self.counters.successful_loads.increment();
+            self.record_retention(retention);
+            Some(payload)
+        } else {
+            drop(payload);
+            None
+        }
+    }
+
+    #[cfg(test)]
+    fn commit_pending(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+    ) -> Option<CachedPayload> {
+        let mut observer = NoopDiagnosticObserver;
+        self.commit_pending_with_observer(entry_id, flight, payload, &mut observer)
+    }
+
+    fn commit_pending_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        observer: &mut O,
+    ) -> Option<CachedPayload>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        let pending_matches = state.pending.get(&entry_id).is_some_and(|pending| {
+            Arc::ptr_eq(&pending.flight, flight) && Arc::ptr_eq(&pending.payload, &payload.bytes)
+        });
+        let entry_matches = state
+            .entries
+            .get(&entry_id)
+            .is_some_and(|entry| Arc::ptr_eq(&entry.payload.bytes, &payload.bytes));
+        if !is_current || !pending_matches || !entry_matches {
+            remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
+            drop(payload);
+            let transitioned = flight.finish_failure_with_observer(observer);
+            if is_current {
+                remove_flight(&mut state, entry_id, flight);
+            }
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return None;
+        }
+
+        // The cache state lock is intentionally acquired before the flight
+        // lock. This makes the provisional entry and terminal transition one
+        // ordered publication, while all source freshness checks stay outside
+        // both locks.
+        let delivered = payload.clone();
+        let transitioned = flight.finish_success_with_observer(delivered, observer);
+        if !transitioned {
+            remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
+            remove_flight(&mut state, entry_id, flight);
+            drop(payload);
+            return None;
+        }
+        state.pending.remove(&entry_id);
+        remove_flight(&mut state, entry_id, flight);
+        self.counters.successful_loads.increment();
+        Some(payload)
+    }
+
+    #[cfg(test)]
+    fn rollback_publication(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        publication: CachePublication,
+    ) {
+        let mut observer = NoopDiagnosticObserver;
+        self.rollback_publication_with_observer(
+            entry_id,
+            flight,
+            payload,
+            publication,
+            &mut observer,
+        );
+    }
+
+    fn rollback_publication_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        flight: &Arc<LoadFlight>,
+        payload: CachedPayload,
+        publication: CachePublication,
+        observer: &mut O,
+    ) where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        if matches!(publication, CachePublication::Pending) {
+            remove_pending_locked(&mut state, entry_id, flight, Some(&payload.bytes));
+        }
+        drop(payload);
+        let is_current = state
+            .flights
+            .get(&entry_id)
+            .is_some_and(|current| Arc::ptr_eq(current, flight));
+        if !is_current {
+            let transitioned = flight.finish_failure_with_observer(observer);
+            if transitioned {
+                self.counters.failed_loads.increment();
+            }
+            return;
+        }
+        let transitioned = flight.finish_failure_with_observer(observer);
+        remove_flight(&mut state, entry_id, flight);
+        if transitioned {
+            self.counters.failed_loads.increment();
+        }
+    }
+
+    fn invalidate_if_matches_with_observer<O>(
+        &self,
+        entry_id: EntryId,
+        payload: &CachedPayload,
+        observer: &mut O,
+    ) where
+        O: DiagnosticObserver,
+    {
+        let mut state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        let matches = state
+            .entries
+            .get(&entry_id)
+            .is_some_and(|entry| Arc::ptr_eq(&entry.payload.bytes, &payload.bytes));
+        if let Some(removed) = matches.then(|| state.entries.remove(&entry_id)).flatten() {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(removed.payload.bytes.len());
+        }
+    }
+
+    fn complete_bypass_failure(&self) {
+        self.counters.failed_loads.increment();
+    }
+
+    fn record_retention(&self, retention: CacheRetention) {
+        match retention {
+            CacheRetention::Retained => {},
+            CacheRetention::Oversized => {
+                self.counters.bypasses.increment();
+                self.counters.oversized_bypasses.increment();
+            },
+            CacheRetention::Pinned => {
+                self.counters.bypasses.increment();
+            },
+            CacheRetention::AllocationFailure => {
+                self.counters.bypasses.increment();
+                self.counters.allocation_bypasses.increment();
+            },
+        }
+    }
+
+    fn insert_locked(
+        &self,
+        state: &mut CacheStateInner,
+        entry_id: EntryId,
+        payload: CachedPayload,
+    ) -> CacheRetention {
+        let weight = payload.bytes.len();
+        if weight > self.limits.max_bytes {
+            return CacheRetention::Oversized;
+        }
+        state.clock = state.clock.wrapping_add(1);
+        let clock = state.clock;
+        while state.entries.len() >= self.limits.max_entries
+            || state.total_bytes.saturating_add(weight) > self.limits.max_bytes
+        {
+            if !self.evict_oldest(state) {
+                return CacheRetention::Pinned;
+            }
+        }
+        if state.entries.try_reserve(1).is_err() {
+            return CacheRetention::AllocationFailure;
+        }
+        if let Some(previous) = state.entries.insert(
+            entry_id,
+            CacheEntry {
+                payload,
+                last_used: clock,
+            },
+        ) {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(previous.payload.bytes.len());
+        }
+        state.total_bytes = state.total_bytes.saturating_add(weight);
+        CacheRetention::Retained
+    }
+
+    #[cfg(test)]
+    fn diagnostics(&self) -> SourceCacheDiagnostics {
+        let mut observer = NoopDiagnosticObserver;
+        self.diagnostics_with_observer(&mut observer)
+    }
+
+    fn diagnostics_with_observer<O>(&self, observer: &mut O) -> SourceCacheDiagnostics
+    where
+        O: DiagnosticObserver,
+    {
+        let state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .unwrap_or_else(|poisoned| poisoned.into_inner());
+        self.diagnostics_snapshot(&state, observer)
+    }
+
+    #[cfg(test)]
+    fn try_diagnostics(
+        &self,
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
+        let mut observer = NoopDiagnosticObserver;
+        self.try_diagnostics_with_observer(&mut observer)
+    }
+
+    fn try_diagnostics_with_observer<O>(
+        &self,
+        observer: &mut O,
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError>
+    where
+        O: DiagnosticObserver,
+    {
+        let state = lock_with_observer(&self.state, observer, LockOperation::Cache)
+            .map_err(|_| SourceCacheDiagnosticsError::StatePoisoned)?;
+        if self.diagnostics.overflowed.load(Ordering::Acquire) {
+            return Err(SourceCacheDiagnosticsError::CounterOverflow);
+        }
+        let snapshot = self.diagnostics_snapshot(&state, observer);
+        if self.diagnostics.overflowed.load(Ordering::Acquire) {
+            return Err(SourceCacheDiagnosticsError::CounterOverflow);
+        }
+        Ok(snapshot)
+    }
+
+    fn diagnostics_snapshot<O>(
+        &self,
+        state: &CacheStateInner,
+        observer: &mut O,
+    ) -> SourceCacheDiagnostics
+    where
+        O: DiagnosticObserver,
+    {
+        // A successful loader briefly owns the same reservation through its
+        // cache entry, completion payload, and returned handles. Count only
+        // unique reservation identities so a diagnostic snapshot cannot
+        // report more retained cache bytes than the hierarchical budget.
+        let mut budget_cache_reserved_bytes = 0_u64;
+        let mut budget_cache_reserved_objects = 0_u64;
+        for entry in state.entries.values() {
+            self.add_diagnostic_gauge(
+                &mut budget_cache_reserved_bytes,
+                entry.payload.reserved_bytes(),
+            );
+            self.add_diagnostic_gauge(
+                &mut budget_cache_reserved_objects,
+                entry.payload.reserved_objects(),
+            );
+        }
+        for flight in state.flights.values() {
+            let (reservation, payload_object_reservation, flight_object_reservation) =
+                flight.diagnostic_reservations_with_observer(observer);
+            if let Some(reservation) = reservation.as_ref() {
+                let already_counted = state.entries.values().any(|entry| {
+                    entry
+                        .payload
+                        .reservation
+                        .as_ref()
+                        .is_some_and(|existing| Arc::ptr_eq(existing, reservation))
+                });
+                if !already_counted {
+                    self.add_diagnostic_gauge(
+                        &mut budget_cache_reserved_bytes,
+                        reservation.amount(),
+                    );
+                }
+            }
+            if let Some(object_reservation) = payload_object_reservation.as_ref() {
+                let already_counted = state.entries.values().any(|entry| {
+                    entry
+                        .payload
+                        .object_reservation
+                        .as_ref()
+                        .is_some_and(|existing| Arc::ptr_eq(existing, object_reservation))
+                });
+                if !already_counted {
+                    self.add_diagnostic_gauge(
+                        &mut budget_cache_reserved_objects,
+                        object_reservation.amount(),
+                    );
+                }
+            }
+            if let Some(object_reservation) = flight_object_reservation.as_ref() {
+                self.add_diagnostic_gauge(
+                    &mut budget_cache_reserved_objects,
+                    object_reservation.amount(),
+                );
+            }
+        }
+        let (budget_input_bytes_used, budget_input_bytes_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::InputBytes),
+                    Some(context.budget().limit(Resource::InputBytes)),
+                )
+            });
+        let (budget_work_used, budget_work_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::Work),
+                    Some(context.budget().limit(Resource::Work)),
+                )
+            });
+        let (budget_output_bytes_used, budget_output_bytes_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::OutputBytes),
+                    Some(context.budget().limit(Resource::OutputBytes)),
+                )
+            });
+        let (budget_objects_used, budget_objects_limit) =
+            self.budget.as_ref().map_or((0, None), |context| {
+                (
+                    context.budget().used(Resource::Objects),
+                    Some(context.budget().limit(Resource::Objects)),
+                )
+            });
+        let budget_reservation_failures = self
+            .counters
+            .budget_reservation_failures
+            .load()
+            .checked_add(
+                self.input_reservation_failures
+                    .as_ref()
+                    .map_or(0, |counter| counter.load()),
+            )
+            .and_then(|total| {
+                total.checked_add(
+                    self.output_reservation_failures
+                        .as_ref()
+                        .map_or(0, |counter| counter.load()),
+                )
+            })
+            .unwrap_or_else(|| {
+                self.diagnostics.overflowed.store(true, Ordering::Release);
+                u64::MAX
+            });
+        SourceCacheDiagnostics {
+            hits: self.counters.hits.load(),
+            cold_loads: self.counters.cold_loads.load(),
+            waiter_joins: self.counters.waiter_joins.load(),
+            successful_loads: self.counters.successful_loads.load(),
+            failed_loads: self.counters.failed_loads.load(),
+            evictions: self.counters.evictions.load(),
+            bypasses: self.counters.bypasses.load(),
+            oversized_bypasses: self.counters.oversized_bypasses.load(),
+            allocation_bypasses: self.counters.allocation_bypasses.load(),
+            retained_entries: state.entries.len(),
+            retained_bytes: state.total_bytes,
+            in_flight_loads: state.flights.len(),
+            budget_managed: self.budget.is_some(),
+            budget_reservation_failures,
+            budget_memory_used: self
+                .budget
+                .as_ref()
+                .map_or(0, |context| context.budget().used(Resource::Memory)),
+            budget_cache_reserved_bytes,
+            budget_memory_limit: self
+                .budget
+                .as_ref()
+                .map(|context| context.budget().limit(Resource::Memory)),
+            budget_input_bytes_used,
+            budget_input_bytes_limit,
+            budget_output_bytes_used,
+            budget_output_bytes_limit,
+            budget_work_used,
+            budget_work_limit,
+            budget_objects_used,
+            budget_objects_limit,
+            budget_catalog_reserved_objects: 0,
+            budget_cache_reserved_objects,
+        }
+    }
+
+    fn add_diagnostic_gauge(&self, total: &mut u64, amount: u64) {
+        if let Some(next) = total.checked_add(amount) {
+            *total = next;
+        } else {
+            *total = u64::MAX;
+            self.diagnostics.overflowed.store(true, Ordering::Release);
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum CacheRetention {
+    Retained,
+    Oversized,
+    Pinned,
+    AllocationFailure,
+}
+
+fn remove_flight(state: &mut CacheStateInner, entry_id: EntryId, flight: &Arc<LoadFlight>) {
+    if state
+        .flights
+        .get(&entry_id)
+        .is_some_and(|current| Arc::ptr_eq(current, flight))
+    {
+        state.flights.remove(&entry_id);
+    }
+}
+
+fn remove_pending_locked(
+    state: &mut CacheStateInner,
+    entry_id: EntryId,
+    flight: &Arc<LoadFlight>,
+    expected_payload: Option<&Arc<Vec<u8>>>,
+) -> bool {
+    let Some((pending_flight, pending_payload)) = state
+        .pending
+        .get(&entry_id)
+        .map(|pending| (Arc::clone(&pending.flight), Arc::clone(&pending.payload)))
+    else {
+        return false;
+    };
+    if !Arc::ptr_eq(&pending_flight, flight)
+        || expected_payload.is_some_and(|expected| !Arc::ptr_eq(expected, &pending_payload))
+    {
+        return false;
+    }
+
+    state.pending.remove(&entry_id);
+    let entry_matches = state
+        .entries
+        .get(&entry_id)
+        .is_some_and(|entry| Arc::ptr_eq(&entry.payload.bytes, &pending_payload));
+    if entry_matches {
+        if let Some(removed) = state.entries.remove(&entry_id) {
+            state.total_bytes = state
+                .total_bytes
+                .saturating_sub(removed.payload.bytes.len());
+        }
+    }
+    true
+}
+
+fn payload_is_externally_pinned(payload: &CachedPayload) -> bool {
+    // Unmanaged `PartData::into_arc` can outlive its handle, while managed
+    // handles retain a reservation. Check both identities before evicting an
+    // entry so either form of caller ownership keeps the bytes pinned.
+    Arc::strong_count(&payload.bytes) > 1
+        || payload
+            .reservation
+            .as_ref()
+            .is_some_and(|reservation| Arc::strong_count(reservation) > 1)
+}
+
+/// Compare two Part spellings under OPC's allocation-free ASCII folding rule.
+fn cmp_ascii_case_insensitive(left: &str, right: &str) -> std::cmp::Ordering {
+    let mut left_bytes = left.as_bytes().iter();
+    let mut right_bytes = right.as_bytes().iter();
+    loop {
+        match (left_bytes.next(), right_bytes.next()) {
+            (Some(left), Some(right)) => {
+                let ordering = left.to_ascii_lowercase().cmp(&right.to_ascii_lowercase());
+                if ordering != std::cmp::Ordering::Equal {
+                    return ordering;
+                }
+            },
+            (None, None) => return std::cmp::Ordering::Equal,
+            (None, Some(_)) => return std::cmp::Ordering::Less,
+            (Some(_), None) => return std::cmp::Ordering::Greater,
+        }
+    }
+}
+
+fn build_casefold_order(parts: &[CatalogPart]) -> Result<Vec<usize>> {
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(parts.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC case-insensitive part lookup order",
+            source,
+        })?;
+    order.extend(0..parts.len());
+    order.sort_unstable_by(|left, right| {
+        cmp_ascii_case_insensitive(
+            parts[*left].partname.as_str(),
+            parts[*right].partname.as_str(),
+        )
+    });
+    Ok(order)
+}
+
+/// A structurally validated OPC package backed by an immutable positional source.
+///
+/// Opening reads and validates ZIP metadata, content types, and relationship
+/// XML without materializing ordinary part payloads. Existing constructors use
+/// exact reads; an explicit read-ahead policy may fetch adjacent compressed
+/// bytes within its bounded window. The ordinary view is immutable.
+/// [`Self::write_part_overlays_to_stream`] is a narrow publisher for a bounded
+/// same-topology Part replacement set that raw-copies every other ZIP member;
+/// call [`Self::into_opc_package`] when a general owning mutable package is
+/// needed.
+///
+/// # Clones share one opened package
+///
+/// `Clone` allocates nothing and copies no index, catalog or payload. It
+/// increments the reference counts of the source handle, the archive index,
+/// the admitted catalog and the payload cache, plus the fingerprint memo,
+/// read-ahead window and catalog budget reservation when the package has them, and copies the
+/// read limits. Every clone is the same opened package: clones return equal
+/// [`Self::source_lineage`] tokens and the same [`Self::source_version`], read
+/// through one bounded cache under one execution context, and a payload
+/// decoded through one clone is a cache hit for the others. A clone therefore
+/// behaves as a shared borrow of the package would, except that it is owned.
+///
+/// The publishers that take `self` consume one clone; publish from
+/// `package.clone()` to keep the package readable. Publication mutates no
+/// part, catalog or source state: edits travel in their own plans, so every
+/// clone may publish any number of times and its output depends only on the
+/// source and the plan. Each publication checks the source version again, so
+/// the source checked while editing is the source copied to output, and a
+/// source changed in place refuses every clone with
+/// [`OpcError::SourceChanged`].
+///
+/// The shared state that does change over the package's life changes no part
+/// bytes, refusal or published byte; it changes speed and diagnostics only:
+/// the cache contents, the read-ahead window (a publication or materialization
+/// from any clone returns every clone to exact reads), and a managed package's
+/// write pool and worker permits. The cache, the budget reservations, the
+/// read-ahead window and the write pool are released when the last clone is
+/// dropped.
+pub struct SourceBackedPackage {
+    source: SourceSnapshot,
+    fingerprint_memo: Option<Arc<OwnedSourceFingerprintMemo>>,
+    archive: Arc<IndexedArchive<SourceReader>>,
+    read_ahead: Option<Arc<ArchiveReadAhead>>,
+    limits: SourceLimits,
+    catalog: Arc<AdmittedCatalog>,
+    cache: Arc<PartCache>,
+    catalog_object_reservation: Option<Arc<Reservation>>,
+}
+
+/// The catalog admitted by one open, shared by every clone of the package.
+///
+/// It is built once by the open and never mutated afterwards.
+struct AdmittedCatalog {
+    content_types_member: String,
+    /// Parsed at source admission and shared with an owning conversion.
+    /// Keeping this binding avoids a second manifest parse at the conversion
+    /// seam while retaining the source XML allocation separately.
+    content_types: Arc<ContentTypeMap>,
+    package_relationships: Relationships,
+    parts: Vec<CatalogPart>,
+    /// Aggregate declared bytes of ordinary parts, computed by the source
+    /// catalog's existing central-directory admission pass.
+    declared_part_bytes: u64,
+    /// Aggregate declared bytes of every physical archive member, retained
+    /// from that same admission pass for O(affected) publication checks.
+    declared_archive_bytes: u64,
+    /// Relationship XML aggregate counters retained by the parser's existing
+    /// relationship admission walk.
+    declared_relationship_xml_bytes: u64,
+    declared_relationship_xml_events: u64,
+    relationship_xml_metrics: HashMap<PackURI, RelationshipXmlMetrics>,
+    parts_by_name: HashMap<PackURI, usize>,
+    /// Positions in `parts`, sorted by ASCII-case-insensitive Part spelling.
+    /// When present, this immutable index costs exactly one `usize` per
+    /// admitted ordinary Part (logical requested bytes; allocator capacity may
+    /// vary), bounded by `SourceLimits::max_parts()`. It stores no folded-name
+    /// allocations. Managed opens intentionally leave it absent so their
+    /// cancellation-aware path adds no unreserved retained memory or sorting
+    /// work; those opens retain the bounded linear fallback instead.
+    casefold_order: Option<Vec<usize>>,
+    non_part_members: Vec<NonPartMember>,
+    /// Reference-compatible repairs applied while the catalog was admitted.
+    tolerance_report: ToleranceReport,
+}
+
+// Clones are only useful as handles if each one can move to another thread
+// while the others keep reading and publishing. This fails to compile if a
+// future field breaks that.
+const _: () = {
+    const fn assert_shareable<T: Clone + Send + Sync>() {}
+    assert_shareable::<SourceBackedPackage>();
+};
+
+impl Clone for SourceBackedPackage {
+    /// Share this opened package (see the type documentation).
+    ///
+    /// The destructuring is exhaustive on purpose: a field added later must
+    /// be classified here as shared, copied or rebuilt before this compiles.
+    fn clone(&self) -> Self {
+        let Self {
+            source,
+            fingerprint_memo,
+            archive,
+            read_ahead,
+            limits,
+            catalog,
+            cache,
+            catalog_object_reservation,
+        } = self;
+        Self {
+            // A handle whose source, lineage and monitored-read depth are
+            // `Arc`-shared; its version and length are plain copies.
+            source: source.clone(),
+            fingerprint_memo: fingerprint_memo.clone(),
+            archive: Arc::clone(archive),
+            read_ahead: read_ahead.clone(),
+            limits: *limits,
+            catalog: Arc::clone(catalog),
+            cache: Arc::clone(cache),
+            catalog_object_reservation: catalog_object_reservation.clone(),
+        }
+    }
+}
+
+/// Validation-only open failure with exact ingress phase provenance.
+pub(crate) struct ValidationOpenError {
+    pub(crate) phase: ValidationCatalogPhase,
+    pub(crate) error: OpcError,
+}
+
+impl SourceBackedPackage {
+    /// Return the bounded read policy captured when this package was opened.
+    #[must_use]
+    pub const fn read_limits(&self) -> SourceLimits {
+        self.limits
+    }
+
+    /// Return the admitted aggregate payload bytes of ordinary parts.
+    ///
+    /// The value comes from the central-directory pass that admitted this
+    /// source catalog; querying it performs no payload reads and no package
+    /// walk. It is a physical owner metric only: semantic family limits keep
+    /// their own affected-closure counters.
+    #[must_use]
+    pub fn admitted_part_bytes(&self) -> u64 {
+        self.catalog.declared_part_bytes
+    }
+
+    /// Return the source-read policy captured when this package was opened.
+    ///
+    /// Publication can drain a read-ahead window and switch the live adapter
+    /// back to exact reads, but deferred materialization must retain the
+    /// original configured policy rather than silently reopening with the
+    /// default.
+    #[must_use]
+    pub fn source_read_policy(&self) -> SourceReadPolicy {
+        self.read_ahead
+            .as_ref()
+            .map_or_else(SourceReadPolicy::exact, |read_ahead| {
+                read_ahead.source_read_policy()
+            })
+    }
+
+    /// Validation-only source open. Ordinary callers retain the existing open
+    /// path; this variant adds phase provenance without changing its hot path.
+    pub(crate) fn from_read_at_for_validation(
+        source: Arc<dyn ReadAt>,
+        limits: SourceLimits,
+    ) -> std::result::Result<Self, ValidationOpenError> {
+        let phase = |phase, error| ValidationOpenError { phase, error };
+        let version = source
+            .version()
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let length = source
+            .len()
+            .map_err(OpcError::from)
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        limits
+            .check(
+                SourceLimitKind::InputBytes,
+                length,
+                limits.max_input_bytes(),
+            )
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let diagnostics = Arc::new(DiagnosticState::default());
+        let snapshot = SourceSnapshot {
+            source: Arc::clone(&source),
+            version,
+            length,
+            monitor_reads: Arc::new(MonitoredReadDepth::new(0)),
+            lineage: SourceLineage(Arc::new(())),
+            context: None,
+            input_reservation_failures: None,
+            output_reservation_failures: None,
+        };
+        snapshot
+            .ensure_current()
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        let prefetch = Arc::new(StructuralPrefetch::new());
+        let archive = match indexed_archive_with_limits(
+            SourceReader {
+                snapshot: snapshot.clone(),
+                read_ahead: None,
+                prefetch: Some(Arc::clone(&prefetch)),
+            },
+            length,
+            limits,
+        ) {
+            Ok(archive) => archive,
+            Err(mapped) => {
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(phase(ValidationCatalogPhase::Ingress, mapped));
+                }
+                snapshot
+                    .ensure_current()
+                    .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+                return Err(phase(ValidationCatalogPhase::Ingress, mapped));
+            },
+        };
+        snapshot
+            .ensure_current()
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+        // Structural admission is one sequential pass. Giving it one indexed
+        // read session lets a single Deflate decoder be reset between the
+        // content-types member and each `.rels` member instead of being built
+        // per member; every read is otherwise the archive's own.
+        prefetch.prime(&snapshot, &structural_prefetch_runs(&archive));
+        let catalog_result =
+            PackageReader::source_catalog_for_validation(&SessionedArchive::new(&archive), limits);
+        prefetch.clear();
+        let catalog = match catalog_result {
+            Ok(catalog) => catalog,
+            Err(ValidationCatalogError {
+                phase: stage,
+                error,
+            }) => {
+                if matches!(error, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(phase(stage, error));
+                }
+                snapshot
+                    .ensure_current()
+                    .map_err(|error| phase(stage, error))?;
+                return Err(phase(stage, error));
+            },
+        };
+        let SourceCatalog {
+            pkg_srels,
+            parts,
+            declared_part_bytes,
+            declared_archive_bytes,
+            declared_relationship_xml_bytes,
+            declared_relationship_xml_events,
+            content_types,
+            relationship_xml_metrics,
+            non_part_members,
+            content_types_member,
+            tolerance_report,
+        } = catalog;
+        snapshot
+            .ensure_current()
+            .map_err(|error| phase(ValidationCatalogPhase::Ingress, error))?;
+
+        let package_relationships = relationships_for_package(pkg_srels)
+            .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+        let mut catalog_parts = Vec::new();
+        catalog_parts
+            .try_reserve_exact(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC catalog parts",
+                source,
+            })
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        let mut parts_by_name = HashMap::new();
+        parts_by_name
+            .try_reserve(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC part lookup",
+                source,
+            })
+            .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+        for (index, part) in parts.into_iter().enumerate() {
+            let relationships = relationships_for_part(&part.partname, part.srels)
+                .map_err(|error| phase(ValidationCatalogPhase::LoadedRelationships, error))?;
+            let entry_id = archive
+                .entry_id(part.partname.membername())
+                .ok_or_else(|| OpcError::PartNotFound(part.partname.to_string()))
+                .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?;
+            parts_by_name.insert(part.partname.clone(), index);
+            catalog_parts.push(CatalogPart {
+                partname: part.partname,
+                // Admitted verbatim by the catalog reader.
+                content_type: ContentType::from_admitted_source(part.content_type),
+                relationships,
+                entry_id,
+            });
+        }
+        // PackageReader has already guaranteed ASCII-case-insensitive
+        // uniqueness, so positions can be searched without folded Strings.
+        // The 2,048-Part boundary is a conservative measured tuning threshold,
+        // not a semantic limit on admitted ordinary Parts.
+        let casefold_order = if catalog_parts.len() >= SOURCE_CASEFOLD_INDEX_MIN_PARTS {
+            Some(
+                build_casefold_order(&catalog_parts)
+                    .map_err(|error| phase(ValidationCatalogPhase::Catalog, error))?,
+            )
+        } else {
+            None
+        };
+
+        Ok(Self {
+            source: snapshot,
+            fingerprint_memo: None,
+            archive: Arc::new(archive),
+            read_ahead: None,
+            limits,
+            catalog: Arc::new(AdmittedCatalog {
+                content_types_member,
+                content_types,
+                package_relationships,
+                parts: catalog_parts,
+                declared_part_bytes,
+                declared_archive_bytes,
+                declared_relationship_xml_bytes,
+                declared_relationship_xml_events,
+                relationship_xml_metrics,
+                parts_by_name,
+                casefold_order,
+                non_part_members,
+                tolerance_report,
+            }),
+            cache: Arc::new(PartCache::new_with_diagnostics(
+                SourceCacheLimits::default(),
+                diagnostics,
+            )),
+            catalog_object_reservation: None,
+        })
+    }
+
+    /// Open a filesystem-backed OPC package with explicit read limits without
+    /// materializing ordinary part payloads.
+    ///
+    /// The path is held through an immutable positional [`FileSource`]. The
+    /// supplied limits govern ZIP indexing, catalog admission, relationship
+    /// parsing, and later payload reads. Ordinary payloads remain cold until a
+    /// [`PartView::data`] request. This avoids the eager [`OpcPackage`] input
+    /// and all-Part payload allocations, but does not claim a total RSS bound.
+    /// [`OpcPackage`] stays the explicit eager CRUD type.
+    #[cfg(any(unix, windows))]
+    pub fn from_path(path: impl AsRef<Path>, limits: SourceLimits) -> Result<Self> {
+        Self::from_read_at(
+            Arc::new(FileSource::open(path)?),
+            limits,
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+    }
+
+    /// Open a source-backed package from a sequential reader with explicit
+    /// source, deferred-cache and execution policies.
+    ///
+    /// The reader is consumed once with `limits` enforced during ingestion.
+    /// When `execution_context` is present it is checked before ingestion and
+    /// is retained by the positional owner for mandatory-open and deferred
+    /// payload checks. The bounded byte vector is moved into the owned source
+    /// without a second copy; `cache_limits` governs the deferred payload
+    /// cache just as it does for positional-source opens.
+    ///
+    pub fn from_reader<R: Read>(
+        reader: R,
+        limits: SourceLimits,
+        cache_limits: SourceCacheLimits,
+        execution_context: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        if let Some(context) = execution_context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let source = Arc::new(OwnedSource::new(read_limited(reader, limits)?));
+        Self::from_read_at_inner(
+            SourceInput::Owned(source),
+            limits,
+            cache_limits,
+            execution_context,
+            SourceReadPolicy::exact(),
+        )
+    }
+
+    /// Open an owned source-backed package with explicit source, deferred-cache
+    /// and execution policies.
+    ///
+    /// The input vector is moved into the source owner. `execution_context` is
+    /// checked before that move and retained by the owner for mandatory-open
+    /// and deferred payload checks. Opening validates the ZIP catalog, content
+    /// types, and relationships without materializing ordinary part payloads;
+    /// a payload is decompressed only when its [`PartView::data`] is requested.
+    pub fn from_vec(
+        data: Vec<u8>,
+        limits: SourceLimits,
+        cache_limits: SourceCacheLimits,
+        execution_context: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        if let Some(context) = execution_context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let source = Arc::new(OwnedSource::new(data));
+        Self::from_read_at_inner(
+            SourceInput::Owned(source),
+            limits,
+            cache_limits,
+            execution_context,
+            SourceReadPolicy::exact(),
+        )
+    }
+
+    /// Open a source-backed package with explicit source, cache, read-ahead,
+    /// and execution policies. `execution_context` is `None` for an
+    /// unmanaged package and `Some` for the managed reservation path.
+    ///
+    /// The source version is captured before indexing and checked after every
+    /// mandatory open read.  A changed source is never silently accepted.
+    pub fn from_read_at(
+        source: Arc<dyn ReadAt>,
+        limits: SourceLimits,
+        cache_limits: SourceCacheLimits,
+        source_read_policy: SourceReadPolicy,
+        execution_context: Option<ExecutionContext>,
+    ) -> Result<Self> {
+        Self::from_read_at_inner(
+            SourceInput::Generic(source),
+            limits,
+            cache_limits,
+            execution_context,
+            source_read_policy,
+        )
+    }
+
+    fn from_read_at_inner(
+        source_input: SourceInput,
+        limits: SourceLimits,
+        cache_limits: SourceCacheLimits,
+        context: Option<ExecutionContext>,
+        source_read_policy: SourceReadPolicy,
+    ) -> Result<Self> {
+        let (source, owned_source) = source_input.into_parts();
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let diagnostics = Arc::new(DiagnosticState::default());
+        let input_reservation_failures = context
+            .as_ref()
+            .map(|_| Arc::new(DiagnosticCounter::new(Arc::clone(&diagnostics))));
+        let output_reservation_failures = context
+            .as_ref()
+            .map(|_| Arc::new(DiagnosticCounter::new(Arc::clone(&diagnostics))));
+        let version = source.version()?;
+        let length = source.len()?;
+        limits.check(
+            SourceLimitKind::InputBytes,
+            length,
+            limits.max_input_bytes(),
+        )?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let snapshot = SourceSnapshot {
+            source: Arc::clone(&source),
+            version,
+            length,
+            monitor_reads: Arc::new(MonitoredReadDepth::new(0)),
+            lineage: SourceLineage(Arc::new(())),
+            context: context.clone(),
+            input_reservation_failures: input_reservation_failures.clone(),
+            output_reservation_failures: output_reservation_failures.clone(),
+        };
+        snapshot.ensure_current()?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let read_ahead = if source_read_policy.window_bytes() == 0 {
+            None
+        } else {
+            Some(Arc::new(ArchiveReadAhead::new(
+                &snapshot,
+                source_read_policy,
+            )?))
+        };
+        // The structural prefetch is the default open's mechanism and only the
+        // default open's. A caller that asked for a forward window gets that
+        // window's grammar and counters undisturbed, and a managed open keeps
+        // the exact grammar so no `Resource::InputBytes` reservation, no
+        // cancellation observation and no refusal moves.
+        let prefetch = if context.is_none() && read_ahead.is_none() {
+            Some(Arc::new(StructuralPrefetch::new()))
+        } else {
+            None
+        };
+        let archive = match indexed_archive_with_limits(
+            SourceReader {
+                snapshot: snapshot.clone(),
+                read_ahead: read_ahead.as_ref().map(Arc::downgrade),
+                prefetch: prefetch.clone(),
+            },
+            length,
+            limits,
+        ) {
+            Ok(archive) => archive,
+            Err(mapped) => {
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(mapped);
+                }
+                snapshot.ensure_current()?;
+                return Err(mapped);
+            },
+        };
+        snapshot.ensure_current()?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        // The indexed archive and its source catalog remain owned by the
+        // package, shared by its clones, until the last clone drops; so does
+        // this reservation. Reserve one object for the package
+        // catalog owner and one for every physical member before parsing the
+        // source catalog and projecting deferred part vectors; this is a
+        // bounded retained charge, not a cumulative event. Payloads and
+        // load flights use separate units.
+        let catalog_object_reservation = if let Some(context) = context.as_ref() {
+            let member_objects = u64::try_from(archive.len()).map_err(|_| {
+                overlay_unavailable("source-backed OPC catalog member count overflows u64")
+            })?;
+            let object_count = member_objects.checked_add(1).ok_or_else(|| {
+                overlay_unavailable("source-backed OPC catalog object count overflows u64")
+            })?;
+            Some(Arc::new(
+                context
+                    .reserve(Resource::Objects, object_count)
+                    .map_err(map_execution_error)?,
+            ))
+        } else {
+            None
+        };
+        // Fetch the structural members' local records in their own physical
+        // order, one read per contiguous run, before a walk that will revisit
+        // them in an order of its own. Nothing is parsed here and nothing is
+        // decided by it: the reads below take the bytes from this buffer
+        // instead of the source, in the same order, with the same limits
+        // charged and the same verdicts reached.
+        if let Some(prefetch) = prefetch.as_deref() {
+            prefetch.prime(&snapshot, &structural_prefetch_runs(&archive));
+        }
+        // One sequential structural admission pass, one reset Deflate decoder.
+        let catalog_result =
+            PackageReader::source_catalog(&SessionedArchive::new(&archive), limits);
+        if let Some(prefetch) = prefetch.as_deref() {
+            prefetch.clear();
+        }
+        let catalog = match catalog_result {
+            Ok(catalog) => catalog,
+            Err(error) => {
+                let mapped = map_source_backed_error(error);
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(mapped);
+                }
+                snapshot.ensure_current()?;
+                return Err(mapped);
+            },
+        };
+        let SourceCatalog {
+            pkg_srels,
+            parts,
+            declared_part_bytes,
+            declared_archive_bytes,
+            declared_relationship_xml_bytes,
+            declared_relationship_xml_events,
+            content_types,
+            relationship_xml_metrics,
+            non_part_members,
+            content_types_member,
+            tolerance_report,
+        } = catalog;
+        snapshot.ensure_current()?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let package_relationships =
+            relationships_for_package_with_context(pkg_srels, context.as_ref())?;
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        let mut catalog_parts = Vec::new();
+        catalog_parts
+            .try_reserve_exact(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC catalog parts",
+                source,
+            })?;
+        let mut parts_by_name = HashMap::new();
+        parts_by_name
+            .try_reserve(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC part lookup",
+                source,
+            })?;
+        for (index, part) in parts.into_iter().enumerate() {
+            if let Some(context) = context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+            let relationships =
+                relationships_for_part_with_context(&part.partname, part.srels, context.as_ref())?;
+            if let Some(context) = context.as_ref() {
+                context.check().map_err(map_execution_error)?;
+            }
+            let entry_id = archive
+                .entry_id(part.partname.membername())
+                .ok_or_else(|| OpcError::PartNotFound(part.partname.to_string()))?;
+            parts_by_name.insert(part.partname.clone(), index);
+            catalog_parts.push(CatalogPart {
+                partname: part.partname,
+                // Admitted verbatim by the catalog reader.
+                content_type: ContentType::from_admitted_source(part.content_type),
+                relationships,
+                entry_id,
+            });
+        }
+        if let Some(context) = context.as_ref() {
+            context.check().map_err(map_execution_error)?;
+        }
+        // PackageReader has already guaranteed ASCII-case-insensitive
+        // uniqueness, so sufficiently large unmanaged opens can search
+        // positions without folded Strings. The 2,048-Part boundary is a
+        // conservative measured tuning threshold, not a semantic limit.
+        // Managed opens always retain the old bounded linear fallback so this
+        // cancellation-aware path does not add unreserved retained memory or
+        // non-interruptible sorting work.
+        let casefold_order =
+            if context.is_some() || catalog_parts.len() < SOURCE_CASEFOLD_INDEX_MIN_PARTS {
+                None
+            } else {
+                Some(build_casefold_order(&catalog_parts)?)
+            };
+
+        let cache = if let Some(context) = context {
+            let input_reservation_failures = input_reservation_failures.ok_or_else(|| {
+                overlay_unavailable("managed source input reservation counter is unavailable")
+            })?;
+            let output_reservation_failures = output_reservation_failures.ok_or_else(|| {
+                overlay_unavailable("managed source output reservation counter is unavailable")
+            })?;
+            PartCache::new_managed(
+                cache_limits,
+                context,
+                diagnostics,
+                input_reservation_failures,
+                output_reservation_failures,
+            )
+        } else {
+            PartCache::new_with_diagnostics(cache_limits, diagnostics)
+        };
+        let fingerprint_memo = owned_source
+            .map(OwnedSourceFingerprintMemo::new)
+            .transpose()?
+            .map(Arc::new);
+        Ok(Self {
+            source: snapshot,
+            fingerprint_memo,
+            archive: Arc::new(archive),
+            read_ahead,
+            limits,
+            catalog: Arc::new(AdmittedCatalog {
+                content_types_member,
+                content_types,
+                package_relationships,
+                parts: catalog_parts,
+                declared_part_bytes,
+                declared_archive_bytes,
+                declared_relationship_xml_bytes,
+                declared_relationship_xml_events,
+                relationship_xml_metrics,
+                parts_by_name,
+                casefold_order,
+                non_part_members,
+                tolerance_report,
+            }),
+            cache: Arc::new(cache),
+            catalog_object_reservation,
+        })
+    }
+
+    /// Whether `other` is this package or a clone of it.
+    ///
+    /// Each open builds one admitted catalog, and only `Clone` makes a second
+    /// value that holds it, so sharing the catalog allocation is sharing the
+    /// opened package: the same lineage, source, archive index, cache and
+    /// execution budget. A separate open of equal bytes is a different package.
+    fn is_same_opened_package(&self, other: &Self) -> bool {
+        let same = Arc::ptr_eq(&self.catalog, &other.catalog);
+        debug_assert_eq!(same, Arc::ptr_eq(&self.archive, &other.archive));
+        debug_assert_eq!(same, Arc::ptr_eq(&self.cache, &other.cache));
+        debug_assert_eq!(same, self.source.lineage == other.source.lineage);
+        same
+    }
+
+    /// Inspect the explicitly enabled source-read window and its counters.
+    ///
+    /// Exact constructors return `None`. A policy disabled by publication
+    /// retains its diagnostic counters but reports no retained window. Clones
+    /// share one window, so every clone reports the same counters.
+    pub fn source_read_diagnostics(&self) -> Result<Option<SourceReadDiagnostics>> {
+        self.read_ahead
+            .as_ref()
+            .map(|state| state.diagnostics())
+            .transpose()
+    }
+
+    fn disable_read_ahead_for_publication(&self) -> Result<()> {
+        if let Some(read_ahead) = &self.read_ahead {
+            read_ahead.disable_for_exact_publication(&self.source)?;
+        }
+        Ok(())
+    }
+
+    /// Package-level relationships parsed during opening.
+    #[must_use]
+    pub fn rels(&self) -> &Relationships {
+        &self.catalog.package_relationships
+    }
+
+    /// Return metadata-only views of every ordinary part.
+    pub fn iter_parts(&self) -> impl Iterator<Item = PartView<'_>> {
+        (0..self.catalog.parts.len()).map(|index| PartView {
+            package: self,
+            index,
+        })
+    }
+
+    /// Read an explicitly requested set of Parts in input order.
+    ///
+    /// This is an opt-in, source-backed operation.  A managed execution
+    /// context may admit bounded local worker waves when the prepared request
+    /// is large enough for its policy; the existing one-Part path remains the
+    /// serial fallback.  Every admitted read still enters the ordinary cache,
+    /// source-freshness, ZIP-validation, and budgeted `PartData` path.
+    ///
+    /// The request count is capped by [`SourceLimits::max_parts`]; duplicate
+    /// occurrences count toward that cap.  Managed calls preflight declared
+    /// sizes once and reuse them for cache admission and scheduling.  Calls
+    /// without a context retain the existing serial one-Part behavior and do
+    /// not acquire scheduler reservations.
+    ///
+    /// The returned collection retains the bounded reservation for its own
+    /// `PartData` slots until the [`PartBatch`] is dropped.  Repeated names
+    /// remain repeated in the result and may share one cached payload.  A
+    /// failed or cancelled operation joins all admitted workers and returns no
+    /// partial collection.  Cumulative `InputBytes` and `Work` record actual
+    /// physical work and are not rolled back to simulate serial execution;
+    /// clean payloads successfully admitted before a later failure may remain
+    /// in the ordinary cache.  Source freshness and cancellation are final
+    /// fences before any result or error is exposed.
+    pub fn read_parts_ordered(&self, partnames: &[PackURI]) -> Result<PartBatch> {
+        batch::read_parts_ordered(self, partnames)
+    }
+
+    /// Return the exact ZIP member names retained by the indexed source.
+    ///
+    /// This metadata-only iterator is intended for low-level physical-name
+    /// collision checks. It includes ordinary parts, relationship members,
+    /// package metadata, and non-part members without reading payload bytes.
+    pub fn physical_member_names(&self) -> impl ExactSizeIterator<Item = &str> {
+        self.archive.file_names()
+    }
+
+    /// Read and retain the exact physical relationships member for one
+    /// ordinary source part.
+    ///
+    /// The returned [`PartData`] preserves the source bytes and, for a
+    /// managed package, retains the memory/object reservations for the life
+    /// of the handle.  The central-directory size is checked against the
+    /// package and caller ceilings before the archive allocates or
+    /// decompresses the member; declared decompression bytes are charged to
+    /// `Resource::Work` before the read starts.
+    pub fn relationships_data_for_with_limit(
+        &self,
+        source_uri: &PackURI,
+        maximum: usize,
+    ) -> Result<Option<PartData>> {
+        self.relationships_data_for_with_limit_and_accounting(source_uri, maximum, None)
+    }
+
+    /// Return a relationship member's declared ZIP size without decoding it.
+    /// The declaration is used only for bounded wire preflight; callers that
+    /// retain the member must still use
+    /// [`Self::relationships_data_for_with_limit`] for source and payload
+    /// validation.
+    pub fn declared_relationships_uncompressed_size(
+        &self,
+        source_uri: &PackURI,
+    ) -> Result<Option<u64>> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let relationships_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let Some(entry) = self.archive.entry_id(relationships_uri.membername()) else {
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            return Ok(None);
+        };
+        let declared = self.archive.metadata_for(entry)?.uncompressed_size();
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(Some(declared))
+    }
+
+    fn relationships_data_for_with_limit_and_accounting(
+        &self,
+        source_uri: &PackURI,
+        maximum: usize,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<Option<PartData>> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let relationships_uri = source_uri.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let Some(entry) = self.archive.entry_id(relationships_uri.membername()) else {
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            return Ok(None);
+        };
+        let metadata = self.archive.metadata_for(entry)?;
+        let maximum = maximum.min(self.limits.max_relationship_xml_bytes());
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.limits.check(
+            SourceLimitKind::RelationshipXmlBytes,
+            metadata.uncompressed_size(),
+            maximum as u64,
+        )?;
+
+        // Match the ordinary cold-Part path: reserve the decoded payload and
+        // its owner object, and charge declared decompression work before
+        // invoking the ZIP reader.  The relationship member is not inserted
+        // into the Part cache, so these reservations are carried directly by
+        // the returned PartData handle.
+        let resources = self
+            .cache
+            .reserve_direct_payload(metadata.uncompressed_size())
+            .map_err(map_execution_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        // A counted scope: the read below and the fences after it re-observe
+        // the source for as long as this handle is built.
+        let _monitored = self.source.monitor_publication();
+
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let read_result = if accounting.is_some() {
+            self.archive
+                .read_entry_with_accounting(entry, &mut zip_accounting)
+        } else {
+            self.archive.read_entry(entry)
+        }
+        .map_err(map_preservation_error);
+        let source_result = self.source.ensure_current();
+        let execution_result = self.cache.check_context().map_err(map_execution_error);
+        let accounting_result = accounting
+            .take()
+            .map(|report| report.merge_zip(&zip_accounting));
+        let bytes = match (source_result, execution_result, read_result) {
+            (Err(error), _, _) => return Err(error),
+            (Ok(()), Err(error), _) => return Err(error),
+            (Ok(()), Ok(()), Err(error)) => return Err(error),
+            (Ok(()), Ok(()), Ok(bytes)) => bytes,
+        };
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if bytes.len() as u64 != metadata.uncompressed_size() {
+            return Err(OpcError::ZipError(format!(
+                "source-backed OPC relationships member declared {} uncompressed bytes but read {}",
+                metadata.uncompressed_size(),
+                bytes.len()
+            )));
+        }
+        self.limits.check(
+            SourceLimitKind::RelationshipXmlBytes,
+            bytes.len() as u64,
+            maximum as u64,
+        )?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        accounting_result.transpose()?;
+        Ok(Some(PartData {
+            payload: CachedPayload {
+                bytes: Arc::new(bytes),
+                reservation: resources.reservation,
+                object_reservation: resources.payload_object_reservation,
+            },
+        }))
+    }
+
+    /// Read and retain the exact physical `[Content_Types].xml` member under
+    /// the caller's bounded payload policy. The returned handle keeps managed
+    /// memory/object reservations alive for the lifetime of the read-set
+    /// owner, matching [`Self::relationships_data_for_with_limit`].
+    pub fn content_types_data_with_limit(&self, maximum: usize) -> Result<PartData> {
+        self.content_types_data_with_limit_and_accounting(maximum, None)
+    }
+
+    /// Return `[Content_Types].xml`'s declared ZIP size without decoding it.
+    /// The declaration is only a wire preflight input; publication still
+    /// validates and retains the exact member through the bounded accessor.
+    pub fn declared_content_types_uncompressed_size(&self) -> Result<u64> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let entry = self
+            .archive
+            .entry_id(&self.catalog.content_types_member)
+            .ok_or_else(|| OpcError::PartNotFound(self.catalog.content_types_member.clone()))?;
+        let declared = self.archive.metadata_for(entry)?.uncompressed_size();
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(declared)
+    }
+
+    fn content_types_data_with_limit_and_accounting(
+        &self,
+        maximum: usize,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<PartData> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let Some(entry) = self.archive.entry_id(&self.catalog.content_types_member) else {
+            return Err(OpcError::PartNotFound(
+                self.catalog.content_types_member.clone(),
+            ));
+        };
+        let metadata = self.archive.metadata_for(entry)?;
+        let maximum = maximum.min(self.limits.max_content_types_bytes());
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            metadata.uncompressed_size(),
+            maximum as u64,
+        )?;
+        self.limits.check(
+            SourceLimitKind::PartBytes,
+            metadata.uncompressed_size(),
+            self.limits.max_part_bytes(),
+        )?;
+        let resources = self
+            .cache
+            .reserve_direct_payload(metadata.uncompressed_size())
+            .map_err(map_execution_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        // A counted scope: the read below and the fences after it re-observe
+        // the source for as long as this handle is built.
+        let _monitored = self.source.monitor_publication();
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let read_result = if accounting.is_some() {
+            self.archive
+                .read_entry_with_accounting(entry, &mut zip_accounting)
+        } else {
+            self.archive.read_entry(entry)
+        }
+        .map_err(map_preservation_error);
+        let source_result = self.source.ensure_current();
+        let execution_result = self.cache.check_context().map_err(map_execution_error);
+        let accounting_result = accounting
+            .take()
+            .map(|report| report.merge_zip(&zip_accounting));
+        let bytes = match (source_result, execution_result, read_result) {
+            (Err(error), _, _) => return Err(error),
+            (Ok(()), Err(error), _) => return Err(error),
+            (Ok(()), Ok(()), Err(error)) => return Err(error),
+            (Ok(()), Ok(()), Ok(bytes)) => bytes,
+        };
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if bytes.len() as u64 != metadata.uncompressed_size() {
+            return Err(OpcError::ZipError(format!(
+                "source-backed OPC content-types member declared {} uncompressed bytes but read {}",
+                metadata.uncompressed_size(),
+                bytes.len()
+            )));
+        }
+        self.limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            bytes.len() as u64,
+            maximum as u64,
+        )?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        accounting_result.transpose()?;
+        Ok(PartData {
+            payload: CachedPayload {
+                bytes: Arc::new(bytes),
+                reservation: resources.reservation,
+                object_reservation: resources.payload_object_reservation,
+            },
+        })
+    }
+
+    /// Whether any retained physical member declares traditional ZIP encryption.
+    ///
+    /// This is central-directory metadata captured during bounded open; it does
+    /// not read or decrypt any member payload.
+    #[must_use]
+    pub fn has_encrypted_entries(&self) -> bool {
+        self.archive.has_encrypted_entries()
+    }
+
+    /// Look up one ordinary part without reading its payload.
+    ///
+    /// The lookup reads only the retained catalog and consumes no source
+    /// bytes, so one observation after it proves what a leading and trailing
+    /// pair proved. The missing-Part branch observes before reporting, so a
+    /// changed source still takes precedence over `PartNotFound` — the order
+    /// the leading observation produced, and the order
+    /// `litchi-pptx`'s collision probe and `litchi-docx`'s validation walk
+    /// both depend on when they map `PartNotFound` to a non-error.
+    pub fn part(&self, partname: &PackURI) -> Result<PartView<'_>> {
+        let Some(index) = self.part_index(partname) else {
+            self.source.ensure_current()?;
+            return Err(OpcError::PartNotFound(partname.to_string()));
+        };
+        let view = PartView {
+            package: self,
+            index,
+        };
+        self.source.ensure_current()?;
+        Ok(view)
+    }
+
+    /// Capture one XML Part as a provenance-bearing source publication value.
+    ///
+    /// The returned value retains the exact decoded source allocation and may
+    /// later be spliced with compact generated fragments.  Source XML is a
+    /// distinct publication class: its original formatting and lexical forms
+    /// are validated for bounded well-formedness, never normalized or passed
+    /// through the authored compactness audit.
+    pub(crate) fn source_xml_part(&self, index: usize) -> Result<SourceXmlPart> {
+        self.source_xml_part_with_hint(index, None)
+    }
+
+    fn source_xml_part_with_hint(
+        &self,
+        index: usize,
+        hint: Option<&SourceXmlPart>,
+    ) -> Result<SourceXmlPart> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "source XML publication refuses encrypted ZIP members",
+            ));
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let part = self
+            .catalog
+            .parts
+            .get(index)
+            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+        if !xml_minifier::audit::package::is_xml_part(
+            part.partname.as_str(),
+            part.content_type.as_str(),
+        ) {
+            return Err(overlay_unavailable(
+                "source XML publication requires an XML-classified Part",
+            ));
+        }
+        let data = self.read_part(index)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if let Some(hint) = hint.filter(|hint| {
+            hint.source_lineage == *self.source.lineage()
+                && hint.source_version == self.source.version()
+                && hint.source.lineage() == &hint.source_lineage
+                && hint.source.version() == hint.source_version
+                && hint.source_partname.is_equivalent_to(&part.partname)
+                && hint.content_type() == part.content_type.as_str()
+                && hint.limits == self.limits
+                && hint.is_physical_source()
+        }) {
+            // Retain the constructor's fresh-state fences. Only the immutable
+            // original proof is eligible; a candidate payload is never the
+            // current source. Its existing metadata and payload reservations
+            // remain shared with the returned clone.
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                data.as_bytes().len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            // Charge the bounded comparison even when immutable allocation
+            // identity proves equality without examining individual bytes.
+            if let Some(context) = self.source.context_ref() {
+                context
+                    .consume(Resource::Work, data.as_bytes().len() as u64)
+                    .map_err(map_execution_error)?;
+            }
+            let mut matches = hint.original.shares_allocation_with(&data);
+            if !matches && hint.bytes().len() == data.as_bytes().len() {
+                matches = true;
+                for (original, current) in hint
+                    .bytes()
+                    .chunks(SOURCE_PUBLICATION_CHUNK_BYTES)
+                    .zip(data.as_bytes().chunks(SOURCE_PUBLICATION_CHUNK_BYTES))
+                {
+                    self.source.ensure_current()?;
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    if original != current {
+                        matches = false;
+                        break;
+                    }
+                }
+            }
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            if matches {
+                return Ok(hint.clone());
+            }
+        }
+        SourceXmlPart::from_source_parts(
+            self.source.clone(),
+            self.limits,
+            &part.partname,
+            part.content_type.as_str(),
+            data,
+        )
+    }
+
+    /// Resolve a catalog part by OPC part-name equivalence.
+    ///
+    /// The exact hash lookup is the common path. OPC part names compare
+    /// case-insensitively, however, and [`PackageReader`] admits only one
+    /// spelling of an ASCII-case-equivalent name. Opens that retain the
+    /// immutable order index resolve misses with a binary search that allocates
+    /// no folded names; managed opens retain the bounded linear fallback.
+    fn part_index(&self, partname: &PackURI) -> Option<usize> {
+        self.catalog
+            .parts_by_name
+            .get(partname)
+            .copied()
+            .or_else(|| {
+                let wanted = partname.as_str();
+                if let Some(casefold_order) = self.catalog.casefold_order.as_ref() {
+                    casefold_order
+                        .binary_search_by(|index| {
+                            cmp_ascii_case_insensitive(
+                                self.catalog.parts[*index].partname.as_str(),
+                                wanted,
+                            )
+                        })
+                        .ok()
+                        .map(|position| casefold_order[position])
+                } else {
+                    self.catalog
+                        .parts
+                        .iter()
+                        .position(|part| part.partname.as_str().eq_ignore_ascii_case(wanted))
+                }
+            })
+    }
+
+    /// Return the unique main document part without reading its payload.
+    pub fn main_document_part(&self) -> Result<PartView<'_>> {
+        self.source.ensure_current()?;
+        let partname = main_document_partname(&self.catalog.package_relationships)?;
+        self.part(&partname)
+    }
+
+    /// ZIP items present in the source but not modelled as OPC parts.
+    #[must_use]
+    pub fn non_part_members(&self) -> &[NonPartMember] {
+        &self.catalog.non_part_members
+    }
+
+    /// Reference-compatible repairs applied while the source was admitted.
+    ///
+    /// Same contract as [`OpcPackage::tolerance_report`]: an empty report
+    /// means the package conformed, and materializing this package into an
+    /// [`OpcPackage`] carries the report over.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.catalog.tolerance_report
+    }
+
+    /// Return content-free payload-cache and managed-publication activity.
+    ///
+    /// See [`SourceCacheDiagnostics`] for the precise event definitions. This
+    /// operation does not read part payloads or expose member identifiers. For
+    /// managed packages it also reports cumulative direct-publication
+    /// `OutputBytes` usage/limit and budget refusal counts; this includes
+    /// [`SourceArtifact::write_to`] and bounded overlay sinks, while
+    /// unmanaged compatibility publication remains uncharged. Clones share the
+    /// cache, so the counters cover reads and publications through every clone.
+    #[must_use]
+    pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
+        let mut observer = NoopDiagnosticObserver;
+        let mut diagnostics = self.cache.diagnostics_with_observer(&mut observer);
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        diagnostics
+    }
+
+    /// Return a fail-closed payload-cache diagnostic snapshot.
+    ///
+    /// Unlike [`Self::cache_diagnostics`], this instrumentation-oriented
+    /// variant reports a poisoned cache-state mutex or a checked counter
+    /// overflow as an error. Ordinary compatibility callers can continue to
+    /// use the infallible method; benchmark and telemetry code should use this
+    /// method so an invalid snapshot cannot be mistaken for a valid interval.
+    pub fn try_cache_diagnostics(
+        &self,
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
+        let mut observer = NoopDiagnosticObserver;
+        let mut diagnostics = self.cache.try_diagnostics_with_observer(&mut observer)?;
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        Ok(diagnostics)
+    }
+
+    /// Return cache diagnostics while observing cache and same-Part
+    /// single-flight mutex lock boundaries.
+    ///
+    /// The callback is stack-borrowed and receives no package, Part, or
+    /// source identity. The returned snapshot is the same compatibility
+    /// snapshot as [`Self::cache_diagnostics`].
+    ///
+    /// The callback runs synchronously while the cache mutex guard is held
+    /// for the `Finished` notification (and while any active flight guard is
+    /// held for its own notification). It must return promptly, must not
+    /// block, re-enter this package or operation, or acquire any lock.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate from this entry point. A panic from either
+    /// callback is caught at the lock boundary, later notifications are
+    /// suppressed, and the panic is resumed after the profiled operation has
+    /// released all cache/flight guards, so observer code does not poison
+    /// those mutexes. Because `Started` runs before lock acquisition, a panic
+    /// there has no matching `Finished` callback, and a caller-owned event
+    /// log may consequently be partial or unbalanced. Normal returns and
+    /// errors keep every emitted boundary in a balanced pair.
+    #[cfg(feature = "performance-diagnostics")]
+    #[must_use]
+    pub fn cache_diagnostics_with_observer(
+        &self,
+        mut observer: impl FnMut(DiagnosticSnapshot),
+    ) -> SourceCacheDiagnostics {
+        let mut observer = CallbackDiagnosticObserver::new(&mut observer);
+        let mut diagnostics = self.cache.diagnostics_with_observer(&mut observer);
+        observer.resume_if_panicked();
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        diagnostics
+    }
+
+    /// Return a fail-closed cache diagnostic snapshot while observing the
+    /// immediate cache/flight lock boundaries.
+    ///
+    /// The callback runs synchronously while the corresponding mutex guard is
+    /// held for the `Finished` notification. It must return promptly, must
+    /// not block, re-enter this package or operation, or acquire any lock.
+    ///
+    /// # Panics
+    ///
+    /// Observer panics propagate from this entry point. A panic from either
+    /// callback is caught at the lock boundary, later notifications are
+    /// suppressed, and the panic is resumed after the profiled operation has
+    /// released all cache/flight guards, so observer code does not poison
+    /// those mutexes. Because `Started` runs before lock acquisition, a panic
+    /// there has no matching `Finished` callback, and a caller-owned event
+    /// log may consequently be partial or unbalanced. Normal returns and
+    /// errors keep every emitted boundary in a balanced pair.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn try_cache_diagnostics_with_observer(
+        &self,
+        mut observer: impl FnMut(DiagnosticSnapshot),
+    ) -> std::result::Result<SourceCacheDiagnostics, SourceCacheDiagnosticsError> {
+        let mut observer = CallbackDiagnosticObserver::new(&mut observer);
+        let result = self.cache.try_diagnostics_with_observer(&mut observer);
+        observer.resume_if_panicked();
+        let mut diagnostics = result?;
+        diagnostics.budget_catalog_reserved_objects = self
+            .catalog_object_reservation
+            .as_ref()
+            .map_or(0, |reservation| reservation.amount());
+        Ok(diagnostics)
+    }
+
+    /// Check the caller-supplied execution policy for a source-backed
+    /// operation.
+    ///
+    /// Compatibility packages have no execution context and therefore always
+    /// pass this check. Managed packages use the check to let a semantic
+    /// facade honor cancellation even when its own parsed value is already
+    /// retained and no new [`PartData`] read is necessary.
+    pub fn check_execution(&self) -> Result<()> {
+        self.cache.check_context().map_err(map_execution_error)
+    }
+
+    /// Return the exact source lineage captured by this package.
+    ///
+    /// The returned token is clone-cheap and cannot be constructed by a
+    /// caller. It lets a semantic facade bind snapshots and patches to this
+    /// opened package rather than to a merely equal [`SourceVersion`]. Every
+    /// clone of this package returns an equal token; every open mints a new
+    /// one, even over the same source.
+    #[must_use]
+    pub fn source_lineage(&self) -> SourceLineage {
+        self.source.lineage.clone()
+    }
+
+    /// Clone the caller-supplied execution context, if this package is on the
+    /// managed path. Compatibility packages return `None`.
+    #[must_use]
+    pub fn execution_context(&self) -> Option<ExecutionContext> {
+        self.cache.context().cloned()
+    }
+
+    /// Return the finite payload-cache policy admitted with this package.
+    ///
+    /// The policy belongs to the opened package rather than to a facade that
+    /// happens to consume it.  A facade that reopens a published artifact
+    /// must carry this value forward so an externally supplied package does
+    /// not silently fall back to the OPC default cache.
+    #[must_use]
+    pub fn cache_limits(&self) -> SourceCacheLimits {
+        self.cache.limits
+    }
+
+    /// Return the exact process-local source identity and revision captured at
+    /// open after verifying that the positional source is still current.
+    pub fn source_version(&self) -> Result<SourceVersion> {
+        self.source.ensure_current()?;
+        Ok(self.source.version)
+    }
+
+    /// Retain an O(1) handle to the exact immutable source artifact.
+    #[must_use]
+    pub fn source_artifact(&self) -> SourceArtifact {
+        SourceArtifact {
+            snapshot: self.source.clone(),
+            fingerprint_memo: self.fingerprint_memo.clone(),
+            archive: Arc::clone(&self.archive),
+            catalog: Arc::clone(&self.catalog),
+        }
+    }
+
+    /// Return a shared handle to an already-owned source archive.
+    #[must_use]
+    fn owned_source_shared(&self) -> Option<Arc<Vec<u8>>> {
+        self.fingerprint_memo
+            .as_ref()
+            .map(|memo| memo.source.shared_bytes())
+    }
+
+    /// Issue an OPC-authorized compressed transfer token for one catalog Part.
+    ///
+    /// The ZIP layer proves the bounded local/central layout, captures the
+    /// exact compressed span, decodes it, compares the decoded bytes with the
+    /// already validated allocation, and records the actual CRC. This method
+    /// adds the package-local source lineage/revision/content-type guard and
+    /// keeps the compressed capture plus writer staging under the managed
+    /// memory budget. Source encryption, signatures, relationship-owned Parts,
+    /// trailing bytes, and every source/context fence remain refusal cases.
+    fn authorize_precompressed(
+        &self,
+        index: usize,
+        expected_decoded: Arc<Vec<u8>>,
+    ) -> Result<AuthorizedPrecompressedPart> {
+        self.authorize_precompressed_inner(index, Some(expected_decoded))
+            .map(|(_, token)| token)
+    }
+
+    fn authorize_precompressed_inner(
+        &self,
+        index: usize,
+        expected_decoded: Option<Arc<Vec<u8>>>,
+    ) -> Result<(Option<PartData>, AuthorizedPrecompressedPart)> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.validate_topology_source_boundary()?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "source-backed compressed transfer refuses encrypted ZIP members",
+            ));
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let part = self
+            .catalog
+            .parts
+            .get(index)
+            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+        if !part.relationships.is_empty() {
+            return Err(overlay_unavailable(
+                "source-backed compressed transfer requires a relationship-leaf Part",
+            ));
+        }
+        let entry_id = part.entry_id;
+        let metadata = self
+            .archive
+            .metadata_for(entry_id)
+            .map_err(map_preservation_error)?;
+        let logical_size = match &expected_decoded {
+            Some(bytes) => u64::try_from(bytes.len())
+                .map_err(|_| overlay_unavailable("precompressed decoded size exceeds u64"))?,
+            None => metadata.uncompressed_size(),
+        };
+        if logical_size != metadata.uncompressed_size() {
+            return Err(OpcError::ZipError(format!(
+                "source-backed precompressed payload expected {logical_size} decoded bytes but ZIP metadata declares {}",
+                metadata.uncompressed_size()
+            )));
+        }
+        self.limits.check(
+            SourceLimitKind::ArchiveCompressedBytes,
+            metadata.compressed_size(),
+            self.limits.max_archive_compressed_bytes(),
+        )?;
+        self.limits.check(
+            SourceLimitKind::EntryBytes,
+            metadata.uncompressed_size(),
+            self.limits.max_entry_bytes(),
+        )?;
+        self.limits.check(
+            SourceLimitKind::PartBytes,
+            logical_size,
+            self.limits.max_part_bytes(),
+        )?;
+        // The verified capture remains retained while the preservation writer
+        // builds one fresh generated member. Its bounded capacity is
+        // `C + 2*name + 4096`; reserve the capture `C` plus the
+        // payload/fixed portion here. The target-name term is added by
+        // `try_add_precompressed_part` once the destination URI is known.
+        let fixed_bytes = AuthorizedPrecompressedPart::fixed_memory_bytes(
+            &part.partname,
+            part.content_type.as_str(),
+        )?;
+        metadata
+            .compressed_size()
+            .checked_mul(2)
+            .and_then(|bytes| bytes.checked_add(fixed_bytes))
+            .ok_or_else(|| overlay_unavailable("precompressed staging size overflows u64"))?;
+        let memory_reservation = self.reserve_topology_memory(metadata.compressed_size())?;
+        let writer_memory_reservation = self.reserve_topology_memory(metadata.compressed_size())?;
+        let fixed_memory_reservation = self.reserve_topology_memory(fixed_bytes)?;
+
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if let Some(context) = self.source.context.as_ref() {
+            let work = metadata
+                .compressed_size()
+                .checked_add(if expected_decoded.is_some() {
+                    metadata.uncompressed_size()
+                } else {
+                    0
+                })
+                .ok_or_else(|| overlay_unavailable("precompressed verification work overflows"))?;
+            context
+                .consume(Resource::Work, work)
+                .map_err(map_execution_error)?;
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+        }
+        let _monitored = self.source.monitor_publication();
+        let mut captured = None;
+        let (data, expected_decoded) = match expected_decoded {
+            Some(bytes) => (None, bytes),
+            None => {
+                let mut observer = NoopDiagnosticObserver;
+                let data = self.read_part_with_observer_and_capture(
+                    index,
+                    None,
+                    None,
+                    &mut observer,
+                    Some(&mut captured),
+                    None,
+                )?;
+                // Cache admission charges decoded work for elected loaders.
+                // Hits/waiters require a fresh verification decode instead.
+                if captured.is_none() {
+                    if let Some(context) = self.source.context.as_ref() {
+                        context
+                            .consume(Resource::Work, logical_size)
+                            .map_err(map_execution_error)?;
+                    }
+                }
+                let bytes = Arc::clone(&data.payload.bytes);
+                (Some(data), bytes)
+            },
+        };
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let physical = match captured {
+            Some(physical) => Ok(physical),
+            None => self.archive.read_entry_precompressed_with_progress(
+                entry_id,
+                expected_decoded.as_slice(),
+                |_| {
+                    self.source.ensure_current()?;
+                    self.cache.check_context().map_err(map_execution_error)
+                },
+            ),
+        };
+        let source_error = self.source.ensure_current().err();
+        let execution_error = self.cache.check_context().err().map(map_execution_error);
+        if let Some(error) = source_error {
+            return Err(error);
+        }
+        if let Some(error) = execution_error {
+            return Err(error);
+        }
+        let physical = physical.map_err(map_verified_precompressed_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+
+        let token = AuthorizedPrecompressedPart {
+            physical,
+            source_artifact: SourceArtifact {
+                snapshot: self.source.clone(),
+                fingerprint_memo: self.fingerprint_memo.clone(),
+                archive: Arc::clone(&self.archive),
+                catalog: Arc::clone(&self.catalog),
+            },
+            source_lineage: self.source.lineage.clone(),
+            source_version: self.source.version,
+            source_partname: part.partname.clone(),
+            source_content_type: part.content_type.clone(),
+            expected_decoded,
+            decoded_payload: data.as_ref().map(|data| data.payload.clone()),
+            memory_reservation,
+            writer_memory_reservation,
+            fixed_memory_reservation,
+            writer_name_reservation: None,
+        };
+        Ok((data, token))
+    }
+
+    /// Validate that the located ZIP ends at the exact source boundary.
+    ///
+    /// The offset was retained by the initial positional archive locator, so
+    /// this check performs no source read, allocation, or directory rescan. It
+    /// lets a format facade refuse trailing opaque bytes before returning a
+    /// topology-changing semantic plan.
+    pub fn validate_topology_source_boundary(&self) -> Result<()> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.archive.archive_end_offset() != self.source.length {
+            return Err(overlay_unavailable(
+                "source ZIP archive has trailing bytes outside its located archive",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Fully materialize this immutable view into the existing mutable package type.
+    ///
+    /// This conversion refuses managed packages before any ordinary payload
+    /// read. Unmanaged payloads are adopted as shared allocations by the
+    /// owning parts. Managed payload handles retain hierarchical reservations,
+    /// however, and cannot escape as bare owning-package allocations; use the
+    /// source-backed view while that context is active. A materialized signed
+    /// graph retains borrowed-ingress policy and must be explicitly stripped
+    /// or resigned before ordinary publication.
+    ///
+    /// Clones of this package share its catalog, so the conversion copies the
+    /// non-part member list exactly as [`Self::to_opc_package`] does and leaves
+    /// every other clone readable.
+    pub fn into_opc_package(self) -> Result<OpcPackage> {
+        self.to_opc_package_inner(None, false)
+    }
+
+    /// Fully materialize this immutable view while recording cold Part reads
+    /// in a caller-owned report.
+    ///
+    /// The consuming conversion uses the same serial read session as
+    /// [`Self::into_opc_package`]. Stored and Deflate payload work from cold
+    /// Parts is merged into `accounting`; cache hits contribute no counters.
+    /// The report is updated before a later source, ZIP, or materialization
+    /// error is returned, so a failed conversion can retain partial cold-read
+    /// progress. Managed packages are refused before any payload read and
+    /// leave the report unchanged.
+    pub fn into_opc_package_with_accounting(
+        self,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<OpcPackage> {
+        self.to_opc_package_inner(Some(accounting), false)
+    }
+
+    /// Materialize this immutable view into an owning package without
+    /// consuming the source-backed package.
+    ///
+    /// The borrowed conversion is intentionally unavailable for packages
+    /// opened with an execution context. Unmanaged payloads are adopted as
+    /// shared allocations by the owning parts, while managed payload handles
+    /// retain hierarchical memory and object reservations that cannot be
+    /// detached into a bare owning-package allocation. The refusal occurs
+    /// after source and execution checks, but before any ordinary payload read.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::ManagedPackageMaterialization`] for a managed
+    /// package, or the same source, limit, relationship, ZIP, and allocation
+    /// errors as [`Self::into_opc_package`]. A source mutation or cancellation
+    /// observed before, during, or after materialization rejects the result.
+    /// A signed borrowed graph remains policy-gated after materialization.
+    pub fn to_opc_package(&self) -> Result<OpcPackage> {
+        self.to_opc_package_inner(None, false)
+    }
+
+    /// Materialize this source-backed package while retaining a bounded copy
+    /// of its exact source archive for later owning-package publication.
+    ///
+    /// This is the explicit Eager conversion seam. In-memory and reader-owned
+    /// sources share their existing allocation; positional sources are copied
+    /// once under [`SourceLimits::max_input_bytes`]. The copy retains ZIP
+    /// framing and opaque members so a later owning edit can preserve every
+    /// untouched physical member. The source is fenced before and after the
+    /// copy and the ordinary materialization, so a changed file cannot be
+    /// adopted as an eager owner.
+    pub fn to_opc_package_preserving_source(&self) -> Result<OpcPackage> {
+        self.to_opc_package_inner(None, true)
+    }
+
+    /// Materialize this immutable view without consuming it while recording
+    /// cold Part reads in a caller-owned report.
+    ///
+    /// This borrowed conversion has the same source, managed-package, cache,
+    /// decoder-session, and partial-error behavior as
+    /// [`Self::into_opc_package_with_accounting`]. A cache hit contributes no
+    /// counters. The source-backed package remains usable after a successful
+    /// conversion.
+    pub fn to_opc_package_with_accounting(
+        &self,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<OpcPackage> {
+        self.to_opc_package_inner(Some(accounting), false)
+    }
+
+    fn to_opc_package_inner(
+        &self,
+        accounting: Option<&mut OpcOperationAccounting>,
+        preserve_source: bool,
+    ) -> Result<OpcPackage> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        if self.cache.is_managed() {
+            return Err(OpcError::ManagedPackageMaterialization);
+        }
+        let source = self.finish_stage(if preserve_source {
+            self.materialization_source_shared().map(Some)
+        } else {
+            Ok(self.owned_source_shared())
+        })?;
+        let non_part_members = self.finish_stage(self.cloned_non_part_members())?;
+        let result = self.materialize_opc_package_with_accounting(
+            non_part_members,
+            accounting,
+            source,
+            preserve_source,
+        );
+        self.finish_stage(result)
+    }
+
+    fn materialization_source_shared(&self) -> Result<Arc<Vec<u8>>> {
+        if let Some(source) = self.owned_source_shared() {
+            return Ok(source);
+        }
+
+        let length = usize::try_from(self.source.length)
+            .map_err(|_| overlay_unavailable("source archive is too large for this platform"))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed eager archive preservation",
+                source,
+            })?;
+        if bytes.capacity() < length {
+            return Err(overlay_unavailable(
+                "source archive preservation allocation exceeds its requested bound",
+            ));
+        }
+        self.source_artifact().write_to(&mut bytes)?;
+        if bytes.len() != length {
+            return Err(OpcError::ZipError(format!(
+                "source-backed OPC archive declared {length} bytes but copied {}",
+                bytes.len()
+            )));
+        }
+        Ok(Arc::new(bytes))
+    }
+
+    /// Admit every catalog part's declared size against the part and
+    /// aggregate part-byte limits, as an owning open does before it defers
+    /// or reads any payload.
+    fn check_declared_part_bytes(&self) -> Result<()> {
+        self.limits.check(
+            SourceLimitKind::TotalPartBytes,
+            self.catalog.declared_part_bytes,
+            self.limits.max_total_part_bytes(),
+        )
+    }
+
+    fn cloned_non_part_members(&self) -> Result<Vec<NonPartMember>> {
+        let mut members = Vec::new();
+        let reserve = members
+            .try_reserve_exact(self.catalog.non_part_members.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC non-part members",
+                source,
+            });
+        self.finish_stage(reserve)?;
+        for member in &self.catalog.non_part_members {
+            let result = NonPartMember::new(member.name(), member.reason());
+            members.push(self.finish_stage(result)?);
+        }
+        Ok(members)
+    }
+
+    /// Build the owning graph from the admitted catalog.
+    ///
+    /// With `defer_payloads` (the source-preserving conversion, which always
+    /// holds the source archive in memory), ordinary part payloads stay in
+    /// that retained archive and inflate on first use, exactly as an owning
+    /// open of the same bytes defers them; the declared sizes are admitted
+    /// here, as that open admits them before any payload work. Otherwise
+    /// every payload is read now.
+    fn materialize_opc_package_with_accounting(
+        &self,
+        non_part_members: Vec<NonPartMember>,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+        source: Option<Arc<Vec<u8>>>,
+        defer_payloads: bool,
+    ) -> Result<OpcPackage> {
+        self.disable_read_ahead_for_publication()?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let mut package = OpcPackage::new();
+        let result = copy_relationships(&self.catalog.package_relationships, package.rels_mut());
+        self.finish_stage(result)?;
+        let mut parts = Vec::new();
+        self.finish_stage(
+            parts
+                .try_reserve_exact(self.catalog.parts.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC materialized parts",
+                    source,
+                }),
+        )?;
+        let deferred = match &source {
+            Some(bytes) if defer_payloads => {
+                self.finish_stage(self.check_declared_part_bytes())?;
+                Some(Arc::new(crate::payload::DeferredPartSource::new(
+                    Arc::clone(bytes),
+                    self.limits,
+                )))
+            },
+            _ => None,
+        };
+        let mut read_session = self.archive.read_session();
+        for index in 0..self.catalog.parts.len() {
+            let catalog_part = &self.catalog.parts[index];
+            let payload = if let Some(deferred) = &deferred {
+                let member = catalog_part.partname.membername();
+                let mut name = String::new();
+                self.finish_stage(name.try_reserve_exact(member.len()).map_err(|source| {
+                    OpcError::Allocation {
+                        resource: "source-backed OPC deferred part member name",
+                        source,
+                    }
+                }))?;
+                name.push_str(member);
+                let declared_len = self
+                    .archive
+                    .metadata_for(catalog_part.entry_id)?
+                    .uncompressed_size();
+                crate::payload::PartPayload::deferred(deferred, name.into_boxed_str(), declared_len)
+            } else {
+                let bytes = self.finish_stage(self.read_part_with_session(
+                    index,
+                    &mut read_session,
+                    accounting.as_deref_mut(),
+                ))?;
+                crate::payload::PartPayload::ready(self.finish_stage(bytes.into_arc())?)
+            };
+            let part_result = PartFactory::load_payload(
+                catalog_part.partname.clone(),
+                catalog_part.content_type.as_str().to_owned(),
+                payload,
+            );
+            let mut part = self.finish_stage(part_result)?;
+            let result = copy_relationships(&catalog_part.relationships, part.rels_mut());
+            self.finish_stage(result)?;
+            parts.push((part, true));
+        }
+        let result = package.try_add_materialized_parts(parts, || self.finish_stage(Ok(())));
+        self.finish_stage(result)?;
+        // The catalog already admitted and summed every ordinary part's
+        // declared payload. Transfer that proof instead of making the eager
+        // owner rescan the complete part map at the conversion seam.
+        package.set_admitted_part_bytes(self.catalog.declared_part_bytes);
+        package.set_non_part_members(non_part_members);
+        package.set_tolerance_report(self.catalog.tolerance_report.clone());
+        if let Some(source) = source {
+            self.attach_owned_source_preservation(&mut package, true, source, &[], accounting)?;
+        }
+        package.mark_source_ingress_signature_policy();
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        Ok(package)
+    }
+
+    /// Transfer source archive provenance into an already materialized graph.
+    ///
+    /// The source bytes supplied by the conversion are shared with the owning
+    /// package. The source manifest and relationship members are captured
+    /// before the archive is attached, so a later eager edit can use targeted
+    /// preservation for every untouched member. The OPC catalog is reused;
+    /// only the bounded physical ZIP member scan needed by the publication
+    /// provenance is performed. The preserving conversion supplies a bounded
+    /// source copy for positional inputs; ordinary materialization supplies a
+    /// source allocation only when one already exists in memory.
+    pub(crate) fn attach_owned_source_preservation(
+        &self,
+        package: &mut OpcPackage,
+        exact: bool,
+        source: Arc<Vec<u8>>,
+        removed: &[PackURI],
+        mut accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<()> {
+        let content_types = self
+            .content_types_data_with_limit_and_accounting(
+                self.limits.max_content_types_bytes(),
+                accounting.as_deref_mut(),
+            )?
+            .into_arc()?;
+
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let package_relationships = package.rels().clone();
+        let source_package_rels_match =
+            package_relationships.semantically_eq(&self.catalog.package_relationships);
+        if source_package_rels_match
+            && let Some(data) = self.relationships_data_for_with_limit_and_accounting(
+                &package_uri,
+                self.limits.max_relationship_xml_bytes(),
+                accounting.as_deref_mut(),
+            )?
+        {
+            package.retain_relationships_xml(
+                package_uri.clone(),
+                data.into_arc()?,
+                &package_relationships,
+            )?;
+        }
+
+        for source_part in &self.catalog.parts {
+            // Metadata only: a deferred payload stays in the archive.
+            let Some(current) = package.part_metadata(&source_part.partname) else {
+                continue;
+            };
+            if !current.rels().semantically_eq(&source_part.relationships) {
+                continue;
+            }
+            if let Some(data) = self.relationships_data_for_with_limit_and_accounting(
+                &source_part.partname,
+                self.limits.max_relationship_xml_bytes(),
+                accounting.as_deref_mut(),
+            )? {
+                let relationships = current.rels().clone();
+                package.retain_relationships_xml(
+                    source_part.partname.clone(),
+                    data.into_arc()?,
+                    &relationships,
+                )?;
+            }
+        }
+
+        package.attach_owned_source_preservation(
+            source,
+            Some(content_types),
+            Some(Arc::clone(&self.catalog.content_types)),
+            self.limits,
+            exact,
+            removed,
+        )?;
+        Ok(())
+    }
+
+    fn finish_stage<T>(&self, result: Result<T>) -> Result<T> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        result
+    }
+
+    /// Prepare a bounded source-backed OPC topology plan for semantic readback
+    /// and later publication.
+    ///
+    /// Existing Part payloads may be replaced, new typed Parts may be added,
+    /// and relationships may be added, replaced, or removed on the package or
+    /// an existing or newly added Part. Unchanged members retain their exact
+    /// source ZIP records. The content-types manifest retains its original
+    /// bytes and member spelling; only required new `Override` elements are
+    /// inserted immediately before the parsed `Types` closing tag.
+    /// Existing canonical relationship members use the generated
+    /// [`Relationships::to_xml`] form. A noncanonical existing member is
+    /// changed by a source splice when the operation appends authored edges,
+    /// removes explicitly selected direct Relationship elements, or composes
+    /// those two operations for one owner. Each path proves the original
+    /// relationship set and retains every unrelated source byte. Replacement
+    /// operations on the same owner still require canonical source bytes. The source-splice
+    /// profile refuses namespace URI declarations that require entity
+    /// decoding, even when that lexical form is otherwise well-formed XML.
+    ///
+    /// An empty plan is an exact source copy, including signed packages and
+    /// physical details unsupported by the rewrite preservation primitive.
+    pub fn prepare_topology(self, plan: SourceTopologyPlan) -> Result<PreparedTopology> {
+        let state = self.prepare_topology_state(plan)?;
+        let reservation = self.reserve_topology_memory(
+            (size_of::<PreparedTopologyState>() + size_of::<[usize; 2]>()) as u64,
+        )?;
+        Ok(PreparedTopology {
+            package: self,
+            state: Arc::new(state),
+            _state_reservation: reservation,
+        })
+    }
+
+    /// Measure the candidate package metadata produced by a topology plan.
+    ///
+    /// This is the length-only admission seam for callers that must reserve an
+    /// exact durable wire budget before retaining any Part payload.  The
+    /// planner reads relationship and content-types metadata, but it does not
+    /// materialize unchanged Part payloads; callers therefore use it for
+    /// structural additions/removals before their charged capture phase.
+    pub fn topology_metadata_lengths(
+        &self,
+        presentation_uri: &PackURI,
+        plan: SourceTopologyPlan,
+    ) -> Result<(usize, usize)> {
+        self.topology_metadata_lengths_fast(presentation_uri, plan)
+    }
+
+    /// Compute the two metadata lengths needed by a native presentation edit.
+    ///
+    /// This is intentionally a lexical, affected-owner preflight.  The full
+    /// topology planner remains the publication authority, but using it here
+    /// would first build a physical-member index, a complete Part namespace,
+    /// and a package-wide relationship graph even when the caller only needs
+    /// the presentation `.rels` and `[Content_Types].xml` lengths.  The
+    /// source catalog already owns the typed maps and scalar relationship
+    /// metrics; this pass reads only changed relationship members and the
+    /// content-types manifest when their selectors actually change.
+    fn topology_metadata_lengths_fast(
+        &self,
+        presentation_uri: &PackURI,
+        plan: SourceTopologyPlan,
+    ) -> Result<(usize, usize)> {
+        self.disable_read_ahead_for_publication()?;
+        self.validate_topology_source_boundary()?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "topology publication refuses encrypted ZIP members",
+            ));
+        }
+        if plan.is_empty() {
+            let relationships = self
+                .declared_relationships_uncompressed_size(presentation_uri)?
+                .ok_or_else(|| overlay_unavailable("topology metadata has no relationships"))?;
+            let relationships = usize::try_from(relationships)
+                .map_err(|_| overlay_unavailable("relationships metadata length exceeds usize"))?;
+            let content_types = usize::try_from(self.declared_content_types_uncompressed_size()?)
+                .map_err(|_| {
+                overlay_unavailable("content-types metadata length exceeds usize")
+            })?;
+            return Ok((relationships, content_types));
+        }
+
+        let SourceTopologyPlan {
+            additions,
+            removals,
+            mut relationships,
+            raw_relationships,
+            raw_content_types,
+            ..
+        } = plan;
+        self.check_topology_progress()?;
+        for addition in &additions {
+            let payload_len = addition.payload.effective_bytes_arc().len() as u64;
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                payload_len,
+                self.limits.max_part_bytes(),
+            )?;
+            self.limits.check(
+                SourceLimitKind::EntryBytes,
+                payload_len,
+                self.limits.max_entry_bytes(),
+            )?;
+        }
+        for removal in &removals {
+            if self.part_index(removal).is_none() {
+                return Err(OpcError::PartNotFound(removal.to_string()));
+            }
+        }
+        relationships.sort_unstable_by(|left, right| {
+            left.owner
+                .as_str()
+                .cmp(right.owner.as_str())
+                .then_with(|| left.r_id.cmp(&right.r_id))
+        });
+
+        // The relationship planner only needs physical IDs for the owners it
+        // is about to rewrite.  Exact archive lookup is the common path.  A
+        // fallback directory scan is retained solely for a case-variant
+        // member spelling, and therefore never becomes a package-wide index
+        // or a per-edit archive count.
+        let mut affected_members = Vec::new();
+        let affected_member_capacity = relationships
+            .len()
+            .checked_add(removals.len())
+            .and_then(|count| count.checked_add(raw_relationships.len()))
+            .ok_or_else(|| overlay_unavailable("affected relationship member count overflows"))?;
+        affected_members
+            .try_reserve(affected_member_capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC affected relationship members",
+                source,
+            })?;
+        for change in &relationships {
+            let member = change
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            if !affected_members
+                .iter()
+                .any(|candidate: &String| candidate == &member)
+            {
+                affected_members.push(member);
+            }
+        }
+        for removal in &removals {
+            let member = removal
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            if !affected_members
+                .iter()
+                .any(|candidate| candidate == &member)
+            {
+                affected_members.push(member);
+            }
+        }
+        for restore in &raw_relationships {
+            let member = restore
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            if !affected_members
+                .iter()
+                .any(|candidate| candidate == &member)
+            {
+                affected_members.push(member);
+            }
+        }
+        let physical_members = self.build_affected_physical_member_lookup(&affected_members)?;
+        for restore in &raw_relationships {
+            let member_name = restore
+                .owner
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned();
+            let existing =
+                self.source_entry_id_case_insensitive(&member_name, &physical_members)?;
+            match (restore.expected.as_ref(), existing) {
+                (Some(expected), Some(entry)) => {
+                    let metadata = self.archive.metadata_for(entry)?;
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        metadata.uncompressed_size(),
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    let source = self
+                        .archive
+                        .read_entry(entry)
+                        .map_err(map_preservation_error)?;
+                    self.check_topology_progress()?;
+                    if source.as_slice() != expected.as_slice() {
+                        return Err(overlay_unavailable("stale raw relationship source image"));
+                    }
+                },
+                (Some(_), None) => {
+                    return Err(overlay_unavailable(
+                        "raw relationship source member is physically absent",
+                    ));
+                },
+                (None, Some(_)) => {
+                    return Err(overlay_unavailable(
+                        "raw relationship source member is physically present",
+                    ));
+                },
+                (None, None) => {},
+            }
+            if let Some(replacement) = restore.replacement.as_ref() {
+                self.limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    replacement.len() as u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                self.limits.check(
+                    SourceLimitKind::EntryBytes,
+                    replacement.len() as u64,
+                    self.limits.max_entry_bytes(),
+                )?;
+            }
+        }
+        let (_, relationship_preflights) =
+            relationships_plan::plan_relationship_publications_metadata(
+                self,
+                &relationships,
+                &physical_members,
+            )?;
+
+        let relationships_len = raw_relationships
+            .iter()
+            .find(|restore| restore.owner.is_equivalent_to(presentation_uri))
+            .map(|restore| restore.replacement.as_ref().map_or(0, |bytes| bytes.len()))
+            .or_else(|| {
+                relationship_preflights
+                    .iter()
+                    .find(|summary| summary.owner.is_equivalent_to(presentation_uri))
+                    .and_then(|summary| usize::try_from(summary.final_bytes).ok())
+            })
+            .or(self
+                .declared_relationships_uncompressed_size(presentation_uri)?
+                .and_then(|length| usize::try_from(length).ok()))
+            .ok_or_else(|| overlay_unavailable("topology metadata has no relationships"))?;
+
+        let content_types_len = if let Some(raw) = raw_content_types.as_ref() {
+            let (source, _, _) = self.read_content_types_xml()?;
+            if source.as_slice() != raw.expected.as_slice() {
+                return Err(overlay_unavailable("stale raw content-types source image"));
+            }
+            self.limits.check(
+                SourceLimitKind::ContentTypesBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_content_types_bytes() as u64,
+            )?;
+            self.limits.check(
+                SourceLimitKind::EntryBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_entry_bytes(),
+            )?;
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            raw.replacement.len()
+        } else if additions.is_empty()
+            && removals.is_empty()
+            && !raw_relationships
+                .iter()
+                .any(|restore| restore.replacement.is_none())
+        {
+            usize::try_from(self.declared_content_types_uncompressed_size()?)
+                .map_err(|_| overlay_unavailable("content-types metadata length exceeds usize"))?
+        } else {
+            let mut override_additions = Vec::new();
+            override_additions
+                .try_reserve(additions.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC metadata content-type additions",
+                    source,
+                })?;
+            for addition in additions {
+                if let Some(existing) = self.catalog.content_types.override_for(&addition.partname)
+                {
+                    if existing.as_str() != addition.content_type.as_str() {
+                        return Err(overlay_unavailable(format!(
+                            "existing content-type override for '{}' conflicts",
+                            addition.partname
+                        )));
+                    }
+                    continue;
+                }
+                if self
+                    .catalog
+                    .content_types
+                    .get(&addition.partname)
+                    .is_ok_and(|existing| existing == addition.content_type.as_str())
+                {
+                    continue;
+                }
+                override_additions
+                    .push((addition.partname, addition.content_type.as_str().to_owned()));
+            }
+            let mut override_removals = Vec::new();
+            override_removals
+                .try_reserve(removals.len().saturating_add(raw_relationships.len()))
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC metadata content-type removals",
+                    source,
+                })?;
+            for removal in removals {
+                if self.catalog.content_types.override_for(&removal).is_some() {
+                    override_removals.push(removal.clone());
+                }
+                let relationships_uri = removal.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .catalog
+                    .content_types
+                    .override_for(&relationships_uri)
+                    .is_some()
+                    && self
+                        .source_entry_id_case_insensitive(
+                            relationships_uri.membername(),
+                            &physical_members,
+                        )?
+                        .is_some()
+                {
+                    override_removals.push(relationships_uri);
+                }
+            }
+            for restore in raw_relationships
+                .iter()
+                .filter(|restore| restore.replacement.is_none())
+            {
+                let relationships_uri =
+                    restore.owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .catalog
+                    .content_types
+                    .override_for(&relationships_uri)
+                    .is_some()
+                    && self
+                        .source_entry_id_case_insensitive(
+                            relationships_uri.membername(),
+                            &physical_members,
+                        )?
+                        .is_some()
+                {
+                    override_removals.push(relationships_uri);
+                }
+            }
+            override_removals.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+            override_removals.dedup_by(|left, right| left.is_equivalent_to(right));
+            if override_additions.is_empty() && override_removals.is_empty() {
+                usize::try_from(self.declared_content_types_uncompressed_size()?).map_err(|_| {
+                    overlay_unavailable("content-types metadata length exceeds usize")
+                })?
+            } else {
+                let (source, _, _) = self.read_content_types_xml()?;
+                let content_plan = content_types_plan::ContentTypesPlan::plan_owned(
+                    &source,
+                    override_additions,
+                    &override_removals,
+                    self.limits,
+                    self.cache.context(),
+                    self.cache.reservation_failure_counter(),
+                )?;
+                content_plan.final_len()
+            }
+        };
+        self.check_topology_progress()?;
+        Ok((relationships_len, content_types_len))
+    }
+
+    /// Validate a complete prepared candidate while borrowing this package.
+    ///
+    /// Uses the same bounded planner and effective catalog as
+    /// [`Self::prepare_topology`], without cloning the source ZIP or catalog.
+    /// Generated overlays, source authorization tokens, and managed reservations
+    /// remain alive through the callback. Source and execution fences run on
+    /// both sides, and this method writes no external output. The package is
+    /// still usable after either callback success or failure.
+    ///
+    /// Exact no-op plans have no prepared candidate and return an error without
+    /// invoking the callback, matching [`PreparedTopology::with_candidate`].
+    ///
+    /// Candidate views cannot escape the callback that retains their preparation:
+    ///
+    /// ```compile_fail
+    /// use litchi_opc::{PackURI, SourceBackedPackage, SourceTopologyPlan};
+    /// fn escape(package: &SourceBackedPackage, plan: SourceTopologyPlan) {
+    ///     let uri = PackURI::new("/word/document.xml").unwrap();
+    ///     let _part = package.with_prepared_topology(plan, |candidate| {
+    ///         candidate.part(&uri)
+    ///     });
+    /// }
+    /// ```
+    pub fn with_prepared_topology<T, F>(&self, plan: SourceTopologyPlan, callback: F) -> Result<T>
+    where
+        F: FnOnce(&EffectiveTopology<'_>) -> Result<T>,
+    {
+        let state = self.prepare_topology_state(plan)?;
+        state.with_candidate(self, callback)
+    }
+
+    fn prepare_topology_state(&self, plan: SourceTopologyPlan) -> Result<PreparedTopologyState> {
+        self.disable_read_ahead_for_publication()?;
+        if plan.is_empty() {
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            return Ok(PreparedTopologyState {
+                changed: Vec::new(),
+                retained: None,
+                effective: None,
+                totals: None,
+                _catalog_reservation: None,
+                no_op: true,
+            });
+        }
+        let introduces_signature = plan.introduces_signature_infrastructure();
+        self.validate_topology_source_boundary()?;
+        if self.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "topology publication refuses encrypted ZIP members",
+            ));
+        }
+
+        let SourceTopologyPlan {
+            mut replacements,
+            mut additions,
+            mut removals,
+            mut relationships,
+            mut raw_relationships,
+            raw_content_types,
+            relationship_bytes: _,
+            raw_metadata_bytes: _,
+        } = plan;
+        self.check_topology_progress()?;
+        replacements
+            .sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+        additions
+            .sort_unstable_by(|left, right| left.partname.as_str().cmp(right.partname.as_str()));
+        removals.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+        relationships.sort_unstable_by(|left, right| {
+            left.owner
+                .as_str()
+                .cmp(right.owner.as_str())
+                .then_with(|| left.r_id.cmp(&right.r_id))
+        });
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if let TopologyPartPayload::Precompressed(payload) = &addition.payload {
+                payload.check_for_publication(addition.content_type.as_str())?;
+            }
+            if let TopologyPartPayload::SourceXml(payload) = &addition.payload {
+                payload.check_for_publication(addition.content_type.as_str(), self.limits)?;
+            }
+        }
+        self.check_topology_progress()?;
+        let has_signature_infrastructure = self.has_signature_infrastructure();
+        if introduces_signature && !has_signature_infrastructure {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if (!additions.is_empty() || !removals.is_empty()) && has_signature_infrastructure {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+
+        // A signed source must reject a changed Part before namespace,
+        // relationship, physical-member, or output-limit planning. Exact
+        // no-op replacements remain eligible for the byte-for-byte signed
+        // source copy below. Keep only the verification result: retaining
+        // PartData here would retain a source payload (and its managed
+        // reservation) across all subsequent topology planning.
+        let signed_replacements_are_noop = if additions.is_empty() && has_signature_infrastructure {
+            for (index, replacement) in replacements.iter().enumerate() {
+                if index & 0x3f == 0 {
+                    self.check_topology_progress()?;
+                }
+                let target = self
+                    .part_index(&replacement.partname)
+                    .ok_or_else(|| OpcError::PartNotFound(replacement.partname.to_string()))?;
+                let original = self.read_part(target)?;
+                if original.as_bytes() != replacement.replacement.as_slice() {
+                    return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+                }
+            }
+            true
+        } else {
+            false
+        };
+
+        let (physical_members, _physical_member_memory) = self.build_physical_member_lookup()?;
+        let content_types_key = folded_ascii_name(
+            &self.catalog.content_types_member,
+            "source-backed OPC folded physical member name",
+        )?;
+        let content_types_member_count = physical_members
+            .by_folded_name
+            .get(&content_types_key)
+            .map_or(0, |info| info.count);
+        if content_types_member_count != 1 {
+            return Err(overlay_unavailable(
+                "source must contain exactly one content-types member",
+            ));
+        }
+
+        // Resolve replacements against the immutable source catalog. A
+        // replacement is deliberately never allowed to target a Part added by
+        // the same plan; callers must express that as the new Part payload.
+        let mut pending_replacements = Vec::new();
+        pending_replacements
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology replacement targets",
+                source,
+            })?;
+        for (index, replacement) in replacements.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let target = self
+                .part_index(&replacement.partname)
+                .ok_or_else(|| OpcError::PartNotFound(replacement.partname.to_string()))?;
+            if let Some(source_xml) = replacement.source_xml.as_ref() {
+                let destination_original = self.read_part(target)?;
+                source_xml.check_for_replacement(
+                    &self.source,
+                    &self.catalog.parts[target].partname,
+                    self.catalog.parts[target].content_type.as_str(),
+                    destination_original.as_bytes(),
+                    self.limits,
+                )?;
+            }
+            pending_replacements.push(PendingOverlay {
+                target,
+                replacement: Arc::clone(&replacement.replacement),
+                source_xml: replacement.source_xml.clone(),
+                replacement_spans: replacement.replacement_spans.clone(),
+                proof: replacement.proof.clone(),
+            });
+        }
+        let mut pending_replacement_indices = HashMap::new();
+        pending_replacement_indices
+            .try_reserve(pending_replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology replacement index",
+                source,
+            })?;
+        for (index, replacement) in pending_replacements.iter().enumerate() {
+            if pending_replacement_indices
+                .insert(replacement.target, index)
+                .is_some()
+            {
+                return Err(OpcError::DuplicatePartName(
+                    self.catalog.parts[replacement.target].partname.to_string(),
+                ));
+            }
+        }
+        let mut pending_removals = Vec::new();
+        pending_removals
+            .try_reserve_exact(removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology removal targets",
+                source,
+            })?;
+        for (index, removal) in removals.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let target = self
+                .part_index(removal)
+                .ok_or_else(|| OpcError::PartNotFound(removal.to_string()))?;
+            if pending_removals.contains(&target) {
+                return Err(OpcError::DuplicatePartName(removal.to_string()));
+            }
+            pending_removals.push(target);
+        }
+        let mut pending_removal_set = HashSet::new();
+        pending_removal_set
+            .try_reserve(pending_removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology removal index",
+                source,
+            })?;
+        pending_removal_set.extend(pending_removals.iter().copied());
+        self.validate_overlay_limits(
+            pending_replacements
+                .iter()
+                .map(|overlay| (overlay.target, overlay.replacement.len())),
+            self.limits,
+        )?;
+
+        // Build the source/new Part namespace with the same duplicate,
+        // equivalent, and derived-name rules used by package ingestion.
+        let namespace_capacity = self
+            .catalog
+            .parts
+            .len()
+            .checked_sub(pending_removals.len())
+            .ok_or_else(|| overlay_unavailable("topology Part removal count underflows"))?
+            .checked_add(additions.len())
+            .ok_or_else(|| overlay_unavailable("topology Part count overflows usize"))?;
+        self.limits.check(
+            SourceLimitKind::Parts,
+            namespace_capacity as u64,
+            self.limits.max_parts() as u64,
+        )?;
+        let mut part_names = PartNameIndex::try_with_capacity(namespace_capacity)?;
+        for (index, part) in self.catalog.parts.iter().enumerate() {
+            if index & 0xff == 0 {
+                self.check_topology_progress()?;
+            }
+            if !pending_removal_set.contains(&index) {
+                part_names.insert(&part.partname)?;
+            }
+        }
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if is_relationship_member_name(addition.partname.membername()) {
+                return Err(overlay_unavailable(
+                    "a topology Part cannot use a reserved relationships member name",
+                ));
+            }
+            part_names.insert(&addition.partname)?;
+            let physical_key = folded_ascii_name(
+                addition.partname.membername(),
+                "source-backed OPC folded physical member name",
+            )?;
+            if physical_members.by_folded_name.contains_key(&physical_key) {
+                return Err(overlay_unavailable(format!(
+                    "new Part '{}' collides with a physical source member",
+                    addition.partname
+                )));
+            }
+        }
+
+        // Keep one fallibly allocated, ASCII-folded namespace lookup for
+        // relationship owner/target canonicalization. This prevents a
+        // case-equivalent owner spelling from splitting groups and avoids a
+        // relationship-by-relationship scan of the complete Part catalog.
+        let mut canonical_part_names = HashMap::new();
+        canonical_part_names
+            .try_reserve(namespace_capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology canonical Part lookup",
+                source,
+            })?;
+        for (index, part) in self.catalog.parts.iter().enumerate() {
+            if pending_removal_set.contains(&index) {
+                continue;
+            }
+            let key = folded_part_name(&part.partname)?;
+            if canonical_part_names.insert(key, index).is_some() {
+                return Err(overlay_unavailable(
+                    "source Part names are not uniquely ASCII-case-resolvable",
+                ));
+            }
+        }
+        let additions_offset = self.catalog.parts.len();
+        for (index, addition) in additions.iter().enumerate() {
+            let key = folded_part_name(&addition.partname)?;
+            let encoded = additions_offset
+                .checked_add(index)
+                .ok_or_else(|| overlay_unavailable("topology Part lookup index overflows"))?;
+            if canonical_part_names.insert(key, encoded).is_some() {
+                return Err(overlay_unavailable(
+                    "topology Part names are not uniquely ASCII-case-resolvable",
+                ));
+            }
+        }
+
+        // Validate all relationship owners and internal targets before
+        // constructing any generated XML. Internal targets must resolve to a
+        // physical existing or newly added Part; external targets remain
+        // caller-owned URI references and are never resolved through the Part
+        // graph.
+        for (index, relationship) in relationships.iter_mut().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if relationship.owner.as_str() != PACKAGE_URI {
+                let owner_key = folded_part_name(&relationship.owner)?;
+                let Some(owner_index) = canonical_part_names.get(&owner_key).copied() else {
+                    return Err(OpcError::PartNotFound(format!(
+                        "relationship owner '{}'",
+                        relationship.owner
+                    )));
+                };
+                relationship.owner = if owner_index < additions_offset {
+                    self.catalog.parts[owner_index].partname.clone()
+                } else {
+                    additions[owner_index - additions_offset].partname.clone()
+                };
+            }
+            let (TopologyRelationshipOperation::Add { target, .. }
+            | TopologyRelationshipOperation::Replace { target, .. }) = &mut relationship.operation
+            else {
+                continue;
+            };
+            let SourceRelationshipTarget::Internal(target) = target else {
+                continue;
+            };
+            if target.as_str() == PACKAGE_URI {
+                return Err(OpcError::InvalidRelationship(
+                    "internal relationship target cannot be the package root".to_string(),
+                ));
+            }
+            let target_key = folded_part_name(target)?;
+            let Some(target_index) = canonical_part_names.get(&target_key).copied() else {
+                return Err(OpcError::PartNotFound(format!(
+                    "relationship target '{}'",
+                    target
+                )));
+            };
+            *target = if target_index < additions_offset {
+                self.catalog.parts[target_index].partname.clone()
+            } else {
+                additions[target_index - additions_offset].partname.clone()
+            };
+        }
+        relationships.sort_unstable_by(|left, right| {
+            left.owner
+                .as_str()
+                .cmp(right.owner.as_str())
+                .then_with(|| left.r_id.cmp(&right.r_id))
+        });
+        for (index, restore) in raw_relationships.iter_mut().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if restore.owner.as_str() == PACKAGE_URI {
+                restore.owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+                continue;
+            }
+            let key = folded_part_name(&restore.owner)?;
+            let owner_index = if let Some(owner_index) = canonical_part_names.get(&key).copied() {
+                owner_index
+            } else if restore.replacement.is_none()
+                && self
+                    .part_index(&restore.owner)
+                    .is_some_and(|index| pending_removal_set.contains(&index))
+            {
+                self.part_index(&restore.owner)
+                    .ok_or_else(|| OpcError::PartNotFound(restore.owner.to_string()))?
+            } else {
+                return Err(OpcError::PartNotFound(format!(
+                    "raw relationship restore owner '{}'",
+                    restore.owner
+                )));
+            };
+            restore.owner = if owner_index < additions_offset {
+                self.catalog.parts[owner_index].partname.clone()
+            } else {
+                additions
+                    .get(owner_index - additions_offset)
+                    .ok_or_else(|| {
+                        overlay_unavailable(
+                            "raw relationship restore addition owner index is out of bounds",
+                        )
+                    })?
+                    .partname
+                    .clone()
+            };
+        }
+        self.check_topology_progress()?;
+
+        // A retained owner may not keep an inbound edge to a removed Part.
+        // Require the same plan to remove or retarget every such relationship;
+        // relationship members owned by removed Parts are omitted wholesale.
+        let relationship_is_detached = |owner: &str, r_id: &str| {
+            relationships.iter().any(|change| {
+                change.owner.as_str() == owner
+                    && change.r_id == r_id
+                    && matches!(
+                        &change.operation,
+                        TopologyRelationshipOperation::Remove { .. }
+                            | TopologyRelationshipOperation::Replace { .. }
+                    )
+            })
+        };
+        for relationship in self.catalog.package_relationships.iter() {
+            if relationship.is_external() {
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            if self
+                .part_index(&target)
+                .is_some_and(|index| pending_removal_set.contains(&index))
+                && !relationship_is_detached(PACKAGE_URI, relationship.r_id())
+            {
+                return Err(OpcError::InvalidRelationship(format!(
+                    "relationship '{}' owned by the package still targets removed Part '{}'",
+                    relationship.r_id(),
+                    target
+                )));
+            }
+        }
+        for (owner_index, owner) in self.catalog.parts.iter().enumerate() {
+            if pending_removal_set.contains(&owner_index) {
+                continue;
+            }
+            for relationship in owner.relationships.iter() {
+                if relationship.is_external() {
+                    continue;
+                }
+                let target = relationship.target_partname()?;
+                if self
+                    .part_index(&target)
+                    .is_some_and(|index| pending_removal_set.contains(&index))
+                    && !relationship_is_detached(owner.partname.as_str(), relationship.r_id())
+                {
+                    return Err(OpcError::InvalidRelationship(format!(
+                        "relationship '{}' owned by '{}' still targets removed Part '{}'",
+                        relationship.r_id(),
+                        owner.partname,
+                        target
+                    )));
+                }
+            }
+        }
+
+        // Read and validate the source content-types manifest only when the
+        // plan can change the effective mapping.  Replacement-only and
+        // relationship-only plans preserve every source mapping, and retained
+        // Part catalog entries provide a validated lazy fallback for candidate
+        // content-type queries.  ContentTypesPlan records exact lexical
+        // removal/insertion ranges and final bytes/mappings, so the aggregate
+        // admission below can reject changed manifests before output
+        // allocation.
+        let (
+            content_types_xml,
+            content_types_reservation,
+            content_types_object_reservation,
+            source_content_types_memory,
+            source_content_types,
+        ) = if additions.is_empty()
+            && pending_removals.is_empty()
+            && !raw_relationships
+                .iter()
+                .any(|restore| restore.replacement.is_none())
+            && raw_content_types.is_none()
+        {
+            (None, None, None, None, None)
+        } else {
+            let (content_types_xml, content_types_reservation, content_types_object_reservation) =
+                self.read_content_types_xml()?;
+            // Scan once without edits to obtain the exact source mapping count,
+            // then reserve the source map's XML-sized strings and per-entry
+            // hash state before `ContentTypeMap` allocates them. The edit plan
+            // below performs its own lexical range scan and keeps only its
+            // small staged metadata reservation.
+            let source_mapping_plan = content_types_plan::ContentTypesPlan::plan(
+                &content_types_xml,
+                &[],
+                &[],
+                self.limits,
+                self.cache.context(),
+                self.cache.reservation_failure_counter(),
+            )?;
+            let source_mapping_count = source_mapping_plan.mapping_count();
+            drop(source_mapping_plan);
+            let source_content_types_memory_bound = content_types_xml
+                .len()
+                .checked_mul(3)
+                .and_then(|bytes| bytes.checked_add(source_mapping_count.checked_mul(512)?))
+                .and_then(|bytes| bytes.checked_add(4096))
+                .ok_or_else(|| overlay_unavailable("source content-types map bound overflows"))?;
+            let source_content_types_memory = self.reserve_topology_memory(
+                u64::try_from(source_content_types_memory_bound).map_err(|_| {
+                    overlay_unavailable("source content-types map bound exceeds u64")
+                })?,
+            )?;
+            let source_content_types = ContentTypeMap::from_xml(&content_types_xml, self.limits)?;
+            (
+                Some(content_types_xml),
+                content_types_reservation,
+                content_types_object_reservation,
+                source_content_types_memory,
+                Some(source_content_types),
+            )
+        };
+        if let Some(raw) = raw_content_types.as_ref() {
+            let source = content_types_xml.as_deref().ok_or_else(|| {
+                overlay_unavailable("content-types source is unavailable for raw restore")
+            })?;
+            self.limits.check(
+                SourceLimitKind::ContentTypesBytes,
+                raw.expected.len() as u64,
+                self.limits.max_content_types_bytes() as u64,
+            )?;
+            self.limits.check(
+                SourceLimitKind::ContentTypesBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_content_types_bytes() as u64,
+            )?;
+            self.limits.check(
+                SourceLimitKind::EntryBytes,
+                raw.expected.len() as u64,
+                self.limits.max_entry_bytes(),
+            )?;
+            self.limits.check(
+                SourceLimitKind::EntryBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_entry_bytes(),
+            )?;
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                raw.replacement.len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            if source != raw.expected.as_slice() {
+                return Err(overlay_unavailable("stale raw content-types source image"));
+            }
+            // `source_content_types` is retained for the effective candidate,
+            // while the strict audit below builds a second bounded map.  Hold
+            // that parser's working reservation before it sees source
+            // bytes so malformed or adversarial XML cannot allocate outside
+            // the managed admission decision.
+            let _strict_source_memory =
+                self.reserve_topology_memory(content_types_xml_working_memory_bound(
+                    source.len(),
+                    source_content_types
+                        .as_ref()
+                        .map_or(0, ContentTypeMap::mapping_count),
+                )?)?;
+            let parsed = parse_strict_raw_content_types_xml(source, self.limits)?;
+            if source_content_types.as_ref() != Some(&parsed) {
+                return Err(overlay_unavailable(
+                    "source content-types image does not match its typed catalog",
+                ));
+            }
+        }
+        let mut required_content_type_overrides = Vec::new();
+        required_content_type_overrides
+            .try_reserve_exact(additions.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology content-type overrides",
+                source,
+            })?;
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let source_content_types = source_content_types.as_ref().ok_or_else(|| {
+                overlay_unavailable("content-types catalog is unavailable for a new Part")
+            })?;
+            if let Some(existing) = source_content_types.override_for(&addition.partname) {
+                if existing.as_str() != addition.content_type.as_str() {
+                    return Err(overlay_unavailable(format!(
+                        "existing content-type override for '{}' conflicts",
+                        addition.partname
+                    )));
+                }
+                continue;
+            }
+            if source_content_types
+                .get(&addition.partname)
+                .is_ok_and(|existing| existing == addition.content_type.as_str())
+            {
+                continue;
+            }
+            required_content_type_overrides.push((
+                addition.partname.clone(),
+                addition.content_type.as_str().to_string(),
+            ));
+        }
+        required_content_type_overrides
+            .sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+        let mut removed_content_type_overrides = Vec::new();
+        removed_content_type_overrides
+            .try_reserve_exact(pending_removals.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC removed content-type overrides",
+                source,
+            })?;
+        if let Some(source_content_types) = source_content_types.as_ref() {
+            for target in &pending_removals {
+                let partname = &self.catalog.parts[*target].partname;
+                if source_content_types.override_for(partname).is_some() {
+                    removed_content_type_overrides.push(partname.clone());
+                }
+                let relationships_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .source_entry_id_case_insensitive(
+                        relationships_uri.membername(),
+                        &physical_members,
+                    )?
+                    .is_some()
+                    && source_content_types
+                        .override_for(&relationships_uri)
+                        .is_some()
+                {
+                    removed_content_type_overrides.push(relationships_uri);
+                }
+            }
+            for restore in raw_relationships
+                .iter()
+                .filter(|restore| restore.replacement.is_none())
+            {
+                let relationships_uri =
+                    restore.owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+                if self
+                    .source_entry_id_case_insensitive(
+                        relationships_uri.membername(),
+                        &physical_members,
+                    )?
+                    .is_some()
+                    && source_content_types
+                        .override_for(&relationships_uri)
+                        .is_some()
+                {
+                    removed_content_type_overrides.push(relationships_uri);
+                }
+            }
+        }
+        removed_content_type_overrides
+            .sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+        removed_content_type_overrides.dedup_by(|left, right| left.is_equivalent_to(right));
+        self.check_topology_progress()?;
+        let mut content_types_plan = if required_content_type_overrides.is_empty()
+            && removed_content_type_overrides.is_empty()
+        {
+            None
+        } else {
+            Some(content_types_plan::ContentTypesPlan::plan_owned(
+                content_types_xml.as_deref().ok_or_else(|| {
+                    overlay_unavailable("content-types source is unavailable for overrides")
+                })?,
+                required_content_type_overrides,
+                &removed_content_type_overrides,
+                self.limits,
+                self.cache.context(),
+                self.cache.reservation_failure_counter(),
+            )?)
+        };
+        let content_types_summary =
+            content_types_plan
+                .as_ref()
+                .map(|plan| ContentTypesPublicationSummary {
+                    bytes: plan.final_len() as u64,
+                    mappings: plan.mapping_count() as u64,
+                });
+
+        // Group relationship changes by owner. A new member and a canonical
+        // existing member use the established generated XML path.
+        // A noncanonical existing member is changed only by the narrow
+        // add-only or explicitly selected-removal lexical splice below;
+        // replacement remains fail-closed because its source markup is not
+        // modeled.
+        // The relationship preflight owns the final typed clones used by
+        // both graph validation and publication. Reserve the source clone,
+        // final override map, and their relationship strings before the
+        // planner allocates either map.
+        let mut relationship_clone_memory_reservations = Vec::new();
+        relationship_clone_memory_reservations
+            .try_reserve_exact(relationships.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship clone reservations",
+                source,
+            })?;
+        // The planner also retains one summary per changed owner and a
+        // transient borrowed-change slice for each owner. Charge those
+        // metadata vectors before the planner starts allocating them; the
+        // source/typed relationship clone bound above covers the deep graph
+        // storage itself.
+        if !relationships.is_empty() {
+            let preflight_metadata_bound = relationships
+                .len()
+                .checked_mul(256)
+                .and_then(|bytes| bytes.checked_add(4096))
+                .ok_or_else(|| {
+                    overlay_unavailable("relationship preflight metadata bound overflows")
+                })?;
+            if let Some(reservation) =
+                self.reserve_topology_memory(u64::try_from(preflight_metadata_bound).map_err(
+                    |_| overlay_unavailable("relationship preflight metadata bound exceeds u64"),
+                )?)?
+            {
+                relationship_clone_memory_reservations.push(reservation);
+            }
+        }
+        let mut reservation_group_start = 0usize;
+        while reservation_group_start < relationships.len() {
+            self.check_topology_progress()?;
+            let owner = relationships[reservation_group_start].owner.clone();
+            let mut reservation_group_end = reservation_group_start + 1;
+            while reservation_group_end < relationships.len()
+                && relationships[reservation_group_end].owner == owner
+            {
+                reservation_group_end += 1;
+            }
+            let owner_index = if owner.as_str() == PACKAGE_URI {
+                None
+            } else {
+                self.part_index(&owner)
+            };
+            let source_owner_relationships = if owner.as_str() == PACKAGE_URI {
+                Some(&self.catalog.package_relationships)
+            } else {
+                owner_index.map(|index| &self.catalog.parts[index].relationships)
+            };
+            let mut additional_relationships = 0usize;
+            let mut additional_string_bytes = 0usize;
+            for change in &relationships[reservation_group_start..reservation_group_end] {
+                let (reltype, target) = match &change.operation {
+                    TopologyRelationshipOperation::Add { reltype, target }
+                    | TopologyRelationshipOperation::Replace {
+                        reltype, target, ..
+                    } => (Some(reltype), Some(target)),
+                    TopologyRelationshipOperation::Remove { .. } => (None, None),
+                };
+                if let (Some(reltype), Some(target)) = (reltype, target) {
+                    additional_relationships =
+                        additional_relationships.checked_add(1).ok_or_else(|| {
+                            overlay_unavailable(
+                                "relationship clone additional slot bound overflows",
+                            )
+                        })?;
+                    let target_bytes = match target {
+                        SourceRelationshipTarget::Internal(target) => target.as_str().len(),
+                        SourceRelationshipTarget::External(target) => target.len(),
+                    };
+                    additional_string_bytes = additional_string_bytes
+                        .checked_add(change.r_id.len())
+                        .and_then(|bytes| bytes.checked_add(reltype.len()))
+                        .and_then(|bytes| bytes.checked_add(target_bytes))
+                        .ok_or_else(|| {
+                            overlay_unavailable(
+                                "relationship clone additional string bound overflows",
+                            )
+                        })?;
+                }
+            }
+            let clone_memory_bound = relationship_clone_memory_bound(
+                source_owner_relationships,
+                &owner,
+                additional_relationships,
+                additional_string_bytes,
+            )?;
+            if let Some(reservation) = self.reserve_topology_memory(clone_memory_bound)? {
+                relationship_clone_memory_reservations.push(reservation);
+            }
+            reservation_group_start = reservation_group_end;
+        }
+        let (preflight_relationship_overrides, preflight_relationships) =
+            relationships_plan::plan_relationship_publications(
+                self,
+                &relationships,
+                &physical_members,
+            )?;
+        self.validate_topology_relationship_graph_nodes(
+            &preflight_relationship_overrides,
+            &canonical_part_names,
+            additions_offset,
+            &additions,
+            &pending_removal_set,
+        )?;
+        // Admit relationship and content-types byte/event/member deltas before
+        // either publication loop constructs candidate XML.
+        self.validate_topology_limits(
+            &pending_replacements,
+            &pending_removals,
+            &additions,
+            &preflight_relationships,
+            content_types_summary,
+            &[],
+            self.limits,
+        )?;
+        let mut relationship_overrides = preflight_relationship_overrides;
+        let mut raw_relationship_memory_reservations = Vec::new();
+        raw_relationship_memory_reservations
+            .try_reserve_exact(raw_relationships.len().saturating_mul(2))
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC raw relationship reservations",
+                source,
+            })?;
+        let (prepared_raw_relationships, raw_relationship_removed_entries) = self
+            .prepare_raw_relationship_restores(
+                &raw_relationships,
+                &relationship_overrides,
+                &canonical_part_names,
+                additions_offset,
+                &additions,
+                &pending_removal_set,
+                &physical_members,
+                &mut raw_relationship_memory_reservations,
+            )?;
+        let mut relationship_publications = Vec::new();
+        relationship_publications
+            .try_reserve_exact(relationships.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology relationship publications",
+                source,
+            })?;
+        let mut group_start = 0usize;
+        while group_start < relationships.len() {
+            self.check_topology_progress()?;
+            let owner = relationships[group_start].owner.clone();
+            let mut group_end = group_start + 1;
+            while group_end < relationships.len() && relationships[group_end].owner == owner {
+                group_end += 1;
+            }
+            let Some(owner_relationships) = relationship_overrides.get(&owner) else {
+                // A replacement whose requested value already equals the
+                // source has no publication overlay. The preflight map is the
+                // authoritative changed-owner set, so skip it without a
+                // second typed clone.
+                group_start = group_end;
+                continue;
+            };
+            let owner_index = if owner.as_str() == PACKAGE_URI {
+                None
+            } else {
+                self.part_index(&owner)
+            };
+            let source_owner_relationships = if owner.as_str() == PACKAGE_URI {
+                Some(&self.catalog.package_relationships)
+            } else {
+                owner_index.map(|index| &self.catalog.parts[index].relationships)
+            };
+            let owner_base = if owner.as_str() == PACKAGE_URI {
+                "/".to_string()
+            } else if let Some(index) = owner_index {
+                self.catalog.parts[index].partname.base_uri().to_string()
+            } else {
+                owner.base_uri().to_string()
+            };
+            let relationship_count = owner_relationships.len();
+            let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let member_name = relationship_uri.membername().to_owned();
+            self.limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                member_name.len() as u64,
+                self.limits.max_archive_member_name_bytes(),
+            )?;
+            if additions.iter().any(|addition| {
+                addition
+                    .partname
+                    .membername()
+                    .eq_ignore_ascii_case(&member_name)
+            }) {
+                return Err(overlay_unavailable(
+                    "a generated relationships member collides with a new Part",
+                ));
+            }
+            let existing_entry =
+                self.source_entry_id_case_insensitive(&member_name, &physical_members)?;
+            let (xml, source_event_count, memory_reservations) = if let Some(entry_id) =
+                existing_entry
+            {
+                let metadata = self.archive.metadata_for(entry_id)?;
+                let declared_bytes = metadata.uncompressed_size();
+                self.limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    declared_bytes,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                self.limits.check(
+                    SourceLimitKind::EntryBytes,
+                    declared_bytes,
+                    self.limits.max_entry_bytes(),
+                )?;
+                let source_relationships = source_owner_relationships.ok_or_else(|| {
+                    overlay_unavailable(
+                        "existing relationships member has no source relationship catalog",
+                    )
+                })?;
+                // `read_entry` materializes the source XML before the
+                // lexical form is classified. Reserve its declared
+                // capacity and a conservative source-sized parser working
+                // bound first. The bound covers the resolver's namespace
+                // metadata, owned prefix/URI bytes, identity set buckets,
+                // decoded attributes, and a transient output-sized Vec.
+                let source_memory_bound = relationship_xml_working_memory_bound(
+                    declared_bytes,
+                    source_relationships.len(),
+                )?;
+                let source_memory_reservation =
+                    self.reserve_topology_memory(source_memory_bound)?;
+                let original = self
+                    .archive
+                    .read_entry(entry_id)
+                    .map_err(map_preservation_error)?;
+                self.check_topology_progress()?;
+                if original.len() as u64 != declared_bytes {
+                    return Err(OpcError::ZipError(format!(
+                        "source-backed OPC relationships member '{}' declared {declared_bytes} uncompressed bytes but read {}",
+                        member_name,
+                        original.len()
+                    )));
+                }
+                let original_is_canonical = {
+                    let source_canonical_len =
+                        canonical_relationship_xml_len(source_relationships)?;
+                    let source_canonical_len_u64 =
+                        u64::try_from(source_canonical_len).map_err(|_| {
+                            overlay_unavailable("canonical relationship XML length exceeds u64")
+                        })?;
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        source_canonical_len_u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    // The comparator retains only the sorted relationship
+                    // references and compares serializer chunks directly
+                    // against the source.  It never allocates a canonical
+                    // source-sized byte buffer before aggregate admission.
+                    let _comparison_memory = self.reserve_topology_memory(
+                        canonical_relationship_comparison_memory_bound(source_relationships.len())?,
+                    )?;
+                    canonical_relationship_source_matches(&original, source_relationships)?
+                };
+                if original_is_canonical {
+                    let canonical_len = canonical_relationship_xml_len(owner_relationships)?;
+                    let canonical_len_u64 = u64::try_from(canonical_len).map_err(|_| {
+                        overlay_unavailable("canonical relationship XML length exceeds u64")
+                    })?;
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        canonical_len_u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    let canonical_memory_reservation = self.reserve_topology_memory(
+                        canonical_relationship_serializer_memory_bound(
+                            owner_relationships,
+                            canonical_len,
+                        )?,
+                    )?;
+                    let xml = owner_relationships.try_to_xml_bytes()?;
+                    if xml.len() != canonical_len {
+                        return Err(overlay_unavailable(
+                            "canonical relationship XML length changed during generation",
+                        ));
+                    }
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        xml.len() as u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    validate_overlay_xml(relationship_uri.as_str(), &xml)?;
+                    let reparsed =
+                        PackageReader::parse_owned_relationships(&xml, &owner, self.limits)?;
+                    if !relationships_semantically_equal(&reparsed, owner_relationships) {
+                        return Err(overlay_unavailable(
+                            "generated canonical relationships changed semantic graph",
+                        ));
+                    }
+                    let mut memory_reservations = Vec::new();
+                    memory_reservations.try_reserve_exact(2).map_err(|source| {
+                        OpcError::Allocation {
+                            resource: "source-backed OPC canonical relationship reservations",
+                            source,
+                        }
+                    })?;
+                    if let Some(reservation) = source_memory_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    if let Some(reservation) = canonical_memory_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    (xml, None, memory_reservations)
+                } else {
+                    let removal_only = relationships[group_start..group_end].iter().all(|change| {
+                        matches!(
+                            &change.operation,
+                            TopologyRelationshipOperation::Remove { .. }
+                        )
+                    });
+                    let parsed = parse_noncanonical_relationship_source(
+                        &original,
+                        &member_name,
+                        source_relationships,
+                        self.limits,
+                        || self.check_topology_progress(),
+                    )?;
+                    if removal_only {
+                        let mut removed_ranges = Vec::new();
+                        let mut removed_event_count = 0_u64;
+                        removed_ranges
+                            .try_reserve_exact(group_end - group_start)
+                            .map_err(|source| OpcError::Allocation {
+                                resource: "source-backed OPC relationship removal ranges",
+                                source,
+                            })?;
+                        for relationship in &relationships[group_start..group_end] {
+                            let TopologyRelationshipOperation::Remove { .. } =
+                                &relationship.operation
+                            else {
+                                return Err(overlay_unavailable(
+                                    "noncanonical relationship removal received a non-removal operation",
+                                ));
+                            };
+                            let range = parsed
+                                .relationship_ranges
+                                .get(&relationship.r_id)
+                                .ok_or_else(|| {
+                                    overlay_unavailable(format!(
+                                        "source relationships member '{}' has no range for '{}'",
+                                        member_name, relationship.r_id
+                                    ))
+                                })?;
+                            removed_event_count = removed_event_count
+                                .checked_add(
+                                    *parsed
+                                        .relationship_event_counts
+                                        .get(&relationship.r_id)
+                                        .ok_or_else(|| {
+                                            overlay_unavailable(format!(
+                                                "source relationships member '{}' has no event count for '{}'",
+                                                member_name, relationship.r_id
+                                            ))
+                                        })?,
+                                )
+                                .ok_or_else(|| {
+                                    overlay_unavailable(
+                                        "relationship removal event count overflows",
+                                    )
+                                })?;
+                            removed_ranges.push(range.clone());
+                        }
+                        if removed_event_count > parsed.event_count {
+                            return Err(overlay_unavailable(
+                                "relationship removal event count exceeds source event count",
+                            ));
+                        }
+                        removed_ranges.sort_unstable_by_key(|range| range.start);
+                        let source_event_count = parsed.event_count;
+                        drop(parsed.relationship_ranges);
+                        let new_len =
+                            relationship_source_output_len(original.len(), &removed_ranges)?;
+                        let new_len_u64 = u64::try_from(new_len).map_err(|_| {
+                            overlay_unavailable("relationship removal XML length exceeds u64")
+                        })?;
+                        self.limits.check(
+                            SourceLimitKind::RelationshipXmlBytes,
+                            new_len_u64,
+                            self.limits.max_relationship_xml_bytes() as u64,
+                        )?;
+                        self.limits.check(
+                            SourceLimitKind::EntryBytes,
+                            new_len_u64,
+                            self.limits.max_entry_bytes(),
+                        )?;
+                        let mut xml = original;
+                        remove_relationship_source_ranges(&mut xml, &removed_ranges)?;
+                        let _ = parse_noncanonical_relationship_source(
+                            &xml,
+                            &member_name,
+                            owner_relationships,
+                            self.limits,
+                            || self.check_topology_progress(),
+                        )?;
+                        self.limits.check(
+                            SourceLimitKind::RelationshipXmlBytes,
+                            xml.len() as u64,
+                            self.limits.max_relationship_xml_bytes() as u64,
+                        )?;
+                        let mut memory_reservations = Vec::new();
+                        memory_reservations.try_reserve_exact(1).map_err(|source| {
+                            OpcError::Allocation {
+                                resource: "source-backed OPC relationship removal reservations",
+                                source,
+                            }
+                        })?;
+                        if let Some(reservation) = source_memory_reservation {
+                            memory_reservations.push(reservation);
+                        }
+                        (xml, Some(source_event_count), memory_reservations)
+                    } else {
+                        // A noncanonical relationship member can be composed
+                        // with removals, additions and empty-edge replacements. Keep its source
+                        // bytes lossless by compacting removed child ranges
+                        // first and appending only the authored additions.
+                        let mut removed_ranges = Vec::new();
+                        removed_ranges
+                            .try_reserve_exact(group_end - group_start)
+                            .map_err(|source| OpcError::Allocation {
+                                resource: "source-backed OPC mixed relationship ranges",
+                                source,
+                            })?;
+                        let mut append_len = 0usize;
+                        for (index, change) in
+                            relationships[group_start..group_end].iter().enumerate()
+                        {
+                            if index & 0x3f == 0 {
+                                self.check_topology_progress()?;
+                            }
+                            match &change.operation {
+                                TopologyRelationshipOperation::Remove { .. } => {
+                                    let range = parsed
+                                        .relationship_ranges
+                                        .get(&change.r_id)
+                                        .ok_or_else(|| {
+                                            overlay_unavailable(format!(
+                                                "source relationships member '{}' has no range for '{}'",
+                                                member_name, change.r_id
+                                            ))
+                                        })?;
+                                    removed_ranges.push(range.clone());
+                                },
+                                TopologyRelationshipOperation::Add { reltype, target }
+                                | TopologyRelationshipOperation::Replace {
+                                    reltype, target, ..
+                                } => {
+                                    if matches!(
+                                        &change.operation,
+                                        TopologyRelationshipOperation::Replace { .. }
+                                    ) {
+                                        removed_ranges.push(replaceable_relationship_range(
+                                            &parsed,
+                                            &original,
+                                            &change.r_id,
+                                        )?);
+                                    }
+                                    let (target_ref, target_mode) =
+                                        Self::topology_relationship_target_ref(
+                                            target,
+                                            &owner_base,
+                                        )?;
+                                    self.validate_topology_relationship_field_limits(
+                                        &change.r_id,
+                                        reltype,
+                                        &target_ref,
+                                    )?;
+                                    let fragment_len = relationship_append_fragment_len(
+                                        parsed.root_prefix.len(),
+                                        &change.r_id,
+                                        reltype,
+                                        &target_ref,
+                                        target_mode,
+                                    )?;
+                                    append_len =
+                                        append_len.checked_add(fragment_len).ok_or_else(|| {
+                                            overlay_unavailable(
+                                                "relationship append XML length overflows usize",
+                                            )
+                                        })?;
+                                },
+                            }
+                        }
+                        removed_ranges.sort_unstable_by_key(|range| range.start);
+                        if append_len == 0 {
+                            return Err(overlay_unavailable(
+                                "noncanonical relationship splice has no generated children",
+                            ));
+                        }
+                        let compact_len = if removed_ranges.is_empty() {
+                            original.len()
+                        } else {
+                            relationship_source_output_len(original.len(), &removed_ranges)?
+                        };
+                        let new_len = relationship_source_append_output_len(
+                            compact_len,
+                            parsed.root_empty_end.is_some(),
+                            parsed.root_name.len(),
+                            append_len,
+                        )?;
+                        let new_len_u64 = u64::try_from(new_len).map_err(|_| {
+                            overlay_unavailable("relationship append XML length exceeds u64")
+                        })?;
+                        self.limits.check(
+                            SourceLimitKind::RelationshipXmlBytes,
+                            new_len_u64,
+                            self.limits.max_relationship_xml_bytes() as u64,
+                        )?;
+                        self.limits.check(
+                            SourceLimitKind::EntryBytes,
+                            new_len_u64,
+                            self.limits.max_entry_bytes(),
+                        )?;
+                        // Keep the original source allocation reserved while a
+                        // growth of the retained Vec may transiently coexist
+                        // with its new allocation. The second reservation covers
+                        // the final XML Vec, parser working state, duplicate-ID
+                        // buckets, and the temporary generated fragment buffer.
+                        let append_working_memory = relationship_xml_working_memory_bound(
+                            new_len_u64,
+                            owner_relationships.len(),
+                        )?
+                        .checked_add(new_len_u64)
+                        .and_then(|bytes| {
+                            u64::try_from(append_len)
+                                .ok()
+                                .and_then(|fragment| bytes.checked_add(fragment))
+                        })
+                        .ok_or_else(|| {
+                            overlay_unavailable("relationship append XML memory bound exceeds u64")
+                        })?;
+                        let append_memory_reservation =
+                            self.reserve_topology_memory(append_working_memory)?;
+                        let mut inserted = Vec::new();
+                        inserted.try_reserve_exact(append_len).map_err(|source| {
+                            OpcError::Allocation {
+                                resource: "source-backed OPC relationship append XML",
+                                source,
+                            }
+                        })?;
+                        for (index, change) in
+                            relationships[group_start..group_end].iter().enumerate()
+                        {
+                            if index & 0x3f == 0 {
+                                self.check_topology_progress()?;
+                            }
+                            let (TopologyRelationshipOperation::Add { reltype, target }
+                            | TopologyRelationshipOperation::Replace {
+                                reltype, target, ..
+                            }) = &change.operation
+                            else {
+                                continue;
+                            };
+                            let (target_ref, target_mode) =
+                                Self::topology_relationship_target_ref(target, &owner_base)?;
+                            append_relationship_fragment(
+                                &mut inserted,
+                                &parsed.root_prefix,
+                                &change.r_id,
+                                reltype,
+                                &target_ref,
+                                target_mode,
+                            )?;
+                        }
+                        debug_assert_eq!(inserted.len(), append_len);
+                        if inserted.len() != append_len {
+                            return Err(overlay_unavailable(
+                                "relationship append XML length changed during generation",
+                            ));
+                        }
+                        let mut xml = original;
+                        if !removed_ranges.is_empty() {
+                            if parsed.root_empty_end.is_some() {
+                                return Err(overlay_unavailable(
+                                    "a self-closing relationships root cannot contain a removed child",
+                                ));
+                            }
+                            remove_relationship_source_ranges(&mut xml, &removed_ranges)?;
+                        }
+                        let compact_len = xml.len();
+                        if parsed.root_empty_end.is_none()
+                            && compact_len.checked_add(append_len) != Some(new_len)
+                        {
+                            return Err(overlay_unavailable(
+                                "relationship splice length changed during compaction",
+                            ));
+                        }
+                        xml.try_reserve_exact(append_len).map_err(|source| {
+                            OpcError::Allocation {
+                                resource: "source-backed OPC relationship append member",
+                                source,
+                            }
+                        })?;
+                        if let Some(root_end) = parsed.root_empty_end {
+                            let insertion = parsed.root_close_start;
+                            let old_len = compact_len;
+                            xml.resize(new_len, 0);
+                            let suffix_start = root_end;
+                            let suffix_len = old_len - suffix_start;
+                            xml.copy_within(
+                                suffix_start..old_len,
+                                insertion + 1 + append_len + 2 + parsed.root_name.len() + 1,
+                            );
+                            xml[insertion] = b'>';
+                            xml[insertion + 1..insertion + 1 + append_len]
+                                .copy_from_slice(&inserted);
+                            let close_start = insertion + 1 + append_len;
+                            xml[close_start..close_start + 2].copy_from_slice(b"</");
+                            let name_start = close_start + 2;
+                            xml[name_start..name_start + parsed.root_name.len()]
+                                .copy_from_slice(&parsed.root_name);
+                            xml[name_start + parsed.root_name.len()] = b'>';
+                            debug_assert_eq!(
+                                name_start + parsed.root_name.len() + 1 + suffix_len,
+                                new_len
+                            );
+                        } else {
+                            let removed_before_close = removed_ranges.iter().try_fold(
+                                0usize,
+                                |removed, range| {
+                                    if range.end > parsed.root_close_start {
+                                        return Err(overlay_unavailable(
+                                            "a removed relationship crosses the root close boundary",
+                                        ));
+                                    }
+                                    removed.checked_add(range.end - range.start).ok_or_else(|| {
+                                        overlay_unavailable(
+                                            "removed relationship length overflows the root offset",
+                                        )
+                                    })
+                                },
+                            )?;
+                            let insertion = parsed
+                                .root_close_start
+                                .checked_sub(removed_before_close)
+                                .ok_or_else(|| {
+                                    overlay_unavailable(
+                                        "removed relationship ranges underflow the root close offset",
+                                    )
+                                })?;
+                            let old_len = compact_len;
+                            xml.resize(new_len, 0);
+                            xml.copy_within(insertion..old_len, insertion + append_len);
+                            xml[insertion..insertion + append_len].copy_from_slice(&inserted);
+                        }
+                        drop(inserted);
+
+                        // Reparse the candidate against the complete updated
+                        // catalog before the publication plan can be handed
+                        // to the ZIP writer. This proves the splice did not
+                        // alter source semantics and that every generated
+                        // child inherits the root namespace correctly.
+                        let source_event_count = parsed.event_count;
+                        drop(parsed.relationship_ranges);
+                        let _ = parse_noncanonical_relationship_source(
+                            &xml,
+                            &member_name,
+                            owner_relationships,
+                            self.limits,
+                            || self.check_topology_progress(),
+                        )?;
+                        self.limits.check(
+                            SourceLimitKind::RelationshipXmlBytes,
+                            xml.len() as u64,
+                            self.limits.max_relationship_xml_bytes() as u64,
+                        )?;
+                        let mut memory_reservations = Vec::new();
+                        memory_reservations.try_reserve_exact(2).map_err(|source| {
+                            OpcError::Allocation {
+                                resource: "source-backed OPC relationship append reservations",
+                                source,
+                            }
+                        })?;
+                        if let Some(reservation) = source_memory_reservation {
+                            memory_reservations.push(reservation);
+                        }
+                        if let Some(reservation) = append_memory_reservation {
+                            memory_reservations.push(reservation);
+                        }
+                        (xml, Some(source_event_count), memory_reservations)
+                    }
+                }
+            } else {
+                let canonical_len = canonical_relationship_xml_len(owner_relationships)?;
+                let canonical_len_u64 = u64::try_from(canonical_len).map_err(|_| {
+                    overlay_unavailable("canonical relationship XML length exceeds u64")
+                })?;
+                self.limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    canonical_len_u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                let canonical_memory_reservation =
+                    self.reserve_topology_memory(canonical_relationship_serializer_memory_bound(
+                        owner_relationships,
+                        canonical_len,
+                    )?)?;
+                let xml = owner_relationships.try_to_xml_bytes()?;
+                if xml.len() != canonical_len {
+                    return Err(overlay_unavailable(
+                        "canonical relationship XML length changed during generation",
+                    ));
+                }
+                self.limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    xml.len() as u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                validate_overlay_xml(relationship_uri.as_str(), &xml)?;
+                let reparsed = PackageReader::parse_owned_relationships(&xml, &owner, self.limits)?;
+                if !relationships_semantically_equal(&reparsed, owner_relationships) {
+                    return Err(overlay_unavailable(
+                        "generated canonical relationships changed semantic graph",
+                    ));
+                }
+                let mut memory_reservations = Vec::new();
+                memory_reservations.try_reserve_exact(1).map_err(|source| {
+                    OpcError::Allocation {
+                        resource: "source-backed OPC canonical relationship reservations",
+                        source,
+                    }
+                })?;
+                if let Some(reservation) = canonical_memory_reservation {
+                    memory_reservations.push(reservation);
+                }
+                (xml, None, memory_reservations)
+            };
+            relationship_publications.push(TopologyRelationshipPublication {
+                owner,
+                member_name,
+                xml,
+                raw_xml: None,
+                existing_entry,
+                relationship_count,
+                source_event_count,
+                memory_reservations,
+            });
+            group_start = group_end;
+        }
+
+        relationship_publications
+            .sort_unstable_by(|left, right| left.member_name.cmp(&right.member_name));
+        relationship_publications
+            .try_reserve(prepared_raw_relationships.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC raw relationship publications",
+                source,
+            })?;
+        let mut raw_relationship_removed_members = Vec::new();
+        raw_relationship_removed_members
+            .try_reserve_exact(raw_relationship_removed_entries.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC raw relationship omitted members",
+                source,
+            })?;
+        for raw in &prepared_raw_relationships {
+            if !raw.changed {
+                continue;
+            }
+            if let Some(replacement) = raw.replacement.as_ref() {
+                if let Some(position) = relationship_publications
+                    .iter()
+                    .position(|publication| publication.owner == raw.owner)
+                {
+                    let publication = &mut relationship_publications[position];
+                    publication.xml.clear();
+                    publication.raw_xml = Some(Arc::clone(replacement));
+                    publication.source_event_count = raw.source_event_count;
+                } else {
+                    let relationship_count = relationship_overrides.get(&raw.owner).map_or_else(
+                        || {
+                            self.source_relationships_for_owner(&raw.owner)
+                                .map_or(0, Relationships::len)
+                        },
+                        Relationships::len,
+                    );
+                    relationship_publications.push(TopologyRelationshipPublication {
+                        owner: raw.owner.clone(),
+                        member_name: raw.member_name.clone(),
+                        xml: Vec::new(),
+                        raw_xml: Some(Arc::clone(replacement)),
+                        existing_entry: raw.existing_entry,
+                        relationship_count,
+                        source_event_count: raw.source_event_count,
+                        memory_reservations: Vec::new(),
+                    });
+                }
+            } else if let Some(position) = relationship_publications
+                .iter()
+                .position(|publication| publication.owner == raw.owner)
+            {
+                relationship_publications.remove(position);
+                raw_relationship_removed_members.push(raw.member_name.clone());
+            } else {
+                raw_relationship_removed_members.push(raw.member_name.clone());
+            }
+        }
+        relationship_publications
+            .sort_unstable_by(|left, right| left.member_name.cmp(&right.member_name));
+        if relationship_publications.windows(2).any(|pair| {
+            pair[0]
+                .member_name
+                .eq_ignore_ascii_case(&pair[1].member_name)
+        }) {
+            return Err(overlay_unavailable(
+                "multiple topology relationship owners resolve to one member",
+            ));
+        }
+        self.validate_topology_relationship_graph_nodes(
+            &relationship_overrides,
+            &canonical_part_names,
+            additions_offset,
+            &additions,
+            &pending_removal_set,
+        )?;
+        let mut removed_relationship_member_count = 0usize;
+        for (index, target) in pending_removals.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let part = self.catalog.parts.get(*target).ok_or_else(|| {
+                overlay_unavailable("topology removal target index is out of bounds")
+            })?;
+            let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            if self
+                .archive
+                .entry_id(relationships_uri.membername())
+                .is_some()
+            {
+                removed_relationship_member_count = removed_relationship_member_count
+                    .checked_add(1)
+                    .ok_or_else(|| {
+                        overlay_unavailable("removed relationship member count overflows")
+                    })?;
+            }
+        }
+        for (raw_entry, _) in &raw_relationship_removed_entries {
+            let already_removed = pending_removals.iter().any(|target| {
+                self.catalog.parts.get(*target).and_then(|part| {
+                    part.partname
+                        .rels_uri()
+                        .ok()
+                        .and_then(|uri| self.archive.entry_id(uri.membername()))
+                }) == Some(*raw_entry)
+            });
+            if !already_removed {
+                removed_relationship_member_count = removed_relationship_member_count
+                    .checked_add(1)
+                    .ok_or_else(|| {
+                        overlay_unavailable("removed relationship member count overflows")
+                    })?;
+            }
+        }
+        let removed_archive_member_count = pending_removals
+            .len()
+            .checked_add(removed_relationship_member_count)
+            .ok_or_else(|| overlay_unavailable("removed archive member count overflows"))?;
+        let new_relationship_member_count = relationship_publications
+            .iter()
+            .filter(|publication| publication.existing_entry.is_none())
+            .count();
+        let new_archive_members = additions
+            .len()
+            .checked_add(new_relationship_member_count)
+            .ok_or_else(|| overlay_unavailable("topology archive member count overflows usize"))?;
+        self.limits.check(
+            SourceLimitKind::Members,
+            self.archive
+                .len()
+                .checked_sub(removed_archive_member_count)
+                .ok_or_else(|| overlay_unavailable("removed archive member count exceeds source"))?
+                .checked_add(new_archive_members)
+                .ok_or_else(|| {
+                    overlay_unavailable("topology archive member count overflows usize")
+                })? as u64,
+            self.limits.max_members() as u64,
+        )?;
+        let mut existing_relationship_members = 0usize;
+        for (index, name) in self.archive.file_names().enumerate() {
+            if index & 0xff == 0 {
+                self.check_topology_progress()?;
+            }
+            if is_relationship_member_name(name) {
+                existing_relationship_members = existing_relationship_members
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("relationship member count overflows"))?;
+            }
+        }
+        self.limits.check(
+            SourceLimitKind::RelationshipParts,
+            existing_relationship_members
+                .checked_sub(removed_relationship_member_count)
+                .ok_or_else(|| {
+                    overlay_unavailable("removed relationship member count exceeds source")
+                })?
+                .checked_add(new_relationship_member_count)
+                .ok_or_else(|| overlay_unavailable("relationship member count overflows usize"))?
+                as u64,
+            self.limits.max_relationship_parts() as u64,
+        )?;
+        let package_owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let mut relationship_count = relationship_overrides
+            .get(&package_owner)
+            .map_or(self.catalog.package_relationships.len(), Relationships::len);
+        for (index, part) in self.catalog.parts.iter().enumerate() {
+            if index & 0xff == 0 {
+                self.check_topology_progress()?;
+            }
+            if pending_removal_set.contains(&index) {
+                continue;
+            }
+            let owner_relationship_count = relationship_overrides
+                .get(&part.partname)
+                .map_or(part.relationships.len(), Relationships::len);
+            relationship_count = relationship_count
+                .checked_add(owner_relationship_count)
+                .ok_or_else(|| overlay_unavailable("relationship count overflows usize"))?;
+        }
+        for addition in &additions {
+            relationship_count = relationship_count
+                .checked_add(
+                    relationship_overrides
+                        .get(&addition.partname)
+                        .map_or(0, Relationships::len),
+                )
+                .ok_or_else(|| overlay_unavailable("relationship count overflows usize"))?;
+        }
+        self.limits.check(
+            SourceLimitKind::TotalRelationships,
+            relationship_count as u64,
+            self.limits.max_total_relationships() as u64,
+        )?;
+        for (index, publication) in relationship_publications.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            self.limits.check(
+                SourceLimitKind::RelationshipsPerPart,
+                publication.relationship_count as u64,
+                self.limits.max_relationships_per_part() as u64,
+            )?;
+        }
+
+        let mut content_types_replacement = if let Some(plan) = content_types_plan.take() {
+            let (xml, generated_memory_reservation) = plan.materialize(
+                self.limits,
+                self.cache.context(),
+                self.cache.reservation_failure_counter(),
+            )?;
+            (Some(Arc::new(xml)), generated_memory_reservation)
+        } else {
+            (None, None)
+        };
+        let mut candidate_content_type_mapping_count =
+            content_types_summary.map(|summary| summary.mappings as usize);
+        if let Some(raw) = raw_content_types.as_ref() {
+            let source = content_types_xml.as_deref().ok_or_else(|| {
+                overlay_unavailable("content-types source is unavailable for raw restore")
+            })?;
+            let raw_memory_reservation =
+                self.reserve_topology_memory(content_types_xml_working_memory_bound(
+                    raw.replacement.len(),
+                    raw.replacement
+                        .len()
+                        .min(self.limits.max_content_type_mappings()),
+                )?)?;
+            let raw_map = parse_strict_raw_content_types_xml(&raw.replacement, self.limits)?;
+            if let Some(generated) = content_types_replacement.0.as_ref() {
+                let _candidate_memory =
+                    self.reserve_topology_memory(content_types_xml_working_memory_bound(
+                        generated.len(),
+                        candidate_content_type_mapping_count.unwrap_or(0),
+                    )?)?;
+                let candidate_map = ContentTypeMap::from_xml(generated, self.limits)?;
+                validate_raw_content_types_candidate(
+                    &raw_map,
+                    &candidate_map,
+                    self,
+                    &pending_removal_set,
+                    &additions,
+                    &relationship_publications,
+                    &raw_relationships,
+                )?;
+            } else {
+                let candidate_map = source_content_types.as_ref().ok_or_else(|| {
+                    overlay_unavailable("typed content-types candidate is unavailable")
+                })?;
+                validate_raw_content_types_candidate(
+                    &raw_map,
+                    candidate_map,
+                    self,
+                    &pending_removal_set,
+                    &additions,
+                    &relationship_publications,
+                    &raw_relationships,
+                )?;
+            }
+            candidate_content_type_mapping_count = Some(raw_map.mapping_count());
+            if raw.replacement.as_slice() != source {
+                content_types_replacement =
+                    (Some(Arc::clone(&raw.replacement)), raw_memory_reservation);
+            } else {
+                drop(raw_memory_reservation);
+                content_types_replacement = (None, None);
+            }
+        }
+        let mut content_type_memory_reservations = Vec::new();
+        content_type_memory_reservations
+            .try_reserve_exact(
+                usize::from(content_types_reservation.is_some())
+                    .checked_add(usize::from(content_types_object_reservation.is_some()))
+                    .and_then(|count| {
+                        count.checked_add(usize::from(source_content_types_memory.is_some()))
+                    })
+                    .and_then(|count| {
+                        count.checked_add(usize::from(content_types_replacement.1.is_some()))
+                    })
+                    .ok_or_else(|| {
+                        overlay_unavailable("content-type reservation count overflows usize")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC content-type reservations",
+                source,
+            })?;
+        content_type_memory_reservations.extend(content_types_reservation);
+        content_type_memory_reservations.extend(content_types_object_reservation);
+        content_type_memory_reservations.extend(source_content_types_memory);
+        content_type_memory_reservations.extend(content_types_replacement.1.take());
+        let content_types_replacement = content_types_replacement.0.take();
+
+        // Check bounded byte resources before auditing authored XML so a
+        // payload that violates both limits reports the deterministic policy
+        // refusal without first parsing attacker-controlled data.
+        let materialized_content_types_summary =
+            if let Some(replacement) = content_types_replacement.as_ref() {
+                Some(ContentTypesPublicationSummary {
+                    bytes: replacement.len() as u64,
+                    mappings: candidate_content_type_mapping_count.ok_or_else(|| {
+                        overlay_unavailable(
+                            "content-types replacement is missing its planned mapping count",
+                        )
+                    })? as u64,
+                })
+            } else {
+                None
+            };
+        let totals = self.validate_topology_limits(
+            &pending_replacements,
+            &pending_removals,
+            &additions,
+            &relationship_publications,
+            materialized_content_types_summary,
+            &raw_relationship_removed_entries,
+            self.limits,
+        )?;
+
+        // Materialize only changed existing payloads. Exact no-op replacements
+        // still preserve the source member byte-for-byte.
+        let mut changed = Vec::new();
+        changed
+            .try_reserve_exact(
+                pending_replacements
+                    .len()
+                    .checked_add(relationship_publications.len())
+                    .and_then(|count| {
+                        count.checked_add(usize::from(content_types_replacement.is_some()))
+                    })
+                    .ok_or_else(|| {
+                        overlay_unavailable("topology changed-member count overflows usize")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology changed members",
+                source,
+            })?;
+        let reservation_capacity =
+            relationship_publications
+                .len()
+                .checked_mul(2)
+                .ok_or_else(|| {
+                    overlay_unavailable(
+                        "source-backed OPC relationship append reservation count overflows",
+                    )
+                })?;
+        let mut topology_relationship_memory_reservations = relationship_clone_memory_reservations;
+        topology_relationship_memory_reservations.append(&mut raw_relationship_memory_reservations);
+        topology_relationship_memory_reservations
+            .try_reserve_exact(reservation_capacity)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship append reservations",
+                source,
+            })?;
+        let mut source_xml_tokens = Vec::new();
+        source_xml_tokens
+            .try_reserve_exact(
+                pending_replacements
+                    .iter()
+                    .filter(|replacement| replacement.source_xml.is_some())
+                    .count()
+                    .checked_add(
+                        additions
+                            .iter()
+                            .filter(|addition| {
+                                matches!(&addition.payload, TopologyPartPayload::SourceXml(_))
+                            })
+                            .count(),
+                    )
+                    .ok_or_else(|| overlay_unavailable("source XML token count overflows usize"))?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC XML source tokens",
+                source,
+            })?;
+        // The proofs the audits below return, by pending replacement, kept
+        // for the effective Parts.
+        let mut replacement_proofs: Vec<Option<xml_minifier::audit::VerifiedSource>> = Vec::new();
+        if !self.cache.is_managed() {
+            replacement_proofs
+                .try_reserve_exact(pending_replacements.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC replacement proofs",
+                    source,
+                })?;
+            replacement_proofs.resize(pending_replacements.len(), None);
+        }
+        if !signed_replacements_are_noop {
+            for (replacement_index, replacement) in pending_replacements.iter().enumerate() {
+                self.check_topology_progress()?;
+                let original = self.read_part(replacement.target)?;
+                // Compare bytes before any XML audit. A caller may intentionally
+                // publish an exact no-op replacement for a source whose Part
+                // payload is malformed; the contract is byte-preserving in that
+                // case and must not turn the no-op into a parser failure.
+                if original.as_bytes() == replacement.replacement.as_slice() {
+                    continue;
+                }
+                let part = &self.catalog.parts[replacement.target];
+                if replacement.source_xml.is_some() {
+                    // The source proof already validated the complete
+                    // assembled XML with source-compatible rules. Its
+                    // original whitespace and lexical forms intentionally do
+                    // not pass through the authored compactness audit.
+                } else if xml_minifier::audit::package::is_xml_part(
+                    part.partname.as_str(),
+                    part.content_type.as_str(),
+                ) {
+                    let proof = self.audit_physical_replacement_xml(
+                        replacement.target,
+                        &original,
+                        &replacement.replacement,
+                        replacement.replacement_spans.as_deref(),
+                        replacement.proof.as_ref(),
+                        None,
+                    )?;
+                    if let Some(slot) = replacement_proofs.get_mut(replacement_index) {
+                        *slot = proof.filter(|proof| {
+                            proof.covers(
+                                replacement.replacement.as_slice(),
+                                xml_minifier::audit::Limits::default(),
+                            )
+                        });
+                    }
+                }
+                changed.push(ChangedOverlay {
+                    target: ChangedOverlayTarget::Part(replacement.target),
+                    replacement: ChangedOverlayPayload::Shared(Arc::clone(
+                        &replacement.replacement,
+                    )),
+                });
+                if let Some(source_xml) = replacement.source_xml.as_ref() {
+                    source_xml_tokens.push(source_xml.clone());
+                }
+            }
+        }
+        for (raw_entry, _) in &raw_relationship_removed_entries {
+            let already_removed = pending_removals.iter().any(|target| {
+                self.catalog.parts.get(*target).and_then(|part| {
+                    part.partname
+                        .rels_uri()
+                        .ok()
+                        .and_then(|uri| self.archive.entry_id(uri.membername()))
+                }) == Some(*raw_entry)
+            });
+            if !already_removed {
+                removed_relationship_member_count = removed_relationship_member_count
+                    .checked_add(1)
+                    .ok_or_else(|| {
+                        overlay_unavailable("removed relationship member count overflows")
+                    })?;
+            }
+        }
+        // Retain generated relationship payloads behind shared holders before
+        // repeated publication. Charge the holder metadata before allocation.
+        let shared_relationship_holders = relationship_publications
+            .iter()
+            .filter(|publication| publication.existing_entry.is_some())
+            .count();
+        let shared_relationship_memory = shared_relationship_holders
+            .checked_mul(size_of::<Vec<u8>>() + size_of::<[usize; 2]>())
+            .ok_or_else(|| overlay_unavailable("shared relationship holder bound overflows"))?;
+        if shared_relationship_memory != 0 {
+            topology_relationship_memory_reservations
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC shared relationship reservations",
+                    source,
+                })?;
+            if let Some(reservation) =
+                self.reserve_topology_memory(shared_relationship_memory as u64)?
+            {
+                topology_relationship_memory_reservations.push(reservation);
+            }
+        }
+        for (index, publication) in relationship_publications.iter_mut().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if publication.existing_entry.is_some() {
+                changed.push(ChangedOverlay {
+                    target: ChangedOverlayTarget::Member(publication.member_name.clone()),
+                    replacement: ChangedOverlayPayload::Shared(publication.take_shared_xml()),
+                });
+            }
+            // New relationship members retain their generated serializer
+            // reservation until the appended entry has been handed to the
+            // ZIP writer, just like changed existing members.
+            topology_relationship_memory_reservations.append(&mut publication.memory_reservations);
+        }
+        if let Some(content_types) = &content_types_replacement {
+            changed.push(ChangedOverlay {
+                target: ChangedOverlayTarget::Member(self.catalog.content_types_member.clone()),
+                replacement: ChangedOverlayPayload::Shared(Arc::clone(content_types)),
+            });
+        }
+
+        let mut omitted_members = Vec::new();
+        omitted_members
+            .try_reserve_exact(
+                pending_removals
+                    .len()
+                    .saturating_mul(2)
+                    .checked_add(raw_relationship_removed_members.len())
+                    .ok_or_else(|| {
+                        overlay_unavailable("topology omitted-member bound overflows")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology omitted members",
+                source,
+            })?;
+        for target in &pending_removals {
+            let part = &self.catalog.parts[*target];
+            omitted_members.push(part.partname.membername().to_string());
+            let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let relationship_member = relationships_uri.membername().to_string();
+            if self
+                .source_entry_id_case_insensitive(&relationship_member, &physical_members)?
+                .is_some()
+            {
+                omitted_members.push(relationship_member);
+            }
+        }
+        for member_name in raw_relationship_removed_members {
+            if !omitted_members
+                .iter()
+                .any(|existing| existing.eq_ignore_ascii_case(&member_name))
+            {
+                omitted_members.push(member_name);
+            }
+        }
+
+        if changed.is_empty()
+            && additions.is_empty()
+            && pending_removals.is_empty()
+            && relationship_publications.is_empty()
+            && content_types_replacement.is_none()
+            && omitted_members.is_empty()
+        {
+            return Ok(PreparedTopologyState {
+                changed: Vec::new(),
+                retained: None,
+                effective: None,
+                totals: None,
+                _catalog_reservation: None,
+                no_op: true,
+            });
+        }
+        if !self.catalog.non_part_members.is_empty() {
+            return Err(overlay_unavailable(
+                "topology publication refuses non-Part or opaque physical members",
+            ));
+        }
+        if self.archive.has_encrypted_entries() {
+            return Err(overlay_unavailable(
+                "topology publication refuses encrypted ZIP members",
+            ));
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+
+        // Freeze the complete effective logical graph while the validated
+        // relationship changes and content-type replacement are still in
+        // scope.  This is metadata plus changed payload handles only; source
+        // Part bytes remain lazy through `source_index`.
+        let effective_content_types = if let Some(replacement) = content_types_replacement.as_ref()
+        {
+            Some(ContentTypeMap::from_xml(replacement, self.limits)?)
+        } else {
+            source_content_types
+        };
+        let package_owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let effective_package_relationships = relationship_overrides.remove(&package_owner);
+        let effective_part_count = self
+            .catalog
+            .parts
+            .len()
+            .checked_sub(pending_removals.len())
+            .and_then(|count| count.checked_add(additions.len()))
+            .ok_or_else(|| overlay_unavailable("effective Part count underflows"))?;
+        let mut effective_string_bytes = 0usize;
+        for addition in &additions {
+            effective_string_bytes = effective_string_bytes
+                .checked_add(addition.partname.as_str().len())
+                .and_then(|bytes| bytes.checked_add(addition.content_type.as_str().len()))
+                .ok_or_else(|| overlay_unavailable("effective catalog string bound overflows"))?;
+        }
+        for publication in relationship_publications
+            .iter()
+            .filter(|publication| publication.existing_entry.is_none())
+        {
+            effective_string_bytes = effective_string_bytes
+                .checked_add(publication.member_name.len())
+                .ok_or_else(|| overlay_unavailable("effective member-name bound overflows"))?;
+        }
+        let effective_slots = effective_part_count
+            .checked_mul(
+                size_of::<PreparedPart>()
+                    + size_of::<Relationships>()
+                    + 2 * size_of::<[usize; 2]>(),
+            )
+            .and_then(|bytes| {
+                bytes.checked_add(additions.len().checked_mul(size_of::<Relationships>())?)
+            })
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    additions
+                        .len()
+                        .checked_add(new_relationship_member_count)?
+                        .checked_mul(
+                            size_of::<String>()
+                                + size_of::<Arc<soapberry_zip::RegeneratedEntry>>()
+                                + size_of::<soapberry_zip::RegeneratedEntry>()
+                                + size_of::<[usize; 2]>(),
+                        )?,
+                )
+            })
+            .and_then(|bytes| {
+                bytes.checked_add(
+                    size_of::<EffectiveTopologyData>()
+                        + size_of::<ContentTypeMap>()
+                        + size_of::<Relationships>()
+                        + size_of::<PreparedTopologyRetention>()
+                        + 5 * size_of::<[usize; 2]>()
+                        + size_of::<Vec<SourceSnapshot>>()
+                        + size_of::<Vec<String>>(),
+                )
+            })
+            .ok_or_else(|| overlay_unavailable("effective catalog metadata bound overflows"))?;
+        let effective_memory_bound =
+            effective_slots
+                .checked_add(effective_string_bytes.checked_mul(2).ok_or_else(|| {
+                    overlay_unavailable("effective catalog string bound overflows")
+                })?)
+                .ok_or_else(|| overlay_unavailable("effective catalog metadata bound overflows"))?;
+        let mut effective_memory_reservations = Vec::new();
+        effective_memory_reservations
+            .try_reserve_exact(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC effective catalog reservations",
+                source,
+            })?;
+        if let Some(reservation) = self
+            .reserve_topology_memory(u64::try_from(effective_memory_bound).map_err(|_| {
+                overlay_unavailable("effective catalog metadata bound exceeds u64")
+            })?)?
+        {
+            effective_memory_reservations.push(reservation);
+        }
+        // Catalog slots are local to this candidate; shared Part objects and
+        // graphs have separate retained admissions. A child must not pin an
+        // obsolete parent's catalog-vector reservation.
+        let catalog_memory = effective_part_count
+            .checked_mul(size_of::<Arc<PreparedPart>>())
+            .and_then(|n| {
+                changed
+                    .capacity()
+                    .checked_mul(size_of::<ChangedOverlay>())
+                    .and_then(|slots| n.checked_add(slots))
+            })
+            .ok_or_else(|| overlay_unavailable("candidate catalog slot bound overflows"))?;
+        let catalog_memory = changed.iter().try_fold(catalog_memory, |bytes, overlay| {
+            let name = match &overlay.target {
+                ChangedOverlayTarget::Member(name) => name.capacity(),
+                _ => 0,
+            };
+            bytes
+                .checked_add(name)
+                .ok_or_else(|| overlay_unavailable("candidate member-name bound overflows"))
+        })?;
+        let catalog_reservation = self.reserve_topology_memory(
+            u64::try_from(catalog_memory)
+                .map_err(|_| overlay_unavailable("candidate catalog slot bound exceeds u64"))?,
+        )?;
+        let mut effective_parts = Vec::new();
+        effective_parts
+            .try_reserve_exact(effective_part_count)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC effective Part catalog",
+                source,
+            })?;
+        let mut retained_xml_proofs = 0;
+        for (index, part) in self.catalog.parts.iter().enumerate() {
+            if pending_removal_set.contains(&index) {
+                continue;
+            }
+            let xml_proof = pending_replacement_indices
+                .get(&index)
+                .and_then(|replacement_index| replacement_proofs.get_mut(*replacement_index))
+                .and_then(Option::take)
+                .filter(|_| retained_xml_proofs < RETAINED_EFFECTIVE_XML_PROOFS);
+            retained_xml_proofs += usize::from(xml_proof.is_some());
+            let replacement = pending_replacement_indices
+                .get(&index)
+                .map(|replacement_index| {
+                    Arc::clone(&pending_replacements[*replacement_index].replacement)
+                });
+            let relationships = relationship_overrides.remove(&part.partname);
+            effective_parts.push(Arc::new(PreparedPart {
+                source_index: Some(index),
+                partname: None,
+                content_type: None,
+                replacement,
+                relationships: relationships.map(Arc::new),
+                source_xml: pending_replacement_indices
+                    .get(&index)
+                    .and_then(|replacement_index| {
+                        pending_replacements[*replacement_index].source_xml.clone()
+                    }),
+                xml_proof,
+                _metadata_reservation: None,
+            }));
+        }
+        for addition in &additions {
+            let relationships = relationship_overrides
+                .remove(&addition.partname)
+                .unwrap_or_else(|| Relationships::for_source(&addition.partname));
+            effective_parts.push(Arc::new(PreparedPart {
+                source_index: None,
+                partname: Some(addition.partname.clone()),
+                content_type: Some(addition.content_type.clone()),
+                replacement: Some(addition.payload.effective_bytes_arc()),
+                relationships: Some(Arc::new(relationships)),
+                source_xml: None,
+                xml_proof: None,
+                _metadata_reservation: None,
+            }));
+        }
+        if !relationship_overrides.is_empty() {
+            return Err(overlay_unavailable(
+                "effective relationship graph contains an unknown owner",
+            ));
+        }
+        let mut added_member_names = Vec::new();
+        added_member_names
+            .try_reserve_exact(
+                additions
+                    .len()
+                    .checked_add(new_relationship_member_count)
+                    .ok_or_else(|| {
+                        overlay_unavailable("effective added-member count overflows usize")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC effective added members",
+                source,
+            })?;
+        added_member_names.extend(
+            additions
+                .iter()
+                .map(|addition| addition.partname.membername().to_string()),
+        );
+        added_member_names.extend(
+            relationship_publications
+                .iter()
+                .filter(|publication| publication.existing_entry.is_none())
+                .map(|publication| publication.member_name.clone()),
+        );
+        let effective = EffectiveTopologyData {
+            package_relationships: effective_package_relationships.map(Arc::new),
+            parts: effective_parts,
+            content_types: effective_content_types.map(Arc::new),
+            added_member_names: Arc::new(added_member_names),
+        };
+
+        // Added members are deterministic: Parts first, then relationship
+        // members sorted by their owner-derived member name.
+        let mut appended = Vec::new();
+        appended
+            .try_reserve_exact(
+                additions
+                    .len()
+                    .checked_add(new_relationship_member_count)
+                    .ok_or_else(|| overlay_unavailable("topology append count overflows usize"))?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology appended members",
+                source,
+            })?;
+        let mut policy_appended = Vec::new();
+        policy_appended
+            .try_reserve_exact(
+                additions
+                    .len()
+                    .checked_add(new_relationship_member_count)
+                    .ok_or_else(|| {
+                        overlay_unavailable("topology policy append count overflows usize")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC topology policy appended members",
+                source,
+            })?;
+        let transfer_source_count = source_xml_tokens
+            .len()
+            .checked_add(
+                additions
+                    .iter()
+                    .filter(|addition| {
+                        matches!(
+                            &addition.payload,
+                            TopologyPartPayload::Precompressed(_)
+                                | TopologyPartPayload::SourceXml(_)
+                        )
+                    })
+                    .count(),
+            )
+            .ok_or_else(|| overlay_unavailable("source-backed OPC source guard count overflows"))?;
+        let mut transfer_sources = Vec::new();
+        transfer_sources
+            .try_reserve_exact(transfer_source_count)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC precompressed source guards",
+                source,
+            })?;
+        // One monitored-read scope per transfer source, alive for exactly as
+        // long as `transfer_sources` is: the prepared state that carries both
+        // into readback and publication. The scopes are counted rather than
+        // latched on the snapshots so that a transfer source shared with
+        // another package stops paying a per-read observation once this
+        // preparation is published or dropped.
+        let mut monitored_transfer_sources: Vec<MonitoredReads> = Vec::new();
+        monitored_transfer_sources
+            .try_reserve_exact(transfer_source_count)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC transfer source monitors",
+                source,
+            })?;
+        for source_xml in &source_xml_tokens {
+            // The complete destination/XML proof ran earlier in this
+            // preparation while resolving source tokens.
+            // Payload and destination limits are immutable, so this
+            // transfer-boundary fence only needs freshness, context, and
+            // cancellation.
+            source_xml.check_source_state()?;
+            monitored_transfer_sources.push(source_xml.source.monitor_publication());
+            transfer_sources.push(source_xml.source_snapshot());
+        }
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let policy_entry = match &addition.payload {
+                TopologyPartPayload::Decoded(payload) => {
+                    if xml_minifier::audit::package::is_xml_part(
+                        addition.partname.as_str(),
+                        addition.content_type.as_str(),
+                    ) {
+                        if addition.producer_bytes {
+                            validate_imported_xml(addition.partname.as_str(), payload)?;
+                        } else {
+                            validate_overlay_xml(addition.partname.as_str(), payload)?;
+                        }
+                    }
+                    PolicyAppendedEntry::new_shared(
+                        addition.partname.membername(),
+                        Arc::clone(payload),
+                        soapberry_zip::CompressionMethod::Deflate,
+                    )
+                },
+                TopologyPartPayload::SourceXml(payload) => {
+                    // This payload was fully checked earlier in this
+                    // preparation before topology planning; only the late
+                    // source/context fence is needed here.
+                    payload.check_source_state()?;
+                    monitored_transfer_sources.push(payload.source.monitor_publication());
+                    source_xml_tokens.push(payload.as_ref().clone());
+                    transfer_sources.push(payload.source_snapshot());
+                    PolicyAppendedEntry::new_shared(
+                        addition.partname.membername(),
+                        payload.payload_arc(),
+                        soapberry_zip::CompressionMethod::Deflate,
+                    )
+                },
+                TopologyPartPayload::Precompressed(payload) => {
+                    monitored_transfer_sources
+                        .push(payload.source_artifact.snapshot.monitor_publication());
+                    transfer_sources.push(payload.source_artifact.snapshot.clone());
+                    // The decoded bytes remain the XML-validation subject even
+                    // when the physical member uses the source's compressed
+                    // payload. This keeps chart/XML validation at the OPC
+                    // boundary instead of silently trusting the fast path.
+                    if xml_minifier::audit::package::is_xml_part(
+                        addition.partname.as_str(),
+                        addition.content_type.as_str(),
+                    ) {
+                        validate_overlay_xml(
+                            addition.partname.as_str(),
+                            payload.expected_decoded(),
+                        )?;
+                    }
+                    PolicyAppendedEntry::new_precompressed(addition.partname.membername(), payload)
+                },
+            };
+            appended.push(Arc::clone(&policy_entry.entry));
+            policy_appended.push(policy_entry);
+        }
+        // Generated relationship bytes share their policy publication bundle;
+        // the bundle retains the exact semantic payload and emitted entry
+        // together through admission and replay.
+        for (index, mut publication) in relationship_publications.into_iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if publication.existing_entry.is_none() {
+                let (member_name, xml) = publication.raw_or_owned_xml();
+                let policy_entry = PolicyAppendedEntry::new_shared(
+                    member_name,
+                    xml,
+                    soapberry_zip::CompressionMethod::Deflate,
+                );
+                appended.push(Arc::clone(&policy_entry.entry));
+                policy_appended.push(policy_entry);
+            }
+        }
+        let transfer_sources = if transfer_sources.is_empty() {
+            None
+        } else {
+            Some(Arc::new(transfer_sources))
+        };
+        // These vectors move into shared retention. Admit their backing
+        // allocations separately from the candidate-local catalog/overlays.
+        let mut retention_bytes = 0usize;
+        for (count, slot) in [
+            (additions.capacity(), size_of::<TopologyPartAddition>()),
+            (omitted_members.capacity(), size_of::<String>()),
+            (
+                appended.capacity(),
+                size_of::<Arc<soapberry_zip::RegeneratedEntry>>(),
+            ),
+            (policy_appended.capacity(), size_of::<PolicyAppendedEntry>()),
+            (
+                transfer_sources
+                    .as_ref()
+                    .map_or(0, |sources| sources.capacity()),
+                size_of::<SourceSnapshot>(),
+            ),
+            (
+                monitored_transfer_sources.capacity(),
+                size_of::<MonitoredReads>(),
+            ),
+            (
+                topology_relationship_memory_reservations.capacity(),
+                size_of::<Arc<Reservation>>(),
+            ),
+            (
+                content_type_memory_reservations.capacity(),
+                size_of::<Arc<Reservation>>(),
+            ),
+            (
+                effective_memory_reservations.capacity(),
+                size_of::<Arc<Reservation>>(),
+            ),
+        ] {
+            retention_bytes = count
+                .checked_mul(slot)
+                .and_then(|bytes| retention_bytes.checked_add(bytes))
+                .ok_or_else(|| overlay_unavailable("retained topology metadata bound overflows"))?;
+        }
+        for name in &omitted_members {
+            retention_bytes = retention_bytes
+                .checked_add(name.capacity())
+                .ok_or_else(|| overlay_unavailable("retained omission name bound overflows"))?;
+        }
+        for addition in &additions {
+            retention_bytes = addition
+                .partname
+                .as_str()
+                .len()
+                .checked_add(addition.content_type.as_str().len())
+                .and_then(|bytes| bytes.checked_mul(2))
+                .and_then(|bytes| retention_bytes.checked_add(bytes))
+                .ok_or_else(|| overlay_unavailable("retained addition name bound overflows"))?;
+        }
+        for appended in &policy_appended {
+            retention_bytes = retention_bytes
+                .checked_add(appended.name.capacity())
+                .ok_or_else(|| overlay_unavailable("retained appended name bound overflows"))?;
+        }
+        let retention_reservation = self.reserve_topology_memory(
+            u64::try_from(retention_bytes)
+                .map_err(|_| overlay_unavailable("retained topology metadata exceeds u64"))?,
+        )?;
+        Ok(PreparedTopologyState {
+            changed,
+            retained: Some(Arc::new(PreparedTopologyRetention {
+                _metadata_reservation: retention_reservation,
+                omitted_members,
+                appended,
+                policy_appended,
+                _additions: additions,
+                transfer_sources,
+                _transfer_monitors: monitored_transfer_sources,
+                _relationship_memory_reservations: topology_relationship_memory_reservations,
+                _content_type_memory_reservations: content_type_memory_reservations,
+                _effective_memory_reservations: effective_memory_reservations,
+            })),
+            effective: Some(effective),
+            totals: Some(totals),
+            _catalog_reservation: catalog_reservation,
+            no_op: false,
+        })
+    }
+
+    /// Publish a bounded source-backed OPC topology plan to a sequential
+    /// stream.  This compatibility wrapper keeps the historical one-shot API
+    /// while routing changed plans through [`Self::prepare_topology`]. An empty
+    /// plan copies the physical source directly without retaining a candidate.
+    pub fn write_topology_to_stream<W: Write>(
+        self,
+        writer: W,
+        plan: SourceTopologyPlan,
+    ) -> Result<()> {
+        if plan.is_empty() {
+            self.disable_read_ahead_for_publication()?;
+            return self.write_exact_source(writer);
+        }
+        self.prepare_topology(plan)?.publish_to_stream(writer)
+    }
+
+    /// Publish a topology plan through a recipient-owned artifact policy.
+    pub fn write_topology_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        plan: SourceTopologyPlan,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        if plan.is_empty() {
+            self.disable_read_ahead_for_publication()?;
+            return self.write_exact_source_with_policy(writer, policy);
+        }
+        self.prepare_topology(plan)?
+            .publish_to_stream_with_policy(writer, policy)
+    }
+
+    /// Copy the physical source through a recipient-owned artifact policy.
+    pub fn write_exact_source_with_policy<W: Write>(
+        self,
+        writer: W,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_source_catalog(&self)?;
+        self.disable_read_ahead_for_publication()?;
+        artifact_restore::write_exact_snapshot_with_policy(&self.source, writer, policy)
+    }
+
+    fn topology_relationship_target_ref(
+        target: &SourceRelationshipTarget,
+        owner_base: &str,
+    ) -> Result<(String, TargetMode)> {
+        let target_ref = match target {
+            SourceRelationshipTarget::Internal(target) => {
+                let target_ref = target.relative_ref(owner_base);
+                if target_ref.is_empty()
+                    || target_ref.chars().any(char::is_control)
+                    || target_ref.contains(['?', '#'])
+                {
+                    return Err(OpcError::InvalidRelationship(
+                        "internal relationship target is not a valid relative reference"
+                            .to_string(),
+                    ));
+                }
+                target_ref
+            },
+            SourceRelationshipTarget::External(target) => target.clone(),
+        };
+        Ok((target_ref, target.mode()))
+    }
+
+    fn validate_topology_relationship_field_limits(
+        &self,
+        r_id: &str,
+        reltype: &str,
+        target_ref: &str,
+    ) -> Result<()> {
+        for value in [r_id, reltype, target_ref] {
+            self.limits.check(
+                SourceLimitKind::XmlAttributeBytes,
+                value.len() as u64,
+                self.limits.max_xml_attribute_bytes() as u64,
+            )?;
+            self.limits.check(
+                SourceLimitKind::XmlAttributeBytes,
+                escaped_xml_attribute_len(value)? as u64,
+                self.limits.max_xml_attribute_bytes() as u64,
+            )?;
+        }
+        self.limits.check(
+            SourceLimitKind::RelationshipTargetBytes,
+            target_ref.len() as u64,
+            self.limits.max_relationship_target_bytes() as u64,
+        )
+    }
+
+    /// Replace one existing ordinary Part and publish to a sequential stream.
+    ///
+    /// This is an explicit low-level OPC operation. The Part URI, content
+    /// type, relationships, package catalog, and physical member topology are
+    /// immutable; only the selected payload may change. Every other ZIP member
+    /// is raw-copied from the positional source. Unsupported physical layouts
+    /// are refused before output instead of silently materializing the package.
+    ///
+    /// An exact payload no-op copies the complete source artifact byte for
+    /// byte, including signatures and unsupported physical details. A real
+    /// change to a signed package is refused because this operation accepts no
+    /// signature-stripping or resigning policy.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, limit, Part, signature, XML-publication, ZIP, or
+    /// sink error. If a non-atomic sink accepts bytes before failing, the error
+    /// is [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlay_to_stream<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            Arc::new,
+            None,
+            None,
+        )
+    }
+
+    /// Policy-aware counterpart for a deferred artifact producer.
+    pub fn write_part_overlay_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            Arc::new,
+            None,
+            Some(policy),
+        )
+    }
+
+    /// Replace one existing ordinary Part with caller-owned shared bytes and
+    /// publish to a sequential stream.
+    ///
+    /// The [`Arc<Vec<u8>>`] is retained by the bounded publication plan until
+    /// the selected ZIP member has been regenerated. This permits a caller
+    /// that already owns a shared immutable payload to hand it over without
+    /// copying the payload bytes. The same source, limit, validation,
+    /// signature, cancellation, and sink semantics as
+    /// [`Self::write_part_overlay_to_stream`] apply.
+    pub fn write_part_overlay_shared_to_stream<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Arc<Vec<u8>>,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            std::convert::identity,
+            None,
+            None,
+        )
+    }
+
+    /// Policy-aware shared-payload counterpart.
+    pub fn write_part_overlay_shared_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Arc<Vec<u8>>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            std::convert::identity,
+            None,
+            Some(policy),
+        )
+    }
+
+    /// Replace one existing ordinary Part and publish it while recording
+    /// cold ZIP work and accepted output in a caller-owned report.
+    ///
+    /// The selected source Part is loaded with [`PartView::data_with_accounting`]
+    /// semantics: cache hits and same-Part flight waiters contribute no ZIP
+    /// counters. Exact payload no-ops use the raw source publication path and
+    /// therefore report the exact accepted source/output bytes. Changed
+    /// payloads use the preservation path and report raw unchanged plus
+    /// generated Store/Deflate payload counters separately from total output.
+    /// Ordinary batch overlays, topology publication, `PartWriter`, eager
+    /// package writes, and parallel paths remain intentionally unaccounted.
+    pub fn write_part_overlay_to_stream_with_accounting<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        self.write_single_part_overlay_to_stream(
+            writer,
+            partname,
+            replacement,
+            Arc::new,
+            Some(accounting),
+            None,
+        )
+    }
+
+    /// Publish one existing Part without constructing the general replacement
+    /// vector and its intermediate overlay plans.
+    ///
+    /// The one-Part entry points are used by the format-owned source editors
+    /// for the common single-slide/single-cell publication case. Keeping this
+    /// path on the same validation and preservation machinery as the bounded
+    /// multi-Part path avoids changing semantics while removing short-lived
+    /// one-element vectors from the publication setup.
+    fn write_single_part_overlay_to_stream<W: Write, P, F>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: P,
+        into_shared: F,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> Result<()>
+    where
+        F: FnOnce(P) -> Arc<Vec<u8>>,
+    {
+        self.disable_read_ahead_for_publication()?;
+        let target = self
+            .catalog
+            .parts_by_name
+            .get(partname)
+            .copied()
+            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+        let replacement = into_shared(replacement);
+        self.validate_overlay_limits(std::iter::once((target, replacement.len())), self.limits)?;
+
+        // Reading the original before any XML audit preserves the exact
+        // no-op contract: malformed but byte-identical source payloads still
+        // reproduce the source artifact without being parsed.
+        let original = match accounting.as_deref_mut() {
+            Some(accounting) => self.read_part_with_accounting(target, Some(accounting))?,
+            None => self.read_part(target)?,
+        };
+        if original.as_bytes() == replacement.as_slice() {
+            // The exact source path does not need the decoded comparison
+            // payload. Drop it before the first publication write so a
+            // managed oversized-cache bypass releases its reservation.
+            drop(original);
+            return match (accounting, policy) {
+                (Some(accounting), None) => {
+                    self.write_exact_source_with_accounting(writer, accounting)
+                },
+                (None, Some(policy)) => self.write_exact_source_with_policy(writer, policy),
+                (None, None) => self.write_exact_source(writer),
+                (Some(_), Some(_)) => Err(overlay_unavailable(
+                    "accounting and artifact stream policy cannot be combined",
+                )),
+            };
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+
+        let target_part = &self.catalog.parts[target];
+        if xml_minifier::audit::package::is_xml_part(
+            target_part.partname.as_str(),
+            target_part.content_type.as_str(),
+        ) {
+            validate_source_part_replacement_xml(
+                target_part.partname.as_str(),
+                original.as_bytes(),
+                &replacement,
+            )?;
+        }
+        // Changed publication re-reads unchanged source records and only
+        // owns the replacement payload.
+        drop(original);
+
+        let changed = [ChangedOverlay {
+            target: ChangedOverlayTarget::Part(target),
+            replacement: ChangedOverlayPayload::Shared(replacement),
+        }];
+        match (accounting, policy) {
+            (Some(accounting), None) => self.write_changed_overlays_with_appended_accounting(
+                writer,
+                &changed,
+                &[],
+                accounting,
+            ),
+            (None, Some(policy)) => {
+                self.write_changed_overlays_with_appended_with_policy(writer, &changed, &[], policy)
+            },
+            (None, None) => self.write_changed_overlays(writer, &changed),
+            (Some(_), Some(_)) => Err(overlay_unavailable(
+                "accounting and artifact stream policy cannot be combined",
+            )),
+        }
+    }
+
+    /// Replace one ordinary Part while removing a bounded set of external
+    /// relationships owned by that Part.
+    ///
+    /// This is an explicit, forward-only topology-changing publisher intended
+    /// for sanitizers which have already proved that every removed relationship
+    /// reference is inside the replacement payload. Relationship IDs must be
+    /// unique, must exist on `partname`, and must identify external targets.
+    /// The selected Part and its relationships member are regenerated; every
+    /// other physical ZIP member is raw-copied.
+    ///
+    /// # Errors
+    ///
+    /// Returns before output for a missing, duplicate, internal, oversized, or
+    /// signed selection. Sink failures after output begins are reported as
+    /// [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlay_with_external_relationship_removals_to_stream<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        removed_relationship_ids: Vec<String>,
+    ) -> Result<()> {
+        self.write_part_overlay_with_external_relationship_removals_to_stream_inner(
+            writer,
+            partname,
+            replacement,
+            removed_relationship_ids,
+            None,
+        )
+    }
+
+    /// Policy-aware single-Part publication with external relationship
+    /// removals.
+    pub fn write_part_overlay_with_external_relationship_removals_to_stream_with_policy<
+        W: Write,
+    >(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        removed_relationship_ids: Vec<String>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlay_with_external_relationship_removals_to_stream_inner(
+            writer,
+            partname,
+            replacement,
+            removed_relationship_ids,
+            Some(policy),
+        )
+    }
+
+    fn write_part_overlay_with_external_relationship_removals_to_stream_inner<W: Write>(
+        self,
+        writer: W,
+        partname: &PackURI,
+        replacement: Vec<u8>,
+        mut removed_relationship_ids: Vec<String>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
+        if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
+            return Err(overlay_unavailable(format!(
+                "relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
+            )));
+        }
+        if removed_relationship_ids.is_empty() {
+            return match policy {
+                Some(policy) => self.write_part_overlay_to_stream_with_policy(
+                    writer,
+                    partname,
+                    replacement,
+                    policy,
+                ),
+                None => self.write_part_overlay_to_stream(writer, partname, replacement),
+            };
+        }
+        removed_relationship_ids.sort_unstable();
+        if let Some(duplicate) = removed_relationship_ids
+            .windows(2)
+            .find(|pair| pair[0] == pair[1])
+        {
+            return Err(OpcError::DuplicateRelationshipId(duplicate[0].clone()));
+        }
+
+        let target = self
+            .catalog
+            .parts_by_name
+            .get(partname)
+            .copied()
+            .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+        let target_part = &self.catalog.parts[target];
+        for id in &removed_relationship_ids {
+            let relationship = target_part.relationships.get(id).ok_or_else(|| {
+                OpcError::RelationshipNotFound(format!("relationship '{id}' was not found"))
+            })?;
+            if !relationship.is_external() {
+                return Err(OpcError::InvalidRelationship(format!(
+                    "relationship '{id}' is not external"
+                )));
+            }
+        }
+        let relationship_xml =
+            relationship_xml_without(&target_part.relationships, &removed_relationship_ids)?;
+        self.limits.check(
+            SourceLimitKind::RelationshipXmlBytes,
+            relationship_xml.len() as u64,
+            self.limits.max_relationship_xml_bytes() as u64,
+        )?;
+
+        let relationship_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let relationship_member = relationship_uri.membername().to_owned();
+        let relationship_entry = self.archive.entry_id(&relationship_member).ok_or_else(|| {
+            OpcError::RelationshipNotFound(format!(
+                "relationships member '{}' was not found",
+                relationship_uri.as_str()
+            ))
+        })?;
+        self.validate_overlay_limits(std::iter::once((target, replacement.len())), self.limits)?;
+        self.validate_part_and_relationship_overlay_limits(
+            target,
+            replacement.len(),
+            relationship_entry,
+            relationship_xml.len(),
+            self.limits,
+        )?;
+        let original_part = self.read_part(target)?;
+        let original_relationships = match self.archive.read_entry(relationship_entry) {
+            Ok(bytes) => bytes,
+            Err(error) => return Err(map_preservation_error(error)),
+        };
+        self.source.ensure_current()?;
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if xml_minifier::audit::package::is_xml_part(
+            target_part.partname.as_str(),
+            target_part.content_type.as_str(),
+        ) {
+            validate_source_part_replacement_xml(
+                target_part.partname.as_str(),
+                original_part.as_bytes(),
+                &replacement,
+            )?;
+        }
+        validate_source_part_replacement_xml(
+            relationship_uri.as_str(),
+            &original_relationships,
+            &relationship_xml,
+        )?;
+        drop(original_part);
+
+        let changed = [
+            ChangedOverlay {
+                target: ChangedOverlayTarget::Part(target),
+                replacement: ChangedOverlayPayload::Shared(Arc::new(replacement)),
+            },
+            ChangedOverlay {
+                target: ChangedOverlayTarget::Member(relationship_member),
+                replacement: ChangedOverlayPayload::Owned(relationship_xml),
+            },
+        ];
+        match policy {
+            Some(policy) => {
+                self.write_changed_overlays_with_appended_with_policy(writer, &changed, &[], policy)
+            },
+            None => self.write_changed_overlays(writer, &changed),
+        }
+    }
+
+    /// Replace several existing Parts while removing bounded sets of
+    /// external relationships owned by those Parts.
+    ///
+    /// The payload and each selected `.rels` member are regenerated together;
+    /// every other ZIP member is raw-copied. Relationship IDs must be unique
+    /// and must identify external relationships. The caller owns the XML
+    /// proof that removed IDs are no longer referenced by replacement
+    /// payloads. A real change to a signed source is refused before output.
+    pub fn write_part_overlays_with_external_relationship_removals_to_stream<W: Write>(
+        self,
+        writer: W,
+        overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+    ) -> Result<()> {
+        self.write_part_overlays_with_external_relationship_removals_to_stream_inner(
+            writer, overlays, None,
+        )
+    }
+
+    /// Policy-aware bounded publication with external relationship removals.
+    pub fn write_part_overlays_with_external_relationship_removals_to_stream_with_policy<
+        W: Write,
+    >(
+        self,
+        writer: W,
+        overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_with_external_relationship_removals_to_stream_inner(
+            writer,
+            overlays,
+            Some(policy),
+        )
+    }
+
+    fn write_part_overlays_with_external_relationship_removals_to_stream_inner<W: Write>(
+        self,
+        writer: W,
+        mut overlays: Vec<(PackURI, Vec<u8>, Vec<String>)>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
+        if overlays.len() > MAX_SOURCE_OVERLAY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "replacement set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
+            )));
+        }
+        if overlays.is_empty() {
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
+        }
+        overlays.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+        if let Some(duplicate) = overlays.windows(2).find(|pair| pair[0].0 == pair[1].0) {
+            return Err(OpcError::DuplicatePartName(duplicate[0].0.to_string()));
+        }
+
+        let mut part_overlays = Vec::new();
+        part_overlays
+            .try_reserve_exact(overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship overlay parts",
+                source,
+            })?;
+        let mut relationship_overlays = Vec::new();
+        relationship_overlays
+            .try_reserve_exact(overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship overlay members",
+                source,
+            })?;
+        let mut removed_relationship_total = 0usize;
+
+        for (partname, replacement, mut removed_relationship_ids) in overlays {
+            if removed_relationship_ids.len() > MAX_SOURCE_RELATIONSHIP_REMOVALS {
+                return Err(overlay_unavailable(format!(
+                    "relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
+                )));
+            }
+            removed_relationship_ids.sort_unstable();
+            if let Some(duplicate) = removed_relationship_ids
+                .windows(2)
+                .find(|pair| pair[0] == pair[1])
+            {
+                return Err(OpcError::DuplicateRelationshipId(duplicate[0].clone()));
+            }
+            removed_relationship_total = removed_relationship_total
+                .checked_add(removed_relationship_ids.len())
+                .ok_or_else(|| overlay_unavailable("relationship removal count overflows usize"))?;
+            if removed_relationship_total > MAX_SOURCE_RELATIONSHIP_REMOVALS {
+                return Err(overlay_unavailable(format!(
+                    "aggregate relationship removal set exceeds the {MAX_SOURCE_RELATIONSHIP_REMOVALS}-relationship bound"
+                )));
+            }
+            let target = self
+                .catalog
+                .parts_by_name
+                .get(&partname)
+                .copied()
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            let target_part = &self.catalog.parts[target];
+            if removed_relationship_ids.is_empty() {
+                part_overlays.push(PendingOverlay {
+                    target,
+                    replacement: Arc::new(replacement),
+                    source_xml: None,
+                    replacement_spans: None,
+                    proof: None,
+                });
+                continue;
+            }
+            for id in &removed_relationship_ids {
+                let relationship = target_part.relationships.get(id).ok_or_else(|| {
+                    OpcError::RelationshipNotFound(format!("relationship '{id}' was not found"))
+                })?;
+                if !relationship.is_external() {
+                    return Err(OpcError::InvalidRelationship(format!(
+                        "relationship '{id}' is not external"
+                    )));
+                }
+            }
+            let relationship_xml =
+                relationship_xml_without(&target_part.relationships, &removed_relationship_ids)?;
+            self.limits.check(
+                SourceLimitKind::RelationshipXmlBytes,
+                relationship_xml.len() as u64,
+                self.limits.max_relationship_xml_bytes() as u64,
+            )?;
+            let relationship_uri = partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let relationship_member = relationship_uri.membername().to_owned();
+            let relationship_entry =
+                self.archive.entry_id(&relationship_member).ok_or_else(|| {
+                    OpcError::RelationshipNotFound(format!(
+                        "relationships member '{}' was not found",
+                        relationship_uri.as_str()
+                    ))
+                })?;
+            part_overlays.push(PendingOverlay {
+                target,
+                replacement: Arc::new(replacement),
+                source_xml: None,
+                replacement_spans: None,
+                proof: None,
+            });
+            relationship_overlays.push((
+                target,
+                relationship_entry,
+                relationship_member,
+                relationship_xml,
+            ));
+        }
+
+        for (index, left) in relationship_overlays.iter().enumerate() {
+            for right in relationship_overlays.iter().skip(index + 1) {
+                if left.2 == right.2 {
+                    return Err(overlay_unavailable(
+                        "multiple relationship overlays resolve to one ZIP member",
+                    ));
+                }
+            }
+            for part in &part_overlays {
+                if self.catalog.parts[part.target].partname.membername() == left.2 {
+                    return Err(overlay_unavailable(
+                        "a relationship overlay collides with a Part ZIP member",
+                    ));
+                }
+            }
+        }
+
+        let mut payload_lengths = Vec::new();
+        payload_lengths
+            .try_reserve_exact(part_overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship payload limits",
+                source,
+            })?;
+        for overlay in &part_overlays {
+            payload_lengths.push((overlay.target, overlay.replacement.len()));
+        }
+        let mut changed = Vec::new();
+        changed
+            .try_reserve_exact(
+                part_overlays
+                    .len()
+                    .checked_add(relationship_overlays.len())
+                    .and_then(|count| count.checked_mul(2))
+                    .ok_or_else(|| {
+                        overlay_unavailable("relationship overlay count overflows usize")
+                    })?,
+            )
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship changed overlays",
+                source,
+            })?;
+        let mut relationship_entries = Vec::new();
+        relationship_entries
+            .try_reserve_exact(relationship_overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC relationship overlay limits",
+                source,
+            })?;
+
+        for (target, relationship_entry, _, relationship_xml) in &relationship_overlays {
+            let original_relationships = match self.archive.read_entry(*relationship_entry) {
+                Ok(bytes) => bytes,
+                Err(error) => return Err(map_preservation_error(error)),
+            };
+            self.source.ensure_current()?;
+            let relationship_uri = self.catalog.parts[*target]
+                .partname
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?;
+            validate_source_part_replacement_xml(
+                relationship_uri.as_str(),
+                original_relationships.as_slice(),
+                relationship_xml,
+            )?;
+            relationship_entries.push((*relationship_entry, relationship_xml.len()));
+        }
+        self.validate_combined_relationship_overlay_limits(
+            &payload_lengths,
+            &relationship_entries,
+            self.limits,
+        )?;
+
+        for (_, _, relationship_member, relationship_xml) in relationship_overlays {
+            changed.push(ChangedOverlay {
+                target: ChangedOverlayTarget::Member(relationship_member),
+                replacement: ChangedOverlayPayload::Owned(relationship_xml),
+            });
+        }
+
+        for overlay in part_overlays {
+            let original = self.read_part(overlay.target)?;
+            self.source.ensure_current()?;
+            let target_part = &self.catalog.parts[overlay.target];
+            if xml_minifier::audit::package::is_xml_part(
+                target_part.partname.as_str(),
+                target_part.content_type.as_str(),
+            ) {
+                validate_source_part_replacement_xml(
+                    target_part.partname.as_str(),
+                    original.as_bytes(),
+                    &overlay.replacement,
+                )?;
+            }
+            if original.as_bytes() != overlay.replacement.as_slice() {
+                changed.push(ChangedOverlay {
+                    target: ChangedOverlayTarget::Part(overlay.target),
+                    replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
+                });
+            }
+            // The original is needed only for comparison and XML auditing;
+            // never carry its handle into changed-member publication.
+            drop(original);
+        }
+
+        if changed.is_empty() {
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        match policy {
+            Some(policy) => {
+                self.write_changed_overlays_with_appended_with_policy(writer, &changed, &[], policy)
+            },
+            None => self.write_changed_overlays(writer, &changed),
+        }
+    }
+
+    /// Replace a bounded set of existing ordinary Parts and publish to a
+    /// sequential stream.
+    ///
+    /// The replacement set is sorted and checked for duplicate Part URIs. Its
+    /// maximum size is 64. Part URIs, content types, relationships, the package
+    /// catalog, and physical member topology are immutable. Every unselected
+    /// ZIP member and every selected exact no-op member is raw-copied.
+    ///
+    /// If every replacement is byte-identical to its source payload, the
+    /// complete source artifact is copied byte for byte, including signatures
+    /// and unsupported physical details. A real change to a signed package is
+    /// refused because this operation accepts no signature policy.
+    ///
+    /// All selected payloads, aggregate limits, signatures, changed XML, and
+    /// the preservation plan are validated before the first output byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, limit, duplicate-Part, Part, signature,
+    /// XML-publication, ZIP, or sink error. If a non-atomic sink accepts bytes
+    /// before failing, the error is [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlays_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, Vec::new(), Arc::new, None)
+    }
+
+    /// Policy-aware bounded overlay publication.
+    pub fn write_part_overlays_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, Vec::new(), Arc::new, Some(policy))
+    }
+
+    /// Replace a bounded set of existing ordinary Parts with caller-owned
+    /// shared payloads and publish to a sequential stream.
+    ///
+    /// This is the shared-ownership counterpart to
+    /// [`Self::write_part_overlays_to_stream`]. Each [`Arc<Vec<u8>>`] is moved
+    /// into the opaque publication plan; no payload-byte copy is performed.
+    /// The replacement set is sorted and checked for duplicate Part URIs. Its
+    /// maximum size is 64. Part URIs, content types, relationships, the
+    /// package catalog, and physical member topology are immutable. Every
+    /// unselected ZIP member and every selected exact no-op member is
+    /// raw-copied.
+    pub fn write_part_overlays_shared_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            Vec::new(),
+            std::convert::identity,
+            None,
+        )
+    }
+
+    /// Policy-aware shared-payload overlay publication.
+    pub fn write_part_overlays_shared_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            Vec::new(),
+            std::convert::identity,
+            Some(policy),
+        )
+    }
+
+    /// Replace and physically delete bounded sets of existing ordinary Parts.
+    ///
+    /// This is an explicit low-level OPC publication operation. Deletion omits
+    /// the selected physical Part member without reading or decompressing its
+    /// payload. It does not implicitly edit `[Content_Types].xml`, remove
+    /// inbound relationships, or remove the deleted Part's relationships
+    /// member. Callers must include every required manifest and relationship
+    /// payload in `replacements`, or the resulting package graph may be
+    /// invalid. Format-owned editors should prefer a topology-aware operation
+    /// whenever one is available.
+    ///
+    /// The complete selection is bounded, duplicate and overlapping Part URIs
+    /// are refused, and every selected Part must exist. All validation,
+    /// signature checks, source-version checks, cancellation checks, and ZIP
+    /// preservation planning complete before the first output byte. Untouched
+    /// members retain their compressed payloads and physical metadata. An
+    /// empty plan copies the complete source artifact byte for byte; any real
+    /// deletion or replacement of a signed source is refused.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed source, limit, duplicate-Part, missing-Part, signature,
+    /// XML-publication, ZIP, or sink error. If a non-atomic sink accepts bytes
+    /// before failing, the error is [`OpcError::IncompleteOutput`].
+    pub fn write_part_overlays_with_deletions_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+        deletions: Vec<PackURI>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, deletions, Arc::new, None)
+    }
+
+    /// Policy-aware overlay publication with physical deletions.
+    pub fn write_part_overlays_with_deletions_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Vec<u8>)>,
+        deletions: Vec<PackURI>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(writer, replacements, deletions, Arc::new, Some(policy))
+    }
+
+    /// Shared-payload counterpart to
+    /// [`Self::write_part_overlays_with_deletions_to_stream`].
+    ///
+    /// Replacement payloads are retained through [`Arc<Vec<u8>>`] without a
+    /// payload-byte copy. Physical deletion and all validation, preservation,
+    /// signature, source, cancellation, and sink semantics are identical.
+    pub fn write_part_overlays_with_deletions_shared_to_stream<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+        deletions: Vec<PackURI>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            deletions,
+            std::convert::identity,
+            None,
+        )
+    }
+
+    /// Policy-aware shared-payload overlay publication with deletions.
+    pub fn write_part_overlays_with_deletions_shared_to_stream_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: Vec<(PackURI, Arc<Vec<u8>>)>,
+        deletions: Vec<PackURI>,
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        self.write_part_overlays_impl(
+            writer,
+            replacements,
+            deletions,
+            std::convert::identity,
+            Some(policy),
+        )
+    }
+
+    fn write_part_overlays_impl<W: Write, P, F>(
+        self,
+        writer: W,
+        mut replacements: Vec<(PackURI, P)>,
+        mut deletions: Vec<PackURI>,
+        mut into_shared: F,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> Result<()>
+    where
+        F: FnMut(P) -> Arc<Vec<u8>>,
+    {
+        self.disable_read_ahead_for_publication()?;
+        let selected = replacements
+            .len()
+            .checked_add(deletions.len())
+            .ok_or_else(|| overlay_unavailable("replacement and deletion count overflows usize"))?;
+        if selected > MAX_SOURCE_OVERLAY_PARTS {
+            return Err(overlay_unavailable(format!(
+                "replacement and deletion set exceeds the {MAX_SOURCE_OVERLAY_PARTS}-Part bound"
+            )));
+        }
+        if replacements.is_empty() && deletions.is_empty() {
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
+        }
+        replacements.sort_unstable_by(|left, right| left.0.as_str().cmp(right.0.as_str()));
+        for (index, (partname, _)) in replacements.iter().enumerate() {
+            if replacements[..index]
+                .iter()
+                .any(|(candidate, _)| candidate.is_equivalent_to(partname))
+            {
+                return Err(OpcError::DuplicatePartName(partname.to_string()));
+            }
+        }
+        deletions.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+        for (index, partname) in deletions.iter().enumerate() {
+            if deletions[..index]
+                .iter()
+                .any(|candidate| candidate.is_equivalent_to(partname))
+                || replacements
+                    .iter()
+                    .any(|(candidate, _)| candidate.is_equivalent_to(partname))
+            {
+                return Err(OpcError::DuplicatePartName(partname.to_string()));
+            }
+        }
+
+        let mut overlays = Vec::new();
+        overlays
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC replacement plan",
+                source,
+            })?;
+        for (partname, replacement) in replacements {
+            let target = self
+                .part_index(&partname)
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            overlays.push(PendingOverlay {
+                target,
+                replacement: into_shared(replacement),
+                source_xml: None,
+                replacement_spans: None,
+                proof: None,
+            });
+        }
+        let mut omitted_members = Vec::new();
+        omitted_members
+            .try_reserve_exact(deletions.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC deletion plan",
+                source,
+            })?;
+        for partname in deletions {
+            let target = self
+                .part_index(&partname)
+                .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))?;
+            omitted_members.push(self.catalog.parts[target].partname.membername().to_string());
+        }
+        self.validate_overlay_limits(
+            overlays
+                .iter()
+                .map(|overlay| (overlay.target, overlay.replacement.len())),
+            self.limits,
+        )?;
+
+        let mut changed = Vec::new();
+        changed
+            .try_reserve_exact(overlays.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC changed replacement plan",
+                source,
+            })?;
+        {
+            // The selected validation reads are one sequential operation. An
+            // unmanaged package may reuse one indexed Deflate decoder across
+            // those reads; Store members bypass it and cache hits remain
+            // cache-only. Managed packages intentionally retain the existing
+            // one-shot path to avoid retaining unaccounted decoder workspace
+            // across managed loads; their cancellation and reservation policy
+            // remains unchanged.
+            let mut read_session = (!self.cache.is_managed()).then(|| self.archive.read_session());
+            for overlay in overlays {
+                // Reading every selected closure proves its local framing,
+                // compression, declared size, and CRC before output.
+                let original = match read_session.as_mut() {
+                    Some(session) => self.read_part_with_session(overlay.target, session, None)?,
+                    None => self.read_part(overlay.target)?,
+                };
+                if original.as_bytes() != overlay.replacement.as_slice() {
+                    changed.push((overlay, original));
+                }
+            }
+        }
+        if changed.is_empty() && omitted_members.is_empty() {
+            return match policy {
+                Some(policy) => self.write_exact_source_with_policy(writer, policy),
+                None => self.write_exact_source(writer),
+            };
+        }
+        if self.has_signature_infrastructure() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(changed.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC changed payloads",
+                source,
+            })?;
+        for (overlay, original) in changed {
+            let target_part = &self.catalog.parts[overlay.target];
+            if xml_minifier::audit::package::is_xml_part(
+                target_part.partname.as_str(),
+                target_part.content_type.as_str(),
+            ) {
+                // The pair audit's verdict and error, from the remembered
+                // original and its indexed proof when this unmanaged package
+                // has audited it before.
+                let _proof = self.audit_physical_replacement_xml(
+                    overlay.target,
+                    &original,
+                    &overlay.replacement,
+                    None,
+                    None,
+                    None,
+                )?;
+            }
+            drop(original);
+            replacements.push(ChangedOverlay {
+                target: ChangedOverlayTarget::Part(overlay.target),
+                replacement: ChangedOverlayPayload::Shared(Arc::clone(&overlay.replacement)),
+            });
+        }
+        match policy {
+            Some(policy) => self.write_changed_overlays_with_omissions_and_appended_with_policy(
+                writer,
+                &replacements,
+                &omitted_members,
+                &[],
+                policy,
+            ),
+            None => {
+                self.write_changed_overlays_with_omissions(writer, &replacements, &omitted_members)
+            },
+        }
+    }
+
+    fn validate_overlay_limits<I>(&self, overlays: I, limits: SourceLimits) -> Result<()>
+    where
+        I: Iterator<Item = (usize, usize)> + Clone,
+    {
+        for (_, replacement_len) in overlays.clone() {
+            let replacement_bytes =
+                u64::try_from(replacement_len).map_err(|_| OpcError::Limit {
+                    kind: SourceLimitKind::PartBytes,
+                    observed: u64::MAX,
+                    maximum: limits.max_part_bytes(),
+                })?;
+            limits.check(
+                SourceLimitKind::PartBytes,
+                replacement_bytes,
+                limits.max_part_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::EntryBytes,
+                replacement_bytes,
+                limits.max_entry_bytes(),
+            )?;
+        }
+
+        let part_total = self.catalog.declared_part_bytes;
+        let archive_total = self.catalog.declared_archive_bytes;
+        let mut adjusted_parts = part_total;
+        let mut adjusted_archive = archive_total;
+        for (target, replacement_len) in overlays {
+            let target_bytes = self
+                .archive
+                .metadata_for(self.catalog.parts[target].entry_id)?
+                .uncompressed_size();
+            let replacement_bytes = replacement_len as u64;
+            adjusted_parts = adjusted_overlay_total(
+                adjusted_parts,
+                target_bytes,
+                replacement_bytes,
+                SourceLimitKind::TotalPartBytes,
+                limits.max_total_part_bytes(),
+            )?;
+            adjusted_archive = adjusted_overlay_total(
+                adjusted_archive,
+                target_bytes,
+                replacement_bytes,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            adjusted_parts,
+            limits.max_total_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            adjusted_archive,
+            limits.max_aggregate_bytes(),
+        )?;
+        Ok(())
+    }
+
+    fn validate_part_and_relationship_overlay_limits(
+        &self,
+        target: usize,
+        replacement_len: usize,
+        relationship_entry: EntryId,
+        relationship_len: usize,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let relationship_bytes = relationship_len as u64;
+        limits.check(
+            SourceLimitKind::EntryBytes,
+            relationship_bytes,
+            limits.max_entry_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::RelationshipXmlBytes,
+            relationship_bytes,
+            limits.max_relationship_xml_bytes() as u64,
+        )?;
+
+        let archive_total = self.catalog.declared_archive_bytes;
+        let relationship_total = self.catalog.declared_relationship_xml_bytes;
+        let original_part = self
+            .archive
+            .metadata_for(self.catalog.parts[target].entry_id)?
+            .uncompressed_size();
+        let original_relationship = self
+            .archive
+            .metadata_for(relationship_entry)?
+            .uncompressed_size();
+        let adjusted_archive = adjusted_overlay_total(
+            archive_total,
+            original_part,
+            replacement_len as u64,
+            SourceLimitKind::AggregateBytes,
+            limits.max_aggregate_bytes(),
+        )?;
+        let adjusted_archive = adjusted_overlay_total(
+            adjusted_archive,
+            original_relationship,
+            relationship_bytes,
+            SourceLimitKind::AggregateBytes,
+            limits.max_aggregate_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            adjusted_archive,
+            limits.max_aggregate_bytes(),
+        )?;
+        let adjusted_relationships = adjusted_overlay_total(
+            relationship_total,
+            original_relationship,
+            relationship_bytes,
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            adjusted_relationships,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )
+    }
+
+    fn validate_combined_relationship_overlay_limits(
+        &self,
+        part_overlays: &[(usize, usize)],
+        relationship_overlays: &[(EntryId, usize)],
+        limits: SourceLimits,
+    ) -> Result<()> {
+        for (_, replacement_len) in part_overlays {
+            let replacement_bytes = *replacement_len as u64;
+            limits.check(
+                SourceLimitKind::PartBytes,
+                replacement_bytes,
+                limits.max_part_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::EntryBytes,
+                replacement_bytes,
+                limits.max_entry_bytes(),
+            )?;
+        }
+        for (_, replacement_len) in relationship_overlays {
+            let replacement_bytes = *replacement_len as u64;
+            limits.check(
+                SourceLimitKind::EntryBytes,
+                replacement_bytes,
+                limits.max_entry_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::RelationshipXmlBytes,
+                replacement_bytes,
+                limits.max_relationship_xml_bytes() as u64,
+            )?;
+        }
+        let archive_total = self.catalog.declared_archive_bytes;
+        let part_total = self.catalog.declared_part_bytes;
+        let relationship_total = self.catalog.declared_relationship_xml_bytes;
+        let mut adjusted_archive = archive_total;
+        let mut adjusted_parts = part_total;
+        let mut adjusted_relationships = relationship_total;
+        for (target, replacement_len) in part_overlays {
+            let original = self
+                .archive
+                .metadata_for(self.catalog.parts[*target].entry_id)?
+                .uncompressed_size();
+            adjusted_archive = adjusted_overlay_total(
+                adjusted_archive,
+                original,
+                *replacement_len as u64,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            adjusted_parts = adjusted_overlay_total(
+                adjusted_parts,
+                original,
+                *replacement_len as u64,
+                SourceLimitKind::TotalPartBytes,
+                limits.max_total_part_bytes(),
+            )?;
+        }
+        for (entry, replacement_len) in relationship_overlays {
+            let original = self.archive.metadata_for(*entry)?.uncompressed_size();
+            adjusted_archive = adjusted_overlay_total(
+                adjusted_archive,
+                original,
+                *replacement_len as u64,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            adjusted_relationships = adjusted_overlay_total(
+                adjusted_relationships,
+                original,
+                *replacement_len as u64,
+                SourceLimitKind::TotalRelationshipXmlBytes,
+                limits.max_total_relationship_xml_bytes() as u64,
+            )?;
+        }
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            adjusted_archive,
+            limits.max_aggregate_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            adjusted_parts,
+            limits.max_total_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            adjusted_relationships,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )
+    }
+
+    fn validate_topology_limits<P: RelationshipPublicationSummary>(
+        &self,
+        replacements: &[PendingOverlay],
+        removals: &[usize],
+        additions: &[TopologyPartAddition],
+        relationship_publications: &[P],
+        content_types_replacement: Option<ContentTypesPublicationSummary>,
+        raw_relationship_removed_entries: &[(EntryId, u64)],
+        limits: SourceLimits,
+    ) -> Result<PreparedTopologyTotals> {
+        let mut part_total = self.catalog.declared_part_bytes;
+        let mut archive_total = self.catalog.declared_archive_bytes;
+        let mut relationship_total = self.catalog.declared_relationship_xml_bytes;
+        let mut relationship_event_total = self.catalog.declared_relationship_xml_events;
+        // The source totals above include every physical member.  A prepared
+        // removal drops its Part member and, when present, its derived
+        // relationships member before replacement/addition deltas are applied.
+        // Keep these subtractions explicit so a candidate that shrinks to an
+        // exact aggregate limit is admitted rather than charged against
+        // bytes that will not be published.
+        for (index, target) in removals.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let part = self.catalog.parts.get(*target).ok_or_else(|| {
+                overlay_unavailable("topology removal target index is out of bounds")
+            })?;
+            let part_bytes = self
+                .archive
+                .metadata_for(part.entry_id)?
+                .uncompressed_size();
+            archive_total = adjusted_overlay_total(
+                archive_total,
+                part_bytes,
+                0,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            let relationships_uri = part.partname.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let relationship_member = relationships_uri.membername();
+            let Some(entry) = self.archive.entry_id(relationship_member) else {
+                continue;
+            };
+            let relationship_bytes = self.archive.metadata_for(entry)?.uncompressed_size();
+            archive_total = adjusted_overlay_total(
+                archive_total,
+                relationship_bytes,
+                0,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            relationship_total = adjusted_overlay_total(
+                relationship_total,
+                relationship_bytes,
+                0,
+                SourceLimitKind::TotalRelationshipXmlBytes,
+                limits.max_total_relationship_xml_bytes() as u64,
+            )?;
+            let metrics = self
+                .catalog
+                .relationship_xml_metrics
+                .get(&part.partname)
+                .ok_or_else(|| {
+                    overlay_unavailable("removed relationships event metrics are unavailable")
+                })?;
+            relationship_event_total = adjusted_overlay_total(
+                relationship_event_total,
+                metrics.event_count,
+                0,
+                SourceLimitKind::TotalRelationshipXmlEvents,
+                limits.max_total_relationship_xml_events() as u64,
+            )?;
+        }
+        for (entry, event_count) in raw_relationship_removed_entries {
+            let already_removed = removals.iter().any(|target| {
+                self.catalog.parts.get(*target).and_then(|part| {
+                    part.partname
+                        .rels_uri()
+                        .ok()
+                        .and_then(|uri| self.archive.entry_id(uri.membername()))
+                }) == Some(*entry)
+            });
+            if already_removed {
+                continue;
+            }
+            let relationship_bytes = self.archive.metadata_for(*entry)?.uncompressed_size();
+            archive_total = adjusted_overlay_total(
+                archive_total,
+                relationship_bytes,
+                0,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            relationship_total = adjusted_overlay_total(
+                relationship_total,
+                relationship_bytes,
+                0,
+                SourceLimitKind::TotalRelationshipXmlBytes,
+                limits.max_total_relationship_xml_bytes() as u64,
+            )?;
+            relationship_event_total = adjusted_overlay_total(
+                relationship_event_total,
+                *event_count,
+                0,
+                SourceLimitKind::TotalRelationshipXmlEvents,
+                limits.max_total_relationship_xml_events() as u64,
+            )?;
+        }
+        for (index, target) in removals.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let part = self.catalog.parts.get(*target).ok_or_else(|| {
+                overlay_unavailable("topology removal target index is out of bounds")
+            })?;
+            let part_bytes = self
+                .archive
+                .metadata_for(part.entry_id)?
+                .uncompressed_size();
+            part_total = adjusted_overlay_total(
+                part_total,
+                part_bytes,
+                0,
+                SourceLimitKind::TotalPartBytes,
+                limits.max_total_part_bytes(),
+            )?;
+        }
+        for (index, replacement) in replacements.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let replacement_bytes = u64::try_from(replacement.replacement.len())
+                .map_err(|_| overlay_unavailable("topology replacement length overflows u64"))?;
+            limits.check(
+                SourceLimitKind::PartBytes,
+                replacement_bytes,
+                limits.max_part_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::EntryBytes,
+                replacement_bytes,
+                limits.max_entry_bytes(),
+            )?;
+            let original = self
+                .archive
+                .metadata_for(self.catalog.parts[replacement.target].entry_id)?
+                .uncompressed_size();
+            part_total = adjusted_overlay_total(
+                part_total,
+                original,
+                replacement_bytes,
+                SourceLimitKind::TotalPartBytes,
+                limits.max_total_part_bytes(),
+            )?;
+            archive_total = adjusted_overlay_total(
+                archive_total,
+                original,
+                replacement_bytes,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+        }
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let (bytes, compressed_bytes) = match &addition.payload {
+                TopologyPartPayload::Decoded(payload) => (
+                    u64::try_from(payload.len())
+                        .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?,
+                    None,
+                ),
+                TopologyPartPayload::SourceXml(payload) => (
+                    u64::try_from(payload.bytes().len()).map_err(|_| {
+                        overlay_unavailable("topology XML Part length overflows u64")
+                    })?,
+                    None,
+                ),
+                TopologyPartPayload::Precompressed(payload) => {
+                    (payload.logical_size(), Some(payload.compressed_size()))
+                },
+            };
+            let member_name_bytes = u64::try_from(addition.partname.membername().len())
+                .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                member_name_bytes,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            if let Some(compressed_bytes) = compressed_bytes {
+                limits.check(
+                    SourceLimitKind::ArchiveCompressedBytes,
+                    compressed_bytes,
+                    limits.max_archive_compressed_bytes(),
+                )?;
+            }
+            part_total = checked_overlay_total(
+                part_total,
+                bytes,
+                SourceLimitKind::TotalPartBytes,
+                limits.max_total_part_bytes(),
+            )?;
+            archive_total = checked_overlay_total(
+                archive_total,
+                bytes,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+        }
+        if let Some(summary) = content_types_replacement {
+            let bytes = summary.bytes;
+            limits.check(SourceLimitKind::PartBytes, bytes, limits.max_part_bytes())?;
+            limits.check(
+                SourceLimitKind::ContentTypesBytes,
+                bytes,
+                limits.max_content_types_bytes() as u64,
+            )?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            let entry = self
+                .archive
+                .entry_id(&self.catalog.content_types_member)
+                .ok_or_else(|| OpcError::PartNotFound(self.catalog.content_types_member.clone()))?;
+            let original = self.archive.metadata_for(entry)?.uncompressed_size();
+            archive_total = adjusted_overlay_total(
+                archive_total,
+                original,
+                bytes,
+                SourceLimitKind::AggregateBytes,
+                limits.max_aggregate_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::ContentTypeMappings,
+                summary.mappings,
+                limits.max_content_type_mappings() as u64,
+            )?;
+        }
+        for (index, publication) in relationship_publications.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let bytes = publication.output_bytes()?;
+            limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                publication.member_name().len() as u64,
+                limits.max_archive_member_name_bytes(),
+            )?;
+            limits.check(
+                SourceLimitKind::RelationshipsPerPart,
+                publication.relationship_count() as u64,
+                limits.max_relationships_per_part() as u64,
+            )?;
+            let events = publication.output_events(limits)?;
+            limits.check(
+                SourceLimitKind::RelationshipXmlBytes,
+                bytes,
+                limits.max_relationship_xml_bytes() as u64,
+            )?;
+            limits.check(SourceLimitKind::EntryBytes, bytes, limits.max_entry_bytes())?;
+            if let Some(entry) = publication.existing_entry() {
+                let original = self.archive.metadata_for(entry)?.uncompressed_size();
+                archive_total = adjusted_overlay_total(
+                    archive_total,
+                    original,
+                    bytes,
+                    SourceLimitKind::AggregateBytes,
+                    limits.max_aggregate_bytes(),
+                )?;
+                relationship_total = adjusted_overlay_total(
+                    relationship_total,
+                    original,
+                    bytes,
+                    SourceLimitKind::TotalRelationshipXmlBytes,
+                    limits.max_total_relationship_xml_bytes() as u64,
+                )?;
+                let original_events = self
+                    .catalog
+                    .relationship_xml_metrics
+                    .get(publication.owner())
+                    .map(|metrics| metrics.event_count)
+                    .ok_or_else(|| {
+                        overlay_unavailable("source relationship event count is unavailable")
+                    })?;
+                // The splice scanner retains raw events, including whitespace
+                // text. Aggregate ingress metrics use trimmed text, so only
+                // the catalog count can be subtracted from the source total.
+                if publication
+                    .source_event_count()
+                    .is_some_and(|raw_events| raw_events < original_events)
+                {
+                    return Err(overlay_unavailable(
+                        "source relationship event counts are inconsistent",
+                    ));
+                }
+                relationship_event_total = adjusted_overlay_total(
+                    relationship_event_total,
+                    original_events,
+                    events,
+                    SourceLimitKind::TotalRelationshipXmlEvents,
+                    limits.max_total_relationship_xml_events() as u64,
+                )?;
+            } else {
+                archive_total = checked_overlay_total(
+                    archive_total,
+                    bytes,
+                    SourceLimitKind::AggregateBytes,
+                    limits.max_aggregate_bytes(),
+                )?;
+                relationship_total = checked_overlay_total(
+                    relationship_total,
+                    bytes,
+                    SourceLimitKind::TotalRelationshipXmlBytes,
+                    limits.max_total_relationship_xml_bytes() as u64,
+                )?;
+                relationship_event_total = checked_overlay_total(
+                    relationship_event_total,
+                    events,
+                    SourceLimitKind::TotalRelationshipXmlEvents,
+                    limits.max_total_relationship_xml_events() as u64,
+                )?;
+            }
+        }
+        limits.check(
+            SourceLimitKind::TotalPartBytes,
+            part_total,
+            limits.max_total_part_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::AggregateBytes,
+            archive_total,
+            limits.max_aggregate_bytes(),
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            relationship_total,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlEvents,
+            relationship_event_total,
+            limits.max_total_relationship_xml_events() as u64,
+        )?;
+
+        let mut output_bound = self.source.length;
+        for (index, replacement) in replacements.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            output_bound = output_bound
+                .checked_add((replacement.replacement.len() as u64).saturating_mul(2))
+                .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
+        }
+        for (index, addition) in additions.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let payload_bytes = match &addition.payload {
+                TopologyPartPayload::Decoded(payload) => u64::try_from(payload.len())
+                    .map_err(|_| overlay_unavailable("topology Part length overflows u64"))?,
+                TopologyPartPayload::SourceXml(payload) => u64::try_from(payload.bytes().len())
+                    .map_err(|_| overlay_unavailable("topology XML Part length overflows u64"))?,
+                TopologyPartPayload::Precompressed(payload) => payload.compressed_size(),
+            };
+            let member_name_bytes = u64::try_from(addition.partname.membername().len())
+                .map_err(|_| overlay_unavailable("topology member name length overflows u64"))?;
+            output_bound = output_bound
+                .checked_add(payload_bytes)
+                .and_then(|value| {
+                    member_name_bytes
+                        .checked_mul(2)
+                        .and_then(|name_bytes| value.checked_add(name_bytes))
+                })
+                .and_then(|value| value.checked_add(4096))
+                .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
+        }
+        for (index, publication) in relationship_publications.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            if publication.existing_entry().is_none() {
+                output_bound = output_bound
+                    .checked_add(publication.output_bytes()?)
+                    .and_then(|value| value.checked_add(4096))
+                    .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
+            }
+        }
+        if let Some(summary) = content_types_replacement {
+            output_bound = output_bound
+                .checked_add(summary.bytes.saturating_mul(2))
+                .ok_or_else(|| overlay_unavailable("topology output bound overflows u64"))?;
+        }
+        // The ZIP writer promotes the output format when ZIP64 is required;
+        // retain this checked bound solely as an overflow guard.
+        Ok(PreparedTopologyTotals {
+            parts: part_total,
+            archive: archive_total,
+            output_bound,
+        })
+    }
+
+    fn validate_topology_relationship_graph_nodes(
+        &self,
+        relationship_overrides: &HashMap<PackURI, Relationships>,
+        canonical_part_names: &HashMap<String, usize>,
+        additions_offset: usize,
+        additions: &[TopologyPartAddition],
+        pending_removals: &HashSet<usize>,
+    ) -> Result<()> {
+        let package_owner = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        let package_relationships = relationship_overrides
+            .get(&package_owner)
+            .unwrap_or(&self.catalog.package_relationships);
+        let mut visited = HashSet::new();
+        let mut work_queue = Vec::new();
+        for relationship in package_relationships.iter() {
+            if !relationship.is_external() {
+                self.enqueue_topology_graph_target(
+                    relationship.target_partname()?,
+                    &mut visited,
+                    &mut work_queue,
+                )?;
+            }
+        }
+        let mut cursor = 0usize;
+        while cursor < work_queue.len() {
+            if cursor & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let owner = &work_queue[cursor];
+            let owner_relationships = self.topology_relationships_for_owner(
+                owner,
+                relationship_overrides,
+                canonical_part_names,
+                additions_offset,
+                additions,
+                pending_removals,
+            )?;
+            if let Some(owner_relationships) = owner_relationships {
+                for relationship in owner_relationships.iter() {
+                    if !relationship.is_external() {
+                        self.enqueue_topology_graph_target(
+                            relationship.target_partname()?,
+                            &mut visited,
+                            &mut work_queue,
+                        )?;
+                    }
+                }
+            }
+            cursor += 1;
+        }
+        Ok(())
+    }
+
+    fn enqueue_topology_graph_target(
+        &self,
+        target: PackURI,
+        visited: &mut HashSet<PackURI>,
+        work_queue: &mut Vec<PackURI>,
+    ) -> Result<()> {
+        if visited.contains(&target) {
+            return Ok(());
+        }
+        let next = visited
+            .len()
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("topology graph node count overflows"))?;
+        self.limits.check(
+            SourceLimitKind::RelationshipGraphNodes,
+            next as u64,
+            self.limits.max_relationship_graph_nodes() as u64,
+        )?;
+        visited
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC effective relationship graph nodes",
+                source,
+            })?;
+        work_queue
+            .try_reserve(1)
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC effective relationship graph queue",
+                source,
+            })?;
+        visited.insert(target.clone());
+        work_queue.push(target);
+        Ok(())
+    }
+
+    fn topology_relationships_for_owner<'a>(
+        &'a self,
+        owner: &PackURI,
+        relationship_overrides: &'a HashMap<PackURI, Relationships>,
+        canonical_part_names: &HashMap<String, usize>,
+        additions_offset: usize,
+        additions: &'a [TopologyPartAddition],
+        pending_removals: &HashSet<usize>,
+    ) -> Result<Option<&'a Relationships>> {
+        let key = folded_part_name(owner)?;
+        let Some(index) = canonical_part_names.get(&key).copied() else {
+            return Ok(None);
+        };
+        if index < additions_offset {
+            if pending_removals.contains(&index) {
+                return Ok(None);
+            }
+            let source = &self.catalog.parts[index];
+            Ok(relationship_overrides
+                .get(&source.partname)
+                .or(Some(&source.relationships)))
+        } else {
+            let addition = additions.get(index - additions_offset).ok_or_else(|| {
+                overlay_unavailable("topology graph addition index is out of bounds")
+            })?;
+            Ok(relationship_overrides.get(&addition.partname))
+        }
+    }
+
+    /// Whether the package's physical inventory contains recognized signature
+    /// infrastructure.
+    ///
+    /// This is a conservative metadata query over the open-time central
+    /// directory, relationship declarations, and content-type declarations.
+    /// It does not read or decrypt member payloads and does not reserve managed
+    /// memory, object, or work budget. The result describes the package's
+    /// captured source snapshot; publication operations still perform their
+    /// own source-freshness checks before emitting bytes.
+    #[must_use]
+    pub fn has_signature_infrastructure(&self) -> bool {
+        // The central-directory names are the authoritative physical-member
+        // inventory. Scanning them does not materialize any payload and also
+        // covers raw/non-Part members (including reserved relationship
+        // members) that are intentionally absent from `self.parts` and may
+        // not be retained in `self.non_part_members` for classification.
+        self.archive.file_names().any(is_signature_member_path)
+            || self
+                .catalog
+                .package_relationships
+                .iter()
+                .any(is_signature_relationship_or_target)
+            || self.catalog.parts.iter().any(|part| {
+                is_signature_path(part.partname.as_str())
+                    || is_signature_content_type(part.content_type.as_str())
+                    || part
+                        .relationships
+                        .iter()
+                        .any(is_signature_relationship_or_target)
+            })
+    }
+
+    /// Read the source content-types member at publication time.
+    ///
+    /// The source catalog parses this stream during open. Topology publication
+    /// needs the original lexical bytes, so it re-reads the one catalogued
+    /// member through the direct payload accounting path after checking source
+    /// freshness and the managed execution policy.
+    fn read_content_types_xml(
+        &self,
+    ) -> Result<(Vec<u8>, Option<Arc<Reservation>>, Option<Arc<Reservation>>)> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let entry = self
+            .archive
+            .entry_id(&self.catalog.content_types_member)
+            .ok_or_else(|| OpcError::PartNotFound(self.catalog.content_types_member.clone()))?;
+        let metadata = self.archive.metadata_for(entry)?;
+        let declared_bytes = metadata.uncompressed_size();
+        self.limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            declared_bytes,
+            self.limits.max_content_types_bytes() as u64,
+        )?;
+        self.limits.check(
+            SourceLimitKind::PartBytes,
+            declared_bytes,
+            self.limits.max_part_bytes(),
+        )?;
+        self.limits.check(
+            SourceLimitKind::EntryBytes,
+            declared_bytes,
+            self.limits.max_entry_bytes(),
+        )?;
+        let resources = self
+            .cache
+            .reserve_direct_payload(declared_bytes)
+            .map_err(map_execution_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let _monitored = self.source.monitor_publication();
+        let bytes = self
+            .archive
+            .read_entry(entry)
+            .map_err(map_preservation_error)?;
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        self.limits.check(
+            SourceLimitKind::ContentTypesBytes,
+            bytes.len() as u64,
+            self.limits.max_content_types_bytes() as u64,
+        )?;
+        self.limits.check(
+            SourceLimitKind::PartBytes,
+            bytes.len() as u64,
+            self.limits.max_part_bytes(),
+        )?;
+        self.limits.check(
+            SourceLimitKind::EntryBytes,
+            bytes.len() as u64,
+            self.limits.max_entry_bytes(),
+        )?;
+        if bytes.len() as u64 != declared_bytes {
+            return Err(OpcError::ZipError(format!(
+                "source-backed OPC content-types member declared {declared_bytes} uncompressed bytes but read {}",
+                bytes.len()
+            )));
+        }
+        Ok((
+            bytes,
+            resources.reservation,
+            resources.payload_object_reservation,
+        ))
+    }
+
+    fn prepare_raw_relationship_restores(
+        &self,
+        raw_relationships: &[RawRelationshipsRestore],
+        relationship_overrides: &HashMap<PackURI, Relationships>,
+        canonical_part_names: &HashMap<String, usize>,
+        additions_offset: usize,
+        additions: &[TopologyPartAddition],
+        pending_removal_set: &HashSet<usize>,
+        physical_members: &PhysicalMemberLookup,
+        memory_reservations: &mut Vec<Arc<Reservation>>,
+    ) -> Result<(Vec<PreparedRawRelationship>, Vec<(EntryId, u64)>)> {
+        let mut prepared = Vec::new();
+        prepared
+            .try_reserve_exact(raw_relationships.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC raw relationship preparations",
+                source,
+            })?;
+        let mut removed_entries = Vec::new();
+        removed_entries
+            .try_reserve_exact(raw_relationships.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC raw relationship removals",
+                source,
+            })?;
+
+        for (index, restore) in raw_relationships.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let owner = if restore.owner.as_str() == PACKAGE_URI {
+                PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?
+            } else {
+                let key = folded_part_name(&restore.owner)?;
+                let owner_index = if let Some(owner_index) = canonical_part_names.get(&key).copied()
+                {
+                    owner_index
+                } else if restore.replacement.is_none()
+                    && self
+                        .part_index(&restore.owner)
+                        .is_some_and(|index| pending_removal_set.contains(&index))
+                {
+                    self.part_index(&restore.owner)
+                        .ok_or_else(|| OpcError::PartNotFound(restore.owner.to_string()))?
+                } else {
+                    return Err(OpcError::PartNotFound(format!(
+                        "raw relationship restore owner '{}'",
+                        restore.owner
+                    )));
+                };
+                if owner_index < additions_offset {
+                    self.catalog.parts[owner_index].partname.clone()
+                } else {
+                    additions
+                        .get(owner_index - additions_offset)
+                        .ok_or_else(|| {
+                            overlay_unavailable(
+                                "raw relationship restore addition owner index is out of bounds",
+                            )
+                        })?
+                        .partname
+                        .clone()
+                }
+            };
+            let relationship_uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+            let member_name = relationship_uri.membername().to_owned();
+            self.limits.check(
+                SourceLimitKind::ArchiveMemberNameBytes,
+                member_name.len() as u64,
+                self.limits.max_archive_member_name_bytes(),
+            )?;
+            let existing_entry =
+                self.source_entry_id_case_insensitive(&member_name, physical_members)?;
+            let source_owner_relationships = self.source_relationships_for_owner(&owner);
+            let mut source_event_count = None;
+            match (&restore.expected, existing_entry) {
+                (Some(expected), Some(entry)) => {
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        expected.len() as u64,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    self.limits.check(
+                        SourceLimitKind::EntryBytes,
+                        expected.len() as u64,
+                        self.limits.max_entry_bytes(),
+                    )?;
+                    if expected.len() > MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES {
+                        return Err(overlay_unavailable(
+                            "raw relationship expected image exceeds the bounded XML size",
+                        ));
+                    }
+                    let metadata = self.archive.metadata_for(entry)?;
+                    let declared = metadata.uncompressed_size();
+                    self.limits.check(
+                        SourceLimitKind::RelationshipXmlBytes,
+                        declared,
+                        self.limits.max_relationship_xml_bytes() as u64,
+                    )?;
+                    self.limits.check(
+                        SourceLimitKind::EntryBytes,
+                        declared,
+                        self.limits.max_entry_bytes(),
+                    )?;
+                    let source_memory = relationship_xml_working_memory_bound(
+                        declared,
+                        self.source_relationships_for_owner(&owner)
+                            .map_or(0, Relationships::len),
+                    )?;
+                    let source_reservation = self.reserve_topology_memory(source_memory)?;
+                    if let Some(reservation) = source_reservation {
+                        memory_reservations.push(reservation);
+                    }
+                    let _source_resources = self
+                        .cache
+                        .reserve_direct_payload(declared)
+                        .map_err(map_execution_error)?;
+                    let bytes = self
+                        .archive
+                        .read_entry(entry)
+                        .map_err(map_preservation_error)?;
+                    self.source.ensure_current()?;
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    if bytes.as_slice() != expected.as_slice() || bytes.len() as u64 != declared {
+                        return Err(overlay_unavailable("stale raw relationship source image"));
+                    }
+                    let source_relationships = source_owner_relationships.ok_or_else(|| {
+                        overlay_unavailable(
+                            "source relationship catalog is unavailable for raw restore",
+                        )
+                    })?;
+                    let parsed = parse_strict_raw_relationship_source(
+                        &bytes,
+                        &member_name,
+                        source_relationships,
+                        self.limits,
+                        || self.check_topology_progress(),
+                    )?;
+                    source_event_count = Some(parsed.event_count);
+                },
+                (None, None) => {
+                    if source_owner_relationships
+                        .is_some_and(|relationships| !relationships.is_empty())
+                    {
+                        return Err(overlay_unavailable(
+                            "absent raw relationship member has source edges",
+                        ));
+                    }
+                },
+                (Some(_), None) => {
+                    return Err(overlay_unavailable(
+                        "raw relationship source member is physically absent",
+                    ));
+                },
+                (None, Some(_)) => {
+                    return Err(overlay_unavailable(
+                        "raw relationship source member is physically present",
+                    ));
+                },
+            }
+
+            let removed_owner = self
+                .part_index(&owner)
+                .is_some_and(|owner_index| pending_removal_set.contains(&owner_index));
+            // The raw parser only borrows the effective candidate.  Cloning a
+            // source relationship set here would allocate before a managed
+            // reservation and would duplicate the graph for a raw-only plan.
+            // Added or removed owners have no source graph, so retain one
+            // small local empty value for those cases.
+            let empty_candidate;
+            let candidate = if removed_owner && restore.replacement.is_none() {
+                empty_candidate = Relationships::for_source(&owner);
+                &empty_candidate
+            } else if let Some(relationships) = relationship_overrides.get(&owner) {
+                relationships
+            } else if let Some(relationships) = self.source_relationships_for_owner(&owner) {
+                relationships
+            } else {
+                empty_candidate = Relationships::for_source(&owner);
+                &empty_candidate
+            };
+            let replacement = restore.replacement.as_ref();
+            if let Some(replacement) = replacement {
+                self.limits.check(
+                    SourceLimitKind::RelationshipXmlBytes,
+                    replacement.len() as u64,
+                    self.limits.max_relationship_xml_bytes() as u64,
+                )?;
+                self.limits.check(
+                    SourceLimitKind::EntryBytes,
+                    replacement.len() as u64,
+                    self.limits.max_entry_bytes(),
+                )?;
+                if replacement.len() > MAX_SOURCE_TOPOLOGY_RELATIONSHIP_BYTES {
+                    return Err(overlay_unavailable(
+                        "raw relationship replacement exceeds the bounded XML size",
+                    ));
+                }
+                let replacement_reservation =
+                    self.reserve_topology_memory(relationship_xml_working_memory_bound(
+                        replacement.len() as u64,
+                        candidate.len(),
+                    )?)?;
+                if let Some(reservation) = replacement_reservation {
+                    memory_reservations.push(reservation);
+                }
+                let parsed = parse_strict_raw_relationship_source(
+                    replacement,
+                    &member_name,
+                    candidate,
+                    self.limits,
+                    || self.check_topology_progress(),
+                )?;
+                let _replacement_event_count = parsed.event_count;
+            } else if !candidate.is_empty() {
+                return Err(overlay_unavailable(
+                    "absent raw relationship member does not match effective relationship graph",
+                ));
+            }
+
+            if let (None, Some(entry)) = (replacement, existing_entry) {
+                removed_entries.push((entry, source_event_count.unwrap_or(0)));
+            }
+            prepared.push(PreparedRawRelationship {
+                owner,
+                member_name,
+                existing_entry,
+                replacement: replacement.cloned(),
+                source_event_count,
+                changed: match (restore.expected.as_ref(), replacement) {
+                    (Some(expected), Some(replacement)) => {
+                        expected.as_slice() != replacement.as_slice()
+                    },
+                    (Some(_), None) => existing_entry.is_some(),
+                    (None, Some(_)) => true,
+                    (None, None) => false,
+                },
+            });
+        }
+        Ok((prepared, removed_entries))
+    }
+
+    fn source_relationships_for_owner(&self, owner: &PackURI) -> Option<&Relationships> {
+        if owner.as_str() == PACKAGE_URI {
+            Some(&self.catalog.package_relationships)
+        } else {
+            self.part_index(owner)
+                .map(|index| &self.catalog.parts[index].relationships)
+        }
+    }
+
+    fn build_physical_member_lookup(
+        &self,
+    ) -> Result<(PhysicalMemberLookup, Option<Arc<Reservation>>)> {
+        let mut total_name_bytes = 0_u64;
+        for (index, name) in self.archive.file_names().enumerate() {
+            if index & 0xff == 0 {
+                self.check_topology_progress()?;
+            }
+            total_name_bytes = total_name_bytes
+                .checked_add(name.len() as u64)
+                .ok_or_else(|| overlay_unavailable("physical member name bytes overflow"))?;
+        }
+        let member_count = self.archive.len() as u64;
+        // Folded String allocations and the hash table are retained for the
+        // duration of publication. Charge a conservative bound before
+        // allocating either: two copies of name bytes plus fixed per-entry
+        // table/String metadata.
+        let memory_bound = total_name_bytes
+            .checked_mul(2)
+            .and_then(|bytes| bytes.checked_add(member_count.checked_mul(128)?))
+            .ok_or_else(|| overlay_unavailable("physical member lookup memory overflows"))?;
+        let memory_reservation = self.reserve_topology_memory(memory_bound)?;
+        let mut by_folded_name: HashMap<String, PhysicalMemberInfo> = HashMap::new();
+        by_folded_name
+            .try_reserve(self.archive.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC physical member lookup",
+                source,
+            })?;
+        for (index, (entry_id, name)) in self.archive.file_entries().enumerate() {
+            if index & 0xff == 0 {
+                self.check_topology_progress()?;
+            }
+            let key = folded_ascii_name(name, "source-backed OPC folded physical member name")?;
+            if let Some(info) = by_folded_name.get_mut(&key) {
+                info.count = info
+                    .count
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("physical member count overflows"))?;
+            } else {
+                by_folded_name.insert(key, PhysicalMemberInfo { entry_id, count: 1 });
+            }
+        }
+        self.check_topology_progress()?;
+        Ok((PhysicalMemberLookup { by_folded_name }, memory_reservation))
+    }
+
+    fn build_affected_physical_member_lookup(
+        &self,
+        member_names: &[String],
+    ) -> Result<PhysicalMemberLookup> {
+        let mut by_folded_name = HashMap::new();
+        by_folded_name
+            .try_reserve(member_names.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC affected physical member lookup",
+                source,
+            })?;
+        for (index, member_name) in member_names.iter().enumerate() {
+            if index & 0x3f == 0 {
+                self.check_topology_progress()?;
+            }
+            let key = folded_ascii_name(
+                member_name,
+                "source-backed OPC folded affected physical member name",
+            )?;
+            if by_folded_name.contains_key(&key) {
+                continue;
+            }
+            if let Some(entry_id) = self.archive.entry_id(member_name) {
+                by_folded_name.insert(key, PhysicalMemberInfo { entry_id, count: 1 });
+                continue;
+            }
+
+            // Source admission rejects ambiguous ASCII-case-equivalent ZIP
+            // members.  The fallback is only for a non-canonical spelling of
+            // this affected `.rels` member; it never constructs the global
+            // directory index used by publication.
+            let mut found = None;
+            let mut count = 0usize;
+            for (entry_id, candidate) in self.archive.file_entries() {
+                if folded_ascii_name(candidate, "source-backed OPC folded fallback member name")?
+                    != key
+                {
+                    continue;
+                }
+                found = Some(entry_id);
+                count = count
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("physical member count overflows"))?;
+            }
+            if let Some(entry_id) = found {
+                by_folded_name.insert(key, PhysicalMemberInfo { entry_id, count });
+            }
+        }
+        self.check_topology_progress()?;
+        Ok(PhysicalMemberLookup { by_folded_name })
+    }
+
+    fn source_entry_id_case_insensitive(
+        &self,
+        member_name: &str,
+        physical_members: &PhysicalMemberLookup,
+    ) -> Result<Option<EntryId>> {
+        let key = folded_ascii_name(member_name, "source-backed OPC folded physical member name")?;
+        if let Some(info) = physical_members.by_folded_name.get(&key) {
+            if info.count != 1 {
+                return Err(overlay_unavailable(format!(
+                    "physical member name '{member_name}' is ambiguous under ASCII case folding"
+                )));
+            }
+            return Ok(self.archive.entry_id(member_name).or(Some(info.entry_id)));
+        }
+        Ok(self.archive.entry_id(member_name))
+    }
+
+    fn check_topology_progress(&self) -> Result<()> {
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)
+    }
+
+    fn reserve_topology_memory(&self, bytes: u64) -> Result<Option<Arc<Reservation>>> {
+        let Some(context) = self.cache.context() else {
+            return Ok(None);
+        };
+        let reservation = context.reserve(Resource::Memory, bytes).map_err(|error| {
+            if matches!(error, ExecutionError::ResourceLimit(_)) {
+                self.cache.record_budget_reservation_failure();
+            }
+            map_execution_error(error)
+        })?;
+        Ok(Some(Arc::new(reservation)))
+    }
+
+    fn write_exact_source<W: Write>(self, writer: W) -> Result<()> {
+        write_exact_snapshot(&self.source, writer, self.cache.context())
+    }
+
+    fn write_changed_overlays_with_omissions_and_appended_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        appended: &[PolicyAppendedEntry],
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_changed_overlays(&self, replacements, omitted_member_names, appended)?;
+        let mut appended_entries = Vec::new();
+        appended_entries
+            .try_reserve_exact(appended.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC policy appended entries",
+                source,
+            })?;
+        appended_entries.extend(appended.iter().map(|member| Arc::clone(&member.entry)));
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            &appended_entries,
+            None,
+            Some(policy),
+        )
+    }
+
+    fn write_exact_source_with_accounting<W: Write>(
+        self,
+        writer: W,
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        write_exact_snapshot_with_accounting(&self.source, writer, self.cache.context(), accounting)
+    }
+
+    fn write_changed_overlays<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended(writer, replacements, &[])
+    }
+
+    fn write_changed_overlays_with_omissions<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            &[],
+            None,
+            None,
+        )
+    }
+
+    fn write_changed_overlays_with_omissions_and_appended<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            appended,
+            None,
+            None,
+        )
+    }
+
+    fn write_changed_overlays_with_appended<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            &[],
+            appended,
+            None,
+            None,
+        )
+    }
+
+    fn write_changed_overlays_with_appended_with_policy<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        policy: &ArtifactStreamPolicy<'_>,
+    ) -> Result<()> {
+        policy.admit_changed_overlays(&self, replacements, omitted_member_names, &[])?;
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            omitted_member_names,
+            &[],
+            None,
+            Some(policy),
+        )
+    }
+
+    fn write_changed_overlays_with_appended_accounting<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+        accounting: &mut OpcOperationAccounting,
+    ) -> Result<()> {
+        self.write_changed_overlays_with_appended_inner(
+            writer,
+            replacements,
+            &[],
+            appended,
+            Some(accounting),
+            None,
+        )
+    }
+
+    fn write_changed_overlays_with_appended_inner<W: Write>(
+        self,
+        writer: W,
+        replacements: &[ChangedOverlay],
+        omitted_member_names: &[String],
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
+        mut accounting: Option<&mut OpcOperationAccounting>,
+        policy: Option<&ArtifactStreamPolicy<'_>>,
+    ) -> Result<()> {
+        self.disable_read_ahead_for_publication()?;
+        let _monitored = self.source.monitor_publication();
+        self.source.ensure_current()?;
+        let mut scratch = [0_u8; PRESERVATION_INDEX_STACK_BYTES];
+        let index = match self
+            .archive
+            .preservation_index(&mut scratch, self.limits.zip_limits())
+        {
+            Ok(index) => index,
+            Err(error) => {
+                let unsupported = matches!(
+                    error.kind(),
+                    soapberry_zip::ErrorKind::UnsupportedPreservation { .. }
+                );
+                let mapped = map_preservation_error(error);
+                if matches!(mapped, OpcError::Cancelled | OpcError::Execution(_)) {
+                    return Err(mapped);
+                }
+                self.source.ensure_current()?;
+                if unsupported {
+                    return Err(overlay_unavailable(mapped.to_string()));
+                }
+                return Err(mapped);
+            },
+        };
+        self.source.ensure_current()?;
+        if index.archive_end_offset() != self.source.length {
+            return Err(overlay_unavailable(
+                "source ZIP archive has trailing bytes outside its located archive",
+            ));
+        }
+
+        // Build a sorted keyed lookup once. The previous per-entry linear
+        // search made publication O(archive_members * replacements), which is
+        // avoidable even though the replacement set is bounded.
+        let mut replacement_lookup: Vec<(&[u8], &ChangedOverlay)> = Vec::new();
+        replacement_lookup
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC replacement lookup",
+                source,
+            })?;
+        for replacement in replacements {
+            let target_name = replacement_member_name(replacement, &self.catalog.parts);
+            replacement_lookup.push((target_name.as_bytes(), replacement));
+        }
+        replacement_lookup.sort_unstable_by(|left, right| left.0.cmp(right.0));
+        if replacement_lookup
+            .windows(2)
+            .any(|pair| pair[0].0 == pair[1].0)
+        {
+            return Err(overlay_unavailable(
+                "multiple changed overlays resolve to one source member",
+            ));
+        }
+        let mut replacement_entry_counts: Vec<usize> = Vec::new();
+        replacement_entry_counts
+            .try_reserve_exact(replacement_lookup.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC replacement entry counts",
+                source,
+            })?;
+        replacement_entry_counts.resize(replacement_lookup.len(), 0);
+        let mut omission_lookup: Vec<&[u8]> = Vec::new();
+        omission_lookup
+            .try_reserve_exact(omitted_member_names.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC omission lookup",
+                source,
+            })?;
+        for member_name in omitted_member_names {
+            omission_lookup.push(member_name.as_bytes());
+        }
+        omission_lookup.sort_unstable();
+        if omission_lookup.windows(2).any(|pair| pair[0] == pair[1]) {
+            return Err(overlay_unavailable(
+                "multiple deletions resolve to one source member",
+            ));
+        }
+        if replacement_lookup.iter().any(|(replacement, _)| {
+            omission_lookup
+                .binary_search_by(|candidate| candidate.cmp(replacement))
+                .is_ok()
+        }) {
+            return Err(overlay_unavailable(
+                "one source member cannot be replaced and deleted",
+            ));
+        }
+        let mut omission_entry_counts: Vec<usize> = Vec::new();
+        omission_entry_counts
+            .try_reserve_exact(omission_lookup.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC omission entry counts",
+                source,
+            })?;
+        omission_entry_counts.resize(omission_lookup.len(), 0);
+        for (entry_index, entry) in index.entries().iter().enumerate() {
+            if entry_index & 0xff == 0 {
+                self.source.ensure_current()?;
+                self.cache.check_context().map_err(map_execution_error)?;
+            }
+            if let Ok(replacement_index) = replacement_lookup
+                .binary_search_by(|candidate| candidate.0.cmp(entry.raw_name_bytes()))
+            {
+                replacement_entry_counts[replacement_index] = replacement_entry_counts
+                    [replacement_index]
+                    .checked_add(1)
+                    .ok_or_else(|| {
+                        overlay_unavailable("replacement entry count overflows usize")
+                    })?;
+            }
+            if let Ok(omission_index) =
+                omission_lookup.binary_search_by(|candidate| candidate.cmp(&entry.raw_name_bytes()))
+            {
+                omission_entry_counts[omission_index] = omission_entry_counts[omission_index]
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("omission entry count overflows usize"))?;
+            }
+        }
+        let mut replacement_bytes = 0_u64;
+        for (replacement_index, (_, replacement)) in replacement_lookup.iter().enumerate() {
+            if replacement_entry_counts[replacement_index] != 1 {
+                return Err(overlay_unavailable(
+                    "selected Part does not have one canonical UTF-8 source member",
+                ));
+            }
+            replacement_bytes = replacement_bytes
+                .checked_add(replacement.replacement.len() as u64)
+                .ok_or_else(|| overlay_unavailable("replacement byte total overflows u64"))?;
+        }
+        if omission_entry_counts.iter().any(|count| *count != 1) {
+            return Err(overlay_unavailable(
+                "selected deletion does not have one canonical UTF-8 source member",
+            ));
+        }
+        let appended_bytes = (appended.len() as u64)
+            .checked_mul(4096)
+            .ok_or_else(|| overlay_unavailable("appended member size overflows u64"))?;
+        let conservative_output_bound = self
+            .source
+            .length
+            .checked_add(replacement_bytes.saturating_mul(2))
+            .and_then(|bytes| bytes.checked_add(appended_bytes))
+            .and_then(|bytes| bytes.checked_add(SOURCE_PUBLICATION_CHUNK_BYTES as u64));
+        if conservative_output_bound.is_none() {
+            return Err(overlay_unavailable(
+                "selected Part replacement output bound overflows u64",
+            ));
+        }
+
+        let mut plan = soapberry_zip::PreservationPlan::new();
+        plan.try_reserve_exact(index.entries().len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC preservation actions",
+                source,
+            })?;
+        plan.try_reserve_appended(appended.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "source-backed OPC preservation appended actions",
+                source,
+            })?;
+        for (entry_index, entry) in index.entries().iter().enumerate() {
+            if entry_index & 0xff == 0 {
+                self.source.ensure_current()?;
+                self.cache.check_context().map_err(map_execution_error)?;
+            }
+            if let Ok(replacement_index) = replacement_lookup
+                .binary_search_by(|candidate| candidate.0.cmp(entry.raw_name_bytes()))
+            {
+                let replacement = replacement_lookup[replacement_index].1;
+                let target_name = replacement_member_name(replacement, &self.catalog.parts);
+                let compression = entry.compression_method();
+                let regenerated = match &replacement.replacement {
+                    ChangedOverlayPayload::Shared(data) => {
+                        soapberry_zip::RegeneratedEntry::new_shared(target_name, Arc::clone(data))
+                    },
+                    ChangedOverlayPayload::Owned(data) => {
+                        regenerated_owned_entry(target_name, data, compression)?
+                    },
+                };
+                plan.push(soapberry_zip::PreservationAction::Regenerate {
+                    id: entry.id(),
+                    entry: regenerated.compression_method(compression),
+                });
+            } else if omission_lookup
+                .binary_search_by(|candidate| candidate.cmp(&entry.raw_name_bytes()))
+                .is_ok()
+            {
+                plan.push(soapberry_zip::PreservationAction::Omit(entry.id()));
+            } else {
+                plan.push(soapberry_zip::PreservationAction::Copy(entry.id()));
+            }
+        }
+        for entry in appended {
+            plan.try_append_shared(Arc::clone(entry))
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC preservation appended member",
+                    source,
+                })?;
+        }
+
+        self.source.ensure_current()?;
+        self.cache.check_context().map_err(map_execution_error)?;
+        let mut written = 0_u64;
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let mut accounting_error = None;
+        let has_accounting = accounting.is_some();
+        let execution_failure = Arc::new(Mutex::new(None));
+        let result = if let Some(policy) = policy {
+            // Preserve the managed package's compression admission and
+            // parallel wave for policy publications. The admission callback
+            // below runs after that wave has prepared the exact ZIP profile,
+            // but before the first byte is accepted by the policy sink.
+            let scheduled = match self.cache.write_session() {
+                Some(session) => {
+                    let wave = session.wave_for(&plan);
+                    let (wave, wave_permits) = self
+                        .cache
+                        .admit_deflate_wave(wave)
+                        .map_err(map_execution_error)?;
+                    wave.is_parallel().then_some((session, wave, wave_permits))
+                },
+                None => None,
+            };
+            let cancellation = self.cache.context().cloned().map(PublicationCancellation);
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    writer,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(writer, &mut written),
+            };
+            let policy_sink = artifact_restore::policy_source_sink(
+                policy,
+                counted,
+                &self.source,
+                self.cache.context(),
+            )?;
+            if has_accounting {
+                match scheduled {
+                    Some((session, wave, _wave_permits)) => index
+                        .write_to_with_admission_and_accounting_and_session(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            &mut zip_accounting,
+                            session,
+                            wave,
+                            cancellation
+                                .as_ref()
+                                .expect("parallel ZIP publication requires a context"),
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                    None => index
+                        .write_to_with_admission_and_accounting(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            &mut zip_accounting,
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                }
+            } else {
+                match scheduled {
+                    Some((session, wave, _wave_permits)) => index
+                        .write_to_with_admission_and_session(
+                            &plan,
+                            Chunked { inner: policy_sink },
+                            session,
+                            wave,
+                            cancellation
+                                .as_ref()
+                                .expect("parallel ZIP publication requires a context"),
+                            |profile| policy.admit_preservation_profile(profile),
+                        )
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                    None => index
+                        .write_to_with_admission(&plan, Chunked { inner: policy_sink }, |profile| {
+                            policy.admit_preservation_profile(profile)
+                        })
+                        .map_err(map_preservation_admission_error)
+                        .and_then(|mut sink| sink.flush().map_err(OpcError::IoError)),
+                }
+            }
+        } else if let Some(context) = self.cache.context() {
+            let Some(output_reservation_failures) =
+                self.source.output_reservation_failures.as_ref()
+            else {
+                return Err(overlay_unavailable(
+                    "managed source output reservation counter is unavailable",
+                ));
+            };
+            // Decide and charge the compression wave before a single member is
+            // compressed and long before the first byte reaches the sink, so a
+            // refused wave refuses the publication with nothing published.
+            let scheduled = match self.cache.write_session() {
+                Some(session) => {
+                    let wave = session.wave_for(&plan);
+                    let (wave, wave_permits) = self
+                        .cache
+                        .admit_deflate_wave(wave)
+                        .map_err(map_execution_error)?;
+                    wave.is_parallel().then_some((session, wave, wave_permits))
+                },
+                None => None,
+            };
+            let cancellation = PublicationCancellation(context.clone());
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    writer,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(writer, &mut written),
+            };
+            let checked = SourceCheckedSink {
+                inner: counted,
+                snapshot: self.source.clone(),
+            };
+            let cooperative = ContextCheckedSink {
+                inner: checked,
+                context: Some(context.clone()),
+                failure: Arc::clone(&execution_failure),
+            };
+            let budgeted = OutputBudgetedSink {
+                inner: cooperative,
+                context: context.clone(),
+                failure: Arc::clone(&execution_failure),
+                output_reservation_failures: output_reservation_failures.clone(),
+            };
+            let written = match (has_accounting, scheduled) {
+                (true, Some((session, wave, _wave_permits))) => index
+                    .write_to_with_accounting_and_session(
+                        &plan,
+                        Chunked { inner: budgeted },
+                        &mut zip_accounting,
+                        session,
+                        wave,
+                        &cancellation,
+                    ),
+                (true, None) => index.write_to_with_accounting(
+                    &plan,
+                    Chunked { inner: budgeted },
+                    &mut zip_accounting,
+                ),
+                (false, Some((session, wave, _wave_permits))) => index.write_to_with_session(
+                    &plan,
+                    Chunked { inner: budgeted },
+                    session,
+                    wave,
+                    &cancellation,
+                ),
+                (false, None) => index.write_to(&plan, Chunked { inner: budgeted }),
+            };
+            match written {
+                Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                Err(error) => Err(map_preservation_error(error)),
+            }
+        } else {
+            let counted = match accounting.as_deref_mut() {
+                Some(report) => Counted::with_accounting(
+                    writer,
+                    &mut written,
+                    report,
+                    &mut accounting_error,
+                    false,
+                ),
+                None => Counted::new(writer, &mut written),
+            };
+            let checked = SourceCheckedSink {
+                inner: counted,
+                snapshot: self.source.clone(),
+            };
+            let cooperative = ContextCheckedSink {
+                inner: checked,
+                context: None,
+                failure: Arc::clone(&execution_failure),
+            };
+            if has_accounting {
+                match index.write_to_with_accounting(
+                    &plan,
+                    Chunked { inner: cooperative },
+                    &mut zip_accounting,
+                ) {
+                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                    Err(error) => Err(map_preservation_error(error)),
+                }
+            } else {
+                match index.write_to(&plan, Chunked { inner: cooperative }) {
+                    Ok(mut sink) => sink.flush().map_err(OpcError::IoError),
+                    Err(error) => Err(map_preservation_error(error)),
+                }
+            }
+        };
+        let result = execution_failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .map_or(result, |error| Err(map_execution_error(error)));
+        let result = policy
+            .and_then(|policy| policy.take_failure())
+            .map_or(result, |error| Err(map_execution_error(error)));
+        let result = match (
+            result,
+            self.cache.check_context().map_err(map_execution_error),
+            policy.map_or(Ok(()), |policy| policy.check_recipient()),
+        ) {
+            (Err(error), _, _) => Err(error),
+            (Ok(()), Err(error), _) | (Ok(()), Ok(()), Err(error)) => Err(error),
+            (Ok(()), Ok(()), Ok(())) => Ok(()),
+        };
+        let merge_result = accounting.map_or(Ok(()), |report| report.merge_zip(&zip_accounting));
+        // Merge the operation-local ZIP report before the final source
+        // decision. `finish_source_publication` must remain authoritative for
+        // SourceChanged and IncompleteOutput, even when accounting also fails.
+        let result = finish_source_publication(result, &self.source, written);
+        match result {
+            Err(error) => Err(error),
+            Ok(()) => accounting_error.map_or(merge_result, Err),
+        }
+    }
+
+    fn read_part(&self, index: usize) -> Result<PartData> {
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer(index, None, None, &mut observer)
+    }
+
+    /// Read one prepared request without looking up central-directory
+    /// metadata a second time.  The batch planner owns the metadata lookup;
+    /// this entry point keeps the existing cache, source, ZIP, and budget
+    /// fences authoritative while consuming that immutable prepared record.
+    pub(crate) fn read_part_prepared(
+        &self,
+        index: usize,
+        entry_id: EntryId,
+        declared_bytes: u64,
+    ) -> Result<PartData> {
+        self.read_part_prepared_with_session(index, entry_id, declared_bytes, None)
+    }
+
+    /// Read one prepared request, optionally reusing a caller-owned session.
+    ///
+    /// The session only resets one Deflate decoder between members. Cache
+    /// admission, the source and budget fences, the ZIP checks and every error
+    /// identity are the sessionless path's.
+    fn read_part_prepared_with_session(
+        &self,
+        index: usize,
+        entry_id: EntryId,
+        declared_bytes: u64,
+        session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+    ) -> Result<PartData> {
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer_and_capture(
+            index,
+            None,
+            session,
+            &mut observer,
+            None,
+            Some((entry_id, declared_bytes)),
+        )
+    }
+
+    /// A read session for one sequential multi-member operation over `members`
+    /// distinct members, when this package may retain decoder workspace for its
+    /// length and the operation is long enough to repay it.
+    ///
+    /// A managed package intentionally gets `None`: retaining decoder
+    /// workspace across a managed load would escape the managed memory budget.
+    /// Its cancellation and reservation policy is unchanged. An operation
+    /// shorter than
+    /// [`SESSION_MEMBER_THRESHOLD`](crate::pkgreader::SESSION_MEMBER_THRESHOLD)
+    /// also gets `None`, under that constant's stated rule: the one workspace a
+    /// kept session retains is only worth its heap high-water when the
+    /// operation avoids at least sixteen constructions of it.
+    fn sequential_read_session(
+        &self,
+        members: usize,
+    ) -> Option<soapberry_zip::office::IndexedReadSession<'_, SourceReader>> {
+        (!self.cache.is_managed() && members >= crate::pkgreader::SESSION_MEMBER_THRESHOLD)
+            .then(|| self.archive.read_session())
+    }
+
+    fn read_part_with_session(
+        &self,
+        index: usize,
+        session: &mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<PartData> {
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer(index, accounting, Some(session), &mut observer)
+    }
+
+    fn read_part_with_accounting(
+        &self,
+        index: usize,
+        accounting: Option<&mut OpcOperationAccounting>,
+    ) -> Result<PartData> {
+        let mut observer = NoopDiagnosticObserver;
+        self.read_part_with_observer(index, accounting, None, &mut observer)
+    }
+
+    fn read_part_with_observer<O>(
+        &self,
+        index: usize,
+        accounting: Option<&mut OpcOperationAccounting>,
+        session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+        observer: &mut O,
+    ) -> Result<PartData>
+    where
+        O: DiagnosticObserver,
+    {
+        self.read_part_with_observer_and_capture(index, accounting, session, observer, None, None)
+    }
+
+    fn read_part_with_observer_and_capture<O>(
+        &self,
+        index: usize,
+        accounting: Option<&mut OpcOperationAccounting>,
+        mut session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+        observer: &mut O,
+        capture: Option<&mut Option<soapberry_zip::office::VerifiedPrecompressedEntry>>,
+        prepared: Option<(EntryId, u64)>,
+    ) -> Result<PartData>
+    where
+        O: DiagnosticObserver,
+    {
+        self.cache.check_context().map_err(map_execution_error)?;
+        let catalog_entry = self
+            .catalog
+            .parts
+            .get(index)
+            .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+        let (entry_id, declared_bytes) = match prepared {
+            Some((entry_id, declared)) => (entry_id, Some(declared)),
+            None => {
+                let entry_id = catalog_entry.entry_id;
+                let declared = if self.cache.is_managed() {
+                    let declared = self.archive.metadata_for(entry_id)?.uncompressed_size();
+                    self.limits.check(
+                        SourceLimitKind::PartBytes,
+                        declared,
+                        self.limits.max_part_bytes(),
+                    )?;
+                    Some(declared)
+                } else {
+                    None
+                };
+                (entry_id, declared)
+            },
+        };
+        loop {
+            let access = match self.cache.enter_with_observer(
+                entry_id,
+                declared_bytes.unwrap_or_default(),
+                observer,
+            ) {
+                Ok(access) => access,
+                Err(error) => {
+                    // A changed source still outranks a cache-entry
+                    // cancellation or reservation failure, which is the order
+                    // the removed loop-head observation produced.
+                    self.source.ensure_current()?;
+                    return Err(map_execution_error(error));
+                },
+            };
+            match access {
+                CacheAccess::Hit(bytes) => {
+                    if let Err(error) = self.source.ensure_current() {
+                        self.cache
+                            .invalidate_if_matches_with_observer(entry_id, &bytes, observer);
+                        return Err(error);
+                    }
+                    self.cache.check_context().map_err(map_execution_error)?;
+                    return Ok(PartData { payload: bytes });
+                },
+                CacheAccess::Waiter(flight) => {
+                    if let Some(payload) = flight
+                        .wait_with_observer(self.cache.context(), observer)
+                        .map_err(map_execution_error)?
+                    {
+                        if let Err(error) = self.source.ensure_current() {
+                            self.cache
+                                .invalidate_if_matches_with_observer(entry_id, &payload, observer);
+                            return Err(error);
+                        }
+                        self.cache.check_context().map_err(map_execution_error)?;
+                        return Ok(PartData { payload });
+                    }
+                    // The loader may have failed; in that case the flight is
+                    // removed and this caller retries rather than observing a
+                    // retained error. A retry that reaches the loading path
+                    // takes its opening source observation there.
+                },
+                CacheAccess::Loader(flight) => {
+                    let unwind_guard = LoadFlightUnwindGuard {
+                        cache: &self.cache,
+                        entry_id,
+                        flight: Some(Arc::clone(&flight)),
+                    };
+                    let result = self.load_part_with_accounting(
+                        index,
+                        entry_id,
+                        declared_bytes,
+                        Some(flight),
+                        None,
+                        accounting,
+                        session.as_deref_mut(),
+                        observer,
+                        capture,
+                    );
+                    unwind_guard.disarm();
+                    return result;
+                },
+                CacheAccess::Bypass(reservation) => {
+                    return self.load_part_with_accounting(
+                        index,
+                        entry_id,
+                        declared_bytes,
+                        None,
+                        Some(reservation),
+                        accounting,
+                        session.as_deref_mut(),
+                        observer,
+                        capture,
+                    );
+                },
+            }
+        }
+    }
+
+    fn load_part_with_accounting<O>(
+        &self,
+        index: usize,
+        entry_id: EntryId,
+        declared_bytes: Option<u64>,
+        flight: Option<Arc<LoadFlight>>,
+        bypass_resources: Option<LoadResources>,
+        mut accounting: Option<&mut OpcOperationAccounting>,
+        session: Option<&mut soapberry_zip::office::IndexedReadSession<'_, SourceReader>>,
+        observer: &mut O,
+        capture: Option<&mut Option<soapberry_zip::office::VerifiedPrecompressedEntry>>,
+    ) -> Result<PartData>
+    where
+        O: DiagnosticObserver,
+    {
+        let mut zip_accounting = LowLevelZipOperationAccounting::default();
+        let result = (|| {
+            // Opening observation for this cold read. The removed loop-head
+            // observation stood here; the cache entry, the waiter join and the
+            // budget reservations between the two consume no source bytes.
+            // It precedes the catalog lookup so a changed source still
+            // outranks `PartNotFound`.
+            self.source.ensure_current()?;
+            self.catalog
+                .parts
+                .get(index)
+                .ok_or_else(|| OpcError::PartNotFound(index.to_string()))?;
+            let bytes = if let Some(capture) = capture {
+                let result = self
+                    .archive
+                    .read_entry_precompressed_and_decoded_with_progress(entry_id, |_| {
+                        self.source.ensure_current()?;
+                        self.cache.check_context().map_err(map_execution_error)
+                    });
+                // Preserve the same post-read source/execution precedence
+                // as ordinary cold loads before exposing any ZIP failure.
+                self.source.ensure_current()?;
+                self.cache.check_context().map_err(map_execution_error)?;
+                let (physical, bytes) = result.map_err(map_verified_precompressed_error)?;
+                *capture = Some(physical);
+                bytes
+            } else {
+                let bytes = match (accounting.as_deref_mut(), session) {
+                    (Some(_), Some(session)) => {
+                        session.read_entry_with_accounting(entry_id, &mut zip_accounting)
+                    },
+                    (Some(_), None) => self
+                        .archive
+                        .read_entry_with_accounting(entry_id, &mut zip_accounting),
+                    (None, Some(session)) => session.read_entry(entry_id),
+                    (None, None) => self.archive.read_entry(entry_id),
+                };
+                match bytes {
+                    Ok(bytes) => bytes,
+                    Err(error) => {
+                        // A failed archive read can race with source mutation or
+                        // cooperative cancellation. Apply the same post-read
+                        // fences used by successful cold loads before exposing
+                        // the lower-level archive error.
+                        self.source.ensure_current()?;
+                        self.cache.check_context().map_err(map_execution_error)?;
+                        return Err(map_preservation_error(error));
+                    },
+                }
+            };
+            // The decompressor has finished and no payload has been
+            // published yet. Source freshness has precedence over
+            // cancellation and payload-shape errors for this completed read.
+            self.source.ensure_current()?;
+            self.cache.check_context().map_err(map_execution_error)?;
+            if let Some(declared) = declared_bytes {
+                if bytes.len() as u64 != declared {
+                    return Err(OpcError::ZipError(format!(
+                        "source-backed OPC Part declared {declared} uncompressed bytes but read {}",
+                        bytes.len()
+                    )));
+                }
+            }
+            self.limits.check(
+                SourceLimitKind::PartBytes,
+                bytes.len() as u64,
+                self.limits.max_part_bytes(),
+            )?;
+            // No observation here. The post-read fence above already proved
+            // this payload against a current source, nothing between the two
+            // reads the source, and the fence that decides publication is the
+            // one taken after the provisional publication below -- strictly
+            // later, and the only one that can undo what it observes. The
+            // warm-path observation was removed on the same argument.
+            Ok(Arc::new(bytes))
+        })();
+        let reservation = flight
+            .as_ref()
+            .and_then(|flight| flight.reservation_with_observer(observer))
+            .or_else(|| {
+                bypass_resources
+                    .as_ref()
+                    .and_then(|resources| resources.reservation.as_ref().map(Arc::clone))
+            });
+        let object_reservation = flight
+            .as_ref()
+            .and_then(|flight| flight.payload_object_reservation_with_observer(observer))
+            .or_else(|| {
+                bypass_resources.as_ref().and_then(|resources| {
+                    resources
+                        .payload_object_reservation
+                        .as_ref()
+                        .map(Arc::clone)
+                })
+            });
+        let merge_result = accounting.map_or(Ok(()), |report| report.merge_zip(&zip_accounting));
+        match (flight, result) {
+            (Some(flight), Ok(bytes)) => {
+                let payload = CachedPayload {
+                    bytes,
+                    reservation,
+                    object_reservation,
+                };
+                let publication = match self.cache.publish_pending_with_observer(
+                    entry_id,
+                    &flight,
+                    payload.clone(),
+                    observer,
+                ) {
+                    Ok(publication) => publication,
+                    Err(error) => {
+                        drop(payload);
+                        self.cache
+                            .complete_failure_with_observer(entry_id, &flight, observer);
+                        // The flight is already completed as failed, so this
+                        // early return leaks nothing. The observable
+                        // precedence is source-version failure before
+                        // execution failure, and the removed pre-publication
+                        // observation is what produced it on this branch;
+                        // take it here instead.
+                        self.source.ensure_current()?;
+                        return Err(map_execution_error(error));
+                    },
+                };
+                #[cfg(test)]
+                self.cache.pause_test_publication();
+                // The low-level report has been merged above. Make source
+                // freshness and execution state the final decisions before a
+                // cold value becomes visible through the cache or its
+                // same-Part flight. These checks deliberately run outside all
+                // cache and flight locks.
+                if let Err(error) = self.source.ensure_current() {
+                    self.cache.rollback_publication_with_observer(
+                        entry_id,
+                        &flight,
+                        payload,
+                        publication,
+                        observer,
+                    );
+                    return Err(error);
+                }
+                if let Err(error) = self.cache.check_context() {
+                    self.cache.rollback_publication_with_observer(
+                        entry_id,
+                        &flight,
+                        payload,
+                        publication,
+                        observer,
+                    );
+                    return Err(map_execution_error(error));
+                }
+                let payload = match publication {
+                    CachePublication::Pending => self
+                        .cache
+                        .commit_pending_with_observer(entry_id, &flight, payload, observer),
+                    CachePublication::Uncached(retention) => {
+                        self.cache.complete_uncached_success_with_observer(
+                            entry_id, &flight, payload, retention, observer,
+                        )
+                    },
+                    CachePublication::NotCurrent => {
+                        self.cache.rollback_publication_with_observer(
+                            entry_id,
+                            &flight,
+                            payload,
+                            publication,
+                            observer,
+                        );
+                        None
+                    },
+                };
+                let Some(payload) = payload else {
+                    return Err(overlay_unavailable(
+                        "source-backed OPC cache publication lost its exact loader flight",
+                    ));
+                };
+                if let Err(error) = merge_result {
+                    return Err(error);
+                }
+                Ok(PartData { payload })
+            },
+            (Some(flight), Err(error)) => {
+                drop(reservation);
+                drop(object_reservation);
+                self.cache
+                    .complete_failure_with_observer(entry_id, &flight, observer);
+                Err(error)
+            },
+            (None, Ok(bytes)) => {
+                let payload = CachedPayload {
+                    bytes,
+                    reservation,
+                    object_reservation,
+                };
+                // Keep the no-flight path on the same stale-source boundary
+                // as the coordinated cold-loader path.
+                if let Err(error) = self.source.ensure_current() {
+                    self.cache.complete_bypass_failure();
+                    return Err(error);
+                }
+                if let Err(error) = self
+                    .cache
+                    .complete_bypass_success(entry_id, payload.clone())
+                {
+                    self.cache.complete_bypass_failure();
+                    return Err(map_execution_error(error));
+                }
+                merge_result?;
+                Ok(PartData { payload })
+            },
+            (None, Err(error)) => {
+                self.cache.complete_bypass_failure();
+                Err(error)
+            },
+        }
+    }
+}
+
+fn replacement_member_name<'a>(
+    replacement: &'a ChangedOverlay,
+    parts: &'a [CatalogPart],
+) -> &'a str {
+    match &replacement.target {
+        ChangedOverlayTarget::Part(index) => parts[*index].partname.membername(),
+        ChangedOverlayTarget::Member(name) => name,
+    }
+}
+
+fn is_relationship_member_name(member_name: &str) -> bool {
+    let Some((directory, filename)) = member_name.rsplit_once('/') else {
+        return false;
+    };
+    let has_rels_extension = filename
+        .rsplit_once('.')
+        .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("rels"));
+    let in_rels_directory = directory.eq_ignore_ascii_case("_rels")
+        || directory
+            .rsplit_once('/')
+            .is_some_and(|(_, segment)| segment.eq_ignore_ascii_case("_rels"));
+    has_rels_extension && in_rels_directory
+}
+
+fn folded_part_name(partname: &PackURI) -> Result<String> {
+    folded_ascii_name(
+        partname.as_str(),
+        "source-backed OPC folded topology Part name",
+    )
+}
+
+fn folded_ascii_name(value: &str, resource: &'static str) -> Result<String> {
+    let mut folded = String::new();
+    folded
+        .try_reserve(value.len())
+        .map_err(|source| OpcError::Allocation { resource, source })?;
+    folded.push_str(value);
+    folded.make_ascii_lowercase();
+    Ok(folded)
+}
+
+fn relationship_xml_without(
+    relationships: &Relationships,
+    removed_ids: &[String],
+) -> Result<Vec<u8>> {
+    const HEADER: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
+    const FOOTER: &str = "</Relationships>";
+    const ELEMENT_OVERHEAD: usize = 80;
+    const MAX_ESCAPE_EXPANSION: usize = 6;
+
+    let retained_count = relationships
+        .iter()
+        .filter(|relationship| {
+            removed_ids
+                .binary_search_by(|id| id.as_str().cmp(relationship.r_id()))
+                .is_err()
+        })
+        .count();
+    let mut retained = Vec::new();
+    retained
+        .try_reserve_exact(retained_count)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed relationship removal order",
+            source,
+        })?;
+    for relationship in relationships.iter().filter(|relationship| {
+        removed_ids
+            .binary_search_by(|id| id.as_str().cmp(relationship.r_id()))
+            .is_err()
+    }) {
+        retained.push(relationship);
+    }
+    retained.sort_unstable_by_key(|relationship| relationship.r_id());
+
+    let capacity = retained
+        .iter()
+        .try_fold(HEADER.len() + FOOTER.len(), |total, relationship| {
+            let value_bytes = relationship
+                .r_id()
+                .len()
+                .checked_add(relationship.reltype().len())?
+                .checked_add(relationship.target_ref().len())?;
+            total
+                .checked_add(ELEMENT_OVERHEAD)?
+                .checked_add(value_bytes.checked_mul(MAX_ESCAPE_EXPANSION)?)
+        })
+        .ok_or_else(|| {
+            overlay_unavailable("relationship removal serialization capacity overflows usize")
+        })?;
+    let mut xml = Vec::new();
+    xml.try_reserve_exact(capacity)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed relationship removal XML",
+            source,
+        })?;
+    append_relationship_xml_bytes(&mut xml, HEADER.as_bytes())?;
+    for relationship in retained {
+        append_relationship_xml_bytes(&mut xml, br#"<Relationship Id=""#)?;
+        push_xml_escaped(&mut xml, relationship.r_id())?;
+        append_relationship_xml_bytes(&mut xml, br#"" Type=""#)?;
+        push_xml_escaped(&mut xml, relationship.reltype())?;
+        append_relationship_xml_bytes(&mut xml, br#"" Target=""#)?;
+        push_xml_escaped(&mut xml, relationship.target_ref())?;
+        if relationship.target_mode() == TargetMode::External {
+            append_relationship_xml_bytes(&mut xml, br#"" TargetMode="External"/>"#)?;
+        } else {
+            append_relationship_xml_bytes(&mut xml, br#""/>"#)?;
+        }
+    }
+    append_relationship_xml_bytes(&mut xml, FOOTER.as_bytes())?;
+    Ok(xml)
+}
+
+fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed relationship removal XML",
+            source,
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(())
+}
+
+fn regenerated_owned_entry(
+    name: &str,
+    bytes: &[u8],
+    compression: soapberry_zip::CompressionMethod,
+) -> Result<soapberry_zip::RegeneratedEntry> {
+    let mut owned_name = String::new();
+    owned_name
+        .try_reserve_exact(name.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC changed member name",
+            source,
+        })?;
+    owned_name.push_str(name);
+
+    let mut owned_bytes = Vec::new();
+    owned_bytes
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC changed member payload",
+            source,
+        })?;
+    owned_bytes.extend_from_slice(bytes);
+    Ok(
+        soapberry_zip::RegeneratedEntry::new(owned_name, owned_bytes)
+            .compression_method(compression),
+    )
+}
+
+fn push_xml_escaped(output: &mut Vec<u8>, value: &str) -> Result<()> {
+    for byte in value.as_bytes() {
+        let escaped = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            append_relationship_xml_bytes(output, escaped)?;
+        } else {
+            append_relationship_xml_bytes(output, std::slice::from_ref(byte))?;
+        }
+    }
+    Ok(())
+}
+
+fn relationships_for_package(
+    serialized: impl IntoIterator<Item = SerializedRelationship>,
+) -> Result<Relationships> {
+    relationships_for_package_with_context(serialized, None)
+}
+
+fn relationships_for_package_with_context(
+    serialized: impl IntoIterator<Item = SerializedRelationship>,
+    context: Option<&ExecutionContext>,
+) -> Result<Relationships> {
+    let mut relationships = Relationships::new(PACKAGE_URI.to_string());
+    for relationship in serialized {
+        if let Some(context) = context {
+            context.check().map_err(map_execution_error)?;
+        }
+        relationships.try_add_source_relationship(
+            relationship.reltype,
+            relationship.target_ref,
+            relationship.r_id,
+            relationship.target_mode,
+        )?;
+    }
+    Ok(relationships)
+}
+
+fn relationships_for_part(
+    partname: &PackURI,
+    serialized: impl IntoIterator<Item = SerializedRelationship>,
+) -> Result<Relationships> {
+    relationships_for_part_with_context(partname, serialized, None)
+}
+
+fn relationships_for_part_with_context(
+    partname: &PackURI,
+    serialized: impl IntoIterator<Item = SerializedRelationship>,
+    context: Option<&ExecutionContext>,
+) -> Result<Relationships> {
+    let mut relationships = Relationships::for_source(partname);
+    for relationship in serialized {
+        if let Some(context) = context {
+            context.check().map_err(map_execution_error)?;
+        }
+        relationships.try_add_source_relationship(
+            relationship.reltype,
+            relationship.target_ref,
+            relationship.r_id,
+            relationship.target_mode,
+        )?;
+    }
+    Ok(relationships)
+}
+
+fn copy_relationships(from: &Relationships, to: &mut Relationships) -> Result<()> {
+    for relationship in from.iter() {
+        let reltype = relationship.reltype().to_string();
+        let target_ref = relationship.target_ref().to_string();
+        let r_id = relationship.r_id().to_string();
+        if relationship.has_source_admitted_id() {
+            to.try_add_source_relationship(reltype, target_ref, r_id, relationship.target_mode())?;
+        } else {
+            to.try_add_relationship(reltype, target_ref, r_id, relationship.target_mode())?;
+        }
+    }
+    Ok(())
+}
+
+fn relationships_semantically_equal(left: &Relationships, right: &Relationships) -> bool {
+    if left.len() != right.len() {
+        return false;
+    }
+    left.iter().all(|relationship| {
+        right.get(relationship.r_id()).is_some_and(|candidate| {
+            candidate.reltype() == relationship.reltype()
+                && candidate.target_ref() == relationship.target_ref()
+                && candidate.target_mode() == relationship.target_mode()
+        })
+    })
+}
+
+/// Where the raw content-types reader is relative to the `Types` root
+/// element. Nesting inside the root is not part of it: the depth counter
+/// holds that.
+///
+/// ```text
+/// Prolog --XML declaration, as the first event only--> Prolog
+/// Prolog --comment, PI or whitespace-----------------> Prolog
+/// Prolog --root start tag----------------------------> Open
+/// Prolog --root empty-element tag--------------------> Closed
+/// Open   --nested content----------------------------> Open
+/// Open   --root end tag------------------------------> Closed
+/// Closed --comment, PI or whitespace-----------------> Closed
+/// ```
+///
+/// Refused: an XML declaration that is not the first event; any element
+/// after the root ("content appears after the Types root"); text other than
+/// whitespace, CDATA, references and a DTD anywhere; and the end of input
+/// before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TypesRootPhase {
+    /// No root tag has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
+fn parse_strict_raw_content_types_xml(
+    bytes: &[u8],
+    limits: SourceLimits,
+) -> Result<ContentTypeMap> {
+    let map = ContentTypeMap::from_xml(bytes, limits)?;
+    let mut reader = NsReader::from_reader(bytes);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    let mut depth = 0usize;
+    let mut phase = TypesRootPhase::Prolog;
+    let mut mappings = HashSet::new();
+    mappings
+        .try_reserve(map.mapping_count())
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC raw content-type mapping keys",
+            source,
+        })?;
+    let mut events = 0usize;
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| overlay_unavailable("raw content-types event count overflows"))?;
+        limits.check(
+            SourceLimitKind::Events,
+            events as u64,
+            limits.max_events() as u64,
+        )?;
+        let decoder = reader.decoder();
+        let (resolved_namespace, event) = reader.read_resolved_event()?;
+        match event {
+            Event::Start(element) => {
+                if phase == TypesRootPhase::Closed {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "content appears after the Types root".to_owned(),
+                    ));
+                }
+                if depth == 0 {
+                    if phase == TypesRootPhase::Open
+                        || element.local_name().as_ref() != b"Types"
+                        || !matches!(
+                            resolved_namespace,
+                            ResolveResult::Bound(Namespace(value))
+                                if value == namespace::OPC_CONTENT_TYPES.as_bytes()
+                        )
+                    {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "content-types root must be Types in the OPC content-types namespace"
+                                .to_owned(),
+                        ));
+                    }
+                    reject_unknown_content_types_root_attributes(&element, decoder)?;
+                    phase = TypesRootPhase::Open;
+                } else if depth == 1 {
+                    if !matches!(
+                        resolved_namespace,
+                        ResolveResult::Bound(Namespace(value))
+                            if value == namespace::OPC_CONTENT_TYPES.as_bytes()
+                    ) {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "content-type mapping is outside the OPC content-types namespace"
+                                .to_owned(),
+                        ));
+                    }
+                    let key = strict_content_type_mapping_key(&element, decoder)?;
+                    if !mappings.insert(key) {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "duplicate content-type mapping".to_owned(),
+                        ));
+                    }
+                } else if depth >= 2 {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "nested elements are not permitted in content-types metadata".to_owned(),
+                    ));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| overlay_unavailable("raw content-types depth overflows"))?;
+                limits.check(
+                    SourceLimitKind::Depth,
+                    depth as u64,
+                    limits.max_depth() as u64,
+                )?;
+            },
+            Event::Empty(element) => {
+                if phase == TypesRootPhase::Closed {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "content appears after the Types root".to_owned(),
+                    ));
+                }
+                if depth == 0 {
+                    if phase == TypesRootPhase::Open
+                        || element.local_name().as_ref() != b"Types"
+                        || !matches!(
+                            resolved_namespace,
+                            ResolveResult::Bound(Namespace(value))
+                                if value == namespace::OPC_CONTENT_TYPES.as_bytes()
+                        )
+                    {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "content-types root must be Types in the OPC content-types namespace"
+                                .to_owned(),
+                        ));
+                    }
+                    reject_unknown_content_types_root_attributes(&element, decoder)?;
+                    phase = TypesRootPhase::Closed;
+                } else if depth == 1 {
+                    if !matches!(
+                        resolved_namespace,
+                        ResolveResult::Bound(Namespace(value))
+                            if value == namespace::OPC_CONTENT_TYPES.as_bytes()
+                    ) {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "content-type mapping is outside the OPC content-types namespace"
+                                .to_owned(),
+                        ));
+                    }
+                    let key = strict_content_type_mapping_key(&element, decoder)?;
+                    if !mappings.insert(key) {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "duplicate content-type mapping".to_owned(),
+                        ));
+                    }
+                } else {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "nested elements are not permitted in content-types metadata".to_owned(),
+                    ));
+                }
+            },
+            Event::End(element) => {
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    OpcError::InvalidContentTypesManifest(
+                        "unmatched closing element in content-types metadata".to_owned(),
+                    )
+                })?;
+                if depth == 0 {
+                    if element.local_name().as_ref() != b"Types" {
+                        return Err(OpcError::InvalidContentTypesManifest(
+                            "content-types root closing element is not Types".to_owned(),
+                        ));
+                    }
+                    phase = TypesRootPhase::Closed;
+                } else if depth == 1
+                    && !matches!(element.local_name().as_ref(), b"Default" | b"Override")
+                {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "content-types mapping closing element is invalid".to_owned(),
+                    ));
+                }
+            },
+            Event::Text(text) => {
+                if !text
+                    .as_ref()
+                    .iter()
+                    .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "non-whitespace text is not permitted in content-types metadata".to_owned(),
+                    ));
+                }
+                text.decode().map_err(|error| {
+                    OpcError::InvalidContentTypesManifest(format!(
+                        "invalid content-types text: {error}"
+                    ))
+                })?;
+            },
+            Event::CData(_) | Event::DocType(_) | Event::GeneralRef(_) => {
+                return Err(OpcError::InvalidContentTypesManifest(
+                    "CDATA, DTDs, and general references are not permitted in raw content-types metadata"
+                        .to_owned(),
+                ));
+            },
+            Event::Decl(declaration) => {
+                // Only the first event can be the declaration, so it comes
+                // before the root and at most once.
+                if events != 1 {
+                    return Err(OpcError::InvalidContentTypesManifest(
+                        "the XML declaration is out of place in content-types metadata".to_owned(),
+                    ));
+                }
+                crate::xml_splice::validate_source_declaration(
+                    &declaration,
+                    "[Content_Types].xml",
+                )?;
+            },
+            Event::Eof => break,
+            Event::Comment(_) | Event::PI(_) => {},
+        }
+    }
+    // Every element after the root is refused above, so the depth is zero
+    // whenever the root is closed.
+    match phase {
+        TypesRootPhase::Closed => Ok(map),
+        TypesRootPhase::Prolog | TypesRootPhase::Open => Err(
+            OpcError::InvalidContentTypesManifest("missing or unclosed Types root".to_owned()),
+        ),
+    }
+}
+
+fn validate_raw_content_types_candidate(
+    raw: &ContentTypeMap,
+    candidate: &ContentTypeMap,
+    package: &SourceBackedPackage,
+    pending_removal_set: &HashSet<usize>,
+    additions: &[TopologyPartAddition],
+    relationship_publications: &[TopologyRelationshipPublication],
+    raw_relationships: &[RawRelationshipsRestore],
+) -> Result<()> {
+    let active_capacity = package
+        .catalog
+        .parts
+        .len()
+        .checked_add(additions.len())
+        .and_then(|count| count.checked_add(relationship_publications.len()))
+        .and_then(|count| count.checked_add(package.archive.len()))
+        .ok_or_else(|| overlay_unavailable("raw content-types active names overflow"))?;
+    let name_bytes = package
+        .archive
+        .file_names()
+        .chain(additions.iter().map(|part| part.partname.as_str()))
+        .chain(
+            relationship_publications
+                .iter()
+                .map(|entry| entry.member_name.as_str()),
+        )
+        .chain(
+            raw_relationships
+                .iter()
+                .map(|restore| restore.owner.as_str()),
+        )
+        .try_fold(0usize, |total, name| {
+            package.check_topology_progress()?;
+            total
+                .checked_add(name.len())
+                .ok_or_else(|| overlay_unavailable("raw content-types name bytes overflow"))
+        })?;
+    let working_bytes = name_bytes
+        .checked_mul(8)
+        .and_then(|bytes| bytes.checked_add(active_capacity.checked_mul(512)?))
+        .and_then(|bytes| bytes.checked_add(raw_relationships.len().checked_mul(128)?))
+        .ok_or_else(|| overlay_unavailable("raw content-types coverage memory bound overflows"))?;
+    let _coverage_memory = package.reserve_topology_memory(
+        u64::try_from(working_bytes)
+            .map_err(|_| overlay_unavailable("raw content-types coverage memory exceeds u64"))?,
+    )?;
+    let mut active = Vec::new();
+    active
+        .try_reserve_exact(active_capacity)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC raw content-types active names",
+            source,
+        })?;
+    let mut active_keys = HashSet::new();
+    active_keys
+        .try_reserve(active_capacity)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC raw content-types active-name keys",
+            source,
+        })?;
+    for (index, part) in package.catalog.parts.iter().enumerate() {
+        if !pending_removal_set.contains(&index) {
+            active_keys.insert(folded_part_name(&part.partname)?);
+            active.push(part.partname.clone());
+        }
+    }
+    for addition in additions {
+        active_keys.insert(folded_part_name(&addition.partname)?);
+        active.push(addition.partname.clone());
+    }
+
+    let mut omitted_relationship_members = Vec::new();
+    omitted_relationship_members
+        .try_reserve_exact(
+            pending_removal_set
+                .len()
+                .checked_add(raw_relationships.len())
+                .ok_or_else(|| overlay_unavailable("raw relationship omission names overflow"))?,
+        )
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC raw relationship omission names",
+            source,
+        })?;
+    for index in pending_removal_set {
+        let part = package.catalog.parts.get(*index).ok_or_else(|| {
+            overlay_unavailable("raw content-types removed Part index is invalid")
+        })?;
+        omitted_relationship_members.push(
+            part.partname
+                .rels_uri()
+                .map_err(OpcError::InvalidPackUri)?
+                .membername()
+                .to_owned(),
+        );
+    }
+    for restore in raw_relationships {
+        if restore.replacement.is_none() {
+            omitted_relationship_members.push(
+                restore
+                    .owner
+                    .rels_uri()
+                    .map_err(OpcError::InvalidPackUri)?
+                    .membername()
+                    .to_owned(),
+            );
+        }
+    }
+    for name in package.archive.file_names() {
+        if !is_relationship_member_name(name)
+            || omitted_relationship_members
+                .iter()
+                .any(|omitted| omitted.eq_ignore_ascii_case(name))
+        {
+            continue;
+        }
+        let uri = PackURI::new(format!("/{name}")).map_err(OpcError::InvalidPackUri)?;
+        if active_keys.insert(folded_part_name(&uri)?) {
+            active.push(uri);
+        }
+    }
+    for publication in relationship_publications {
+        if publication.existing_entry.is_none() {
+            let uri = PackURI::new(format!("/{}", publication.member_name))
+                .map_err(OpcError::InvalidPackUri)?;
+            if active_keys.insert(folded_part_name(&uri)?) {
+                active.push(uri);
+            }
+        }
+    }
+
+    for (partname, content_type) in raw.overrides() {
+        // An override the source manifest itself carries for a Part the
+        // source never had (a producer's stale entry, as LibreOffice leaves
+        // for an unwritten SmartArt drawing) stays as the source has it.
+        let stale_in_source = package.part_index(partname).is_none()
+            && package.catalog.content_types.override_for(partname) == Some(content_type);
+        if !active_keys.contains(&folded_part_name(partname)?) && !stale_in_source {
+            return Err(overlay_unavailable(format!(
+                "raw content-types override '{}' has no effective member",
+                partname
+            )));
+        }
+    }
+    for partname in &active {
+        let raw_type = raw.lookup(partname).ok_or_else(|| {
+            overlay_unavailable(format!(
+                "raw content-types image has no mapping for effective member '{}'",
+                partname
+            ))
+        })?;
+        let candidate_type = candidate.lookup(partname).ok_or_else(|| {
+            overlay_unavailable(format!(
+                "typed content-types candidate has no mapping for effective member '{}'",
+                partname
+            ))
+        })?;
+        if raw_type.as_str() != candidate_type.as_str() {
+            return Err(overlay_unavailable(format!(
+                "raw content-types mapping for '{}' differs from effective typed mapping",
+                partname
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn reject_unknown_content_types_root_attributes(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| {
+            OpcError::InvalidContentTypesManifest(format!(
+                "invalid content-types root attribute: {error}"
+            ))
+        })?;
+        let key = decoder.decode(attribute.key.as_ref()).map_err(|error| {
+            OpcError::InvalidContentTypesManifest(format!(
+                "invalid content-types root attribute name: {error}"
+            ))
+        })?;
+        if !relationship_namespace_declaration_name(&key) {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "raw restoration does not admit opaque content-types root attributes".to_owned(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn strict_content_type_mapping_key(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::Decoder,
+) -> Result<String> {
+    let is_default = element.local_name().as_ref() == b"Default";
+    if !is_default && element.local_name().as_ref() != b"Override" {
+        return Err(OpcError::InvalidContentTypesManifest(
+            "only Default and Override children are permitted".to_owned(),
+        ));
+    }
+    let key_name: &[u8] = if is_default {
+        b"Extension"
+    } else {
+        b"PartName"
+    };
+    let mut key = None;
+    let mut content_type = false;
+    let mut seen = HashSet::new();
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| {
+            OpcError::InvalidContentTypesManifest(format!(
+                "invalid content-type mapping attribute: {error}"
+            ))
+        })?;
+        let name = decoder.decode(attribute.key.as_ref()).map_err(|error| {
+            OpcError::InvalidContentTypesManifest(format!(
+                "invalid content-type mapping attribute name: {error}"
+            ))
+        })?;
+        if !seen.insert(name.to_string()) {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-type mapping repeats an attribute".to_owned(),
+            ));
+        }
+        if relationship_namespace_declaration_name(&name) {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-type mapping namespace attributes are not admitted by raw restoration"
+                    .to_owned(),
+            ));
+        }
+        if name.as_bytes() == key_name {
+            key = Some(
+                attribute
+                    .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                    .map_err(|error| {
+                        OpcError::InvalidContentTypesManifest(format!(
+                            "invalid content-type mapping key: {error}"
+                        ))
+                    })?
+                    .into_owned(),
+            );
+        } else if name.as_ref() == "ContentType" {
+            content_type = true;
+        } else {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "content-type mapping has an unsupported attribute".to_owned(),
+            ));
+        }
+    }
+    let key = key.filter(|value| !value.is_empty()).ok_or_else(|| {
+        OpcError::InvalidContentTypesManifest(format!(
+            "{} is missing its required key attribute",
+            if is_default { "Default" } else { "Override" }
+        ))
+    })?;
+    if !content_type {
+        return Err(OpcError::InvalidContentTypesManifest(format!(
+            "{} is missing ContentType",
+            if is_default { "Default" } else { "Override" }
+        )));
+    }
+    let mut qualified = String::new();
+    qualified
+        .try_reserve_exact(key.len().saturating_add(2))
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC raw content-type mapping key",
+            source,
+        })?;
+    qualified.push(if is_default { 'D' } else { 'O' });
+    qualified.push(':');
+    qualified.push_str(&key);
+    Ok(qualified)
+}
+
+/// Audit imported or restored producer bytes with the source policy (see
+/// [`SourceTopologyPlan::try_add_imported_part_shared`]).
+fn validate_imported_xml(part: &str, bytes: &[u8]) -> Result<()> {
+    xml_minifier::audit::verify_source(bytes, xml_minifier::audit::Limits::default())
+        .map(|_report| ())
+        .map_err(|source| OpcError::XmlPublication {
+            part: part.to_string(),
+            source,
+        })
+}
+
+fn validate_overlay_xml(part: &str, bytes: &[u8]) -> Result<()> {
+    xml_minifier::audit::verify_authored(bytes, xml_minifier::audit::Limits::default())
+        .map(|_report| ())
+        .map_err(|source| OpcError::XmlPublication {
+            part: part.to_string(),
+            source,
+        })
+}
+
+/// Audit a Part or relationship stream that a source-backed publication
+/// replaces, on both sides of the replacement: the original bytes the package
+/// holds, then the replacement published in their place.
+///
+/// The source policy applies to the *original* bytes: they were written by
+/// whatever produced the package, this library did not author them, and the
+/// compact output contract does not apply to them. It extends to the
+/// *replacement* at the seven paired sites, because a source-backed
+/// replacement is a splice: the XLSX value editor copies every unedited row
+/// and cell record and the whole envelope from the source and authors compact
+/// bytes only for the cells it changed, so holding the assembled part to the
+/// compact contract refuses the producer's own indentation and, with it,
+/// every real third-party package. Compactness is therefore a property of
+/// this library's serializers, asserted by their own tests, and not a
+/// publication refusal on this route.
+///
+/// Every other check stays, on both sides, and reports the same
+/// [`OpcError::XmlPublication`] [`validate_overlay_xml`] reports: UTF-8,
+/// well-formed XML, exactly one document element, no DTD or DOCTYPE, and
+/// every [`xml_minifier::audit::Limits`] budget. Indentation, a line ending
+/// after the XML declaration, attribute separators of any length and
+/// whitespace before a tag close are accepted as the producer spelled them.
+///
+/// The pair is audited with one source-replacement audit call. The
+/// established paths use [`xml_minifier::audit::verify_source_replacement`],
+/// while the topology path may use its bounded
+/// [`xml_minifier::audit::verify_source_replacement_with_spans`] variant when
+/// it receives more than one untrusted window hint. Both verdicts are exactly
+/// those of auditing the original and then the replacement with
+/// `verify_source`, including which side fails first and the error it
+/// reports; the window path only avoids scanning again replacement bytes that
+/// repeat the original outside the hinted elements, which the original's
+/// audit checked in the same parser state moments earlier. Invalid or
+/// incomplete hints fall back to the complete replacement audit.
+///
+/// [`validate_overlay_xml`] keeps the authored contract where this library
+/// composes a whole stream with no source to inherit from: its canonical
+/// relationship XML and a Part a plan *adds*.
+fn audit_source_part_replacement_xml(
+    part: &str,
+    original: &[u8],
+    replacement: &[u8],
+    spans: Option<&[ReplacementSpan]>,
+) -> Result<xml_minifier::audit::ReplacementProof> {
+    let audit = match spans {
+        Some(spans) if spans.len() > 1 && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS => {
+            xml_minifier::audit::verify_source_replacement_with_spans(
+                original,
+                replacement,
+                xml_minifier::audit::Limits::default(),
+                spans,
+            )
+        },
+        _ => xml_minifier::audit::verify_source_replacement(
+            original,
+            replacement,
+            xml_minifier::audit::Limits::default(),
+        ),
+    };
+    audit.map_err(|error| OpcError::XmlPublication {
+        part: part.to_string(),
+        source: error.into_error(),
+    })
+}
+
+impl SourceBackedPackage {
+    /// Audit replacing physical Part `target`'s source bytes `original` with
+    /// `replacement`, with the verdict and error of
+    /// [`audit_source_part_replacement_xml`], and return the proof of the
+    /// replacement when the audit established one.
+    ///
+    /// That verdict is the source audit of `original` and then of
+    /// `replacement` under the default limits. Two of its inputs can be
+    /// proven instead of scanned again:
+    ///
+    /// * `replacement`, by a [`xml_minifier::audit::VerifiedSource`] that
+    ///   covers its exact allocation under the default limits. Only the audit
+    ///   itself mints one (the transaction commit that verified the bytes, or
+    ///   an earlier call of this method), so a caller without one, or with one
+    ///   for any other bytes or limits, gets the complete audit.
+    /// * `original`, once it has passed here for this Part and source
+    ///   revision of an unmanaged package; then the replacement alone is
+    ///   audited, from the original's retained indexed proof when there is
+    ///   one (below), completely otherwise. The physical bytes of one revision
+    ///   do not change, and a failure is never remembered, so an original
+    ///   that fails is audited, and reported, every time.
+    ///
+    /// Bounded multi-window hints keep their windowed audit and return no
+    /// proof.
+    ///
+    /// On an unmanaged package the remembered original also keeps its audit's
+    /// proof with the content boundaries that audit recorded
+    /// ([`xml_minifier::audit::VerifiedSource::verify_indexed`]). An unproven
+    /// replacement is then audited by
+    /// [`xml_minifier::audit::VerifiedSource::verify_successor`], whose
+    /// verdict and error are the replacement's complete source audit but
+    /// which scans only the bytes that took the place of a run between two
+    /// recorded boundaries, such as an inserted paragraph. The proof keeps
+    /// the original's allocation alive; at most
+    /// [`RETAINED_SOURCE_XML_PROOFS`] are kept per package.
+    ///
+    /// Two refinements apply:
+    ///
+    /// * `predecessor`, the retained proof of the effective revision the
+    ///   replacement edits, is preferred over the original's proof once the
+    ///   original is remembered. Its successor's verdict is the
+    ///   replacement's own source audit whatever bytes it proves, so a
+    ///   predecessor can only make the audit cheaper, and a chain of edits on
+    ///   a committed revision is proved edit by edit from the boundaries each
+    ///   proof derives for its successor.
+    /// * PresentationML slide-like Parts are indexed one level deeper
+    ///   ([`source_xml_index_depth`]), so shape edits inside a slide's shape
+    ///   tree are proved by their own shape.
+    fn audit_physical_replacement_xml(
+        &self,
+        target: usize,
+        original: &PartData,
+        replacement: &Arc<Vec<u8>>,
+        spans: Option<&[ReplacementSpan]>,
+        proof: Option<&xml_minifier::audit::VerifiedSource>,
+        predecessor: Option<&xml_minifier::audit::VerifiedSource>,
+    ) -> Result<Option<xml_minifier::audit::VerifiedSource>> {
+        let limits = xml_minifier::audit::Limits::default();
+        let part = self.catalog.parts[target].partname.as_str();
+        let depth = source_xml_index_depth(self.catalog.parts[target].content_type.as_str());
+        let publication_error = |source| OpcError::XmlPublication {
+            part: part.to_string(),
+            source,
+        };
+        let version = self.source.version();
+        // Unmanaged payloads can be shared as bare allocations, and only
+        // unmanaged packages remember an audit.
+        let shared_original = (!self.cache.is_managed())
+            .then(|| original.into_arc().ok())
+            .flatten();
+        let proof = proof.filter(|proof| proof.covers(replacement.as_slice(), limits));
+        if let Some(proof) = proof {
+            if self.remembered_source_xml_audit(target, version).is_none() {
+                let base = match shared_original {
+                    Some(bytes) => Some(
+                        xml_minifier::audit::VerifiedSource::verify_indexed(bytes, limits, depth)
+                            .map_err(publication_error)?,
+                    ),
+                    None => {
+                        let _report =
+                            xml_minifier::audit::verify_source(original.as_bytes(), limits)
+                                .map_err(publication_error)?;
+                        None
+                    },
+                };
+                self.remember_source_xml_audit(target, version, base);
+            }
+            return Ok(Some(proof.clone()));
+        }
+        if let Some(base) = self.remembered_source_xml_audit(target, version) {
+            // The pair's verdict on `original` is known to pass, so it is the
+            // replacement's own audit, error included.
+            let predecessor = predecessor.filter(|predecessor| {
+                predecessor.limits() == limits && predecessor.index_depth().is_some()
+            });
+            let proof = match predecessor.or(base.as_ref()) {
+                Some(base) => {
+                    base.verify_successor(Arc::clone(replacement), limits)
+                        .map_err(publication_error)?
+                        .0
+                },
+                None => {
+                    xml_minifier::audit::VerifiedSource::verify(Arc::clone(replacement), limits)
+                        .map_err(publication_error)?
+                },
+            };
+            return Ok(Some(proof));
+        }
+        if let Some(spans) = spans
+            && spans.len() > 1
+            && spans.len() <= MAX_SOURCE_REPLACEMENT_SPANS
+        {
+            audit_source_part_replacement_xml(part, original.as_bytes(), replacement, Some(spans))?;
+            self.remember_source_xml_audit(target, version, None);
+            return Ok(None);
+        }
+        let (base, proof) = match shared_original {
+            Some(bytes) => {
+                let (base, proof, _how) =
+                    xml_minifier::audit::VerifiedSource::verify_indexed_replacement(
+                        bytes,
+                        Arc::clone(replacement),
+                        limits,
+                        depth,
+                    )
+                    .map_err(|error| publication_error(error.into_error()))?;
+                (Some(base), proof)
+            },
+            None => {
+                let (proof, _how) = xml_minifier::audit::VerifiedSource::verify_replacement(
+                    original.as_bytes(),
+                    Arc::clone(replacement),
+                    limits,
+                )
+                .map_err(|error| publication_error(error.into_error()))?;
+                (None, proof)
+            },
+        };
+        self.remember_source_xml_audit(target, version, base);
+        Ok(Some(proof))
+    }
+
+    /// The indexed proof the source bytes of `partname` earned when this
+    /// package last audited a replacement of them, when it keeps one;
+    /// nothing is audited.
+    ///
+    /// Only an unmanaged package remembers its originals, at most four of
+    /// them with their proofs, and only for its current source revision. The
+    /// proof covers exactly the bytes [`PartView::data`] returns for the
+    /// Part, so a caller may hand it to a source XML audit of an edit of
+    /// them, such as
+    /// [`xml_minifier::audit::VerifiedSource::verify_successor`], whose
+    /// verdict is the edit's own complete audit either way.
+    #[must_use]
+    pub fn xml_audit_proof(
+        &self,
+        partname: &PackURI,
+    ) -> Option<xml_minifier::audit::VerifiedSource> {
+        self.retained_xml_audit_proof(self.part_index(partname)?)
+    }
+
+    /// [`Self::xml_audit_proof`] by catalog index.
+    pub(crate) fn retained_xml_audit_proof(
+        &self,
+        target: usize,
+    ) -> Option<xml_minifier::audit::VerifiedSource> {
+        self.remembered_source_xml_audit(target, self.source.version())
+            .flatten()
+    }
+
+    /// `None` when the original of `target` at `version` has not passed here;
+    /// otherwise its retained indexed proof, if any.
+    fn remembered_source_xml_audit(
+        &self,
+        target: usize,
+        version: SourceVersion,
+    ) -> Option<Option<xml_minifier::audit::VerifiedSource>> {
+        self.cache
+            .audited_source_xml
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner)
+            .iter()
+            .find(|audited| audited.target == target && audited.version == version)
+            .map(|audited| audited.proof.clone())
+    }
+
+    #[cfg(test)]
+    fn original_source_xml_audited(&self, target: usize, version: SourceVersion) -> bool {
+        self.remembered_source_xml_audit(target, version).is_some()
+    }
+
+    /// Remember a passed original, with its indexed proof when there is one.
+    /// Managed packages retain no memory they do not reserve, so they keep
+    /// auditing it. Keeping a proof beyond [`RETAINED_SOURCE_XML_PROOFS`]
+    /// drops the oldest kept proof; its verdict stays remembered.
+    fn remember_source_xml_audit(
+        &self,
+        target: usize,
+        version: SourceVersion,
+        proof: Option<xml_minifier::audit::VerifiedSource>,
+    ) {
+        if self.cache.is_managed() {
+            return;
+        }
+        let mut audited = self
+            .cache
+            .audited_source_xml
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if audited
+            .iter()
+            .any(|audited| audited.target == target && audited.version == version)
+            || audited.try_reserve(1).is_err()
+        {
+            return;
+        }
+        if proof.is_some()
+            && audited
+                .iter()
+                .filter(|audited| audited.proof.is_some())
+                .count()
+                >= RETAINED_SOURCE_XML_PROOFS
+            && let Some(oldest) = audited.iter_mut().find(|audited| audited.proof.is_some())
+        {
+            oldest.proof = None;
+        }
+        audited.push(AuditedSourceXml {
+            target,
+            version,
+            proof,
+        });
+    }
+}
+
+/// How many remembered originals keep their indexed proof (and so their
+/// allocation) per package.
+const RETAINED_SOURCE_XML_PROOFS: usize = 4;
+
+/// How many Parts of one effective revision keep their replacement's proof
+/// ([`PreparedPart::xml_proof`]). The proof shares the replacement's own
+/// allocation, so what it adds is its boundary index: at most 20 bytes per
+/// boundary, one boundary per 32 payload bytes plus 64, and its namespace
+/// snapshots within the auditor's 8 MiB snapshot budget.
+const RETAINED_EFFECTIVE_XML_PROOFS: usize = 4;
+
+/// The depth to which the source XML audit of a Part with `content_type`
+/// records content boundaries.
+///
+/// PresentationML slides, layouts, masters and notes keep their shapes in
+/// `p:cSld/p:spTree`, three elements deep, so they are indexed one level
+/// deeper than the default, which covers WordprocessingML body blocks and
+/// SpreadsheetML rows.
+fn source_xml_index_depth(content_type: &str) -> xml_minifier::audit::IndexDepth {
+    const SLIDE_LIKE: [&str; 6] = [
+        "application/vnd.openxmlformats-officedocument.presentationml.slide+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideLayout+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.slideMaster+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.notesSlide+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.notesMaster+xml",
+        "application/vnd.openxmlformats-officedocument.presentationml.handoutMaster+xml",
+    ];
+    if SLIDE_LIKE
+        .iter()
+        .any(|slide| slide.eq_ignore_ascii_case(content_type))
+    {
+        xml_minifier::audit::IndexDepth::GRANDCHILDREN
+    } else {
+        xml_minifier::audit::IndexDepth::CHILDREN
+    }
+}
+
+/// One physical Part's original that passed the source XML audit.
+#[derive(Debug)]
+struct AuditedSourceXml {
+    target: usize,
+    version: SourceVersion,
+    /// The audit's proof with its recorded content boundaries, while kept.
+    proof: Option<xml_minifier::audit::VerifiedSource>,
+}
+
+fn validate_source_part_replacement_xml(
+    part: &str,
+    original: &[u8],
+    replacement: &[u8],
+) -> Result<()> {
+    audit_source_part_replacement_xml(part, original, replacement, None).map(|_| ())
+}
+
+fn checked_overlay_total(
+    current: u64,
+    bytes: u64,
+    resource: SourceLimitKind,
+    maximum: u64,
+) -> Result<u64> {
+    current.checked_add(bytes).ok_or(OpcError::Limit {
+        kind: resource,
+        observed: u64::MAX,
+        maximum,
+    })
+}
+
+fn adjusted_overlay_total(
+    current: u64,
+    removed: u64,
+    added: u64,
+    resource: SourceLimitKind,
+    maximum: u64,
+) -> Result<u64> {
+    current
+        .checked_sub(removed)
+        .and_then(|remaining| remaining.checked_add(added))
+        .ok_or(OpcError::Limit {
+            kind: resource,
+            observed: u64::MAX,
+            maximum,
+        })
+}
+
+fn main_document_partname(relationships: &Relationships) -> Result<PackURI> {
+    let mut matching = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            relationship_type::OFFICE_DOCUMENT | relationship_type::STRICT_OFFICE_DOCUMENT
+        )
+    });
+    let relationship = matching.next().ok_or_else(|| {
+        OpcError::InvalidRelationship("main-document relationship is missing".to_string())
+    })?;
+    if matching.next().is_some() {
+        return Err(OpcError::InvalidRelationship(
+            "package has multiple main-document relationships".to_string(),
+        ));
+    }
+    if relationship.is_external() {
+        return Err(OpcError::InvalidRelationship(
+            "main-document relationship cannot be external".to_string(),
+        ));
+    }
+    relationship.target_partname()
+}
+
+fn overlay_unavailable(reason: impl Into<String>) -> OpcError {
+    OpcError::SourceBackedOverlayUnavailable {
+        reason: reason.into(),
+    }
+}
+
+/// Cooperative cancellation for a publication's compression wave.
+///
+/// Cancellation is observed between members, never inside one: a member that
+/// has started is always finished, and the wave completes before any byte is
+/// emitted, so a cancelled publication publishes nothing.
+struct PublicationCancellation(ExecutionContext);
+
+impl soapberry_zip::office::CancellationProbe for PublicationCancellation {
+    fn is_cancelled(&self) -> bool {
+        self.0.cancellation().is_cancelled()
+    }
+}
+
+fn map_preservation_error(error: soapberry_zip::Error) -> OpcError {
+    let is_io = matches!(error.kind(), soapberry_zip::ErrorKind::IO(_));
+    if is_io {
+        return match error.into_kind() {
+            soapberry_zip::ErrorKind::IO(error) => map_io_error(error),
+            kind => OpcError::ZipError(kind.to_string()),
+        };
+    }
+    OpcError::from(error)
+}
+
+fn map_preservation_admission_error(
+    error: soapberry_zip::PreservationAdmissionError<OpcError>,
+) -> OpcError {
+    match error {
+        soapberry_zip::PreservationAdmissionError::Archive(error) => map_preservation_error(error),
+        soapberry_zip::PreservationAdmissionError::Admission(error) => error,
+    }
+}
+
+fn map_verified_decoded_reader_error<E>(
+    error: soapberry_zip::office::VerifiedEntryReaderError<E>,
+) -> VerifiedDecodedReaderError<E> {
+    match error {
+        soapberry_zip::office::VerifiedEntryReaderError::Archive {
+            error,
+            callback_error,
+        } => VerifiedDecodedReaderError::Opc {
+            error: map_preservation_error(error),
+            callback_error,
+        },
+        soapberry_zip::office::VerifiedEntryReaderError::Transport {
+            error,
+            callback_error,
+        } => VerifiedDecodedReaderError::Opc {
+            error: map_io_error(error),
+            callback_error,
+        },
+        soapberry_zip::office::VerifiedEntryReaderError::Callback(error) => {
+            VerifiedDecodedReaderError::Callback(error)
+        },
+        _ => VerifiedDecodedReaderError::Opc {
+            error: OpcError::ZipError("unrecognized verified ZIP entry-reader failure".to_string()),
+            callback_error: None,
+        },
+    }
+}
+
+fn map_verified_precompressed_error(
+    error: soapberry_zip::office::VerifiedPrecompressedError<OpcError>,
+) -> OpcError {
+    match error {
+        soapberry_zip::office::VerifiedPrecompressedError::Archive(error) => {
+            map_preservation_error(error)
+        },
+        soapberry_zip::office::VerifiedPrecompressedError::Transport(error) => map_io_error(error),
+        soapberry_zip::office::VerifiedPrecompressedError::Callback(error) => error,
+        _ => {
+            OpcError::ZipError("unrecognized verified ZIP precompressed-entry failure".to_string())
+        },
+    }
+}
+
+fn with_verified_primary_error<T, E>(
+    result: std::result::Result<T, VerifiedDecodedReaderError<E>>,
+    error: OpcError,
+) -> VerifiedDecodedReaderError<E> {
+    match result {
+        Ok(_) => VerifiedDecodedReaderError::Opc {
+            error,
+            callback_error: None,
+        },
+        Err(VerifiedDecodedReaderError::Opc { callback_error, .. }) => {
+            VerifiedDecodedReaderError::Opc {
+                error,
+                callback_error,
+            }
+        },
+        Err(VerifiedDecodedReaderError::Callback(callback_error)) => {
+            VerifiedDecodedReaderError::Opc {
+                error,
+                callback_error: Some(callback_error),
+            }
+        },
+    }
+}
+
+fn accounting_overflow(counter: &'static str) -> OpcError {
+    OpcError::OperationAccountingOverflow { counter }
+}
+
+fn record_accounting_error(slot: &mut Option<OpcError>, error: OpcError) {
+    if slot.is_none() {
+        *slot = Some(error);
+    }
+}
+
+fn map_execution_error(error: ExecutionError) -> OpcError {
+    match error {
+        ExecutionError::Cancelled => OpcError::Cancelled,
+        error => OpcError::Execution(error),
+    }
+}
+
+fn execution_io_error(error: ExecutionError) -> std::io::Error {
+    crate::error::execution_io_error(error)
+}
+
+fn record_input_reservation_failure(snapshot: &SourceSnapshot) {
+    if let Some(counter) = snapshot.input_reservation_failures.as_ref() {
+        counter.increment();
+    }
+}
+
+fn map_io_error(error: std::io::Error) -> OpcError {
+    if let Some(source) = error
+        .get_ref()
+        .and_then(|source| source.downcast_ref::<SourceChangedIoError>())
+    {
+        return OpcError::SourceChanged {
+            expected: source.expected,
+            actual: source.actual,
+        };
+    }
+    crate::error::map_io_error(error)
+}
+
+fn map_source_backed_error(error: OpcError) -> OpcError {
+    match error {
+        OpcError::IoError(error) => map_io_error(error),
+        error => error,
+    }
+}
+
+pub(super) fn finish_source_publication(
+    result: Result<()>,
+    source: &SourceSnapshot,
+    written: u64,
+) -> Result<()> {
+    let freshness = source.ensure_current();
+    let result = match (result, freshness) {
+        (_, Err(error @ OpcError::SourceChanged { .. })) => Err(error),
+        (Err(error), _) => Err(error),
+        (Ok(()), Err(error)) => Err(error),
+        (Ok(()), Ok(())) => Ok(()),
+    };
+    match result {
+        Err(source) if written != 0 => Err(OpcError::IncompleteOutput {
+            written,
+            source: Box::new(source),
+        }),
+        other => other,
+    }
+}
+
+fn write_exact_snapshot<W: Write>(
+    source: &SourceSnapshot,
+    writer: W,
+    context: Option<&ExecutionContext>,
+) -> Result<()> {
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    let _monitored = source.monitor_publication();
+    source.ensure_current()?;
+    let _workspace_reservation = context
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC publication buffer",
+            source,
+        })?;
+    if buffer.capacity() != SOURCE_PUBLICATION_CHUNK_BYTES {
+        return Err(overlay_unavailable(
+            "exact publication allocation exceeds its reserved window",
+        ));
+    }
+    buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+    let mut written = 0_u64;
+    let result = if let Some(context) = context {
+        let Some(output_reservation_failures) = source.output_reservation_failures.as_ref() else {
+            return Err(overlay_unavailable(
+                "managed source output reservation counter is unavailable",
+            ));
+        };
+        let execution_failure = Arc::new(Mutex::new(None));
+        let counted = Counted::new(writer, &mut written);
+        let checked = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let cooperative = ContextCheckedSink {
+            inner: checked,
+            context: Some(context.clone()),
+            failure: Arc::clone(&execution_failure),
+        };
+        let mut sink = OutputBudgetedSink {
+            inner: cooperative,
+            context: context.clone(),
+            failure: Arc::clone(&execution_failure),
+            output_reservation_failures: output_reservation_failures.clone(),
+        };
+        let mut offset = 0_u64;
+        let result = (|| {
+            while offset < source.length {
+                context.check().map_err(map_execution_error)?;
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    Some(context),
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                context.check().map_err(map_execution_error)?;
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            context.check().map_err(map_execution_error)?;
+            sink.flush()?;
+            Ok(())
+        })();
+        execution_failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .map_or(result, |error| Err(map_execution_error(error)))
+    } else {
+        let counted = Counted::new(writer, &mut written);
+        let mut sink = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let mut offset = 0_u64;
+        (|| {
+            while offset < source.length {
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    None,
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            sink.flush()?;
+            Ok(())
+        })()
+    };
+    finish_source_publication(result, source, written)
+}
+
+fn write_exact_snapshot_with_accounting<W: Write>(
+    source: &SourceSnapshot,
+    writer: W,
+    context: Option<&ExecutionContext>,
+    accounting: &mut OpcOperationAccounting,
+) -> Result<()> {
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    let _monitored = source.monitor_publication();
+    source.ensure_current()?;
+    let _workspace_reservation = context
+        .map(|context| {
+            context
+                .reserve(Resource::Memory, SOURCE_PUBLICATION_CHUNK_BYTES as u64)
+                .map_err(map_execution_error)
+        })
+        .transpose()?;
+    let mut buffer = Vec::new();
+    buffer
+        .try_reserve_exact(SOURCE_PUBLICATION_CHUNK_BYTES)
+        .map_err(|source| OpcError::Allocation {
+            resource: "source-backed OPC publication buffer",
+            source,
+        })?;
+    if buffer.capacity() != SOURCE_PUBLICATION_CHUNK_BYTES {
+        return Err(overlay_unavailable(
+            "exact publication allocation exceeds its reserved window",
+        ));
+    }
+    buffer.resize(SOURCE_PUBLICATION_CHUNK_BYTES, 0);
+    let mut written = 0_u64;
+    let mut accounting_error = None;
+    let result = if let Some(context) = context {
+        let Some(output_reservation_failures) = source.output_reservation_failures.as_ref() else {
+            return Err(overlay_unavailable(
+                "managed source output reservation counter is unavailable",
+            ));
+        };
+        let execution_failure = Arc::new(Mutex::new(None));
+        let counted = Counted::with_accounting(
+            writer,
+            &mut written,
+            accounting,
+            &mut accounting_error,
+            true,
+        );
+        let checked = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let cooperative = ContextCheckedSink {
+            inner: checked,
+            context: Some(context.clone()),
+            failure: Arc::clone(&execution_failure),
+        };
+        let mut sink = OutputBudgetedSink {
+            inner: cooperative,
+            context: context.clone(),
+            failure: Arc::clone(&execution_failure),
+            output_reservation_failures: output_reservation_failures.clone(),
+        };
+        let mut offset = 0_u64;
+        let result = (|| {
+            while offset < source.length {
+                context.check().map_err(map_execution_error)?;
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    Some(context),
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                context.check().map_err(map_execution_error)?;
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            context.check().map_err(map_execution_error)?;
+            sink.flush()?;
+            Ok(())
+        })();
+        execution_failure
+            .lock()
+            .unwrap_or_else(|poisoned| poisoned.into_inner())
+            .take()
+            .map_or(result, |error| Err(map_execution_error(error)))
+    } else {
+        let counted = Counted::with_accounting(
+            writer,
+            &mut written,
+            accounting,
+            &mut accounting_error,
+            true,
+        );
+        let mut sink = SourceCheckedSink {
+            inner: counted,
+            snapshot: source.clone(),
+        };
+        let mut offset = 0_u64;
+        (|| {
+            while offset < source.length {
+                let remaining = usize::try_from((source.length - offset).min(buffer.len() as u64))
+                    .map_err(|_| overlay_unavailable("source range does not fit this platform"))?;
+                let read = read_source_at_with_context(
+                    source,
+                    None,
+                    offset,
+                    &mut buffer[..remaining],
+                    "publication",
+                )?;
+                if read == 0 {
+                    return Err(OpcError::IoError(std::io::Error::new(
+                        std::io::ErrorKind::UnexpectedEof,
+                        "source-backed OPC source ended during publication",
+                    )));
+                }
+                sink.write_all(&buffer[..read])?;
+                offset = offset
+                    .checked_add(read as u64)
+                    .ok_or_else(|| overlay_unavailable("source offset overflow"))?;
+            }
+            sink.flush()?;
+            Ok(())
+        })()
+    };
+    let result = finish_source_publication(result, source, written);
+    match result {
+        Err(error) => Err(error),
+        Ok(()) => accounting_error.map_or(Ok(()), Err),
+    }
+}
+
+/// Whether a member name is one the open reads before it parses anything.
+///
+/// The open reads `[Content_Types].xml`, the package `_rels/.rels`, and every
+/// `*/_rels/*.rels` relationship part the relationship walk or its orphan
+/// fallback reaches (those reads are mandatory, and all 1,237 relationship
+/// parts of the 167-package OOXML corpus are read at open). The test is on the
+/// name alone: no member is read, parsed or classified to apply it, which is
+/// what lets it run before the catalog exists.
+///
+/// It is deliberately a superset in one direction and exact in the other. A
+/// relationship part the walk never reaches is still named here, and the only
+/// cost of that is bytes already adjacent to parts that *are* read. A member
+/// whose name differs in case is *not* named here, because
+/// `PackURI::rels_uri` builds the exact name the walk looks up, so a
+/// differently-cased member is never read at open either.
+fn is_structural_member_name(name: &str) -> bool {
+    if name.eq_ignore_ascii_case(crate::pkgreader::CONTENT_TYPES_MEMBER) {
+        return true;
+    }
+    let Some((directory, file)) = name.rsplit_once('/') else {
+        return false;
+    };
+    if !file.ends_with(".rels") {
+        return false;
+    }
+    directory
+        .rsplit_once('/')
+        .map_or(directory, |(_, last)| last)
+        == "_rels"
+}
+
+/// The runs one read each can deliver for the members this open will read.
+///
+/// The spans come from the archive's own read path
+/// (`IndexedArchive::local_span_hint`), so a run read fetches exactly the bytes
+/// the per-member reads would have fetched, and never a byte outside them.
+/// Anything the archive declines to hint, and any member that does not adjoin
+/// its neighbour, simply keeps the grammar it has today.
+fn structural_prefetch_runs<R>(archive: &IndexedArchive<R>) -> Vec<read_ahead::StructuralRun>
+where
+    R: ZipReaderAt,
+{
+    let spans = archive.file_names().filter_map(|name| {
+        if !is_structural_member_name(name) {
+            return None;
+        }
+        let hint = archive.local_span_hint(archive.entry_id(name)?)?;
+        Some((hint.offset(), hint.length()))
+    });
+    read_ahead::structural_runs(spans).unwrap_or_default()
+}
+
+/// Reserve a bounded positional-read window, retry interrupted reads, and
+/// commit only the bytes actually accepted. The reservation retry loop is important
+/// for short-read adapters: a caller with one input byte remaining must still
+/// be allowed to read one byte even when the adapter initially receives a
+/// larger output buffer. A reservation is held only across the physical read,
+/// so cumulative [`Resource::InputBytes`] usage is exact under retries and
+/// never leaks on an I/O failure.
+fn read_source_at_with_context(
+    snapshot: &SourceSnapshot,
+    context: Option<&ExecutionContext>,
+    offset: u64,
+    output: &mut [u8],
+    operation: &str,
+) -> Result<usize> {
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    snapshot.ensure_current_io_if_monitored()?;
+    let requested = output.len();
+    let (read_output, reservation) = if let Some(context) = context {
+        let mut attempt = u64::try_from(requested)
+            .map_err(|_| overlay_unavailable("source read length overflows u64"))?;
+        loop {
+            match context.reserve(Resource::InputBytes, attempt) {
+                Ok(reservation) => {
+                    let length = usize::try_from(attempt)
+                        .map_err(|_| overlay_unavailable("source read length overflows usize"))?;
+                    break (&mut output[..length], Some(reservation));
+                },
+                Err(error) => {
+                    let Some(limit) = (match &error {
+                        ExecutionError::ResourceLimit(limit) => Some(limit),
+                        ExecutionError::Cancelled
+                        | ExecutionError::WorkersExceedInFlightTasks { .. }
+                        | ExecutionError::ParallelThresholdExceedsInFlightBytes { .. } => None,
+                        _ => None,
+                    }) else {
+                        return Err(map_execution_error(error));
+                    };
+                    let previous = limit.observed.saturating_sub(attempt);
+                    let available = limit.limit.saturating_sub(previous);
+                    let next = available.min(attempt.saturating_sub(1));
+                    if next == 0 {
+                        record_input_reservation_failure(snapshot);
+                        return Err(map_execution_error(error));
+                    }
+                    attempt = next;
+                },
+            }
+        }
+    } else {
+        (output, None)
+    };
+    let read = loop {
+        match snapshot.source.read_at(offset, read_output) {
+            Ok(read) => break read,
+            Err(error) if error.kind() == std::io::ErrorKind::Interrupted => {
+                // An interrupted read accepted no bytes. Keep the same input
+                // reservation, but bound managed retries by Work and observe
+                // cancellation and source changes before calling the provider
+                // again. This also serves BufRead consumers which do not
+                // themselves retry Interrupted from fill_buf.
+                if let Some(context) = context {
+                    context
+                        .consume(Resource::Work, 1)
+                        .map_err(map_execution_error)?;
+                }
+                snapshot.ensure_current_io_if_monitored()?;
+            },
+            Err(error) => return Err(OpcError::IoError(error)),
+        }
+    };
+    validate_source_read_count(read, read_output.len(), operation)?;
+    if let Some(reservation) = reservation {
+        if !reservation.commit(read as u64) {
+            return Err(overlay_unavailable(
+                "source-backed OPC input reservation underflow",
+            ));
+        }
+    }
+    if let Some(context) = context {
+        context.check().map_err(map_execution_error)?;
+    }
+    snapshot
+        .ensure_current_io_if_monitored()
+        .map_err(OpcError::IoError)?;
+    Ok(read)
+}
+
+fn validate_source_read_count(read: usize, requested: usize, operation: &str) -> Result<()> {
+    if read <= requested {
+        return Ok(());
+    }
+    Err(OpcError::IoError(std::io::Error::new(
+        std::io::ErrorKind::InvalidData,
+        format!(
+            "source-backed OPC source reported {read} bytes for a {requested}-byte {operation} read"
+        ),
+    )))
+}
+
+fn is_signature_relationship(kind: &str) -> bool {
+    [
+        relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature",
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/certificate",
+    ]
+    .iter()
+    .any(|candidate| kind.eq_ignore_ascii_case(candidate))
+}
+
+fn is_signature_relationship_or_target(relationship: &Relationship) -> bool {
+    if is_signature_relationship(relationship.reltype()) {
+        return true;
+    }
+    if relationship.is_external() {
+        return false;
+    }
+    let target_path = relationship.target_path();
+    if is_signature_path(target_path) {
+        return true;
+    }
+    if !target_may_be_signature_path(target_path) {
+        return false;
+    }
+    relationship
+        .target_partname()
+        .map_or(true, |target| is_signature_path(target.as_str()))
+}
+
+fn target_may_be_signature_path(path: &str) -> bool {
+    path.split('/')
+        .any(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
+}
+
+fn is_signature_path(path: &str) -> bool {
+    const DIRECTORY: &[u8] = b"/_xmlsignatures/";
+    path.as_bytes()
+        .get(..DIRECTORY.len())
+        .is_some_and(|prefix| prefix.eq_ignore_ascii_case(DIRECTORY))
+}
+
+/// Return whether a physical member name is rooted in the reserved OPC
+/// signature directory.
+///
+/// Part names are absolute (`/_xmlsignatures/...`) while ZIP member names are
+/// relative (`_xmlsignatures/...`). The source-backed catalog deliberately
+/// keeps the latter spelling for raw/non-Part members, so detection must treat
+/// both spellings, ASCII case variants, harmless leading separators/dot
+/// segments, and malformed separator variants as the same conservative
+/// signature-shaped path. Only the first meaningful component is accepted as
+/// the root; an unrelated nested directory named `_xmlsignatures` is not
+/// mistaken for the package signature directory.
+fn is_signature_member_path(path: &str) -> bool {
+    path.split(['/', '\\'])
+        .find(|segment| !segment.is_empty() && *segment != ".")
+        .is_some_and(|segment| segment.eq_ignore_ascii_case("_xmlsignatures"))
+}
+
+fn is_signature_content_type(value: &str) -> bool {
+    [
+        content_type::OPC_DIGITAL_SIGNATURE_ORIGIN,
+        content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE,
+        content_type::OPC_DIGITAL_SIGNATURE_CERTIFICATE,
+    ]
+    .iter()
+    .any(|candidate| value.eq_ignore_ascii_case(candidate))
+}
+
+#[cfg(test)]
+mod tests;
+
+#[cfg(test)]
+mod selected_part_stream_api_tests {
+    use super::{
+        ExecutionError, OpcError, OpcOperationAccounting, PartView, execution_io_error,
+        map_io_error,
+    };
+
+    #[test]
+    fn selected_part_stream_api_is_sink_oriented() {
+        let _ = PartView::stream_to::<Vec<u8>>;
+        let _ = PartView::stream_to_with_accounting::<Vec<u8>>;
+        let _ = OpcOperationAccounting::default();
+    }
+
+    #[test]
+    fn execution_io_error_round_trips_through_source_mapping() {
+        assert!(matches!(
+            map_io_error(execution_io_error(ExecutionError::Cancelled)),
+            OpcError::Cancelled
+        ));
+    }
+
+    #[test]
+    fn output_accounting_overflow_is_deferred_until_finalization() {
+        let mut accounting = OpcOperationAccounting::default();
+        assert!(accounting.add_output_bytes_accepted(u64::MAX).is_ok());
+        assert!(accounting.add_output_bytes_accepted(1).is_err());
+    }
+}
+
+#[cfg(test)]
+mod callback_scoped_verified_reader_tests {
+    use super::{
+        OpcError, OpcOperationAccounting, OpcPackage, OwnedSourceFingerprintMemo, Resource,
+        SourceArtifactRestoreProof, SourceBackedPackage, SourceCacheLimits, SourceLimits,
+        SourceReadPolicy, SourceVersion, VerifiedDecodedReaderError,
+    };
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, OwnedSource, ReadAt,
+    };
+    use std::io::{self, Cursor, Write};
+    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
+
+    const PAYLOAD: &[u8] = b"callback-scoped verified payload";
+
+    fn archive_bytes(payload: &[u8]) -> Vec<u8> {
+        let mut writer = soapberry_zip::office::StreamingArchiveWriter::new(
+            soapberry_zip::office::StreamingArchiveLimits::default(),
+        );
+        writer
+            .write_stored(
+                "[Content_Types].xml",
+                br#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/></Types>"#,
+            )
+            .unwrap();
+        writer
+            .write_stored(
+                "_rels/.rels",
+                br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>"#,
+            )
+            .unwrap();
+        writer.write_stored("word/document.xml", payload).unwrap();
+        writer.finish_to_bytes().unwrap()
+    }
+
+    fn package() -> SourceBackedPackage {
+        SourceBackedPackage::from_vec(
+            archive_bytes(PAYLOAD),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap()
+    }
+
+    struct RejectingSink;
+
+    impl Write for RejectingSink {
+        fn write(&mut self, _bytes: &[u8]) -> io::Result<usize> {
+            Err(io::Error::other("test sink refusal"))
+        }
+
+        fn flush(&mut self) -> io::Result<()> {
+            Ok(())
+        }
+    }
+
+    #[test]
+    fn owned_source_fingerprint_memo_is_deferred_and_shared() {
+        let opened = package();
+        let memo = opened
+            .fingerprint_memo
+            .as_ref()
+            .expect("owned ingress must retain its private fingerprint memo");
+        let first = opened.source_artifact();
+        let second = opened.source_artifact();
+        assert!(Arc::ptr_eq(
+            memo,
+            first
+                .fingerprint_memo
+                .as_ref()
+                .expect("artifact must share the package memo"),
+        ));
+        assert!(Arc::ptr_eq(
+            memo,
+            second
+                .fingerprint_memo
+                .as_ref()
+                .expect("artifact clones must share the package memo"),
+        ));
+        assert!(!memo.is_initialized());
+
+        let fingerprint = first.fingerprint().unwrap();
+        assert!(memo.is_initialized());
+        assert_eq!(second.fingerprint().unwrap(), fingerprint);
+
+        let reader_package = SourceBackedPackage::from_reader(
+            Cursor::new(archive_bytes(PAYLOAD)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let reader_memo = reader_package
+            .fingerprint_memo
+            .as_ref()
+            .expect("from_reader must retain the owned-ingress fingerprint memo");
+        assert!(!reader_memo.is_initialized());
+        let reader_artifact = reader_package.source_artifact();
+        assert_eq!(reader_artifact.fingerprint().unwrap(), fingerprint);
+        assert!(reader_memo.is_initialized());
+        assert_eq!(reader_artifact.fingerprint().unwrap(), fingerprint);
+
+        let separate = package();
+        let separate_memo = separate
+            .fingerprint_memo
+            .as_ref()
+            .expect("each owned ingress must have a memo");
+        assert!(!separate_memo.is_initialized());
+        assert!(!Arc::ptr_eq(memo, separate_memo));
+    }
+
+    #[test]
+    fn generic_and_managed_ingresses_do_not_retain_fingerprint_memo() {
+        let generic = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        assert!(generic.fingerprint_memo.is_none());
+
+        let (_budget, _cancellation_source, context) = managed_context(8 * 1024 * 1024);
+        let managed = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
+        assert!(managed.fingerprint_memo.is_none());
+    }
+
+    #[test]
+    fn owned_source_fingerprint_memo_reservation_is_fallible() {
+        let source = Arc::new(OwnedSource::new(Vec::new()));
+        let result = OwnedSourceFingerprintMemo::new_with_entries(source, usize::MAX);
+        assert!(matches!(
+            result,
+            Err(OpcError::Allocation {
+                resource: "source artifact fingerprint memo",
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn owned_fingerprint_warm_path_preserves_limits_publication_inverse_and_sinks() {
+        let source = archive_bytes(b"<document/>");
+        let package = SourceBackedPackage::from_vec(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let original = package.source_artifact();
+        let original_sha256 = original.fingerprint().unwrap();
+        assert_eq!(original.fingerprint().unwrap(), original_sha256);
+
+        let mut copied = Vec::new();
+        original.write_to(&mut copied).unwrap();
+        assert_eq!(copied, source);
+        assert!(matches!(
+            original.write_to(RejectingSink),
+            Err(OpcError::IoError(_))
+        ));
+
+        let target = super::PackURI::new("/word/document.xml").unwrap();
+        let mut changed = Vec::new();
+        package
+            .write_part_overlay_to_stream(&mut changed, &target, b"<changed/>".to_vec())
+            .unwrap();
+        let reopened = OpcPackage::from_bytes(&changed, SourceLimits::default()).unwrap();
+        assert_eq!(reopened.get_part(&target).unwrap().blob(), b"<changed/>");
+
+        let changed_package = SourceBackedPackage::from_vec(
+            changed,
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            None,
+        )
+        .unwrap();
+        let changed_artifact = changed_package.source_artifact();
+        let changed_sha256 = changed_artifact.fingerprint().unwrap();
+        assert_eq!(changed_artifact.fingerprint().unwrap(), changed_sha256);
+        let proof = SourceArtifactRestoreProof {
+            current_len: changed_artifact.len(),
+            current_sha256: changed_sha256,
+            original_len: original.len(),
+            original_sha256,
+        };
+        let mut inverse = Vec::new();
+        changed_package
+            .restore_source_artifact_to_stream(&original, proof, u64::MAX - 1, &mut inverse)
+            .unwrap();
+        assert_eq!(inverse, source);
+
+        let limited = SourceLimits::builder()
+            .max_input_bytes((source.len().saturating_sub(1)) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        assert!(matches!(
+            SourceBackedPackage::from_vec(source, limited, SourceCacheLimits::default(), None),
+            Err(OpcError::Limit {
+                kind: super::SourceLimitKind::InputBytes,
+                ..
+            })
+        ));
+    }
+
+    fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+        let budget = Budget::root(
+            "callback-scoped-reader-test",
+            Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let (cancellation_source, cancellation) = CancellationSource::pair();
+        let execution_limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroUsize::new(1).unwrap(),
+            NonZeroU64::new(memory.max(1)).unwrap(),
+            0,
+        )
+        .unwrap();
+        let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+        (budget, cancellation_source, context)
+    }
+
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct CallbackFailure;
+
+    impl std::fmt::Display for CallbackFailure {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter.write_str("callback failure")
+        }
+    }
+
+    impl std::error::Error for CallbackFailure {}
+
+    #[derive(Debug)]
+    struct ChangingSource {
+        bytes: Arc<Vec<u8>>,
+        trigger_offset: u64,
+        armed: AtomicBool,
+        revision: AtomicU64,
+    }
+
+    impl ChangingSource {
+        fn new(bytes: Vec<u8>, trigger_offset: u64) -> Self {
+            Self {
+                bytes: Arc::new(bytes),
+                trigger_offset,
+                armed: AtomicBool::new(false),
+                revision: AtomicU64::new(0),
+            }
+        }
+    }
+
+    impl ReadAt for ChangingSource {
+        fn len(&self) -> io::Result<u64> {
+            Ok(self.bytes.len() as u64)
+        }
+
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+            let offset = usize::try_from(offset).map_err(|_| {
+                io::Error::new(io::ErrorKind::InvalidInput, "source offset overflows usize")
+            })?;
+            if offset >= self.bytes.len() {
+                return Ok(0);
+            }
+            let count = output.len().min(self.bytes.len() - offset);
+            output[..count].copy_from_slice(&self.bytes[offset..offset + count]);
+            if (offset as u64) == self.trigger_offset && self.armed.swap(false, Ordering::SeqCst) {
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+            Ok(count)
+        }
+
+        fn version(&self) -> io::Result<SourceVersion> {
+            Ok(SourceVersion::new(
+                0xCBAC_0001,
+                self.revision.load(Ordering::SeqCst),
+            ))
+        }
+    }
+
+    #[test]
+    fn verified_reader_does_not_admit_payload_to_part_cache() {
+        let package = package();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let result = part
+            .with_verified_decoded_reader(|reader| {
+                let mut bytes = Vec::new();
+                reader.read_to_end(&mut bytes)?;
+                Ok::<_, io::Error>(bytes)
+            })
+            .unwrap();
+
+        assert_eq!(result, PAYLOAD);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.cold_loads, 0);
+        assert_eq!(diagnostics.retained_entries, 0);
+    }
+
+    #[test]
+    fn verified_reader_returns_custom_callback_error_after_verification() {
+        let package = package();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|reader| {
+                let mut bytes = [0; 7];
+                reader.read_exact(&mut bytes).map_err(|_| CallbackFailure)?;
+                Err::<(), _>(CallbackFailure)
+            })
+            .unwrap_err();
+
+        assert!(matches!(error, VerifiedDecodedReaderError::Callback(_)));
+        assert!(error.opc().is_none());
+        assert!(matches!(error.callback(), Some(&CallbackFailure)));
+    }
+
+    #[test]
+    fn verified_reader_preserves_typed_source_change_transport_error() {
+        let bytes = archive_bytes(PAYLOAD);
+        let trigger_offset = bytes
+            .windows(PAYLOAD.len())
+            .position(|candidate| candidate == PAYLOAD)
+            .unwrap() as u64;
+        let source = Arc::new(ChangingSource::new(bytes, trigger_offset));
+        let package = SourceBackedPackage::from_read_at(
+            source.clone(),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        source.armed.store(true, Ordering::SeqCst);
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|reader| {
+                let mut bytes = Vec::new();
+                reader.read_to_end(&mut bytes)
+            })
+            .unwrap_err();
+
+        assert!(matches!(error.opc(), Some(OpcError::SourceChanged { .. })));
+        assert!(error.callback().is_some());
+    }
+
+    #[test]
+    fn verified_reader_checks_cancellation_before_callback_and_releases_memory() {
+        let (budget, cancellation_source, context) = managed_context(16 * 1024);
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(archive_bytes(PAYLOAD))),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
+        cancellation_source.cancel();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|_| Ok::<_, io::Error>(()))
+            .unwrap_err();
+
+        assert!(matches!(error.opc(), Some(OpcError::Cancelled)));
+        assert_eq!(budget.used(Resource::Memory), 0);
+    }
+
+    #[test]
+    fn verified_reader_enforces_part_limit_before_callback() {
+        let mut package = package();
+        package.limits = SourceLimits::builder()
+            .max_part_bytes((PAYLOAD.len() - 1) as u64)
+            .unwrap()
+            .build()
+            .unwrap();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let error = part
+            .with_verified_decoded_reader(|_| Ok::<_, io::Error>(()))
+            .unwrap_err();
+
+        assert!(matches!(
+            error.opc(),
+            Some(OpcError::Limit {
+                kind: super::SourceLimitKind::PartBytes,
+                ..
+            })
+        ));
+    }
+
+    #[test]
+    fn verified_reader_managed_accounting_is_precise_and_not_cached() {
+        let source_bytes = archive_bytes(PAYLOAD);
+        let probe = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(source_bytes.clone())),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            None,
+        )
+        .unwrap();
+        let probe_part = probe
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let reader_memory = probe
+            .archive
+            .verified_entry_reader_memory_upper_bound(
+                probe.catalog.parts[probe_part.index].entry_id,
+            )
+            .unwrap();
+        drop(probe);
+        let (budget, _cancellation_source, context) = managed_context(reader_memory);
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(OwnedSource::new(source_bytes)),
+            SourceLimits::default(),
+            SourceCacheLimits::default(),
+            SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .unwrap();
+        let part = package
+            .part(&super::PackURI::new("/word/document.xml").unwrap())
+            .unwrap();
+        let mut accounting = OpcOperationAccounting::default();
+        let result = part
+            .with_verified_decoded_reader_with_accounting(
+                |reader| {
+                    assert_eq!(budget.used(Resource::Memory), reader_memory);
+                    let mut bytes = Vec::new();
+                    reader.read_to_end(&mut bytes)?;
+                    Ok::<_, io::Error>(bytes)
+                },
+                &mut accounting,
+            )
+            .unwrap();
+
+        assert_eq!(result, PAYLOAD);
+        assert_eq!(accounting.stored_payload_bytes_read(), PAYLOAD.len() as u64);
+        assert_eq!(
+            accounting.stored_payload_bytes_accepted(),
+            PAYLOAD.len() as u64
+        );
+        assert_eq!(budget.used(Resource::Memory), 0);
+        let diagnostics = package.cache_diagnostics();
+        assert_eq!(diagnostics.retained_entries, 0);
+    }
+}

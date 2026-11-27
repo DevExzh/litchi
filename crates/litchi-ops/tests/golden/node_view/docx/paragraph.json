@@ -1,0 +1,51 @@
+{
+  "path": "/body/p[1]",
+  "type": "paragraph",
+  "text": "Quarterly report: revenue grew",
+  "preview": "Quarterly report: revenue grew",
+  "style": "Heading1",
+  "childCount": 2,
+  "format": {
+    "style": "Heading1",
+    "styleId": "Heading1",
+    "align": "justify",
+    "spaceBefore": "12pt",
+    "spaceAfter": "6pt",
+    "lineSpacing": "1.15x",
+    "lineRule": "auto",
+    "hangingIndent": "18pt",
+    "indent": "36pt",
+    "keepNext": true,
+    "outlineLvl": 0
+  },
+  "children": [
+    {
+      "path": "/body/p[1]/r[1]",
+      "type": "run",
+      "text": "Quarterly report: ",
+      "childCount": 0,
+      "format": {
+        "font.latin": "Calibri",
+        "size": "14pt",
+        "bold": true,
+        "color": "#1F4E79"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[1]/r[2]",
+      "type": "run",
+      "text": "revenue grew",
+      "childCount": 0,
+      "format": {
+        "size": "10.5pt",
+        "italic": false,
+        "color": "accent1",
+        "underline": "single",
+        "highlight": "yellow",
+        "superscript": true
+      },
+      "children": []
+    }
+  ]
+}

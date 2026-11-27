@@ -1,0 +1,61 @@
+// Wire-only Buffa projection derived from the transition path in
+// `KNArchives.proto`:
+//
+// - `KN.SlideArchive.transition`, field 4;
+// - `KN.TransitionArchive.attributes`, field 2;
+// - `KN.TransitionAttributesArchive.animationAttributes`, field 8, and its
+//   modern custom fields 9--13 and 15--18;
+// - `KN.AnimationAttributesArchive` fields 1--16; and
+// - `KN.SlideNodeArchive.hasTransition`, field 7.
+//
+// The Color and PathSource submessages deliberately appear as opaque bytes:
+// editing code retains caller-owned IWA source and never re-encodes this
+// projection.  All omitted slide data, deprecated database transition fields,
+// and unknown future data therefore remain byte-authoritative in the source.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message KeynoteAnimationAttributes {
+  optional string animation_type = 1;
+  optional string effect = 2;
+  optional double duration = 3;
+  optional uint32 direction = 4;
+  optional double delay = 5;
+  optional bool is_automatic = 6;
+  optional bytes color = 7;
+  optional bytes custom_effect_timing_curve_1 = 8;
+  optional bytes custom_effect_timing_curve_2 = 9;
+  optional bytes custom_effect_timing_curve_3 = 10;
+  optional uint32 random_number_seed = 11;
+  optional double custom_detail = 12;
+  optional string custom_effect_timing_curve_theme_name_1 = 13;
+  optional string custom_effect_timing_curve_theme_name_2 = 14;
+  optional string custom_effect_timing_curve_theme_name_3 = 15;
+  optional bool writing_direction_is_rtl = 16;
+}
+
+message KeynoteTransitionAttributes {
+  optional .LitchiIwaProjection.KeynoteAnimationAttributes animation_attributes = 8;
+  optional float custom_twist = 9;
+  optional uint32 custom_mosaic_size = 10;
+  optional uint32 custom_mosaic_type = 11;
+  optional bool custom_bounce = 12;
+  optional bool custom_magic_move_fade_unmatched_objects = 13;
+  optional int32 custom_timing_curve = 15;
+  optional int32 custom_text_delivery_type = 16;
+  optional bool custom_motion_blur = 17;
+  optional float custom_travel_distance = 18;
+}
+
+message KeynoteTransitionArchive {
+  required .LitchiIwaProjection.KeynoteTransitionAttributes attributes = 2;
+}
+
+message KeynoteSlideTransitionArchive {
+  required .LitchiIwaProjection.KeynoteTransitionArchive transition = 4;
+}
+
+message KeynoteSlideNodeTransitionArchive {
+  required bool has_transition = 7;
+}

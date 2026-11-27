@@ -1,0 +1,114 @@
+mod repair_support;
+
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{TableDistanceUnit, write::Writer};
+
+#[test]
+fn parses_row_cell_units_resets_groups_and_destinations() {
+    let source = r"{\rtf1\trowd\trpaddl100\trpaddfl3\trspdt20\trspdft3\clpadr30\clpadfr3\clspdb40\clspdfb3\cellx1000\intbl A\cell\row\trowd{\trpaddl200\trpaddfl3}\clpadt10\clpadft3\cellx1000\intbl B\cell{\*\unknown\trpaddl999999\trpaddfl9 ignored}\row}";
+    let document = Tree::parse(source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    let rows = document.tables()[0].rows();
+    assert_eq!(rows[0].padding().left.value, Some(100));
+    assert_eq!(rows[0].padding().left.unit, Some(TableDistanceUnit::Twips));
+    assert_eq!(rows[0].spacing().top.value, Some(20));
+    assert_eq!(rows[0].cells()[0].padding().right.value, Some(30));
+    assert_eq!(rows[0].cells()[0].spacing().bottom.value, Some(40));
+    assert_eq!(rows[1].padding().left.value, None);
+    assert_eq!(rows[1].cells()[0].padding().top.value, Some(10));
+}
+
+#[test]
+fn writer_round_trips_deterministically() {
+    let document=Tree::parse(r"{\rtf1\trowd\trpaddl70\trpaddfl3\trspdr21\trspdfr3\clpadt57\clpadft3\cellx1200\intbl Cell\cell\row}", litchi_rtf::read::OpenOptions::default()).unwrap();
+    let mut first = Vec::new();
+    Writer::new(&mut first).write_document(&document).unwrap();
+    let first = String::from_utf8(first).unwrap();
+    assert!(first.contains("\\trpaddl70\\trpaddfl3"));
+    assert!(first.contains("\\clpadt57\\clpadft3"));
+    let reparsed = Tree::parse(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(
+        reparsed.tables()[0].rows()[0].padding(),
+        document.tables()[0].rows()[0].padding()
+    );
+    assert_eq!(
+        reparsed.tables()[0].rows()[0].cells()[0].padding(),
+        document.tables()[0].rows()[0].cells()[0].padding()
+    );
+    let mut second = Vec::new();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
+    assert_eq!(first, String::from_utf8(second).unwrap());
+}
+
+#[test]
+fn spec_cell_spacing_controls_parse_and_write_canonically() {
+    let document = Tree::parse(
+        r"{\rtf1\trowd\clspl11\clspfl3\clspr12\clspfr3\clspt13\clspft3\clspb14\clspfb3\cellx1200\intbl Cell\cell\row}", litchi_rtf::read::OpenOptions::default()
+    )
+    .unwrap();
+    let spacing = document.tables()[0].rows()[0].cells()[0].spacing();
+    assert_eq!(spacing.left.value, Some(11));
+    assert_eq!(spacing.right.value, Some(12));
+    assert_eq!(spacing.top.value, Some(13));
+    assert_eq!(spacing.bottom.value, Some(14));
+
+    let mut output = Vec::new();
+    Writer::new(&mut output).write_document(&document).unwrap();
+    let output = String::from_utf8(output).unwrap();
+    assert!(output.contains(r"\clspl11\clspfl3\clspr12\clspfr3\clspt13\clspft3\clspb14\clspfb3"));
+    assert!(!output.contains(r"\clspd"));
+}
+
+#[test]
+fn parses_real_libreoffice_row_and_cell_distances() {
+    let row_source = std::fs::read_to_string(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf"),
+    )
+    .unwrap();
+    let row_doc = Tree::parse(&row_source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert!(
+        row_doc
+            .tables()
+            .iter()
+            .flat_map(litchi_rtf::raw::Table::rows)
+            .any(|row| row.padding().left.value == Some(57)
+                && row.padding().left.unit == Some(TableDistanceUnit::Twips))
+    );
+    let cell_source=std::fs::read_to_string(std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/libreoffice-core/sw/qa/writerfilter/dmapper/data/floattable-vertical-frame-offset.rtf")).unwrap();
+    let cell_doc = Tree::parse(&cell_source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert!(
+        cell_doc
+            .tables()
+            .iter()
+            .flat_map(litchi_rtf::raw::Table::rows)
+            .flat_map(litchi_rtf::raw::Row::cells)
+            .any(|cell| cell.padding().top.value == Some(57))
+    );
+}
+
+#[test]
+fn rejects_malformed_values_and_units() {
+    for source in [
+        r"{\rtf1\trowd\trpaddl X}",
+        r"{\rtf1\trowd\trpaddl-1 X}",
+        r"{\rtf1\trowd\trpaddl31681 X}",
+        r"{\rtf1\trowd\trpaddfl X}",
+        r"{\rtf1\trowd\trpaddfl1 X}",
+        r"{\rtf1\trowd\clspdfb4 X}",
+    ] {
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
+            "accepted {source}"
+        );
+    }
+    assert!(
+        Tree::parse(
+            r"{\rtf1{\*\unknown\trpaddl-1\trpaddfl9 bad}Visible}",
+            litchi_rtf::read::OpenOptions::default()
+        )
+        .is_ok()
+    );
+}

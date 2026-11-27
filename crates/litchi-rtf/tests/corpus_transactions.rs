@@ -1,0 +1,498 @@
+use litchi_rtf::{
+    EditOptions, Package, SemanticLimitKind, SemanticLimits, UnderlineStyle,
+    edit::{Error, TextSpan, TransferPlan},
+};
+use std::num::NonZeroU16;
+use std::path::{Path, PathBuf};
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
+
+fn corpus(relative: &str) -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../..")
+        .join(relative)
+}
+
+#[test]
+fn large_libreoffice_producer_artifacts_round_trip_exactly() {
+    let fixtures = [
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158982.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/watermark.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/all_gaps_word.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf167569-2.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158762.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf161878.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/text-with-comment.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf158830.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tblrepeat.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf148544.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf163003.rtf",
+        "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/tdf165923.rtf",
+    ];
+    let mut accepted = 0usize;
+    for fixture in fixtures {
+        let bytes = std::fs::read(corpus(fixture)).unwrap();
+        if let Ok(document) = Package::from_bytes(&bytes) {
+            accepted = accepted.saturating_add(1);
+            assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
+            let commit = document.edit().commit().unwrap();
+            assert!(commit.package().same_snapshot(&document));
+            assert_eq!(commit.package().to_bytes().unwrap(), bytes);
+        }
+    }
+    assert!(accepted > 0, "no large producer fixture was accepted");
+}
+
+#[test]
+fn hostile_large_corpus_is_bounded_and_never_normalized_on_open() {
+    let fixtures = [
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-4.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/fail/forcepoint-5.rtf",
+        "test-data/libreoffice-core/sw/qa/writerfilter/filters-test/data/pass/TCI-TN65GP-DDRHDLL-partial.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-1.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/forcepoint-3.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo78900.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/fdo80924.rtf",
+        "test-data/libreoffice-core/sw/qa/core/data/rtf/pass/tdf116851.rtf",
+    ];
+    for fixture in fixtures {
+        let bytes = std::fs::read(corpus(fixture)).unwrap();
+        if let Ok(document) = Package::from_bytes(&bytes) {
+            assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
+        }
+    }
+}
+
+#[test]
+fn lossy_multibyte_tail_retains_text_and_exact_transport() {
+    let mut source = br"{\rtf1\ansi\ansicpg932 ordinary ".to_vec();
+    source.push(0x82);
+    source.push(b'}');
+
+    let document = Package::from_bytes(&source).unwrap();
+    assert_eq!(document.text(), "ordinary \u{fffd}");
+    assert_eq!(document.to_bytes().unwrap(), source);
+}
+
+#[test]
+fn hostile_operation_fanout_stops_at_the_caller_bound() {
+    let body = "x".repeat(600);
+    let source = Package::parse(&format!(r"{{\rtf1\ansi {body}}}")).unwrap();
+    let mut edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(256)));
+    for position in 0..256 {
+        edit.replace_text(TextSpan::new(position, position).unwrap(), "y")
+            .unwrap();
+    }
+    assert!(matches!(
+        edit.replace_text(TextSpan::new(300, 300).unwrap(), "z"),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
+            observed: 257,
+            maximum: 256
+        })
+    ));
+}
+
+#[test]
+fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
+    let microsoft_bytes = std::fs::read(corpus("test-data/rtf/testNegativeUnicode.rtf")).unwrap();
+    let microsoft = Package::from_bytes(&microsoft_bytes).unwrap();
+    let microsoft_target = Package::parse(r"{\rtf1\ansi Microsoft interop target}").unwrap();
+    assert!(matches!(
+        TransferPlan::field(&microsoft, 0, &microsoft_target),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+    let microsoft_reopened = Package::from_bytes(&microsoft.to_bytes().unwrap()).unwrap();
+    assert_eq!(microsoft_reopened.fields().len(), 1);
+    assert_eq!(
+        microsoft_reopened.fields()[0].instruction,
+        microsoft.fields()[0].instruction
+    );
+
+    let passive = Package::parse(r"{\rtf1\ansi{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
+    let changed = TransferPlan::field(&passive, 0, &microsoft_target)
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_package();
+    assert_ne!(
+        changed.to_bytes().unwrap(),
+        microsoft_target.to_bytes().unwrap()
+    );
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.fields().len(), 1);
+    assert_eq!(
+        reopened.fields()[0].instruction,
+        passive.fields()[0].instruction
+    );
+
+    let libreoffice = Package::from_bytes(
+        &std::fs::read(corpus(
+            "test-data/libreoffice-core/sw/qa/extras/rtfimport/data/ole-inline.rtf",
+        ))
+        .unwrap(),
+    )
+    .unwrap();
+    let target = Package::parse(r"{\rtf1\ansi Interop target}").unwrap();
+    let transferred = TransferPlan::object(&libreoffice, 0, &target)
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_package();
+    assert_ne!(transferred.to_bytes().unwrap(), target.to_bytes().unwrap());
+    let reopened = Package::from_bytes(&transferred.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.objects().len(), 1);
+    assert_eq!(reopened.objects()[0].data, libreoffice.objects()[0].data);
+}
+
+#[test]
+fn character_edit_refuses_to_drop_real_paragraph_page_break_state() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/margmirror.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap();
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end {
+                let span = TextSpan::new(run_position, end).unwrap();
+                let mut edit = document.edit();
+                if let Err(error) = edit.set_text_italic(span, !run.format().italic()) {
+                    assert!(
+                        matches!(error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+                    );
+                    return;
+                }
+                let Err(error) = edit.commit() else {
+                    panic!("character publication discarded page-break state: {fixture}");
+                };
+                assert!(
+                    matches!(error, Error::Refused(refusal) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent)
+                );
+                return;
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("real producer fixture has no editable run: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_italic(span, !run.format().italic()).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow italic closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                let replacement = if run.format().underline() == UnderlineStyle::None {
+                    UnderlineStyle::Single
+                } else {
+                    UnderlineStyle::None
+                };
+                if edit.set_text_underline(span, replacement).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow underline closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_strike(span, true).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow strike closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_hidden(span, true).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    assert!(reopened.body().runs().any(|candidate| {
+                        candidate.text() == run.text() && candidate.format().hidden()
+                    }));
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow hidden closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_small_caps(span, true).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    assert!(reopened.body().runs().any(|candidate| {
+                        candidate.text() == run.text() && candidate.format().small_caps()
+                    }));
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow small-caps closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_all_caps(span, true).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    let all_caps_text = reopened
+                        .body()
+                        .runs()
+                        .filter(|candidate| candidate.format().all_caps())
+                        .map(|candidate| candidate.text())
+                        .collect::<String>();
+                    assert!(all_caps_text.contains(run.text()));
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow all-caps closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let mut edit = document.edit();
+                if edit.set_text_double_strike(span, true).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    let double_strike_text = reopened
+                        .body()
+                        .runs()
+                        .filter(|candidate| candidate.format().double_strike())
+                        .map(|candidate| candidate.text())
+                        .collect::<String>();
+                    assert!(double_strike_text.contains(run.text()));
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow double-strike closure: {fixture}");
+}
+
+#[test]
+fn one_real_libreoffice_run_accepts_checked_font_size_edit_when_closure_holds() {
+    let fixture = "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/n751020.rtf";
+    let bytes = std::fs::read(corpus(fixture)).unwrap();
+    let Ok(document) = Package::from_bytes(&bytes) else {
+        panic!("real producer fixture was not accepted: {fixture}");
+    };
+    let mut body_position = 0usize;
+    for paragraph in document.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let end = run_position.saturating_add(run.text().len());
+            if run_position < end
+                && let Ok(span) = TextSpan::new(run_position, end)
+            {
+                let next_size = if run.format().size().get() == 23 {
+                    NonZeroU16::new(24).unwrap()
+                } else {
+                    NonZeroU16::new(23).unwrap()
+                };
+                let mut edit = document.edit();
+                if edit.set_text_font_size(span, next_size).is_ok()
+                    && let Ok(commit) = edit.commit()
+                {
+                    let reopened =
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+                    assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
+                    let changed_text = reopened
+                        .body()
+                        .runs()
+                        .filter(|candidate| candidate.format().size() == next_size)
+                        .map(|candidate| candidate.text())
+                        .collect::<String>();
+                    assert!(changed_text.contains(run.text()));
+                    return;
+                }
+            }
+            run_position = end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    panic!("no selected run satisfied the narrow font-size closure: {fixture}");
+}

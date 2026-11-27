@@ -1,0 +1,1614 @@
+use std::io;
+use std::sync::Arc;
+
+use litchi_iwa_archive::{Limits, package::Catalog, package::EntryEdit};
+use litchi_iwa_common::{
+    decode_varint_from_bytes, encode_varint_into,
+    wire::{WireView, append_length_delimited_field, append_varint_field, patch_varint_field},
+};
+use litchi_iwa_core::{Archive, ArchiveObject, FieldInfo, RawMessage, SnappyStream};
+use litchi_iwa_protos::{tn, tsce, tsd, tsp, tst};
+use litchi_numbers::{
+    MAX_MATERIALIZED_CELLS, Package, SheetSelector, TableSelector, cell::Value, names,
+};
+use prost::Message as _;
+
+const DOCUMENT: &str = "Index/Document.iwa";
+const VIEW_STATE: &str = "Index/ViewState.iwa";
+const FIRST_SHEET: u64 = 2;
+const SECOND_SHEET: u64 = 3;
+const FIRST_INFO: u64 = 10;
+const SECOND_INFO: u64 = 11;
+const THIRD_INFO: u64 = 12;
+const FIRST_MODEL: u64 = 20;
+const SECOND_MODEL: u64 = 21;
+const THIRD_MODEL: u64 = 22;
+const SIDECARS: u64 = 90;
+const CALCULATION_ENGINE: u64 = 700;
+const FORMULA_OWNER_DEPENDENCIES: u64 = 701;
+const METADATA: &str = "Index/Metadata.iwa";
+const PACKAGE_METADATA_TYPE: u32 = 11_006;
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+fn reference(identifier: u64) -> tsp::Reference {
+    tsp::Reference {
+        identifier,
+        ..Default::default()
+    }
+}
+
+fn object(identifier: u64, type_: u32, data: Vec<u8>) -> TestResult<ArchiveObject> {
+    Ok(ArchiveObject::new(
+        identifier,
+        vec![RawMessage { type_, data }],
+        Default::default(),
+    )?)
+}
+
+fn table_model(name: &str, identifier: u64, pivot: bool) -> tst::TableModelArchive {
+    tst::TableModelArchive {
+        table_id: format!("table-{identifier}"),
+        table_name: name.to_owned(),
+        number_of_rows: 1,
+        number_of_columns: 1,
+        base_data_store: tst::DataStore {
+            string_table: reference(SIDECARS),
+            formula_table: reference(SIDECARS),
+            ..Default::default()
+        },
+        pivot_owner: pivot.then(|| reference(777)),
+        ..Default::default()
+    }
+}
+
+fn table_info_payload(model: u64, locked: bool) -> TestResult<Vec<u8>> {
+    let drawable = tsd::DrawableArchive {
+        locked: locked.then_some(true),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    let mut payload = Vec::new();
+    append_length_delimited_field(
+        &mut payload,
+        1,
+        &drawable,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        2,
+        &reference(model).encode_to_vec(),
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    Ok(payload)
+}
+
+fn table_info(identifier: u64, model: u64, locked: bool) -> TestResult<ArchiveObject> {
+    let mut value = object(identifier, 6_000, table_info_payload(model, locked)?)?;
+    value.archive_info.message_infos[0].object_references = vec![model];
+    Ok(value)
+}
+
+fn sidecars() -> TestResult<ArchiveObject> {
+    Ok(ArchiveObject::new(
+        SIDECARS,
+        [
+            tst::table_data_list::ListType::String,
+            tst::table_data_list::ListType::Formula,
+        ]
+        .into_iter()
+        .map(|list_type| RawMessage {
+            type_: 6_005,
+            data: tst::TableDataList {
+                list_type: list_type as i32,
+                next_list_id: 1,
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        })
+        .collect(),
+        Default::default(),
+    )?)
+}
+
+fn compressed(objects: Vec<ArchiveObject>) -> TestResult<Vec<u8>> {
+    Ok(SnappyStream::compress(
+        &Archive { objects }.to_bytes(Default::default())?,
+        Default::default(),
+    )?)
+}
+
+fn append_unknown_varint(data: &mut Vec<u8>, field_number: u32, value: u64) -> TestResult {
+    append_varint_field(data, field_number, value)?;
+    Ok(())
+}
+
+fn metadata_component(
+    identifier: u64,
+    locator: &str,
+    token: u64,
+    unknown: u64,
+) -> TestResult<Vec<u8>> {
+    metadata_component_optional(identifier, locator, Some(token), unknown)
+}
+
+fn metadata_component_optional(
+    identifier: u64,
+    locator: &str,
+    token: Option<u64>,
+    unknown: u64,
+) -> TestResult<Vec<u8>> {
+    let mut data = tsp::ComponentInfo {
+        identifier,
+        preferred_locator: locator.to_owned(),
+        locator: Some(locator.to_owned()),
+        save_token: token,
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_unknown_varint(&mut data, 90, unknown)?;
+    Ok(data)
+}
+
+fn metadata_payload(include_tables: bool) -> TestResult<Vec<u8>> {
+    let mut payload = tsp::PackageMetadata {
+        last_object_identifier: 1_000,
+        save_token: Some(10),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component(100, "Document", 9, 901)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    if include_tables {
+        append_length_delimited_field(
+            &mut payload,
+            3,
+            &metadata_component(101, "Tables", 8, 902)?,
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+    }
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component(102, "ViewState", 7, 903)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    let versioned = metadata_component(100, "Document", 3, 904)?;
+    append_length_delimited_field(
+        &mut payload,
+        11,
+        &versioned,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_unknown_varint(&mut payload, 90, 900)?;
+    Ok(payload)
+}
+
+fn metadata_payload_with_absent_document_token() -> TestResult<Vec<u8>> {
+    let mut payload = tsp::PackageMetadata {
+        last_object_identifier: 1_000,
+        save_token: Some(10),
+        ..Default::default()
+    }
+    .encode_to_vec();
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component_optional(100, "Document", None, 901)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_length_delimited_field(
+        &mut payload,
+        3,
+        &metadata_component(102, "ViewState", 7, 903)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    append_unknown_varint(&mut payload, 90, 900)?;
+    Ok(payload)
+}
+
+fn metadata_entry(include_tables: bool) -> TestResult<Vec<u8>> {
+    compressed(vec![object(
+        100,
+        PACKAGE_METADATA_TYPE,
+        metadata_payload(include_tables)?,
+    )?])
+}
+
+fn replace_metadata_payload(source: &[u8], payload: Vec<u8>) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    archive.objects[0].replace_message_preserving_header(
+        0,
+        RawMessage {
+            type_: PACKAGE_METADATA_TYPE,
+            data: payload,
+        },
+        Default::default(),
+    )?;
+    let rewritten =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(METADATA, &rewritten)], Limits::default())?)
+}
+
+fn with_metadata_component(source: &[u8], component: Vec<u8>) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    append_length_delimited_field(
+        &mut archive.objects[0].messages[0].data,
+        3,
+        &component,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    replace_metadata_payload(source, archive.objects[0].messages[0].data.clone())
+}
+
+fn metadata_payload_from_bytes(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == METADATA)
+        .ok_or_else(|| io::Error::other("metadata entry is missing"))?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    Ok(archive.objects[0].messages[0].data.clone())
+}
+
+fn metadata_component_payloads(source: &[u8]) -> TestResult<Vec<Vec<u8>>> {
+    Ok(WireView::parse(
+        &metadata_payload_from_bytes(source)?,
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?
+    .fields()
+    .filter(|field| field.number() == 3)
+    .map(|field| field.payload().to_owned())
+    .collect())
+}
+
+fn package_bytes(locked: bool, pivot: bool, previews: usize) -> TestResult<Vec<u8>> {
+    let mut root = object(
+        1,
+        1,
+        tn::DocumentArchive {
+            sheets: vec![reference(FIRST_SHEET), reference(SECOND_SHEET)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    root.archive_info.message_infos[0].object_references = vec![FIRST_SHEET, SECOND_SHEET];
+
+    let mut first_sheet = object(
+        FIRST_SHEET,
+        2,
+        tn::SheetArchive {
+            name: "Alpha".to_owned(),
+            drawable_infos: vec![reference(FIRST_INFO), reference(SECOND_INFO)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    first_sheet.archive_info.message_infos[0].object_references = vec![FIRST_INFO, SECOND_INFO];
+    let mut second_sheet = object(
+        SECOND_SHEET,
+        2,
+        tn::SheetArchive {
+            name: "Beta".to_owned(),
+            drawable_infos: vec![reference(THIRD_INFO)],
+            ..Default::default()
+        }
+        .encode_to_vec(),
+    )?;
+    second_sheet.archive_info.message_infos[0].object_references = vec![THIRD_INFO];
+
+    let document = compressed(vec![
+        root,
+        first_sheet,
+        second_sheet,
+        table_info(FIRST_INFO, FIRST_MODEL, locked)?,
+        table_info(SECOND_INFO, SECOND_MODEL, false)?,
+        table_info(THIRD_INFO, THIRD_MODEL, false)?,
+        object(
+            FIRST_MODEL,
+            6_001,
+            table_model("One", FIRST_MODEL, pivot).encode_to_vec(),
+        )?,
+        object(
+            SECOND_MODEL,
+            6_001,
+            table_model("Two", SECOND_MODEL, false).encode_to_vec(),
+        )?,
+        object(
+            THIRD_MODEL,
+            6_001,
+            table_model("One", THIRD_MODEL, false).encode_to_vec(),
+        )?,
+        sidecars()?,
+    ])?;
+    let view = compressed(vec![object(
+        900,
+        777,
+        b"view state is byte exact".to_vec(),
+    )?])?;
+    let metadata = metadata_entry(false)?;
+    let mut entries: Vec<(&str, &[u8])> = vec![
+        ("Data/sentinel.bin", b"unrelated zip member"),
+        (DOCUMENT, &document),
+        (VIEW_STATE, &view),
+        (METADATA, &metadata),
+    ];
+    let preview_values = [
+        ("preview.jpg", b"preview one".as_slice()),
+        ("preview-micro.jpg", b"preview two".as_slice()),
+        ("preview-web.jpg", b"preview three".as_slice()),
+    ];
+    entries.extend(preview_values.into_iter().take(previews));
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+fn bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut result = Vec::new();
+    package.write_to(&mut result)?;
+    Ok(result)
+}
+
+fn sheet_name(package: &Package, position: usize) -> &str {
+    package
+        .workbook_ref()
+        .sheets()
+        .get(position)
+        .unwrap()
+        .name()
+}
+
+fn table_name(package: &Package, sheet: usize, table: usize) -> &str {
+    package
+        .workbook_ref()
+        .sheets()
+        .get(sheet)
+        .unwrap()
+        .tables()
+        .nth(table)
+        .unwrap()
+        .name()
+}
+
+fn rewrite_document(
+    source: &[u8],
+    mutate: impl FnOnce(&mut Archive) -> TestResult,
+) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT)
+        .unwrap();
+    let mut archive = Archive::parse(
+        &SnappyStream::decompress(entry.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    mutate(&mut archive)?;
+    let payload =
+        SnappyStream::compress(&archive.to_bytes(Default::default())?, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &payload)], Limits::default())?)
+}
+
+/// Add the deprecated root calculation-engine route and one formula-owner
+/// dependency.  The names transaction must inspect this graph before
+/// publishing a changed table name, while ordinary package construction only
+/// needs the rooted sheet/sidebar projection.
+#[allow(
+    deprecated,
+    reason = "The fixture intentionally exercises the legacy calculation-engine root field."
+)]
+fn calculation_engine_package(source: &[u8], volatile: bool) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        {
+            let root = archive
+                .object_mut(1)
+                .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+            let mut document = tn::DocumentArchive::decode(root.messages[0].data.as_slice())?;
+            document.calculation_engine = Some(reference(CALCULATION_ENGINE));
+            root.replace_message_preserving_header(
+                0,
+                RawMessage {
+                    type_: 1,
+                    data: document.encode_to_vec(),
+                },
+                Default::default(),
+            )?;
+            root.archive_info.message_infos[0]
+                .object_references
+                .push(CALCULATION_ENGINE);
+        }
+
+        let tracker = tsce::DependencyTrackerArchive {
+            formula_owner_dependencies: vec![reference(FORMULA_OWNER_DEPENDENCIES)],
+            ..Default::default()
+        };
+        let engine = tsce::CalculationEngineArchive {
+            dependency_tracker: tracker,
+            ..Default::default()
+        };
+        let mut engine_object = object(CALCULATION_ENGINE, 4_000, engine.encode_to_vec())?;
+        engine_object.archive_info.message_infos[0]
+            .object_references
+            .push(FORMULA_OWNER_DEPENDENCIES);
+
+        let volatile_dependencies = volatile.then(|| tsce::VolatileDependenciesExpandedArchive {
+            volatile_sheet_table_name_cells: Some(tsce::CellCoordSetArchive {
+                column_entries: vec![tsce::cell_coord_set_archive::ColumnEntry {
+                    column: 0,
+                    row_set: tsce::IndexSetArchive {
+                        entries: vec![tsce::index_set_archive::IndexSetEntry {
+                            range_begin: 0,
+                            range_end: None,
+                        }],
+                    },
+                }],
+            }),
+            ..Default::default()
+        });
+        let owner = object(
+            FORMULA_OWNER_DEPENDENCIES,
+            4_008,
+            tsce::FormulaOwnerDependenciesArchive {
+                formula_owner_uid: tsp::Uuid { lower: 1, upper: 2 },
+                internal_formula_owner_id: 1,
+                volatile_dependencies,
+                ..Default::default()
+            }
+            .encode_to_vec(),
+        )?;
+        archive.objects.push(engine_object);
+        archive.objects.push(owner);
+        Ok(())
+    })
+}
+
+/// Keep the rooted calculation-engine reference valid but make its selected
+/// message malformed.  Package construction should remain usable because the
+/// dependency graph is outside the rooted sheet projection; a changed names
+/// transaction must reject it before any candidate is published.
+#[allow(
+    deprecated,
+    reason = "The fixture intentionally exercises the legacy calculation-engine root field."
+)]
+fn malformed_calculation_engine_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        {
+            let root = archive
+                .object_mut(1)
+                .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+            let mut document = tn::DocumentArchive::decode(root.messages[0].data.as_slice())?;
+            document.calculation_engine = Some(reference(CALCULATION_ENGINE));
+            root.replace_message_preserving_header(
+                0,
+                RawMessage {
+                    type_: 1,
+                    data: document.encode_to_vec(),
+                },
+                Default::default(),
+            )?;
+            root.archive_info.message_infos[0]
+                .object_references
+                .push(CALCULATION_ENGINE);
+        }
+        let mut engine = object(CALCULATION_ENGINE, 4_000, vec![0xff])?;
+        engine.archive_info.message_infos[0]
+            .object_references
+            .push(FORMULA_OWNER_DEPENDENCIES);
+        archive.objects.push(engine);
+        Ok(())
+    })
+}
+
+/// Preserve a valid engine envelope but corrupt the selected formula-owner
+/// dependency.  This exercises the second strict projection and the same
+/// failure-atomic publication boundary as a malformed engine.
+fn malformed_formula_owner_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    let valid = calculation_engine_package(source, false)?;
+    rewrite_document(&valid, |archive| {
+        let owner = archive
+            .object_mut(FORMULA_OWNER_DEPENDENCIES)
+            .ok_or_else(|| io::Error::other("formula owner dependency is missing"))?;
+        owner.replace_message_preserving_header(
+            0,
+            RawMessage {
+                type_: 4_008,
+                data: vec![0xff],
+            },
+            Default::default(),
+        )?;
+        Ok(())
+    })
+}
+
+/// Append a malformed optional calculation-engine reference to the rooted
+/// document.  The sheet-order codec intentionally ignores this unrelated
+/// field, so the package can be opened; the names graph validator must still
+/// reject the changed transaction without mutating its source snapshot.
+fn malformed_root_calculation_reference_package(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let root = archive
+            .object_mut(1)
+            .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            3,
+            &[0x08],
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        Ok(())
+    })
+}
+
+fn form_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let sheet = archive.object_mut(FIRST_SHEET).unwrap();
+        let original = sheet.messages[0].data.clone();
+        sheet.replace_message_preserving_header(
+            0,
+            RawMessage {
+                type_: 3,
+                data: tn::FormBasedSheetArchive {
+                    super_: tn::SheetArchive::decode(original.as_slice())?,
+                    ..Default::default()
+                }
+                .encode_to_vec(),
+            },
+            Default::default(),
+        )?;
+        let info = &mut sheet.archive_info.message_infos[0];
+        info.field_infos.clear();
+        let mut drawables = FieldInfo::new(
+            litchi_iwa_core::FieldPath::new(vec![1, 2], litchi_iwa_core::Limits::default())
+                .unwrap(),
+            litchi_iwa_core::Limits::default(),
+        )
+        .unwrap();
+        drawables.object_references = vec![FIRST_INFO, SECOND_INFO];
+        info.field_infos.push(drawables);
+        Ok(())
+    })
+}
+
+fn legacy_model(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let model = archive.object_mut(FIRST_MODEL).unwrap();
+        model.replace_message_preserving_header(
+            0,
+            RawMessage {
+                type_: 6_000,
+                data: model.messages[0].data.clone(),
+            },
+            Default::default(),
+        )?;
+        Ok(())
+    })
+}
+
+fn split_components(source: &[u8]) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let document = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT)
+        .ok_or_else(|| io::Error::other("synthetic document is missing"))?;
+    let archive = Archive::parse(
+        &SnappyStream::decompress(document.data(), Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    let (document_objects, table_objects): (Vec<_>, Vec<_>) =
+        archive.objects.into_iter().partition(|object| {
+            object
+                .archive_info
+                .identifier
+                .is_some_and(|identifier| identifier <= SECOND_SHEET)
+        });
+    let document = compressed(document_objects)?;
+    let tables = compressed(table_objects)?;
+    let metadata = metadata_entry(true)?;
+    let mut entries = catalog
+        .iter()
+        .filter(|entry| entry.name() != DOCUMENT && entry.name() != METADATA)
+        .map(|entry| (entry.name(), entry.data()))
+        .collect::<Vec<_>>();
+    entries.insert(1, (DOCUMENT, document.as_slice()));
+    entries.insert(2, ("Index/Tables.iwa", tables.as_slice()));
+    entries.push((METADATA, metadata.as_slice()));
+    Ok(litchi_iwa_archive::package::to_bytes(
+        entries,
+        Limits::default(),
+    )?)
+}
+
+fn duplicate_selected_name_field(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let model = archive
+            .object_mut(FIRST_MODEL)
+            .ok_or_else(|| io::Error::other("selected model is missing"))?;
+        append_length_delimited_field(
+            &mut model.messages[0].data,
+            8,
+            b"duplicate",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        Ok(())
+    })
+}
+
+fn selected_header_merge(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        archive
+            .object_mut(FIRST_MODEL)
+            .ok_or_else(|| io::Error::other("selected model is missing"))?
+            .archive_info
+            .should_merge = Some(true);
+        Ok(())
+    })
+}
+
+fn empty_first_sheet(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let sheet = archive
+            .object_mut(FIRST_SHEET)
+            .ok_or_else(|| io::Error::other("selected sheet is missing"))?;
+        let mut decoded = tn::SheetArchive::decode(sheet.messages[0].data.as_slice())?;
+        decoded.drawable_infos.clear();
+        sheet.replace_message_preserving_header(
+            0,
+            RawMessage {
+                type_: 2,
+                data: decoded.encode_to_vec(),
+            },
+            Default::default(),
+        )?;
+        sheet.archive_info.message_infos[0]
+            .object_references
+            .clear();
+        Ok(())
+    })
+}
+
+fn mismatched_selected_message_info(source: &[u8], identifier: u64) -> TestResult<Vec<u8>> {
+    let catalog = Catalog::from_bytes(source, Default::default())?;
+    let entry = catalog
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT)
+        .ok_or_else(|| io::Error::other("synthetic document is missing"))?;
+    let stream = SnappyStream::decompress(entry.data(), Default::default())?.into_bytes();
+    let archive = Archive::parse(&stream, Default::default())?;
+    let object = archive
+        .object(identifier)
+        .ok_or_else(|| io::Error::other("selected object is missing"))?;
+    let header_offset = usize::try_from(object.header_offset)?;
+    let data_offset = usize::try_from(object.data_offset)?;
+    let (header_length, prefix_length) = decode_varint_from_bytes(&stream[header_offset..])?;
+    let header_start = header_offset
+        .checked_add(prefix_length)
+        .ok_or_else(|| io::Error::other("header offset overflow"))?;
+    let header_end = header_start
+        .checked_add(usize::try_from(header_length)?)
+        .ok_or_else(|| io::Error::other("header length overflow"))?;
+    assert_eq!(header_end, data_offset);
+    let mut header = tsp::ArchiveInfo::decode(&stream[header_start..header_end])?;
+    header.message_infos[0].r#type = 99_999;
+    let header = header.encode_to_vec();
+    let mut rewritten = Vec::with_capacity(stream.len() + header.len());
+    rewritten.extend_from_slice(&stream[..header_offset]);
+    encode_varint_into(&mut rewritten, u64::try_from(header.len())?);
+    rewritten.extend_from_slice(&header);
+    rewritten.extend_from_slice(&stream[data_offset..]);
+    let compressed = SnappyStream::compress(&rewritten, Default::default())?;
+    Ok(catalog.reassemble_to_bytes(&[EntryEdit::new(DOCUMENT, &compressed)], Limits::default())?)
+}
+
+fn cross_sheet_shared_model(source: &[u8]) -> TestResult<Vec<u8>> {
+    rewrite_document(source, |archive| {
+        let info = archive
+            .object_mut(THIRD_INFO)
+            .ok_or_else(|| io::Error::other("second-sheet table info is missing"))?;
+        info.replace_message_preserving_header(
+            0,
+            RawMessage {
+                type_: 6_000,
+                data: table_info_payload(FIRST_MODEL, false)?,
+            },
+            Default::default(),
+        )?;
+        info.archive_info.message_infos[0].object_references = vec![FIRST_MODEL];
+        Ok(())
+    })
+}
+
+fn assert_send_sync<T: Send + Sync>() {}
+
+fn native_fixture() -> std::path::PathBuf {
+    std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/numbers/basic.numbers")
+}
+
+#[test]
+fn sheet_table_and_combined_batches_are_atomic_and_preserve_view_state() -> TestResult {
+    let source = package_bytes(false, false, 3)?;
+    let package = Package::from_bytes(&source)?;
+    let sheet = package
+        .edit_names()
+        .rename_sheet("Alpha", "Gamma")?
+        .commit()?;
+    assert_eq!(sheet_name(sheet.package(), 0), "Gamma");
+    assert_eq!(table_name(sheet.package(), 0, 0), "One");
+    assert_eq!(sheet.diagnostics().operations(), 1);
+    assert!(sheet.diagnostics().changed());
+    assert_eq!(sheet.diagnostics().deleted_previews(), 3);
+
+    let table = package
+        .edit_names()
+        .rename_table(SheetSelector::index(0), TableSelector::index(1), "Deux")?
+        .commit()?;
+    assert_eq!(sheet_name(table.package(), 0), "Alpha");
+    assert_eq!(table_name(table.package(), 0, 1), "Deux");
+    assert!(table.diagnostics().changed());
+
+    let combined = package
+        .edit_names()
+        .rename_sheet("Alpha", "Líneas 你好")?
+        .rename_table("Alpha", "One", "表 Café №42")?
+        .rename_table("Beta", "One", "Other sheet can reuse this name")?
+        .commit()?;
+    assert_eq!(sheet_name(combined.package(), 0), "Líneas 你好");
+    assert_eq!(table_name(combined.package(), 0, 0), "表 Café №42");
+    assert_eq!(
+        table_name(combined.package(), 1, 0),
+        "Other sheet can reuse this name"
+    );
+    assert_eq!(combined.diagnostics().operations(), 3);
+    assert!(combined.diagnostics().changed());
+    assert_eq!(
+        Catalog::from_bytes(&source, Default::default())?
+            .iter()
+            .find(|entry| entry.name() == VIEW_STATE)
+            .unwrap()
+            .data(),
+        Catalog::from_bytes(&bytes(combined.package())?, Default::default())?
+            .iter()
+            .find(|entry| entry.name() == VIEW_STATE)
+            .unwrap()
+            .data()
+    );
+    assert!(
+        Catalog::from_bytes(&bytes(combined.package())?, Default::default())?
+            .iter()
+            .all(|entry| !entry.name().starts_with("preview"))
+    );
+    Ok(())
+}
+
+#[test]
+fn selectors_unicode_invalid_names_and_final_collisions_are_typed() -> TestResult {
+    let package = Package::from_bytes(&package_bytes(false, false, 0)?)?;
+    let composed = "Café";
+    let decomposed = "Cafe\u{301}";
+    let commit = package
+        .edit_names()
+        .rename_sheet(SheetSelector::index(0), composed)?
+        .rename_sheet(SheetSelector::index(1), decomposed)?
+        .rename_table(SheetSelector::index(0), TableSelector::index(0), "東京😀")?
+        .commit()?;
+    assert_eq!(sheet_name(commit.package(), 0), composed);
+    assert_eq!(sheet_name(commit.package(), 1), decomposed);
+    assert!(matches!(
+        package.edit_names().rename_sheet("missing", "x"),
+        Err(names::Error::Refused(names::Refusal::SheetNotFound))
+    ));
+    assert!(matches!(
+        package.edit_names().rename_table("Alpha", "missing", "x"),
+        Err(names::Error::Refused(names::Refusal::TableNotFound))
+    ));
+    assert!(matches!(
+        package.edit_names().rename_sheet("Alpha", ""),
+        Err(names::Error::Refused(names::Refusal::InvalidName {
+            reason: names::InvalidReason::Empty
+        }))
+    ));
+    assert!(matches!(
+        package
+            .edit_names()
+            .rename_table("Alpha", "One", "bad\0name"),
+        Err(names::Error::Refused(names::Refusal::InvalidName {
+            reason: names::InvalidReason::ContainsNul
+        }))
+    ));
+    assert!(matches!(
+        package
+            .edit_names()
+            .rename_sheet("Alpha", "same")?
+            .rename_sheet("Beta", "same"),
+        Err(names::Error::Refused(names::Refusal::DuplicateName {
+            path: names::Path::Sheet { position: 1 }
+        }))
+    ));
+    assert!(matches!(
+        package
+            .edit_names()
+            .rename_table("Alpha", "One", "same")?
+            .rename_table("Alpha", "Two", "same"),
+        Err(names::Error::Refused(names::Refusal::DuplicateName {
+            path: names::Path::Table { sheet: 0, table: 1 }
+        }))
+    ));
+    assert!(matches!(
+        package
+            .edit_names()
+            .rename_sheet("Alpha", "first")?
+            .rename_sheet("Alpha", "second"),
+        Err(names::Error::Refused(names::Refusal::DuplicateTarget {
+            path: names::Path::Sheet { position: 0 }
+        }))
+    ));
+
+    let swapped = package
+        .edit_names()
+        .rename_sheet("Alpha", "Beta")?
+        .rename_sheet("Beta", "Alpha")?
+        .commit()?;
+    assert_eq!(sheet_name(swapped.package(), 0), "Beta");
+    assert_eq!(sheet_name(swapped.package(), 1), "Alpha");
+
+    let collision_away = package
+        .edit_names()
+        .rename_table("Alpha", "One", "Two")?
+        .rename_table("Alpha", "Two", "Three")?
+        .commit()?;
+    assert_eq!(table_name(collision_away.package(), 0, 0), "Two");
+    assert_eq!(table_name(collision_away.package(), 0, 1), "Three");
+    Ok(())
+}
+
+#[test]
+fn names_selectors_are_case_sensitive_and_failed_selection_preserves_source() -> TestResult {
+    let source = package_bytes(false, false, 1)?;
+    let package = Package::from_bytes(&source)?;
+    let before = bytes(&package)?;
+
+    assert!(matches!(
+        package.edit_names().rename_sheet("alpha", "Changed"),
+        Err(names::Error::Refused(names::Refusal::SheetNotFound))
+    ));
+    assert_eq!(bytes(&package)?, before);
+
+    assert!(matches!(
+        package.edit_names().rename_table("Alpha", "one", "Changed"),
+        Err(names::Error::Refused(names::Refusal::TableNotFound))
+    ));
+    assert_eq!(bytes(&package)?, before);
+
+    let commit = package
+        .edit_names()
+        .rename_sheet("Alpha", "Changed")?
+        .commit()?;
+    assert_eq!(sheet_name(commit.package(), 0), "Changed");
+    assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn staged_name_bytes_accept_exact_limit_reject_one_over_and_bound_multiple_operations() -> TestResult
+{
+    let maximum = 256;
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_materialized_cells(MAX_MATERIALIZED_CELLS)
+        .and_then(|b| b.max_output_text_bytes(maximum))
+        .and_then(|b| b.build())?;
+    let package = Package::from_bytes_with_options(
+        &package_bytes(false, false, 0)?,
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
+    )?;
+
+    let exact = package
+        .edit_names()
+        .rename_sheet("Alpha", &"a".repeat(100))?
+        .rename_table("Alpha", "One", &"b".repeat(100))?
+        .rename_table("Alpha", "Two", &"c".repeat(45))?;
+    assert!(format!("{exact:?}").contains("operations: 3"));
+
+    let first = package
+        .edit_names()
+        .rename_sheet("Alpha", &"a".repeat(100))?
+        .rename_table("Alpha", "One", &"b".repeat(100))?;
+    let error = first
+        .rename_table("Alpha", "Two", &"c".repeat(46))
+        .expect_err("the third staged name must exceed the aggregate retained budget");
+    assert!(matches!(
+        error,
+        names::Error::Limit {
+            kind: names::LimitKind::NameBytes,
+            observed: 257,
+            maximum: 256,
+        }
+    ));
+    Ok(())
+}
+
+#[test]
+fn noops_patches_inverse_conflicts_concurrency_and_redaction() -> TestResult {
+    let source = package_bytes(false, false, 2)?;
+    let package = Arc::new(Package::from_bytes(&source)?);
+    let empty = package.edit_names().commit()?;
+    assert!(!empty.diagnostics().changed());
+    assert_eq!(empty.diagnostics().operations(), 0);
+    assert_eq!(empty.diagnostics().deleted_previews(), 0);
+    assert_eq!(bytes(empty.package())?, source);
+    let noop = package
+        .edit_names()
+        .rename_sheet("Alpha", "Alpha")?
+        .rename_table("Alpha", "One", "One")?
+        .commit()?;
+    assert!(noop.patch().is_noop());
+    assert_eq!(noop.diagnostics().operations(), 0);
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.diagnostics().deleted_previews(), 0);
+    assert!(!noop.diagnostics().full_reparse_performed());
+    assert_eq!(bytes(noop.package())?, source);
+    assert_eq!(bytes(package.as_ref())?, bytes(noop.package())?);
+    assert_eq!(bytes(package.apply_names(noop.patch())?.package())?, source);
+
+    let first = package
+        .edit_names()
+        .rename_sheet("Alpha", "Changed")?
+        .rename_table("Alpha", "One", "Renamed")?
+        .commit()?;
+    let applied = package.apply_names(first.patch())?;
+    assert_eq!(bytes(applied.package())?, bytes(first.package())?);
+    let restored = first.package().apply_names(&first.patch().inverse())?;
+    assert!(restored.diagnostics().changed());
+    assert_eq!(restored.diagnostics().deleted_previews(), 0);
+    assert_eq!(bytes(restored.package())?, source);
+    assert!(matches!(
+        first.package().apply_names(first.patch()),
+        Err(names::Error::PatchConflict)
+    ));
+    assert!(matches!(
+        package.apply_names(&first.patch().inverse()),
+        Err(names::Error::PatchConflict)
+    ));
+    let text = format!("{:?} {:?}", first.patch(), names::Error::PatchConflict);
+    assert!(!text.contains("Changed"));
+    assert!(!text.contains("Renamed"));
+
+    let left = Arc::clone(&package);
+    let right = Arc::clone(&package);
+    let one = std::thread::spawn(move || left.edit_names().rename_sheet("Alpha", "Left")?.commit());
+    let two =
+        std::thread::spawn(move || right.edit_names().rename_sheet("Alpha", "Right")?.commit());
+    assert_eq!(sheet_name(one.join().unwrap()?.package(), 0), "Left");
+    assert_eq!(sheet_name(two.join().unwrap()?.package(), 0), "Right");
+    assert_eq!(sheet_name(package.as_ref(), 0), "Alpha");
+    assert_send_sync::<Package>();
+    assert_send_sync::<names::Edit<'static>>();
+    assert_send_sync::<names::Patch>();
+    assert_send_sync::<names::Commit>();
+    assert_send_sync::<names::Diagnostics>();
+    assert_send_sync::<names::Error>();
+    Ok(())
+}
+
+#[test]
+fn form_legacy_lock_and_pivot_dependencies_fail_closed_without_publishing() -> TestResult {
+    let form = Package::from_bytes(&form_first_sheet(&package_bytes(false, false, 0)?)?)?;
+    let form_commit = form.edit_names().rename_sheet("Alpha", "Form")?.commit()?;
+    assert_eq!(sheet_name(form_commit.package(), 0), "Form");
+
+    let legacy = Package::from_bytes(&legacy_model(&package_bytes(false, false, 0)?)?)?;
+    let legacy_commit = legacy
+        .edit_names()
+        .rename_table("Alpha", "One", "Legacy")?
+        .commit()?;
+    assert_eq!(table_name(legacy_commit.package(), 0, 0), "Legacy");
+
+    let locked = Package::from_bytes(&package_bytes(true, false, 0)?)?;
+    assert!(matches!(
+        locked
+            .edit_names()
+            .rename_table("Alpha", "One", "Denied")?
+            .commit(),
+        Err(names::Error::Refused(names::Refusal::TableLocked {
+            path: names::Path::Table { sheet: 0, table: 0 }
+        }))
+    ));
+    assert_eq!(table_name(&locked, 0, 0), "One");
+
+    let pivot = Package::from_bytes(&package_bytes(false, true, 0)?)?;
+    assert!(matches!(
+        pivot
+            .edit_names()
+            .rename_table("Alpha", "One", "Denied")?
+            .commit(),
+        Err(names::Error::Refused(
+            names::Refusal::UnsupportedDependency {
+                path: names::Path::Table { sheet: 0, table: 0 }
+            }
+        ))
+    ));
+    Ok(())
+}
+
+#[test]
+fn calculation_engine_dependencies_are_checked_after_root_projection() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+
+    // A complete engine envelope with no volatile name dependency is a valid
+    // detached graph and must not make an ordinary table rename fail.
+    let valid = Package::from_bytes(&calculation_engine_package(&source, false)?)?;
+    let valid_commit = valid
+        .edit_names()
+        .rename_table("Alpha", "One", "Engine-safe")?
+        .commit()?;
+    assert_eq!(table_name(valid_commit.package(), 0, 0), "Engine-safe");
+
+    // A non-empty volatile sheet/table-name set is deliberately outside this
+    // narrow transaction's rewrite plan.  The source snapshot must remain
+    // byte-for-byte unchanged when the guard rejects it.
+    let volatile = Package::from_bytes(&calculation_engine_package(&source, true)?)?;
+    let before = bytes(&volatile)?;
+    let error = volatile
+        .edit_names()
+        .rename_table("Alpha", "One", "Denied")?
+        .commit()
+        .expect_err("volatile formula-owner dependencies must be fail-closed");
+    assert!(matches!(
+        error,
+        names::Error::Refused(names::Refusal::UnsupportedDependency {
+            path: names::Path::Table { sheet: 0, table: 0 }
+        })
+    ));
+    assert_eq!(bytes(&volatile)?, before);
+    Ok(())
+}
+
+#[test]
+fn malformed_calculation_engine_owner_and_root_reference_are_atomic() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+
+    for malformed in [
+        malformed_calculation_engine_package(&source)?,
+        malformed_formula_owner_package(&source)?,
+        malformed_root_calculation_reference_package(&source)?,
+    ] {
+        // These fields are outside the rooted sheet/sidebar projection, so a
+        // package can still be opened.  The changed transaction must reject
+        // the malformed dependency route before writing any candidate bytes.
+        let Ok(package) = Package::from_bytes(&malformed) else {
+            continue;
+        };
+        let before = bytes(&package)?;
+        assert!(matches!(
+            package
+                .edit_names()
+                .rename_table("Alpha", "One", "Denied")?
+                .commit(),
+            Err(names::Error::InvalidSource)
+        ));
+        assert_eq!(bytes(&package)?, before);
+    }
+    Ok(())
+}
+
+#[test]
+fn names_root_projection_keeps_unknown_fields_and_rejects_duplicate_optional_routes() -> TestResult
+{
+    let source = rewrite_document(&package_bytes(false, false, 0)?, |archive| {
+        let root = archive
+            .object_mut(1)
+            .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+        // Unknown root data belongs to the source owner and must not be
+        // normalized by the generated-free sheet-order projection.
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            90,
+            b"root-opaque",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        // Two occurrences of the optional calculation-engine route are
+        // ambiguous even though the rooted sheet projection does not select
+        // this field.
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            3,
+            &reference(CALCULATION_ENGINE).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            3,
+            &reference(CALCULATION_ENGINE + 1).encode_to_vec(),
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&source)?;
+    let before = bytes(&package)?;
+    assert!(matches!(
+        package
+            .edit_names()
+            .rename_sheet("Alpha", "Changed")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&package)?, before);
+
+    // Remove the duplicate route while retaining the unknown field and prove
+    // that a normal sheet rename leaves the root payload exactly untouched.
+    let clean = rewrite_document(&package_bytes(false, false, 0)?, |archive| {
+        let root = archive
+            .object_mut(1)
+            .ok_or_else(|| io::Error::other("Numbers root is missing"))?;
+        append_length_delimited_field(
+            &mut root.messages[0].data,
+            90,
+            b"root-opaque",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        Ok(())
+    })?;
+    let clean_package = Package::from_bytes(&clean)?;
+    let commit = clean_package
+        .edit_names()
+        .rename_sheet("Alpha", "Changed")?
+        .commit()?;
+    let source_catalog = Catalog::from_bytes(&clean, Default::default())?;
+    let target_catalog = Catalog::from_bytes(&bytes(commit.package())?, Default::default())?;
+    let source_archive = Archive::parse(
+        &SnappyStream::decompress(
+            source_catalog
+                .iter()
+                .find(|entry| entry.name() == DOCUMENT)
+                .unwrap()
+                .data(),
+            Default::default(),
+        )?
+        .into_bytes(),
+        Default::default(),
+    )?;
+    let target_archive = Archive::parse(
+        &SnappyStream::decompress(
+            target_catalog
+                .iter()
+                .find(|entry| entry.name() == DOCUMENT)
+                .unwrap()
+                .data(),
+            Default::default(),
+        )?
+        .into_bytes(),
+        Default::default(),
+    )?;
+    assert_eq!(
+        source_archive.object(1).unwrap().messages[0].data,
+        target_archive.object(1).unwrap().messages[0].data
+    );
+    Ok(())
+}
+
+#[test]
+fn names_work_limit_rejects_before_reassembly_and_publication() -> TestResult {
+    // Keep both native component groups selected so the metadata selector
+    // visitor must compare every current ComponentInfo against multiple
+    // locators before publication. The semantic work ceiling must reject
+    // this sidecar-heavy transaction without changing the exact source.
+    let source = split_components(&package_bytes(false, false, 0)?)?;
+    // 2,597 is the pre-selector-charge total for this fixed fixture; the
+    // two selected component groups each add one decompressed metadata
+    // payload bound to the caller-owned work total.
+    let semantic = litchi_numbers::SemanticLimits::DEFAULT
+        .to_builder()
+        .max_formula_render_work(2_597)
+        .and_then(|b| b.max_formula_render_depth(1))
+        .and_then(|b| b.build())?;
+    let package = Package::from_bytes_with_options(
+        &source,
+        litchi_numbers::OpenOptions::new().semantic_limits(semantic),
+    )?;
+    let before = bytes(&package)?;
+    let error = package
+        .edit_names()
+        .rename_sheet("Alpha", "Renamed")?
+        .rename_table("Alpha", "One", "Denied")?
+        .commit()
+        .expect_err("the conservative changed-work guard must run before native rewrite");
+    assert!(matches!(
+        error,
+        names::Error::Limit {
+            kind: names::LimitKind::WireWork,
+            ..
+        }
+    ));
+    assert_eq!(bytes(&package)?, before);
+    Ok(())
+}
+
+#[test]
+fn selected_name_wire_is_strict_and_unknown_bytes_stay_opaque() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+    let padded = rewrite_document(&source, |archive| {
+        let sheet = archive.object_mut(FIRST_SHEET).unwrap();
+        append_varint_field(&mut sheet.messages[0].data, 91, 1234)?;
+        let model = archive.object_mut(FIRST_MODEL).unwrap();
+        append_length_delimited_field(
+            &mut model.messages[0].data,
+            92,
+            b"opaque",
+            litchi_iwa_common::WireLimits::DEFAULT,
+        )?;
+        Ok(())
+    })?;
+    let package = Package::from_bytes(&padded)?;
+    let commit = package
+        .edit_names()
+        .rename_table("Alpha", "One", "Known")?
+        .commit()?;
+    let before = Catalog::from_bytes(&padded, Default::default())?;
+    let after = Catalog::from_bytes(&bytes(commit.package())?, Default::default())?;
+    let before_document = before
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT)
+        .unwrap()
+        .data();
+    let after_document = after
+        .iter()
+        .find(|entry| entry.name() == DOCUMENT)
+        .unwrap()
+        .data();
+    assert_ne!(before_document, after_document);
+    let parsed = Archive::parse(
+        &SnappyStream::decompress(after_document, Default::default())?.into_bytes(),
+        Default::default(),
+    )?;
+    let model = parsed.object(FIRST_MODEL).unwrap();
+    assert!(
+        WireView::parse(
+            &model.messages[0].data,
+            litchi_iwa_common::WireLimits::DEFAULT
+        )?
+        .fields()
+        .any(|field| field.number() == 92)
+    );
+    Ok(())
+}
+
+#[test]
+fn split_components_and_every_preview_cardinality_publish_once() -> TestResult {
+    for previews in 0..=3 {
+        let source = split_components(&package_bytes(false, false, previews)?)?;
+        let package = Package::from_bytes(&source)?;
+        let commit = package
+            .edit_names()
+            .rename_sheet("Alpha", "Split sheet")?
+            .rename_table("Alpha", "One", "Split table")?
+            .commit()?;
+        assert_eq!(commit.diagnostics().operations(), 2);
+        assert_eq!(commit.diagnostics().touched_components(), 2);
+        assert!(commit.diagnostics().changed());
+        assert_eq!(commit.diagnostics().deleted_previews(), previews);
+        assert_eq!(sheet_name(commit.package(), 0), "Split sheet");
+        assert_eq!(table_name(commit.package(), 0, 0), "Split table");
+        let output = bytes(commit.package())?;
+        let catalog = Catalog::from_bytes(&output, Default::default())?;
+        assert_eq!(
+            catalog
+                .iter()
+                .filter(|entry| entry.name().starts_with("preview"))
+                .count(),
+            0
+        );
+        assert_eq!(
+            catalog
+                .iter()
+                .find(|entry| entry.name() == VIEW_STATE)
+                .unwrap()
+                .data(),
+            Catalog::from_bytes(&source, Default::default())?
+                .iter()
+                .find(|entry| entry.name() == VIEW_STATE)
+                .unwrap()
+                .data()
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn changed_names_advance_metadata_tokens_and_inverse_restores_exact_source() -> TestResult {
+    let source = split_components(&package_bytes(false, false, 1)?)?;
+    let source_payload = metadata_payload_from_bytes(&source)?;
+    let source_metadata = tsp::PackageMetadata::decode(source_payload.as_slice())?;
+    let source_components = metadata_component_payloads(&source)?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_names()
+        .rename_sheet("Alpha", "Tokenized")?
+        .rename_table("Alpha", "One", "Token table")?
+        .commit()?;
+
+    let target_bytes = bytes(commit.package())?;
+    let target_payload = metadata_payload_from_bytes(&target_bytes)?;
+    let target_metadata = tsp::PackageMetadata::decode(target_payload.as_slice())?;
+    assert_eq!(
+        target_metadata.last_object_identifier,
+        source_metadata.last_object_identifier
+    );
+    assert_eq!(target_metadata.save_token, Some(11));
+    assert_eq!(
+        target_metadata
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "Document")
+            .and_then(|component| component.save_token),
+        Some(11)
+    );
+    assert_eq!(
+        target_metadata
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "Tables")
+            .and_then(|component| component.save_token),
+        Some(11)
+    );
+    assert_eq!(
+        target_metadata
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "ViewState")
+            .and_then(|component| component.save_token),
+        Some(7)
+    );
+    assert_eq!(
+        target_metadata
+            .versioned_components
+            .iter()
+            .find(|component| component.preferred_locator == "Document")
+            .and_then(|component| component.save_token),
+        Some(3)
+    );
+    assert!(
+        WireView::parse(&target_payload, litchi_iwa_common::WireLimits::DEFAULT)?
+            .fields()
+            .any(|field| field.number() == 90)
+    );
+    for component in metadata_component_payloads(&target_bytes)? {
+        assert!(
+            WireView::parse(&component, litchi_iwa_common::WireLimits::DEFAULT)?
+                .fields()
+                .any(|field| field.number() == 90)
+        );
+    }
+    assert!(source_components.iter().all(|component| {
+        WireView::parse(component, litchi_iwa_common::WireLimits::DEFAULT)
+            .map(|view| view.fields().any(|field| field.number() == 90))
+            .unwrap_or(false)
+    }));
+    assert_eq!(
+        bytes(
+            commit
+                .package()
+                .apply_names(&commit.patch().inverse())?
+                .package()
+        )?,
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn metadata_absent_selected_token_is_added_and_inverse_is_exact() -> TestResult {
+    let source = replace_metadata_payload(
+        &package_bytes(false, false, 0)?,
+        metadata_payload_with_absent_document_token()?,
+    )?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_names()
+        .rename_sheet("Alpha", "Absent token")?
+        .commit()?;
+    let target_bytes = bytes(commit.package())?;
+    let target =
+        tsp::PackageMetadata::decode(metadata_payload_from_bytes(&target_bytes)?.as_slice())?;
+    assert_eq!(target.save_token, Some(11));
+    assert_eq!(
+        target
+            .components
+            .iter()
+            .find(|component| component.preferred_locator == "Document")
+            .and_then(|component| component.save_token),
+        Some(11)
+    );
+    assert_eq!(
+        bytes(
+            commit
+                .package()
+                .apply_names(&commit.patch().inverse())?
+                .package()
+        )?,
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn changed_names_fail_closed_for_missing_duplicate_or_overflow_metadata() -> TestResult {
+    let source = package_bytes(false, false, 0)?;
+    let catalog = Catalog::from_bytes(&source, Default::default())?;
+    let missing =
+        catalog.reassemble_with_deletions_to_bytes(&[], &[METADATA], Limits::default())?;
+    let missing_package = Package::from_bytes(&missing)?;
+    let missing_before = bytes(&missing_package)?;
+    assert!(matches!(
+        missing_package
+            .edit_names()
+            .rename_sheet("Alpha", "Missing metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&missing_package)?, missing_before);
+
+    let duplicate_source =
+        with_metadata_component(&source, metadata_component(100, "Document", 9, 999)?)?;
+    let duplicate = Package::from_bytes(&duplicate_source)?;
+    let duplicate_before = bytes(&duplicate)?;
+    assert!(matches!(
+        duplicate
+            .edit_names()
+            .rename_sheet("Alpha", "Duplicate metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&duplicate)?, duplicate_before);
+
+    let mut wrong_wire_payload = metadata_payload(false)?;
+    append_length_delimited_field(
+        &mut wrong_wire_payload,
+        8,
+        b"wrong wire",
+        litchi_iwa_common::WireLimits::DEFAULT,
+    )?;
+    let wrong_wire_source = replace_metadata_payload(&source, wrong_wire_payload)?;
+    let wrong_wire = Package::from_bytes(&wrong_wire_source)?;
+    let wrong_wire_before = bytes(&wrong_wire)?;
+    assert!(matches!(
+        wrong_wire
+            .edit_names()
+            .rename_sheet("Alpha", "Wrong wire metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&wrong_wire)?, wrong_wire_before);
+
+    let overflow_payload = patch_varint_field(&metadata_payload(false)?, 8, true, Some(u64::MAX))?;
+    let overflow_source = replace_metadata_payload(&source, overflow_payload)?;
+    let overflow = Package::from_bytes(&overflow_source)?;
+    let overflow_before = bytes(&overflow)?;
+    assert!(matches!(
+        overflow
+            .edit_names()
+            .rename_sheet("Alpha", "Overflow metadata")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(bytes(&overflow)?, overflow_before);
+    Ok(())
+}
+
+#[test]
+fn selected_duplicate_name_field_and_header_merge_refuse_atomically() -> TestResult {
+    let duplicate = Package::from_bytes(&duplicate_selected_name_field(&package_bytes(
+        false, false, 0,
+    )?)?)?;
+    assert!(matches!(
+        duplicate
+            .edit_names()
+            .rename_table(SheetSelector::index(0), TableSelector::index(0), "Changed")
+            .and_then(names::Edit::commit),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(table_name(&duplicate, 0, 0), "duplicate");
+
+    let merged = Package::from_bytes(&selected_header_merge(&package_bytes(false, false, 0)?)?)?;
+    assert!(matches!(
+        merged
+            .edit_names()
+            .rename_table("Alpha", "One", "Changed")?
+            .commit(),
+        Err(names::Error::InvalidSource)
+    ));
+    assert_eq!(table_name(&merged, 0, 0), "One");
+    Ok(())
+}
+
+#[test]
+fn native_fixture_combined_rename_reopens_and_inverse_restores_exact_bytes() -> TestResult {
+    let source = std::fs::read(native_fixture())?;
+    let package = Package::from_bytes(&source)?;
+    let commit = package
+        .edit_names()
+        .rename_sheet("Sheet 1", "Líneas 你好 🧪")?
+        .rename_table("Sheet 1", "Table 1", "表 Café №42")?
+        .commit()?;
+    assert_eq!(sheet_name(commit.package(), 0), "Líneas 你好 🧪");
+    assert_eq!(table_name(commit.package(), 0, 0), "表 Café №42");
+    assert!(matches!(
+        commit.package().workbook_ref().sheets()[0].tables().next().unwrap().get_a1("B2")?,
+        Some(Value::Text(value)) if value == "Litchi native Numbers fixture"
+    ));
+    assert_eq!(
+        bytes(
+            commit
+                .package()
+                .apply_names(&commit.patch().inverse())?
+                .package()
+        )?,
+        source
+    );
+    Ok(())
+}
+
+#[test]
+fn empty_sheet_name_changes_and_empty_batches_have_exact_noop_diagnostics() -> TestResult {
+    let source = empty_first_sheet(&package_bytes(false, false, 1)?)?;
+    let package = Package::from_bytes(&source)?;
+    assert_eq!(package.workbook_ref().sheets()[0].table_count(), 0);
+    let changed = package
+        .edit_names()
+        .rename_sheet("Alpha", "Empty")?
+        .commit()?;
+    assert!(changed.diagnostics().changed());
+    assert_eq!(changed.diagnostics().operations(), 1);
+    assert_eq!(changed.diagnostics().deleted_previews(), 1);
+    assert_eq!(sheet_name(changed.package(), 0), "Empty");
+    Ok(())
+}
+
+#[test]
+fn selected_message_metadata_and_cross_sheet_model_aliases_fail_closed() -> TestResult {
+    assert!(
+        Package::from_bytes(&mismatched_selected_message_info(
+            &package_bytes(false, false, 0)?,
+            FIRST_SHEET,
+        )?)
+        .is_err()
+    );
+
+    assert!(
+        Package::from_bytes(&mismatched_selected_message_info(
+            &package_bytes(false, false, 0)?,
+            FIRST_MODEL,
+        )?)
+        .is_err()
+    );
+
+    assert!(
+        Package::from_bytes(&cross_sheet_shared_model(&package_bytes(true, false, 0,)?)?).is_err()
+    );
+    Ok(())
+}

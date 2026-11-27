@@ -1,0 +1,296 @@
+//! Lossless parser state and raw worksheet records.
+
+use std::borrow::Cow;
+use std::collections::HashSet;
+
+use litchi_sheet::{Cell as Address, Rect};
+
+use super::super::formula::Range as FormulaRange;
+use super::super::strings::RichTextState;
+use super::x14ac;
+use crate::cell::SharedFormulaStorage;
+use crate::column::{self, Assignments};
+use crate::layout::Defaults;
+use crate::row;
+
+pub(super) const MAX_CELL_CHARACTERS: usize = 32_767;
+pub(super) const MAX_FORMULA_CHARACTERS: usize = 8_192;
+// A supplementary Unicode scalar can occupy two seven-byte `_xHHHH_`
+// SpreadsheetML escapes before decoding.
+pub(super) const MAX_ENCODED_CELL_BYTES: usize = MAX_CELL_CHARACTERS * 14;
+pub(super) const MAX_CELL_STYLE: u32 = 65_490;
+pub(super) const MAX_COLUMN_STYLE: u32 = 65_429;
+pub(super) const MAX_METADATA_INDEX: u32 = 2_147_483_647;
+pub(crate) const MAX_XML_DEPTH: usize = 256;
+pub(super) const MAX_XML_EVENTS: usize = 1_000_000;
+
+pub(crate) fn merge_successor(local: &[u8]) -> bool {
+    matches!(
+        local,
+        b"phoneticPr"
+            | b"conditionalFormatting"
+            | b"dataValidations"
+            | b"hyperlinks"
+            | b"printOptions"
+            | b"pageMargins"
+            | b"pageSetup"
+            | b"headerFooter"
+            | b"rowBreaks"
+            | b"colBreaks"
+            | b"customProperties"
+            | b"cellWatches"
+            | b"ignoredErrors"
+            | b"smartTags"
+            | b"drawing"
+            | b"legacyDrawing"
+            | b"legacyDrawingHF"
+            | b"picture"
+            | b"oleObjects"
+            | b"controls"
+            | b"webPublishItems"
+            | b"tableParts"
+            | b"extLst"
+    )
+}
+
+/// Where a worksheet reader stands relative to `<sheetData>`, which decides
+/// whether a `<mergeCells>` sits in its schema slot: directly after
+/// `<sheetData>`, before any of the children [`merge_successor`] names.
+///
+/// ```text
+/// Before      --<sheetData>--------------> MergeWindow
+/// MergeWindow --<a mergeCells successor>-> Closed
+/// ```
+///
+/// A `<sheetData>` in `MergeWindow` or `Closed` is a duplicate, and a
+/// successor in `Before` or `Closed` changes nothing. The other worksheet
+/// children are independent "seen" flags of each reader.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum SheetDataStage {
+    /// No `<sheetData>` yet.
+    Before,
+    /// After `<sheetData>`, where the schema allows `<mergeCells>`.
+    MergeWindow,
+    /// After `<sheetData>` and a child that follows `<mergeCells>`.
+    Closed,
+}
+
+impl SheetDataStage {
+    /// A `<sheetData>` starts; `false` when it is a duplicate.
+    #[inline]
+    pub(super) fn enter(&mut self) -> bool {
+        match self {
+            Self::Before => {
+                *self = Self::MergeWindow;
+                true
+            },
+            Self::MergeWindow | Self::Closed => false,
+        }
+    }
+
+    /// A child that follows `<mergeCells>` in the schema starts.
+    #[inline]
+    pub(super) fn successor(&mut self) {
+        match self {
+            Self::MergeWindow => *self = Self::Closed,
+            Self::Before | Self::Closed => {},
+        }
+    }
+
+    /// Whether `<sheetData>` has started.
+    #[inline]
+    pub(super) fn seen(self) -> bool {
+        match self {
+            Self::Before => false,
+            Self::MergeWindow | Self::Closed => true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum Context {
+    Worksheet,
+    SheetFormat,
+    Columns,
+    SheetData,
+    MergeCells,
+    Merge,
+    Row,
+    Cell,
+    Formula,
+    Value,
+    Inline,
+    Run,
+    Text(TextTarget),
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum TextTarget {
+    Formula,
+    Value,
+    Inline,
+}
+
+#[derive(Debug)]
+pub(super) struct PendingRow {
+    pub(super) number: u32,
+    pub(super) last_column: u32,
+    pub(super) properties: row::Properties,
+}
+
+/// One open cell. `'c` is the lifetime of the parsed document: a value the
+/// `<sheetData>` lane admits is borrowed from it rather than copied.
+#[derive(Debug)]
+pub(super) struct PendingCell<'c> {
+    pub(super) row: u32,
+    pub(super) column: u32,
+    pub(super) style: Option<u32>,
+    pub(super) cell_metadata: Option<u32>,
+    pub(super) value_metadata: Option<u32>,
+    pub(super) cell_type: Option<Cow<'c, str>>,
+    pub(super) value: Cow<'c, str>,
+    pub(super) value_bytes: usize,
+    pub(super) saw_value: bool,
+    pub(super) formula: String,
+    pub(super) formula_characters: usize,
+    pub(super) formula_kind: Option<RawFormulaKind>,
+    pub(super) inline: String,
+    pub(super) inline_bytes: usize,
+    pub(super) saw_inline: bool,
+    /// Content model of the cell's `<is>` item.
+    pub(super) inline_state: RichTextState,
+}
+
+/// One cell the `<sheetData>` lane admitted, kept compact until the parse
+/// completes.
+///
+/// The lane admits no formula, inline string or rich-text run, so this is
+/// the whole of what [`RawCell`] would hold for such a cell. `inline` records
+/// that the cell's type is `inlineStr`, for which the ordinary parser keeps
+/// an empty inline string.
+#[derive(Debug)]
+pub(super) struct LaneCell<'c> {
+    pub(super) address: Address,
+    pub(super) style: Option<u32>,
+    pub(super) cell_metadata: Option<u32>,
+    pub(super) value_metadata: Option<u32>,
+    pub(super) cell_type: Option<Cow<'c, str>>,
+    pub(super) value: Option<&'c str>,
+    pub(super) inline: bool,
+}
+
+impl<'c> LaneCell<'c> {
+    /// The raw record the ordinary parser would have kept for this cell.
+    pub(super) fn into_raw(self) -> RawCell<'c> {
+        RawCell {
+            address: self.address,
+            style: self.style,
+            cell_metadata: self.cell_metadata,
+            value_metadata: self.value_metadata,
+            cell_type: self.cell_type,
+            value: self.value.map(Cow::Borrowed),
+            inline: self.inline.then(String::new),
+            inline_rich: false,
+            formula_range: None,
+            shared_formula: None,
+            formula: None,
+        }
+    }
+}
+
+/// The validated fields of one opening cell, in their check order.
+#[derive(Debug)]
+pub(super) struct CellFields<'v> {
+    pub(super) column: u32,
+    pub(super) style: Option<u32>,
+    pub(super) cell_metadata: Option<u32>,
+    pub(super) value_metadata: Option<u32>,
+    pub(super) cell_type: Option<Cow<'v, str>>,
+}
+
+#[derive(Debug)]
+pub(super) enum RawFormulaKind {
+    Scalar,
+    Array(Option<String>),
+    DataTable(Option<String>),
+    Shared { index: u32, range: Option<String> },
+    Unknown(String),
+}
+
+#[derive(Debug)]
+pub(super) struct RawCell<'c> {
+    pub(super) address: Address,
+    pub(super) style: Option<u32>,
+    pub(super) cell_metadata: Option<u32>,
+    pub(super) value_metadata: Option<u32>,
+    pub(super) cell_type: Option<Cow<'c, str>>,
+    pub(super) value: Option<Cow<'c, str>>,
+    pub(super) inline: Option<String>,
+    pub(super) inline_rich: bool,
+    // Shared formulas are expanded into ordinary formula text before
+    // materialization. Keep the master's declared range beside that text so
+    // a scalar-looking follower cannot lose its range ownership.
+    pub(super) formula_range: Option<FormulaRange>,
+    pub(super) shared_formula: Option<SharedFormulaStorage>,
+    pub(super) formula: Option<RawFormula>,
+}
+
+#[derive(Debug)]
+pub(super) struct RawFormula {
+    pub(super) text: String,
+    pub(super) kind: RawFormulaKind,
+}
+
+#[derive(Debug)]
+pub(super) struct SharedMember {
+    pub(super) cell_index: usize,
+    pub(super) row: u32,
+    pub(super) column: u32,
+    pub(super) index: u32,
+    pub(super) range: Option<String>,
+    pub(super) text: String,
+}
+
+#[derive(Debug)]
+pub(super) struct SharedMaster {
+    pub(super) row: u32,
+    pub(super) column: u32,
+    pub(super) range: FormulaRange,
+    pub(super) rect: Rect,
+    pub(super) reference: Box<str>,
+    pub(super) text: String,
+}
+
+#[derive(Debug)]
+pub(super) struct Parser<'c> {
+    pub(super) cells: Vec<RawCell<'c>>,
+    /// Cells of an admitted `<sheetData>` body. The lane takes the whole
+    /// body or none of it, so these precede `cells` in document order.
+    pub(super) lane_cells: Vec<LaneCell<'c>>,
+    pub(super) rows: Vec<row::Stored>,
+    pub(super) columns: Option<Assignments<column::Properties>>,
+    pub(super) defaults: Option<Defaults>,
+    pub(super) extensions: x14ac::Values,
+    pub(super) declared_extent: Option<Rect>,
+    pub(super) row: Option<PendingRow>,
+    pub(super) cell: Option<PendingCell<'c>>,
+    pub(super) seen_rows: HashSet<u32>,
+    pub(super) previous_row: u32,
+    pub(super) seen_dimension: bool,
+    pub(super) seen_defaults: bool,
+    pub(super) seen_columns: bool,
+    pub(super) column_records: usize,
+    pub(super) sheet_data: SheetDataStage,
+    pub(super) merges: Vec<Rect>,
+    pub(super) merge_count: Option<usize>,
+    pub(super) seen_merges: bool,
+    /// Whether cataloged defects are repaired (read facades) or refused
+    /// (write-path admission); see `crate::leniency`.
+    pub(super) repairs: super::Repairs,
+    /// Repairs made so far; moved into the finished store.
+    pub(super) tolerance: crate::leniency::ToleranceReport,
+    /// Whether a row index repeated (repaired last-wins when the parse
+    /// finishes).
+    pub(super) duplicate_rows: bool,
+}

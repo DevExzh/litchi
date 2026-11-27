@@ -1,0 +1,718 @@
+//! Immutable worksheet print-option metadata.
+
+mod patch;
+mod snapshot;
+pub mod source;
+
+pub(crate) use patch::Patch;
+pub use snapshot::Snapshot;
+
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
+
+use crate::error::{Error, Result};
+use litchi_ooxml_common::mce::{Capabilities, Limits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
+const CORE: &[u8] = b"http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const STRICT: &[u8] = b"http://purl.oclc.org/ooxml/spreadsheetml/main";
+const MAX_XML_BYTES: usize = 32 * 1024 * 1024;
+const MAX_DEPTH: usize = 128;
+const MAX_EVENTS: usize = 1_000_000;
+
+/// The effective flags from one worksheet `printOptions` element.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct PrintOptions {
+    horizontal_centered: bool,
+    vertical_centered: bool,
+    print_headings: bool,
+    grid_lines: bool,
+    grid_lines_set: bool,
+}
+
+impl Default for PrintOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl PrintOptions {
+    /// Create schema-default worksheet print properties.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            horizontal_centered: false,
+            vertical_centered: false,
+            print_headings: false,
+            grid_lines: false,
+            // CT_PrintOptions defaults only this Boolean to true.
+            grid_lines_set: true,
+        }
+    }
+
+    /// Set horizontal centering.
+    pub fn set_horizontal_centered(&mut self, value: bool) -> &mut Self {
+        self.horizontal_centered = value;
+        self
+    }
+
+    /// Set vertical centering.
+    pub fn set_vertical_centered(&mut self, value: bool) -> &mut Self {
+        self.vertical_centered = value;
+        self
+    }
+
+    /// Set printed row/column headings.
+    pub fn set_print_headings(&mut self, value: bool) -> &mut Self {
+        self.print_headings = value;
+        self
+    }
+
+    /// Set both wire flags that control printed gridlines.
+    pub fn set_print_grid_lines(&mut self, value: bool) -> &mut Self {
+        self.grid_lines = value;
+        self.grid_lines_set = value;
+        self
+    }
+    /// Center the printed content horizontally on the page.
+    #[must_use]
+    pub fn horizontal_centered(&self) -> bool {
+        self.horizontal_centered
+    }
+
+    /// Center the printed content vertically on the page.
+    #[must_use]
+    pub fn vertical_centered(&self) -> bool {
+        self.vertical_centered
+    }
+
+    /// Print row and column headings.
+    #[must_use]
+    pub fn print_headings(&self) -> bool {
+        self.print_headings
+    }
+
+    /// Raw `gridLines` flag.
+    #[must_use]
+    pub fn grid_lines(&self) -> bool {
+        self.grid_lines
+    }
+
+    /// Effective `gridLinesSet` flag, including its schema default of true.
+    #[must_use]
+    pub fn grid_lines_set(&self) -> bool {
+        self.grid_lines_set
+    }
+
+    /// Whether gridlines are actually requested for printing.
+    ///
+    /// `SpreadsheetML` requires both gridline flags to be true.
+    #[must_use]
+    pub fn prints_grid_lines(&self) -> bool {
+        self.grid_lines && self.grid_lines_set
+    }
+}
+
+/// Serialize one core worksheet `printOptions` element.
+#[must_use]
+pub fn write_print_options(value: &PrintOptions) -> Vec<u8> {
+    format!("<printOptions{}/>", print_option_attributes(value)).into_bytes()
+}
+
+/// Replace, insert, or remove direct worksheet print properties.
+pub fn replace_print_options(xml: &[u8], value: Option<&PrintOptions>) -> Result<Vec<u8>> {
+    rewrite_print_options(xml, value, false)
+}
+
+fn splice_print_options(xml: &[u8], value: Option<&PrintOptions>) -> Result<Vec<u8>> {
+    rewrite_print_options(xml, value, true)
+}
+
+fn rewrite_print_options(
+    xml: &[u8],
+    value: Option<&PrintOptions>,
+    preserve_source: bool,
+) -> Result<Vec<u8>> {
+    let _ = parse_print_options(xml)?;
+    let attributes = value.map(print_option_attributes);
+    let rewrite = if preserve_source {
+        crate::raw::worksheet_property::splice_direct_empty
+    } else {
+        crate::raw::worksheet_property::replace_direct_empty
+    };
+    let output = rewrite(
+        xml,
+        "printOptions",
+        attributes.as_deref(),
+        &[
+            b"pageMargins",
+            b"pageSetup",
+            b"headerFooter",
+            b"rowBreaks",
+            b"colBreaks",
+            b"customProperties",
+            b"cellWatches",
+            b"ignoredErrors",
+            b"smartTags",
+            b"drawing",
+            b"legacyDrawing",
+            b"legacyDrawingHF",
+            b"picture",
+            b"oleObjects",
+            b"controls",
+            b"webPublishItems",
+            b"tableParts",
+            b"extLst",
+        ],
+        "print-options worksheet output",
+    )?;
+    if parse_print_options(&output)?.as_ref() != value {
+        return Err(invalid("worksheet print-options write verification failed"));
+    }
+    Ok(output)
+}
+
+fn print_option_attributes(value: &PrintOptions) -> String {
+    let mut output = String::new();
+    for (name, enabled) in [
+        ("horizontalCentered", value.horizontal_centered),
+        ("verticalCentered", value.vertical_centered),
+        ("headings", value.print_headings),
+        ("gridLines", value.grid_lines),
+        ("gridLinesSet", value.grid_lines_set),
+    ] {
+        output.push(' ');
+        output.push_str(name);
+        output.push_str(if enabled { "=\"1\"" } else { "=\"0\"" });
+    }
+    output
+}
+
+/// Parse a worksheet's optional core `printOptions` element.
+pub fn parse_print_options(xml: &[u8]) -> Result<Option<PrintOptions>> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(invalid("worksheet XML is too large"));
+    }
+    let limits = Limits {
+        max_input_bytes: MAX_XML_BYTES,
+        max_output_bytes: MAX_XML_BYTES,
+        max_depth: MAX_DEPTH,
+        ..Limits::default()
+    };
+    let validated = process_markup_compatibility(xml, &Capabilities::default(), &limits)?;
+    if validated.xml.len() > MAX_XML_BYTES {
+        return Err(invalid("processed worksheet XML is too large"));
+    }
+    let selected = if validated.report.alternate_content_count == 0 {
+        xml
+    } else {
+        validated.xml.as_ref()
+    };
+    parse_selected(selected)
+}
+
+/// Where the `printOptions` reader is relative to the root element.
+///
+/// ```text
+/// Prolog --XML declaration--> Declared
+/// Prolog --whitespace or comment--> Prolog (the declaration may still follow)
+/// Prolog | Declared --root start tag--> Open
+/// Prolog | Declared --empty-element root--> refused
+/// Open --root end tag--> Closed
+/// Declared | Open | Closed --XML declaration--> refused
+/// Closed --start tag--> refused
+/// Closed --empty-element tag--> refused
+/// Closed --non-whitespace text--> refused
+/// Closed --CDATA--> refused
+/// Closed --processing instruction--> refused
+/// Closed --whitespace or comment--> Closed (ignored)
+/// ```
+///
+/// End of input is accepted only in `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    Prolog,
+    Declared,
+    Open,
+    Closed,
+}
+
+fn parse_selected(xml: &[u8]) -> Result<Option<PrintOptions>> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut depth = 0usize;
+    let mut phase = RootPhase::Prolog;
+    let mut result = None;
+    let mut open: Option<(usize, PrintOptions)> = None;
+    let mut events = 0usize;
+    reader.config_mut().check_end_names = true;
+
+    loop {
+        events = events
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet XML event count overflow"))?;
+        if events > MAX_EVENTS {
+            return Err(invalid("worksheet XML exceeds event limit"));
+        }
+        let decoder = reader.decoder();
+        let event = reader.read_event().map_err(xml_error)?.into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        match event {
+            Event::Start(element) => {
+                if phase == RootPhase::Closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("worksheet XML nesting overflow"))?;
+                if depth > MAX_DEPTH {
+                    return Err(invalid("worksheet XML nesting is too deep"));
+                }
+                if depth == 1 {
+                    if matches!(phase, RootPhase::Open | RootPhase::Closed)
+                        || !spreadsheet(&namespace)
+                        || element.local_name().as_ref() != b"worksheet"
+                    {
+                        return Err(invalid("print-options parser requires a worksheet root"));
+                    }
+                    phase = RootPhase::Open;
+                } else if depth == 2
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"printOptions"
+                {
+                    if result.is_some() || open.is_some() {
+                        return Err(invalid("duplicate worksheet printOptions element"));
+                    }
+                    open = Some((depth, parse_options(&element, decoder)?));
+                } else if open.is_some() {
+                    return Err(invalid("printOptions must not contain child elements"));
+                }
+            },
+            Event::Empty(element) => {
+                if phase == RootPhase::Closed {
+                    return Err(invalid("worksheet XML contains content after root"));
+                }
+                if matches!(phase, RootPhase::Prolog | RootPhase::Declared) {
+                    return Err(invalid("worksheet root cannot be empty"));
+                }
+                if depth == 0 {
+                    return Err(invalid("worksheet XML element is outside root"));
+                }
+                if depth == 1
+                    && spreadsheet(&namespace)
+                    && element.local_name().as_ref() == b"printOptions"
+                {
+                    if result.is_some() || open.is_some() {
+                        return Err(invalid("duplicate worksheet printOptions element"));
+                    }
+                    result = Some(parse_options(&element, decoder)?);
+                } else if open.is_some() {
+                    return Err(invalid("printOptions must not contain child elements"));
+                }
+            },
+            Event::Text(text) => {
+                if phase != RootPhase::Open && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet XML text is outside root"));
+                }
+                if open.is_some() && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("printOptions must not contain text"));
+                }
+                if depth == 1 && !text.as_ref().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("worksheet cannot contain direct text"));
+                }
+            },
+            Event::CData(_) if open.is_some() => {
+                return Err(invalid("printOptions must not contain CDATA"));
+            },
+            Event::CData(_) if depth == 1 => {
+                return Err(invalid("worksheet cannot contain direct CDATA"));
+            },
+            Event::CData(_) if phase != RootPhase::Open => {
+                return Err(invalid("worksheet XML CDATA is outside root"));
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("unexpected XML end element"));
+                }
+                if let Some((element_depth, _)) = open.as_ref() {
+                    if *element_depth != depth {
+                        return Err(invalid("invalid printOptions closing state"));
+                    }
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"printOptions"
+                    {
+                        return Err(invalid("invalid printOptions closing element"));
+                    }
+                    let (_, options) = open
+                        .take()
+                        .ok_or_else(|| invalid("invalid printOptions closing state"))?;
+                    result = Some(options);
+                }
+                if depth == 1 {
+                    if !spreadsheet(&namespace) || element.local_name().as_ref() != b"worksheet" {
+                        return Err(invalid("invalid worksheet closing element"));
+                    }
+                    phase = RootPhase::Closed;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("unexpected XML end element"))?;
+            },
+            Event::GeneralRef(reference) => {
+                if phase != RootPhase::Open {
+                    return Err(invalid("worksheet XML entity is outside root"));
+                }
+                if reference.resolve_char_ref().map_err(xml_error)?.is_none()
+                    && !matches!(
+                        reference.decode().map_err(xml_error)?.as_ref(),
+                        "amp" | "lt" | "gt" | "apos" | "quot"
+                    )
+                {
+                    return Err(invalid("custom XML entities are rejected"));
+                }
+                if open.is_some() || depth == 1 {
+                    return Err(invalid("printOptions must not contain entity text"));
+                }
+            },
+            Event::Decl(_) => {
+                if phase != RootPhase::Prolog {
+                    return Err(invalid("invalid worksheet XML declaration position"));
+                }
+                phase = RootPhase::Declared;
+            },
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTD and processing instructions are rejected"));
+            },
+            Event::Comment(_) | Event::CData(_) => {},
+            Event::Eof => break,
+        }
+    }
+    match phase {
+        RootPhase::Closed if depth == 0 && open.is_none() => {},
+        RootPhase::Prolog | RootPhase::Declared | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("incomplete worksheet print-options XML"));
+        },
+    }
+    Ok(result)
+}
+
+fn parse_options(element: &BytesStart<'_>, decoder: Decoder) -> Result<PrintOptions> {
+    let mut options = PrintOptions::default();
+    let mut seen = [false; 5];
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        if attribute.key.as_ref().contains(&b':') {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?;
+        let (slot, target) = match attribute.key.local_name().as_ref() {
+            b"horizontalCentered" => (0, &mut options.horizontal_centered),
+            b"verticalCentered" => (1, &mut options.vertical_centered),
+            b"headings" => (2, &mut options.print_headings),
+            b"gridLines" => (3, &mut options.grid_lines),
+            b"gridLinesSet" => (4, &mut options.grid_lines_set),
+            name => {
+                return Err(invalid(format!(
+                    "unknown printOptions attribute '{}'",
+                    String::from_utf8_lossy(name)
+                )));
+            },
+        };
+        if seen[slot] {
+            return Err(invalid("duplicate printOptions attribute"));
+        }
+        seen[slot] = true;
+        *target = parse_bool(&value)?;
+    }
+    Ok(options)
+}
+
+fn parse_bool(value: &str) -> Result<bool> {
+    match value {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(invalid("invalid printOptions boolean")),
+    }
+}
+
+fn spreadsheet(namespace: &ResolveResult<'_>) -> bool {
+    exact(namespace, CORE) || exact(namespace, STRICT)
+}
+fn exact(namespace: &ResolveResult<'_>, expected: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected)
+}
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(format!(
+        "invalid worksheet print-options XML: {error}"
+    )))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::{OpcPackage, PackURI};
+
+    const START: &str =
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+    const CORE_STR: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+
+    fn parse(body: &str) -> Result<Option<PrintOptions>> {
+        parse_print_options(format!("{START}{body}</worksheet>").as_bytes())
+    }
+
+    fn parse_fixture(path: &str) -> PrintOptions {
+        let package = OpcPackage::open(path, litchi_opc::SourceLimits::default()).unwrap();
+        let uri = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+        parse_print_options(package.get_part(&uri).unwrap().blob())
+            .unwrap()
+            .unwrap()
+    }
+
+    #[test]
+    fn parses_flags_defaults_and_derived_gridline_behavior() {
+        let options = parse(r#"<printOptions horizontalCentered="1" verticalCentered="true" headings="1" gridLines="true" gridLinesSet="0"/>"#).unwrap().unwrap();
+        assert!(options.horizontal_centered());
+        assert!(options.vertical_centered());
+        assert!(options.print_headings());
+        assert!(options.grid_lines());
+        assert!(!options.grid_lines_set());
+        assert!(!options.prints_grid_lines());
+        assert_eq!(
+            parse("<printOptions/>").unwrap().unwrap(),
+            PrintOptions::default()
+        );
+    }
+
+    #[test]
+    fn omitted_grid_lines_set_uses_the_schema_default_in_both_dialects() {
+        for namespace in [CORE_STR, "http://purl.oclc.org/ooxml/spreadsheetml/main"] {
+            for (attributes, grid, known) in [
+                ("", false, true),
+                (r#" gridLines="1""#, true, true),
+                (r#" gridLines="1" gridLinesSet="0""#, true, false),
+                (r#" gridLines="0" gridLinesSet="1""#, false, true),
+            ] {
+                let xml = format!(
+                    r#"<worksheet xmlns="{namespace}"><printOptions{attributes}/></worksheet>"#
+                );
+                let value = parse_print_options(xml.as_bytes()).unwrap().unwrap();
+                assert_eq!(value.grid_lines(), grid);
+                assert_eq!(value.grid_lines_set(), known);
+                assert_eq!(value.prints_grid_lines(), grid && known);
+                let encoded = write_print_options(&value);
+                assert_eq!(
+                    parse(std::str::from_utf8(&encoded).unwrap()).unwrap(),
+                    Some(value)
+                );
+            }
+        }
+        assert_eq!(PrintOptions::new(), PrintOptions::default());
+        assert!(PrintOptions::default().grid_lines_set());
+        assert!(!PrintOptions::default().prints_grid_lines());
+    }
+
+    #[test]
+    fn source_print_splice_keeps_bom_whitespace_comments_and_cell_text() {
+        let xml = format!(
+            "\u{feff}<?xml version=\"1.0\"?>\r\n<worksheet xmlns=\"{CORE_STR}\">\n  <sheetData><row r=\"1\"><c r=\"A1\" t=\"inlineStr\"><is><t xml:space=\"preserve\"> text </t></is></c></row></sheetData>\n  <printOptions gridLines=\"1\"/>\r\n  <!-- retained -->\n</worksheet>\n"
+        );
+        let mut options = parse_print_options(xml.as_bytes()).unwrap().unwrap();
+        options.set_vertical_centered(true);
+        let actual = splice_print_options(xml.as_bytes(), Some(&options)).unwrap();
+        let replacement = String::from_utf8(write_print_options(&options)).unwrap();
+        let expected = xml.replace("<printOptions gridLines=\"1\"/>", &replacement);
+        assert!(actual == expected.as_bytes());
+        let removed = splice_print_options(xml.as_bytes(), None).unwrap();
+        assert!(
+            removed
+                == xml
+                    .replace("<printOptions gridLines=\"1\"/>", "")
+                    .as_bytes()
+        );
+    }
+
+    #[test]
+    fn accepts_strict_namespace_and_absence() {
+        let xml = br#"<worksheet xmlns="http://purl.oclc.org/ooxml/spreadsheetml/main"><printOptions gridLines="1" gridLinesSet="true"/></worksheet>"#;
+        assert!(
+            parse_print_options(xml)
+                .unwrap()
+                .unwrap()
+                .prints_grid_lines()
+        );
+        assert!(parse("").unwrap().is_none());
+    }
+
+    #[test]
+    fn rejects_invalid_duplicate_unknown_and_nested_content() {
+        assert!(parse(r#"<printOptions headings="yes"/>"#).is_err());
+        assert!(parse(r#"<printOptions headings="1" headings="0"/>"#).is_err());
+        assert!(parse(r#"<printOptions mystery="1"/>"#).is_err());
+        assert!(parse(r#"<printOptions><x/></printOptions>"#).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_closing_state_without_panicking() {
+        let xml = format!(r#"{START}<printOptions/></worksheet><printOptions/>"#);
+        let parsed = std::panic::catch_unwind(|| parse_print_options(xml.as_bytes()));
+        assert!(matches!(parsed, Ok(Err(_))));
+
+        let incomplete = format!(r#"{START}<printOptions>"#);
+        assert!(parse_print_options(incomplete.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn rejects_malformed_document_boundaries_and_excessive_depth() {
+        for xml in [
+            format!(
+                r#"<worksheet xmlns="{}"/><worksheet xmlns="{}"/>"#,
+                CORE_STR, CORE_STR
+            ),
+            format!(r#"text{}"#, START),
+            format!(r#"{}text</worksheet>"#, START),
+            format!(r#"{}</worksheet>tail"#, START),
+            format!(r#"{}<![CDATA[data]]></worksheet>"#, START),
+        ] {
+            assert!(
+                parse_print_options(xml.as_bytes()).is_err(),
+                "expected rejection for {xml}"
+            );
+        }
+
+        let mut xml = START.to_owned();
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("<extension>");
+        }
+        for _ in 0..MAX_DEPTH {
+            xml.push_str("</extension>");
+        }
+        xml.push_str("</worksheet>");
+        assert!(parse_print_options(xml.as_bytes()).is_err());
+    }
+
+    #[test]
+    fn loads_poi_centering_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/poi/test-data/spreadsheet/45540_classic_Header.xlsx"
+        );
+        let options = parse_fixture(path);
+        assert!(options.horizontal_centered());
+        assert!(!options.vertical_centered());
+    }
+
+    #[test]
+    fn loads_libreoffice_gridline_fixture() {
+        let path = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf100034.xlsx"
+        );
+        let options = parse_fixture(path);
+        assert!(options.grid_lines());
+        assert!(options.grid_lines_set());
+        assert!(options.prints_grid_lines());
+        assert!(!options.print_headings());
+    }
+
+    /// Freezes how the `printOptions` reader treats what precedes, follows or replaces
+    /// the root element, one row per document shape.
+    #[test]
+    fn print_options_envelope_matrix() {
+        const NAME: &str = "worksheet";
+        const OPEN: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">"#;
+        const EMPTY: &str =
+            r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#;
+        const BODY: &str = r#""#;
+        const CLOSE: &str = "</worksheet>";
+        const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+        let root = format!("{OPEN}{BODY}{CLOSE}");
+        let inputs: [(&str, String); 22] = [
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", EMPTY.to_owned()),
+            ("start and end root", root.clone()),
+            ("root then whitespace", format!("{root}\n ")),
+            ("root then comment", format!("{root}<!--c-->")),
+            (
+                "root then processing instruction",
+                format!("{root}<?pi x?>"),
+            ),
+            ("root then text", format!("{root}text")),
+            ("root then a second identical root", format!("{root}{root}")),
+            (
+                "root then a foreign element, start form",
+                format!("{root}<foreign></foreign>"),
+            ),
+            (
+                "root then a foreign element, empty form",
+                format!("{root}<foreign/>"),
+            ),
+            ("declaration after the root", format!("{root}{DECLARATION}")),
+            (
+                "two declarations",
+                format!("{DECLARATION}{DECLARATION}{root}"),
+            ),
+            (
+                "comment before the declaration",
+                format!("<!--c-->{DECLARATION}{root}"),
+            ),
+            ("text before the root", format!("text{root}")),
+            ("unterminated root", format!("{OPEN}{BODY}")),
+            ("stray end tag", format!("{root}{CLOSE}")),
+            ("DOCTYPE", format!("<!DOCTYPE {NAME}>{root}")),
+            (
+                "top-level CDATA before the root",
+                format!("<![CDATA[x]]>{root}"),
+            ),
+            (
+                "top-level CDATA after the root",
+                format!("{root}<![CDATA[x]]>"),
+            ),
+            (
+                "one declaration then the root",
+                format!("{DECLARATION}{root}"),
+            ),
+        ];
+        let expected: [&str; 22] = [
+            "Invalid(\"incomplete worksheet print-options XML\")",
+            "Invalid(\"incomplete worksheet print-options XML\")",
+            "Invalid(\"incomplete worksheet print-options XML\")",
+            "Invalid(\"worksheet root cannot be empty\")",
+            "Ok",
+            "Ok",
+            "Ok",
+            "Invalid(\"DTD and processing instructions are rejected\")",
+            "Invalid(\"worksheet XML text is outside root\")",
+            "Invalid(\"worksheet XML contains content after root\")",
+            "Invalid(\"worksheet XML contains content after root\")",
+            "Invalid(\"worksheet XML contains content after root\")",
+            "Invalid(\"invalid worksheet XML declaration position\")",
+            "Invalid(\"invalid worksheet XML declaration position\")",
+            "Ok",
+            "Invalid(\"worksheet XML text is outside root\")",
+            "Invalid(\"incomplete worksheet print-options XML\")",
+            "Xml(Malformed(\"invalid worksheet print-options XML: ill-formed document: close tag `</worksheet>` does not match any open tag\"))",
+            "Invalid(\"DTD and processing instructions are rejected\")",
+            "Invalid(\"worksheet XML CDATA is outside root\")",
+            "Invalid(\"worksheet XML CDATA is outside root\")",
+            "Ok",
+        ];
+        for ((label, input), expected) in inputs.iter().zip(expected) {
+            let actual = match parse_selected(input.as_bytes()) {
+                Ok(_) => "Ok".to_owned(),
+                Err(error) => format!("{error:?}"),
+            };
+            assert_eq!(actual, expected, "{label}: {input:?}");
+        }
+    }
+}

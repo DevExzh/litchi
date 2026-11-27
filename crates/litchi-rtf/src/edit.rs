@@ -1,0 +1,16937 @@
+//! Bounded immutable RTF body-text and paragraph-property transactions.
+//!
+//! Operations resolve against one immutable semantic body. Disjoint UTF-8
+//! spans, paragraph alignment, and dependency-free local layout facets compose
+//! in bounded atomic commits. Text edits retain a deliberately narrow uniform
+//! formatting closure. Layout edits instead rewrite checked paragraph/run
+//! snapshots and verify every unrelated property after reopening. Both seams
+//! retain body-anchored opaque syntax at checked source spans while refusing
+//! tables and untyped positioned content; the paragraph-layout seam includes
+//! the typed positioned-frame facet.
+//! Canonical retained-story edits cover checked table cells, headers/footers,
+//! comments, notes, and root shape text frames while refusing unknown
+//! destinations and dependent positioned content.
+
+use crate::write::Writer;
+use crate::{
+    Alignment, CharacterBaseline, CharacterExpansion, HeaderFooterType, Package, ParagraphFrame,
+    TableCellPath, UnderlineStyle,
+};
+use bumpalo::Bump;
+use litchi_core::Position;
+use serde_json::Value;
+use std::borrow::Cow;
+use std::collections::BTreeMap;
+use std::fmt;
+use std::io::{self, Write as _};
+use std::num::NonZeroU16;
+use std::ops::Range;
+use std::sync::{Arc, OnceLock};
+
+mod composition;
+mod destination_splice;
+mod layout_source;
+mod marks;
+mod picture_payload;
+mod producer_paragraphs;
+mod transfer;
+pub use composition::{
+    Composition, CompositionConflict, CompositionError, CompositionLimits, ConflictSet,
+    DurableComposition, DurableMergePlan, MergePlan, MergeResolution, Prepared,
+};
+pub use picture_payload::{
+    MAX_PICTURE_PAYLOAD_OPERATIONS, MAX_PICTURE_REMOVAL_OPERATIONS, PicturePayloadReplacement,
+};
+pub use transfer::TransferPlan;
+
+/// Finite step and retained-weight bounds for [`History`].
+pub use litchi_core::patch::HistoryLimits;
+
+/// Commit-coupled bounded undo/redo history for immutable RTF snapshots.
+pub struct History {
+    inner: litchi_core::patch::History<Package>,
+}
+
+impl History {
+    /// Starts history at one immutable snapshot.
+    #[must_use]
+    pub fn new(current: Package, limits: HistoryLimits) -> Self {
+        Self {
+            inner: litchi_core::patch::History::new(current, limits),
+        }
+    }
+
+    /// Current immutable snapshot.
+    #[must_use]
+    pub const fn current(&self) -> &Package {
+        self.inner.current()
+    }
+
+    /// Whether an undo transition exists.
+    #[must_use]
+    pub fn can_undo(&self) -> bool {
+        self.inner.can_undo()
+    }
+
+    /// Whether a redo transition exists.
+    #[must_use]
+    pub fn can_redo(&self) -> bool {
+        self.inner.can_redo()
+    }
+
+    /// Commits an edit rooted at the current snapshot and records it atomically.
+    ///
+    /// # Errors
+    /// Returns a source, edit, or history-budget error without changing history.
+    pub fn commit(&mut self, edit: Edit) -> Result<Commit, Error> {
+        if !edit.source().same_snapshot(self.current()) {
+            return Err(Error::HistorySourceMismatch);
+        }
+        let commit = edit.commit()?;
+        self.record_commit(&commit)?;
+        Ok(commit)
+    }
+
+    /// Records an already validated commit rooted at the current snapshot.
+    ///
+    /// # Errors
+    /// Returns a source or budget error without changing history.
+    pub fn record_commit(&mut self, commit: &Commit) -> Result<(), Error> {
+        if !commit.patch.before.same_snapshot(self.current()) {
+            return Err(Error::HistorySourceMismatch);
+        }
+        if commit.diagnostics.changed {
+            self.inner
+                .record(commit.snapshot.clone(), commit.patch.history_weight())
+                .map_err(|error| Error::History(error.to_string()))?;
+        }
+        Ok(())
+    }
+
+    /// Moves to the preceding retained snapshot.
+    pub fn undo(&mut self) -> bool {
+        self.inner.undo()
+    }
+
+    /// Moves to the following retained snapshot.
+    pub fn redo(&mut self) -> bool {
+        self.inner.redo()
+    }
+}
+
+mod limits;
+pub use limits::{EditOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder};
+pub use marks::SectionValue;
+
+/// Exact bytes inserted for a raw ordinary-paragraph split.
+const PARAGRAPH_SPLIT_BYTES: &[u8] = br"\par ";
+
+/// A checked half-open UTF-8 byte span in the semantic body text.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct TextSpan {
+    start: usize,
+    end: usize,
+}
+
+/// One checked replacement in a bounded body-paragraph batch.
+///
+/// The zero-based paragraph [`Position`] is resolved against the immutable
+/// source snapshot when the complete batch is staged.
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::ParagraphTextReplacement;
+///
+/// let _ = ParagraphTextReplacement::new(0, "replacement");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ParagraphTextReplacement {
+    position: Position,
+    replacement: String,
+}
+
+/// One immutable-source selector and paragraph alignment update.
+///
+/// The selector is a zero-based [`Position`] resolved against the complete
+/// source paragraph list when the batch is staged.  Batch selectors must be
+/// strictly increasing so a late invalid or duplicate selector cannot change
+/// the meaning of an earlier update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphAlignmentUpdate {
+    position: Position,
+    alignment: Alignment,
+}
+
+impl ParagraphAlignmentUpdate {
+    /// Creates one source-relative paragraph alignment update.
+    #[must_use]
+    pub const fn new(position: Position, alignment: Alignment) -> Self {
+        Self {
+            position,
+            alignment,
+        }
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn position(self) -> Position {
+        self.position
+    }
+
+    /// Returns the requested paragraph alignment.
+    #[must_use]
+    pub const fn alignment(self) -> Alignment {
+        self.alignment
+    }
+}
+
+/// An omission-preserving character-format delta for one ordinary body run.
+///
+/// Every `None` facet keeps the value already stored by the selected run. The
+/// patch is deliberately limited to the local character properties that the
+/// unified operations API can address without rewriting the run's text,
+/// paragraph properties, resources, or retained source syntax.
+///
+/// A patch is resolved against the immutable native paragraph/run axis and
+/// published as one atomic source transaction. The native closure preserves
+/// omitted facets, unrelated run and paragraph properties, and retained
+/// metadata; sources with inline breaks or dependent destinations are refused
+/// before changed publication.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_rtf::edit::{RunFormatPatch, RunFormatUpdate};
+/// use litchi_rtf::Package;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let package = Package::parse(r#"{\rtf1\ansi First\par Second}"#)?;
+/// let patch = RunFormatPatch::new().with_bold(true).with_italic(true);
+/// let mut edit = package.edit();
+/// edit.patch_body_run_formats(&[RunFormatUpdate::new(
+///     Position::new(0),
+///     Position::new(0),
+///     patch,
+/// )])?;
+/// let commit = edit.commit()?;
+/// assert!(commit.diagnostics().changed());
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::{RunFormatPatch, RunFormatUpdate};
+///
+/// let _ = RunFormatUpdate::new(0, 0, RunFormatPatch::new());
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RunFormatPatch {
+    bold: Option<bool>,
+    italic: Option<bool>,
+    underline: Option<UnderlineStyle>,
+    size: Option<NonZeroU16>,
+    strike: Option<bool>,
+    double_strike: Option<bool>,
+    hidden: Option<bool>,
+    all_caps: Option<bool>,
+    small_caps: Option<bool>,
+    outline: Option<bool>,
+}
+
+impl RunFormatPatch {
+    /// Creates an empty patch whose omitted facets preserve the source run.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            bold: None,
+            italic: None,
+            underline: None,
+            size: None,
+            strike: None,
+            double_strike: None,
+            hidden: None,
+            all_caps: None,
+            small_caps: None,
+            outline: None,
+        }
+    }
+
+    /// Sets the bold facet.
+    #[must_use]
+    pub const fn with_bold(mut self, value: bool) -> Self {
+        self.bold = Some(value);
+        self
+    }
+
+    /// Sets the italic facet.
+    #[must_use]
+    pub const fn with_italic(mut self, value: bool) -> Self {
+        self.italic = Some(value);
+        self
+    }
+
+    /// Sets the exact underline style.
+    #[must_use]
+    pub const fn with_underline(mut self, value: UnderlineStyle) -> Self {
+        self.underline = Some(value);
+        self
+    }
+
+    /// Sets the font size in half-points.
+    #[must_use]
+    pub const fn with_size(mut self, value: NonZeroU16) -> Self {
+        self.size = Some(value);
+        self
+    }
+
+    /// Sets the single-strike facet.
+    #[must_use]
+    pub const fn with_strike(mut self, value: bool) -> Self {
+        self.strike = Some(value);
+        self
+    }
+
+    /// Sets the double-strike facet.
+    #[must_use]
+    pub const fn with_double_strike(mut self, value: bool) -> Self {
+        self.double_strike = Some(value);
+        self
+    }
+
+    /// Sets the hidden-text facet.
+    #[must_use]
+    pub const fn with_hidden(mut self, value: bool) -> Self {
+        self.hidden = Some(value);
+        self
+    }
+
+    /// Sets the all-capitals facet.
+    #[must_use]
+    pub const fn with_all_caps(mut self, value: bool) -> Self {
+        self.all_caps = Some(value);
+        self
+    }
+
+    /// Sets the small-capitals facet.
+    #[must_use]
+    pub const fn with_small_caps(mut self, value: bool) -> Self {
+        self.small_caps = Some(value);
+        self
+    }
+
+    /// Sets the outline facet.
+    #[must_use]
+    pub const fn with_outline(mut self, value: bool) -> Self {
+        self.outline = Some(value);
+        self
+    }
+
+    /// Returns whether this patch names no character facet.
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.bold.is_none()
+            && self.italic.is_none()
+            && self.underline.is_none()
+            && self.size.is_none()
+            && self.strike.is_none()
+            && self.double_strike.is_none()
+            && self.hidden.is_none()
+            && self.all_caps.is_none()
+            && self.small_caps.is_none()
+            && self.outline.is_none()
+    }
+
+    /// Returns the requested bold value, if present.
+    #[must_use]
+    pub const fn bold(self) -> Option<bool> {
+        self.bold
+    }
+
+    /// Returns the requested italic value, if present.
+    #[must_use]
+    pub const fn italic(self) -> Option<bool> {
+        self.italic
+    }
+
+    /// Returns the requested underline style, if present.
+    #[must_use]
+    pub const fn underline(self) -> Option<UnderlineStyle> {
+        self.underline
+    }
+
+    /// Returns the requested font size, if present.
+    #[must_use]
+    pub const fn size(self) -> Option<NonZeroU16> {
+        self.size
+    }
+
+    /// Returns the requested single-strike value, if present.
+    #[must_use]
+    pub const fn strike(self) -> Option<bool> {
+        self.strike
+    }
+
+    /// Returns the requested double-strike value, if present.
+    #[must_use]
+    pub const fn double_strike(self) -> Option<bool> {
+        self.double_strike
+    }
+
+    /// Returns the requested hidden-text value, if present.
+    #[must_use]
+    pub const fn hidden(self) -> Option<bool> {
+        self.hidden
+    }
+
+    /// Returns the requested all-capitals value, if present.
+    #[must_use]
+    pub const fn all_caps(self) -> Option<bool> {
+        self.all_caps
+    }
+
+    /// Returns the requested small-capitals value, if present.
+    #[must_use]
+    pub const fn small_caps(self) -> Option<bool> {
+        self.small_caps
+    }
+
+    /// Returns the requested outline value, if present.
+    #[must_use]
+    pub const fn outline(self) -> Option<bool> {
+        self.outline
+    }
+
+    fn from_format(formatting: &crate::types::Formatting, requested: Self) -> Self {
+        Self {
+            bold: requested.bold.map(|_| formatting.bold),
+            italic: requested.italic.map(|_| formatting.italic),
+            underline: requested.underline.map(|_| formatting.underline),
+            size: requested.size.map(|_| formatting.font_size),
+            strike: requested.strike.map(|_| formatting.strike),
+            double_strike: requested.double_strike.map(|_| formatting.double_strike),
+            hidden: requested.hidden.map(|_| formatting.hidden),
+            all_caps: requested.all_caps.map(|_| formatting.all_caps),
+            small_caps: requested.small_caps.map(|_| formatting.smallcaps),
+            outline: requested.outline.map(|_| formatting.outline),
+        }
+    }
+
+    fn all_from_format(formatting: &crate::types::Formatting) -> Self {
+        Self {
+            bold: Some(formatting.bold),
+            italic: Some(formatting.italic),
+            underline: Some(formatting.underline),
+            size: Some(formatting.font_size),
+            strike: Some(formatting.strike),
+            double_strike: Some(formatting.double_strike),
+            hidden: Some(formatting.hidden),
+            all_caps: Some(formatting.all_caps),
+            small_caps: Some(formatting.smallcaps),
+            outline: Some(formatting.outline),
+        }
+    }
+
+    fn changed_from(before: Self, after: Self) -> Self {
+        Self {
+            bold: (before.bold != after.bold).then_some(after.bold).flatten(),
+            italic: (before.italic != after.italic)
+                .then_some(after.italic)
+                .flatten(),
+            underline: (before.underline != after.underline)
+                .then_some(after.underline)
+                .flatten(),
+            size: (before.size != after.size).then_some(after.size).flatten(),
+            strike: (before.strike != after.strike)
+                .then_some(after.strike)
+                .flatten(),
+            double_strike: (before.double_strike != after.double_strike)
+                .then_some(after.double_strike)
+                .flatten(),
+            hidden: (before.hidden != after.hidden)
+                .then_some(after.hidden)
+                .flatten(),
+            all_caps: (before.all_caps != after.all_caps)
+                .then_some(after.all_caps)
+                .flatten(),
+            small_caps: (before.small_caps != after.small_caps)
+                .then_some(after.small_caps)
+                .flatten(),
+            outline: (before.outline != after.outline)
+                .then_some(after.outline)
+                .flatten(),
+        }
+    }
+
+    fn apply_to(self, formatting: &mut crate::types::Formatting) {
+        if let Some(value) = self.bold {
+            formatting.bold = value;
+        }
+        if let Some(value) = self.italic {
+            formatting.italic = value;
+        }
+        if let Some(value) = self.underline {
+            formatting.underline = value;
+        }
+        if let Some(value) = self.size {
+            formatting.font_size = value;
+        }
+        if let Some(value) = self.strike {
+            formatting.strike = value;
+        }
+        if let Some(value) = self.double_strike {
+            formatting.double_strike = value;
+        }
+        if let Some(value) = self.hidden {
+            formatting.hidden = value;
+        }
+        if let Some(value) = self.all_caps {
+            formatting.all_caps = value;
+        }
+        if let Some(value) = self.small_caps {
+            formatting.smallcaps = value;
+        }
+        if let Some(value) = self.outline {
+            formatting.outline = value;
+        }
+    }
+}
+
+/// One immutable-source body paragraph/run selector and character-format
+/// update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RunFormatUpdate {
+    paragraph: Position,
+    run: Position,
+    patch: RunFormatPatch,
+}
+
+impl RunFormatUpdate {
+    /// Creates one source-relative run-format update.
+    #[must_use]
+    pub const fn new(paragraph: Position, run: Position, patch: RunFormatPatch) -> Self {
+        Self {
+            paragraph,
+            run,
+            patch,
+        }
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn paragraph(self) -> Position {
+        self.paragraph
+    }
+
+    /// Returns the zero-based source run position within the paragraph.
+    #[must_use]
+    pub const fn run(self) -> Position {
+        self.run
+    }
+
+    /// Returns the requested omission-preserving patch.
+    #[must_use]
+    pub const fn patch(self) -> RunFormatPatch {
+        self.patch
+    }
+}
+
+/// One immutable-source body paragraph/run selector and text replacement.
+///
+/// The replacement is resolved against the source run axis when the complete
+/// batch is staged.  An optional [`RunFormatPatch`] is applied to the new text
+/// in the same native operation; omitted character facets inherit the selected
+/// run.  Newline-bearing values are refused because they would change the
+/// paragraph axis selected by this API. Tabs, escaped RTF characters, and
+/// Unicode scalars are encoded through the ordinary native text writer.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_rtf::edit::RunTextReplacement;
+/// use litchi_rtf::Package;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let package = Package::parse(r#"{\rtf1\ansi First\par Second}"#)?;
+/// let mut edit = package.edit();
+/// edit.replace_body_run_texts(&[RunTextReplacement::new(
+///     Position::new(0), Position::new(0), "Changed",
+/// )])?;
+/// let _commit = edit.commit()?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::RunTextReplacement;
+///
+/// let _ = RunTextReplacement::new(0, 0, "text");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunTextReplacement {
+    paragraph: Position,
+    run: Position,
+    text: String,
+    format: Option<RunFormatPatch>,
+}
+
+/// One immutable-source body paragraph/run insertion.
+///
+/// `run` is an insertion boundary rather than an existing run selector: zero
+/// inserts before the first run and `run == paragraph.run_count()` appends.
+/// The insertion is resolved against the immutable source run axis when a
+/// complete batch is staged. An omitted format patch inherits the complete
+/// effective formatting of the run to the right, or the final run when
+/// appending; an empty paragraph inherits the effective character state at
+/// its paragraph boundary, falling back to native RTF defaults when that
+/// state is actually default. The ten
+/// addressable facets in [`RunFormatPatch`] override only their named values,
+/// preserving inherited resources and other character metadata.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_rtf::edit::{RunFormatPatch, RunTextInsertion};
+/// use litchi_rtf::Package;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let package = Package::parse(r#"{\rtf1\ansi First\par Second}"#)?;
+/// let mut edit = package.edit();
+/// edit.insert_body_runs(&[RunTextInsertion::new(
+///     Position::new(0), Position::new(1), "between",
+/// ).with_format(RunFormatPatch::new().with_bold(true))])?;
+/// let _commit = edit.commit()?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::RunTextInsertion;
+///
+/// let _ = RunTextInsertion::new(0, 0, "text");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunTextInsertion {
+    paragraph: Position,
+    run: Position,
+    text: String,
+    format: Option<RunFormatPatch>,
+}
+
+impl RunTextInsertion {
+    /// Creates one source-relative run insertion at a run boundary.
+    #[must_use]
+    pub fn new(paragraph: Position, run: Position, text: impl Into<String>) -> Self {
+        Self {
+            paragraph,
+            run,
+            text: text.into(),
+            format: None,
+        }
+    }
+
+    /// Applies an omission-preserving character-format patch to the inserted
+    /// run. Omitted facets retain the inherited source formatting.
+    #[must_use]
+    pub const fn with_format(mut self, format: RunFormatPatch) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn paragraph(&self) -> Position {
+        self.paragraph
+    }
+
+    /// Returns the source run insertion boundary.
+    #[must_use]
+    pub const fn run(&self) -> Position {
+        self.run
+    }
+
+    /// Returns the inserted text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Returns the optional omission-preserving format patch.
+    #[must_use]
+    pub const fn format(&self) -> Option<RunFormatPatch> {
+        self.format
+    }
+}
+
+impl RunTextReplacement {
+    /// Creates one source-relative run text replacement.
+    #[must_use]
+    pub fn new(paragraph: Position, run: Position, text: impl Into<String>) -> Self {
+        Self {
+            paragraph,
+            run,
+            text: text.into(),
+            format: None,
+        }
+    }
+
+    /// Applies an omission-preserving character-format patch to the new text.
+    #[must_use]
+    pub const fn with_format(mut self, format: RunFormatPatch) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn paragraph(&self) -> Position {
+        self.paragraph
+    }
+
+    /// Returns the zero-based source run position within the paragraph.
+    #[must_use]
+    pub const fn run(&self) -> Position {
+        self.run
+    }
+
+    /// Returns the replacement text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Returns the optional character-format patch.
+    #[must_use]
+    pub const fn format(&self) -> Option<RunFormatPatch> {
+        self.format
+    }
+}
+
+/// The dependency-free local layout facets of one ordinary body paragraph.
+///
+/// Values are the paragraph's directly stored RTF properties. Style-sheet
+/// inheritance is intentionally not resolved here: a style reference makes a
+/// layout transaction ineligible, so callers can distinguish direct values
+/// from the document's effective style result. Zero spacing or indentation
+/// and `false` pagination flags represent the cleared state.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphLayout {
+    space_before: i32,
+    space_after: i32,
+    left_indent: i32,
+    right_indent: i32,
+    first_line_indent: i32,
+    keep_together: bool,
+    keep_with_next: bool,
+    page_break_before: bool,
+    frame: Option<ParagraphFrame>,
+}
+
+impl ParagraphLayout {
+    pub(crate) fn from_raw(paragraph: &crate::types::Paragraph) -> Self {
+        Self {
+            space_before: paragraph.spacing.before,
+            space_after: paragraph.spacing.after,
+            left_indent: paragraph.indentation.left,
+            right_indent: paragraph.indentation.right,
+            first_line_indent: paragraph.indentation.first_line,
+            keep_together: paragraph.keep_together,
+            keep_with_next: paragraph.keep_next,
+            page_break_before: paragraph.page_break_before,
+            frame: paragraph.frame,
+        }
+    }
+
+    /// Space before the paragraph in twips.
+    #[must_use]
+    pub const fn space_before(self) -> i32 {
+        self.space_before
+    }
+
+    /// Space after the paragraph in twips.
+    #[must_use]
+    pub const fn space_after(self) -> i32 {
+        self.space_after
+    }
+
+    /// Physical left indentation in twips.
+    #[must_use]
+    pub const fn left_indent(self) -> i32 {
+        self.left_indent
+    }
+
+    /// Physical right indentation in twips.
+    #[must_use]
+    pub const fn right_indent(self) -> i32 {
+        self.right_indent
+    }
+
+    /// First-line indentation in twips. Negative values are hanging indents.
+    #[must_use]
+    pub const fn first_line_indent(self) -> i32 {
+        self.first_line_indent
+    }
+
+    /// Whether the paragraph requests staying on one page.
+    #[must_use]
+    pub const fn keep_together(self) -> bool {
+        self.keep_together
+    }
+
+    /// Whether the paragraph requests staying with its successor.
+    #[must_use]
+    pub const fn keep_with_next(self) -> bool {
+        self.keep_with_next
+    }
+
+    /// Whether the paragraph requests a page break before itself.
+    #[must_use]
+    pub const fn page_break_before(self) -> bool {
+        self.page_break_before
+    }
+
+    /// Positioned frame attached to the paragraph, when present.
+    #[must_use]
+    pub const fn frame(self) -> Option<ParagraphFrame> {
+        self.frame
+    }
+}
+
+/// Typed partial update for dependency-free local paragraph layout.
+///
+/// An omitted field is preserved. Supplying zero for spacing or indentation,
+/// or `false` for a pagination flag, clears that explicit semantic value.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphLayoutPatch {
+    space_before: Option<i32>,
+    space_after: Option<i32>,
+    left_indent: Option<i32>,
+    right_indent: Option<i32>,
+    first_line_indent: Option<i32>,
+    keep_together: Option<bool>,
+    keep_with_next: Option<bool>,
+    page_break_before: Option<bool>,
+    frame: Option<Option<ParagraphFrame>>,
+}
+
+impl ParagraphLayoutPatch {
+    /// Creates an empty delta. At least one field is required when staging.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            space_before: None,
+            space_after: None,
+            left_indent: None,
+            right_indent: None,
+            first_line_indent: None,
+            keep_together: None,
+            keep_with_next: None,
+            page_break_before: None,
+            frame: None,
+        }
+    }
+
+    #[must_use]
+    pub const fn with_space_before(mut self, twips: i32) -> Self {
+        self.space_before = Some(twips);
+        self
+    }
+
+    /// Clears explicit space before the paragraph.
+    #[must_use]
+    pub const fn clear_space_before(self) -> Self {
+        self.with_space_before(0)
+    }
+
+    #[must_use]
+    pub const fn with_space_after(mut self, twips: i32) -> Self {
+        self.space_after = Some(twips);
+        self
+    }
+
+    /// Clears explicit space after the paragraph.
+    #[must_use]
+    pub const fn clear_space_after(self) -> Self {
+        self.with_space_after(0)
+    }
+
+    #[must_use]
+    pub const fn with_left_indent(mut self, twips: i32) -> Self {
+        self.left_indent = Some(twips);
+        self
+    }
+
+    /// Clears explicit physical left indentation.
+    #[must_use]
+    pub const fn clear_left_indent(self) -> Self {
+        self.with_left_indent(0)
+    }
+
+    #[must_use]
+    pub const fn with_right_indent(mut self, twips: i32) -> Self {
+        self.right_indent = Some(twips);
+        self
+    }
+
+    /// Clears explicit physical right indentation.
+    #[must_use]
+    pub const fn clear_right_indent(self) -> Self {
+        self.with_right_indent(0)
+    }
+
+    #[must_use]
+    pub const fn with_first_line_indent(mut self, twips: i32) -> Self {
+        self.first_line_indent = Some(twips);
+        self
+    }
+
+    /// Clears explicit first-line or hanging indentation.
+    #[must_use]
+    pub const fn clear_first_line_indent(self) -> Self {
+        self.with_first_line_indent(0)
+    }
+
+    #[must_use]
+    pub const fn with_keep_together(mut self, keep: bool) -> Self {
+        self.keep_together = Some(keep);
+        self
+    }
+
+    /// Clears the local keep-together request.
+    #[must_use]
+    pub const fn clear_keep_together(self) -> Self {
+        self.with_keep_together(false)
+    }
+
+    #[must_use]
+    pub const fn with_keep_with_next(mut self, keep: bool) -> Self {
+        self.keep_with_next = Some(keep);
+        self
+    }
+
+    /// Clears the local keep-with-next request.
+    #[must_use]
+    pub const fn clear_keep_with_next(self) -> Self {
+        self.with_keep_with_next(false)
+    }
+
+    #[must_use]
+    pub const fn with_page_break_before(mut self, page_break: bool) -> Self {
+        self.page_break_before = Some(page_break);
+        self
+    }
+
+    /// Clears the local page-break-before request.
+    #[must_use]
+    pub const fn clear_page_break_before(self) -> Self {
+        self.with_page_break_before(false)
+    }
+
+    /// Replaces the positioned frame attached to the paragraph.
+    #[must_use]
+    pub const fn with_frame(mut self, frame: ParagraphFrame) -> Self {
+        self.frame = Some(Some(frame));
+        self
+    }
+
+    /// Removes the positioned frame attached to the paragraph.
+    #[must_use]
+    pub const fn clear_frame(mut self) -> Self {
+        self.frame = Some(None);
+        self
+    }
+
+    const fn fields(self) -> LayoutFields {
+        let mut fields = 0u16;
+        if self.space_before.is_some() {
+            fields |= LayoutFields::SPACE_BEFORE;
+        }
+        if self.space_after.is_some() {
+            fields |= LayoutFields::SPACE_AFTER;
+        }
+        if self.left_indent.is_some() {
+            fields |= LayoutFields::LEFT_INDENT;
+        }
+        if self.right_indent.is_some() {
+            fields |= LayoutFields::RIGHT_INDENT;
+        }
+        if self.first_line_indent.is_some() {
+            fields |= LayoutFields::FIRST_LINE_INDENT;
+        }
+        if self.keep_together.is_some() {
+            fields |= LayoutFields::KEEP_TOGETHER;
+        }
+        if self.keep_with_next.is_some() {
+            fields |= LayoutFields::KEEP_WITH_NEXT;
+        }
+        if self.page_break_before.is_some() {
+            fields |= LayoutFields::PAGE_BREAK_BEFORE;
+        }
+        if self.frame.is_some() {
+            fields |= LayoutFields::FRAME;
+        }
+        LayoutFields(fields)
+    }
+
+    fn apply(self, layout: &mut ParagraphLayout) {
+        if let Some(value) = self.space_before {
+            layout.space_before = value;
+        }
+        if let Some(value) = self.space_after {
+            layout.space_after = value;
+        }
+        if let Some(value) = self.left_indent {
+            layout.left_indent = value;
+        }
+        if let Some(value) = self.right_indent {
+            layout.right_indent = value;
+        }
+        if let Some(value) = self.first_line_indent {
+            layout.first_line_indent = value;
+        }
+        if let Some(value) = self.keep_together {
+            layout.keep_together = value;
+        }
+        if let Some(value) = self.keep_with_next {
+            layout.keep_with_next = value;
+        }
+        if let Some(value) = self.page_break_before {
+            layout.page_break_before = value;
+        }
+        if let Some(value) = self.frame {
+            layout.frame = value;
+        }
+    }
+}
+
+/// One immutable-source selector and typed local paragraph-layout delta.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphLayoutUpdate {
+    position: Position,
+    patch: ParagraphLayoutPatch,
+}
+
+impl ParagraphLayoutUpdate {
+    #[must_use]
+    pub const fn new(position: Position, patch: ParagraphLayoutPatch) -> Self {
+        Self { position, patch }
+    }
+
+    #[must_use]
+    pub const fn position(self) -> Position {
+        self.position
+    }
+
+    #[must_use]
+    pub const fn patch(self) -> ParagraphLayoutPatch {
+        self.patch
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct LayoutFields(u16);
+
+impl LayoutFields {
+    const SPACE_BEFORE: u16 = 1 << 0;
+    const SPACE_AFTER: u16 = 1 << 1;
+    const LEFT_INDENT: u16 = 1 << 2;
+    const RIGHT_INDENT: u16 = 1 << 3;
+    const FIRST_LINE_INDENT: u16 = 1 << 4;
+    const KEEP_TOGETHER: u16 = 1 << 5;
+    const KEEP_WITH_NEXT: u16 = 1 << 6;
+    const PAGE_BREAK_BEFORE: u16 = 1 << 7;
+    const FRAME: u16 = 1 << 8;
+
+    const fn is_empty(self) -> bool {
+        self.0 == 0
+    }
+
+    const fn overlaps(self, other: Self) -> bool {
+        self.0 & other.0 != 0
+    }
+}
+
+fn layout_effect_keys(position: usize, fields: LayoutFields) -> Vec<String> {
+    let mut effects = Vec::new();
+    for (bit, name) in [
+        (LayoutFields::SPACE_BEFORE, "space-before"),
+        (LayoutFields::SPACE_AFTER, "space-after"),
+        (LayoutFields::LEFT_INDENT, "left-indent"),
+        (LayoutFields::RIGHT_INDENT, "right-indent"),
+        (LayoutFields::FIRST_LINE_INDENT, "first-line-indent"),
+        (LayoutFields::KEEP_TOGETHER, "keep-together"),
+        (LayoutFields::KEEP_WITH_NEXT, "keep-with-next"),
+        (LayoutFields::PAGE_BREAK_BEFORE, "page-break-before"),
+        (LayoutFields::FRAME, "frame"),
+    ] {
+        if fields.0 & bit != 0 {
+            effects.push(format!("body:paragraph:{position}:layout:{name}"));
+        }
+    }
+    effects
+}
+
+fn first_layout_conflict(
+    operations: &[(usize, LayoutFields, usize)],
+    position: usize,
+    fields: LayoutFields,
+) -> Option<usize> {
+    let start = operations.partition_point(|entry| entry.0 < position);
+    operations
+        .iter()
+        .skip(start)
+        .take_while(|entry| entry.0 == position)
+        .find_map(|entry| entry.1.overlaps(fields).then_some(entry.2))
+}
+
+fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::unsupported_source(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !source_bytes.is_ascii() {
+        return Err(Error::unsupported_source(
+            "paragraph-layout editing refuses non-ASCII transport encodings",
+        ));
+    }
+    if source.model().unknown_syntax_markers() != 0 {
+        return Err(Error::unsupported_source(
+            "paragraph-layout editing refuses unretained unknown RTF syntax",
+        ));
+    }
+    for node in source.opaque() {
+        if let crate::opaque::Anchor::Structural { context, .. } = node.anchor()
+            && !matches!(
+                context,
+                crate::opaque::Context::Metadata | crate::opaque::Context::HeaderFooter
+            )
+        {
+            return Err(Error::unsupported_source(
+                "paragraph-layout editing refuses opaque dependent destinations",
+            ));
+        }
+    }
+    source
+        .model()
+        .positioned_paragraph_property_editability()
+        .map_err(Error::unsupported_source)?;
+    for paragraph in source.body().paragraphs() {
+        if paragraph
+            .inlines()
+            .any(|inline| matches!(inline, crate::text::Inline::Break(crate::text::Break::Line)))
+        {
+            return Err(Error::unsupported_source(
+                "paragraph-layout editing refuses inline line breaks",
+            ));
+        }
+        let raw = paragraph.format().raw();
+        if raw.paragraph_style.is_some()
+            || raw.list_override.is_some()
+            || raw.list_level.is_some()
+            || raw.legacy_numbering.is_some()
+        {
+            return Err(Error::unsupported_source(
+                "paragraph-layout editing refuses dependent style or list references",
+            ));
+        }
+    }
+    Ok(())
+}
+
+impl ParagraphTextReplacement {
+    /// Creates one source-relative paragraph replacement.
+    #[must_use]
+    pub fn new(position: Position, replacement: impl Into<String>) -> Self {
+        Self {
+            position,
+            replacement: replacement.into(),
+        }
+    }
+
+    /// Zero-based source paragraph position.
+    #[must_use]
+    pub const fn position(&self) -> Position {
+        self.position
+    }
+
+    /// Replacement paragraph text.
+    #[must_use]
+    pub fn replacement(&self) -> &str {
+        &self.replacement
+    }
+}
+
+impl TextSpan {
+    /// Creates an ordered half-open span. Document bounds and UTF-8 boundaries
+    /// are checked when the span is staged.
+    ///
+    /// # Errors
+    /// Returns [`Error::ReversedSpan`] when `start` is after `end`.
+    pub const fn new(start: usize, end: usize) -> Result<Self, Error> {
+        if start > end {
+            return Err(Error::ReversedSpan { start, end });
+        }
+        Ok(Self { start, end })
+    }
+
+    /// Start UTF-8 byte position.
+    #[must_use]
+    pub const fn start(self) -> usize {
+        self.start
+    }
+
+    /// Exclusive end UTF-8 byte position.
+    #[must_use]
+    pub const fn end(self) -> usize {
+        self.end
+    }
+
+    /// Whether this span is an insertion point.
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.start == self.end
+    }
+}
+
+/// Checked route to one paragraph in a retained section header or footer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct HeaderFooterParagraph {
+    section: usize,
+    kind: HeaderFooterType,
+    paragraph: usize,
+}
+
+impl HeaderFooterParagraph {
+    /// Creates a selector whose existence is checked when an operation is staged.
+    #[must_use]
+    pub const fn new(section: usize, kind: HeaderFooterType, paragraph: usize) -> Self {
+        Self {
+            section,
+            kind,
+            paragraph,
+        }
+    }
+
+    /// Zero-based section position.
+    #[must_use]
+    pub const fn section(self) -> usize {
+        self.section
+    }
+
+    /// Native header/footer destination kind.
+    #[must_use]
+    pub const fn kind(self) -> HeaderFooterType {
+        self.kind
+    }
+
+    /// Zero-based paragraph position within the destination.
+    #[must_use]
+    pub const fn paragraph(self) -> usize {
+        self.paragraph
+    }
+}
+
+/// Failure from an RTF transaction or patch application.
+#[derive(Debug, Clone)]
+#[non_exhaustive]
+pub enum Error {
+    /// A well-formed request cannot be carried through this edit route.
+    Refused(Refusal),
+    /// The edit engine violated a checked internal invariant.
+    Internal(&'static str),
+    /// The finite operation bound was exceeded.
+    Limit {
+        kind: SemanticLimitKind,
+        observed: usize,
+        maximum: usize,
+    },
+    /// A semantic profile value exceeds its addressable maximum.
+    InvalidLimit {
+        kind: SemanticLimitKind,
+        value: usize,
+        maximum: usize,
+    },
+    /// A paragraph batch must contain at least one replacement.
+    EmptyParagraphBatch,
+    /// Paragraph batch selectors must be strictly increasing and unique.
+    ParagraphBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A paragraph-removal batch must contain at least one selector.
+    EmptyParagraphRemovalBatch,
+    /// Paragraph-removal selectors must be strictly increasing and unique.
+    ParagraphRemovalBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A paragraph-alignment batch must contain at least one update.
+    EmptyParagraphAlignmentBatch,
+    /// Paragraph-alignment selectors must be strictly increasing and unique.
+    ParagraphAlignmentBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A paragraph-layout batch must contain at least one update.
+    EmptyParagraphLayoutBatch,
+    /// A paragraph-layout delta must name at least one field.
+    EmptyParagraphLayoutPatch { position: usize },
+    /// Paragraph-layout batch selectors must be strictly increasing and unique.
+    ParagraphLayoutBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A run-format batch must contain at least one update.
+    EmptyRunFormatBatch,
+    /// A run-format delta must name at least one facet.
+    EmptyRunFormatPatch { paragraph: usize, run: usize },
+    /// Run-format batch selectors must be strictly increasing and unique.
+    RunFormatBatchOutOfOrder {
+        previous_paragraph: usize,
+        previous_run: usize,
+        incoming_paragraph: usize,
+        incoming_run: usize,
+    },
+    /// A run-text replacement batch must contain at least one replacement.
+    EmptyRunTextBatch,
+    /// Run-text selectors must be strictly increasing and unique.
+    RunTextBatchOutOfOrder {
+        previous_paragraph: usize,
+        previous_run: usize,
+        incoming_paragraph: usize,
+        incoming_run: usize,
+    },
+    /// A run-insertion batch must contain at least one insertion.
+    EmptyRunInsertionBatch,
+    /// Run-insertion boundaries must be nondecreasing; equal boundaries keep
+    /// their input order.
+    RunInsertionBatchOutOfOrder {
+        previous_paragraph: usize,
+        previous_run: usize,
+        incoming_paragraph: usize,
+        incoming_run: usize,
+    },
+    /// An inserted run must contain at least one semantic character.
+    EmptyRunTextInsertion { paragraph: usize, run: usize },
+    /// A run insertion boundary is outside the selected paragraph's run axis.
+    RunInsertionOutOfRange {
+        paragraph: usize,
+        run: usize,
+        count: usize,
+    },
+    /// A checked body paragraph/run selector does not exist.
+    RunOutOfRange {
+        paragraph: usize,
+        run: usize,
+        count: usize,
+    },
+    /// Two staged operations have overlapping effects.
+    Conflict { existing: usize, incoming: usize },
+
+    /// Replacement text exceeds the source snapshot's retained resource profile.
+    InputTooLarge { observed: usize, limit: usize },
+    /// A span has its endpoints in reverse order.
+    ReversedSpan { start: usize, end: usize },
+    /// A span is outside the semantic body.
+    SpanOutOfRange { end: usize, length: usize },
+    /// A span endpoint is not a UTF-8 boundary.
+    SpanNotOnCharacterBoundary { position: usize },
+    /// A checked paragraph position does not exist in the source body story.
+    ParagraphOutOfRange { position: usize, count: usize },
+    /// A paragraph split offset is outside the selected paragraph.
+    ParagraphSplitOffsetOutOfRange {
+        position: usize,
+        offset: usize,
+        length: usize,
+    },
+    /// A final paragraph split at its end has no exact terminal boundary.
+    ParagraphSplitAtEndRequiresBoundary { position: usize },
+    /// A paragraph merge must name two consecutive source paragraphs.
+    ParagraphMergeNonAdjacent { first: usize, second: usize },
+    /// A checked retained-destination selector does not exist.
+    DestinationOutOfRange(&'static str),
+    /// A checked standalone picture selector does not exist.
+    PictureOutOfRange { position: usize, count: usize },
+    /// Replacement picture bytes must keep the exact payload length.
+    PicturePayloadSizeMismatch {
+        position: usize,
+        expected: usize,
+        observed: usize,
+    },
+    /// A picture batch must contain at least one replacement.
+    EmptyPicturePayloadBatch,
+    /// Picture batch selectors must be strictly increasing and unique.
+    PicturePayloadBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A picture-removal batch must contain at least one selector.
+    EmptyPictureRemovalBatch,
+    /// Picture-removal selectors must be strictly increasing and unique.
+    PictureRemovalBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A durable operation's semantic expectation is stale.
+    StalePrecondition(&'static str),
+    /// A durable patch uses an unsupported format-owned vocabulary.
+    DurablePatch(String),
+    /// An edit or commit does not originate from the history's current snapshot.
+    HistorySourceMismatch,
+    /// The common bounded history refused a transition.
+    History(String),
+    /// Candidate parsing or validation failed.
+    Rtf(crate::Error),
+    /// Candidate transport construction failed before publication.
+    Write(String),
+
+    /// The patch was applied to bytes other than the snapshot that created it.
+    PatchConflict,
+}
+
+/// Shared, content-free refusal details for this family's errors.
+pub use litchi_core::edit::{Refusal, RefusalKind};
+
+impl Error {
+    pub(crate) const fn unsupported_source(reason: &'static str) -> Self {
+        Self::Refused(Refusal::new(
+            RefusalKind::UnsupportedContent,
+            "edit",
+            reason,
+        ))
+    }
+
+    pub(crate) const fn unsupported_operation(reason: &'static str) -> Self {
+        Self::Refused(Refusal::new(
+            RefusalKind::UnsupportedOperation,
+            "edit",
+            reason,
+        ))
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Refused(refusal) => refusal.fmt(formatter),
+            Self::Internal(reason) => write!(formatter, "internal RTF edit error: {reason}"),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "RTF edit {kind:?} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                formatter,
+                "invalid RTF semantic {kind:?} limit: {value} > {maximum}"
+            ),
+            Self::EmptyParagraphBatch => {
+                formatter.write_str("RTF paragraph replacement batch must not be empty")
+            },
+            Self::ParagraphBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph replacement positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyParagraphRemovalBatch => {
+                formatter.write_str("RTF paragraph removal batch must not be empty")
+            },
+            Self::ParagraphRemovalBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph removal positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyParagraphAlignmentBatch => {
+                formatter.write_str("RTF paragraph-alignment update batch must not be empty")
+            },
+            Self::ParagraphAlignmentBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph-alignment positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyParagraphLayoutBatch => {
+                formatter.write_str("RTF paragraph-layout update batch must not be empty")
+            },
+            Self::EmptyParagraphLayoutPatch { position } => write!(
+                formatter,
+                "RTF paragraph-layout update at position {position} has no fields"
+            ),
+            Self::ParagraphLayoutBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph-layout positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyRunFormatBatch => {
+                formatter.write_str("RTF run-format batch must not be empty")
+            },
+            Self::EmptyRunFormatPatch { paragraph, run } => write!(
+                formatter,
+                "RTF run-format patch at paragraph {paragraph}, run {run} has no facets"
+            ),
+            Self::RunFormatBatchOutOfOrder {
+                previous_paragraph,
+                previous_run,
+                incoming_paragraph,
+                incoming_run,
+            } => write!(
+                formatter,
+                "RTF run-format selectors must be strictly increasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
+            ),
+            Self::EmptyRunTextBatch => {
+                formatter.write_str("RTF run-text replacement batch must not be empty")
+            },
+            Self::RunTextBatchOutOfOrder {
+                previous_paragraph,
+                previous_run,
+                incoming_paragraph,
+                incoming_run,
+            } => write!(
+                formatter,
+                "RTF run-text selectors must be strictly increasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
+            ),
+            Self::EmptyRunInsertionBatch => {
+                formatter.write_str("RTF run-insertion batch must not be empty")
+            },
+            Self::RunInsertionBatchOutOfOrder {
+                previous_paragraph,
+                previous_run,
+                incoming_paragraph,
+                incoming_run,
+            } => write!(
+                formatter,
+                "RTF run-insertion boundaries must be nondecreasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
+            ),
+            Self::EmptyRunTextInsertion { paragraph, run } => write!(
+                formatter,
+                "RTF run insertion at paragraph {paragraph}, boundary {run} must contain text"
+            ),
+            Self::RunInsertionOutOfRange {
+                paragraph,
+                run,
+                count,
+            } => write!(
+                formatter,
+                "RTF body paragraph {paragraph} run insertion boundary {run} is outside 0..={count}"
+            ),
+            Self::RunOutOfRange {
+                paragraph,
+                run,
+                count,
+            } => write!(
+                formatter,
+                "RTF body paragraph {paragraph} run {run} is outside 0..{count}"
+            ),
+            Self::Conflict { existing, incoming } => write!(
+                formatter,
+                "RTF edit operation {incoming} conflicts with operation {existing}"
+            ),
+            Self::InputTooLarge { observed, limit } => write!(
+                formatter,
+                "replacement body text exceeds the source limit: observed {observed}, limit {limit}"
+            ),
+            Self::ReversedSpan { start, end } => {
+                write!(formatter, "RTF text span {start}..{end} is reversed")
+            },
+            Self::SpanOutOfRange { end, length } => write!(
+                formatter,
+                "RTF text span ends at {end}, beyond body length {length}"
+            ),
+            Self::SpanNotOnCharacterBoundary { position } => write!(
+                formatter,
+                "RTF text span position {position} is not a UTF-8 boundary"
+            ),
+            Self::ParagraphOutOfRange { position, count } => write!(
+                formatter,
+                "RTF body paragraph position {position} is outside 0..{count}"
+            ),
+            Self::ParagraphSplitOffsetOutOfRange {
+                position,
+                offset,
+                length,
+            } => write!(
+                formatter,
+                "RTF paragraph {position} split offset {offset} is outside 0..{length}"
+            ),
+            Self::ParagraphSplitAtEndRequiresBoundary { position } => write!(
+                formatter,
+                "RTF paragraph {position} split at its end requires an exact terminal boundary"
+            ),
+            Self::ParagraphMergeNonAdjacent { first, second } => write!(
+                formatter,
+                "RTF paragraphs {first} and {second} are not adjacent source paragraphs"
+            ),
+            Self::DestinationOutOfRange(destination) => {
+                write!(
+                    formatter,
+                    "RTF retained destination does not exist: {destination}"
+                )
+            },
+            Self::PictureOutOfRange { position, count } => write!(
+                formatter,
+                "RTF standalone picture position {position} is outside 0..{count}"
+            ),
+            Self::PicturePayloadSizeMismatch {
+                position,
+                expected,
+                observed,
+            } => write!(
+                formatter,
+                "RTF picture {position} payload length must remain {expected} bytes, observed {observed}"
+            ),
+            Self::EmptyPicturePayloadBatch => {
+                formatter.write_str("RTF picture payload replacement batch must not be empty")
+            },
+            Self::PicturePayloadBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF picture positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyPictureRemovalBatch => {
+                formatter.write_str("RTF picture removal batch must not be empty")
+            },
+            Self::PictureRemovalBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF picture removal positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::StalePrecondition(reason) => {
+                write!(formatter, "stale RTF patch precondition: {reason}")
+            },
+            Self::DurablePatch(reason) => write!(formatter, "invalid durable RTF patch: {reason}"),
+            Self::HistorySourceMismatch => {
+                formatter.write_str("RTF history source is not its current snapshot")
+            },
+            Self::History(reason) => write!(formatter, "RTF history refused commit: {reason}"),
+            Self::Rtf(error) => error.fmt(formatter),
+            Self::Write(error) => write!(formatter, "RTF candidate construction failed: {error}"),
+            Self::PatchConflict => {
+                formatter.write_str("RTF patch source does not match its expected snapshot")
+            },
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<crate::Error> for Error {
+    fn from(error: crate::Error) -> Self {
+        Self::Rtf(error)
+    }
+}
+
+/// Detached, bounded edit of an immutable snapshot.
+pub struct Edit {
+    source: Package,
+    limits: SemanticLimits,
+    operations: Vec<Operation>,
+    replacement_bytes: usize,
+    paragraph_batch_len: Option<usize>,
+    /// Effect keys of the staged destination operations, so a large
+    /// destination batch checks uniqueness in constant time per operation.
+    destination_effects: std::collections::HashSet<String>,
+    /// Field instructions, bookmarks, tab stops and section page setup,
+    /// committed by source splicing.
+    marks: Vec<marks::Mark>,
+}
+
+#[derive(Debug, Clone)]
+enum Operation {
+    Text {
+        span: TextSpan,
+        before: String,
+        after: String,
+        structural: bool,
+        raw_structure: Option<RawParagraphOperation>,
+    },
+    Alignment {
+        position: usize,
+        before: Alignment,
+        after: Alignment,
+    },
+    ParagraphLayout {
+        position: usize,
+        fields: LayoutFields,
+        before: ParagraphLayout,
+        after: ParagraphLayout,
+    },
+    RunFormat {
+        paragraph: usize,
+        run: usize,
+        before: RunFormatPatch,
+        after: RunFormatPatch,
+        text_before: Option<String>,
+        text_after: Option<String>,
+    },
+    RunInsert {
+        paragraph: usize,
+        run: usize,
+        span: TextSpan,
+        text: String,
+        format: Option<RunFormatPatch>,
+        inherited: Box<crate::types::Formatting>,
+        after: crate::types::Formatting,
+    },
+    Bold {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Italic {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Underline {
+        span: TextSpan,
+        before: UnderlineStyle,
+        after: UnderlineStyle,
+    },
+    FontSize {
+        span: TextSpan,
+        before: NonZeroU16,
+        after: NonZeroU16,
+    },
+    Baseline {
+        span: TextSpan,
+        before: CharacterBaseline,
+        after: CharacterBaseline,
+    },
+    Expansion {
+        span: TextSpan,
+        before: CharacterExpansion,
+        after: CharacterExpansion,
+    },
+    HorizontalScale {
+        span: TextSpan,
+        before: u16,
+        after: u16,
+    },
+    Kerning {
+        span: TextSpan,
+        before: u16,
+        after: u16,
+    },
+    Strike {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    DoubleStrike {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Hidden {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    SmallCaps {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    AllCaps {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Outline {
+        span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    InsertParagraph {
+        position: usize,
+        span: TextSpan,
+        text: String,
+    },
+    RemoveParagraph {
+        position: usize,
+        text: String,
+    },
+    RestoreParagraph {
+        position: usize,
+        text: String,
+    },
+    MoveParagraph {
+        position: usize,
+        final_position: usize,
+        text: String,
+    },
+    SwapParagraph {
+        first: usize,
+        second: usize,
+        first_text: String,
+        second_text: String,
+    },
+    TableCellText {
+        path: TableCellPath,
+        before: String,
+        after: String,
+    },
+    HeaderFooterText {
+        target: HeaderFooterParagraph,
+        before: String,
+        after: String,
+    },
+    AnnotationText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    NoteText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    ShapeText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    SmartTag {
+        index: usize,
+        before: crate::SmartTag<'static>,
+        after: crate::SmartTag<'static>,
+    },
+    MoveBookmark {
+        index: usize,
+        before: crate::MoveBookmark<'static>,
+        after: crate::MoveBookmark<'static>,
+    },
+    PicturePayload(picture_payload::StagedPicturePayload),
+    PictureRemoval(picture_payload::StagedPictureRemoval),
+    RootTransfer {
+        vocabulary: &'static str,
+        effect: String,
+        before: Vec<u8>,
+        after: Vec<u8>,
+    },
+}
+
+/// A source-proven ordinary-paragraph boundary edit.
+///
+/// The semantic `Text` operation carrying this marker is deliberately kept
+/// separate from the normal writer-backed text path. Its source ranges are
+/// proven against the immutable snapshot before staging and checked again
+/// before publication, allowing the commit to splice only `\\par` bytes.
+#[derive(Debug, Clone)]
+enum RawParagraphOperation {
+    Split {
+        position: usize,
+        offset: usize,
+        source_offset: usize,
+        boundary: Vec<u8>,
+        before: String,
+    },
+    Merge {
+        position: usize,
+        boundary: Range<usize>,
+        boundary_bytes: Vec<u8>,
+        left: String,
+        right: String,
+    },
+}
+
+fn smart_tag_replacement_bytes(value: &crate::SmartTag<'_>) -> usize {
+    value.attributes.iter().fold(
+        value.name.len().saturating_add(value.content.len()),
+        |total, attribute| {
+            total
+                .saturating_add(attribute.name.len())
+                .saturating_add(attribute.value.len())
+        },
+    )
+}
+
+impl Operation {
+    fn replacement_bytes(&self) -> usize {
+        match self {
+            Self::Text {
+                raw_structure: Some(RawParagraphOperation::Split { boundary, .. }),
+                ..
+            } => boundary.len(),
+            Self::Text { after, .. }
+            | Self::TableCellText { after, .. }
+            | Self::HeaderFooterText { after, .. }
+            | Self::AnnotationText { after, .. }
+            | Self::NoteText { after, .. }
+            | Self::ShapeText { after, .. } => after.len(),
+            Self::SmartTag { after, .. } => smart_tag_replacement_bytes(after),
+            Self::MoveBookmark { after, .. } => after.tag.len().saturating_add(after.content.len()),
+            Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
+            Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
+            Self::RemoveParagraph { .. }
+            | Self::MoveParagraph { .. }
+            | Self::SwapParagraph { .. } => 0,
+            Self::PicturePayload(operation) => operation.after_transport.len(),
+            Self::PictureRemoval(_) => 0,
+            Self::RootTransfer { after, .. } => after.len(),
+            Self::ParagraphLayout { before, after, .. } => {
+                let _ = (before, after);
+                0
+            },
+            Self::RunFormat { text_after, .. } => text_after.as_deref().map_or(0, str::len),
+            Self::RunInsert { text, .. } => text.len(),
+            Self::Alignment { .. }
+            | Self::Bold { .. }
+            | Self::Italic { .. }
+            | Self::Underline { .. }
+            | Self::Strike { .. }
+            | Self::DoubleStrike { .. }
+            | Self::Hidden { .. }
+            | Self::SmallCaps { .. }
+            | Self::AllCaps { .. }
+            | Self::Outline { .. }
+            | Self::FontSize { .. }
+            | Self::Baseline { .. }
+            | Self::Expansion { .. }
+            | Self::HorizontalScale { .. }
+            | Self::Kerning { .. } => 0,
+        }
+    }
+
+    fn effect_keys(&self) -> Vec<String> {
+        match self {
+            Self::Text { structural, .. } if *structural => {
+                vec!["body:structure".to_string()]
+            },
+            Self::Text { .. } => vec!["body:text".to_string()],
+            Self::Alignment { position, .. } => {
+                vec![format!("body:paragraph:{position}:alignment")]
+            },
+            Self::ParagraphLayout {
+                position, fields, ..
+            } => layout_effect_keys(*position, *fields),
+            Self::RunFormat { paragraph, run, .. } => {
+                vec![format!("body:paragraph:{paragraph}:run:{run}:format")]
+            },
+            Self::RunInsert { paragraph, run, .. } => {
+                vec![format!("body:paragraph:{paragraph}:run:{run}:insert")]
+            },
+            Self::Bold { span, .. } => {
+                vec![format!("body:character:{}-{}:bold", span.start, span.end)]
+            },
+            Self::Italic { span, .. } => {
+                vec![format!("body:character:{}-{}:italic", span.start, span.end)]
+            },
+            Self::Underline { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:underline",
+                    span.start, span.end
+                )]
+            },
+            Self::FontSize { span, .. } => vec![format!(
+                "body:character:{}-{}:font-size",
+                span.start, span.end
+            )],
+            Self::Baseline { span, .. } => vec![format!(
+                "body:character:{}-{}:baseline",
+                span.start, span.end
+            )],
+            Self::Expansion { span, .. } => vec![format!(
+                "body:character:{}-{}:expansion",
+                span.start, span.end
+            )],
+            Self::HorizontalScale { span, .. } => vec![format!(
+                "body:character:{}-{}:horizontal-scale",
+                span.start, span.end
+            )],
+            Self::Kerning { span, .. } => vec![format!(
+                "body:character:{}-{}:kerning",
+                span.start, span.end
+            )],
+            Self::Strike { span, .. } => {
+                vec![format!("body:character:{}-{}:strike", span.start, span.end)]
+            },
+            Self::DoubleStrike { span, .. } => vec![format!(
+                "body:character:{}-{}:double-strike",
+                span.start, span.end
+            )],
+            Self::Hidden { span, .. } => {
+                vec![format!("body:character:{}-{}:hidden", span.start, span.end)]
+            },
+            Self::SmallCaps { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:small-caps",
+                    span.start, span.end
+                )]
+            },
+            Self::AllCaps { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:all-caps",
+                    span.start, span.end
+                )]
+            },
+            Self::Outline { span, .. } => {
+                vec![format!(
+                    "body:character:{}-{}:outline",
+                    span.start, span.end
+                )]
+            },
+            Self::InsertParagraph { .. }
+            | Self::RemoveParagraph { .. }
+            | Self::RestoreParagraph { .. }
+            | Self::MoveParagraph { .. }
+            | Self::SwapParagraph { .. } => vec!["body:structure".to_string()],
+            Self::TableCellText { path, .. } => vec![table_cell_effect(path)],
+            Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
+            Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
+            Self::NoteText { index, .. } => vec![note_effect(*index)],
+            Self::ShapeText { index, .. } => vec![shape_effect(*index)],
+            Self::SmartTag { index, .. } => vec![format!("body:smart-tag:{index}")],
+            Self::MoveBookmark { index, .. } => vec![format!("body:move-bookmark:{index}")],
+            Self::PicturePayload(operation) => {
+                vec![format!("body:picture:{}:payload", operation.position)]
+            },
+            Self::PictureRemoval(operation) => {
+                vec![format!("body:picture:{}", operation.position)]
+            },
+            Self::RootTransfer { effect, .. } => vec![effect.clone()],
+        }
+    }
+
+    const fn span(&self) -> Option<TextSpan> {
+        match self {
+            Self::Text { span, .. }
+            | Self::Bold { span, .. }
+            | Self::Italic { span, .. }
+            | Self::Underline { span, .. }
+            | Self::FontSize { span, .. }
+            | Self::Baseline { span, .. }
+            | Self::Strike { span, .. }
+            | Self::DoubleStrike { span, .. }
+            | Self::Hidden { span, .. }
+            | Self::SmallCaps { span, .. }
+            | Self::AllCaps { span, .. }
+            | Self::Outline { span, .. }
+            | Self::Expansion { span, .. }
+            | Self::HorizontalScale { span, .. }
+            | Self::Kerning { span, .. }
+            | Self::InsertParagraph { span, .. }
+            | Self::RunInsert { span, .. } => Some(*span),
+            Self::Alignment { .. }
+            | Self::ParagraphLayout { .. }
+            | Self::RunFormat { .. }
+            | Self::RemoveParagraph { .. }
+            | Self::RestoreParagraph { .. }
+            | Self::MoveParagraph { .. }
+            | Self::SwapParagraph { .. }
+            | Self::TableCellText { .. }
+            | Self::HeaderFooterText { .. }
+            | Self::AnnotationText { .. }
+            | Self::NoteText { .. }
+            | Self::ShapeText { .. }
+            | Self::SmartTag { .. }
+            | Self::MoveBookmark { .. }
+            | Self::PicturePayload(_)
+            | Self::PictureRemoval(_)
+            | Self::RootTransfer { .. } => None,
+        }
+    }
+
+    const fn is_property(&self) -> bool {
+        matches!(
+            self,
+            Self::Alignment { .. }
+                | Self::ParagraphLayout { .. }
+                | Self::RunFormat { .. }
+                | Self::Bold { .. }
+                | Self::Italic { .. }
+                | Self::Underline { .. }
+                | Self::FontSize { .. }
+                | Self::Baseline { .. }
+                | Self::Strike { .. }
+                | Self::DoubleStrike { .. }
+                | Self::Hidden { .. }
+                | Self::SmallCaps { .. }
+                | Self::AllCaps { .. }
+                | Self::Outline { .. }
+                | Self::Expansion { .. }
+                | Self::HorizontalScale { .. }
+                | Self::Kerning { .. }
+        )
+    }
+
+    const fn is_destination(&self) -> bool {
+        matches!(
+            self,
+            Self::TableCellText { .. }
+                | Self::HeaderFooterText { .. }
+                | Self::AnnotationText { .. }
+                | Self::NoteText { .. }
+                | Self::ShapeText { .. }
+                | Self::SmartTag { .. }
+                | Self::MoveBookmark { .. }
+                | Self::PicturePayload(_)
+                | Self::PictureRemoval(_)
+                | Self::RootTransfer { .. }
+        )
+    }
+
+    const fn is_root_transfer(&self) -> bool {
+        matches!(self, Self::RootTransfer { .. })
+    }
+
+    const fn is_picture_payload(&self) -> bool {
+        matches!(self, Self::PicturePayload(_))
+    }
+
+    const fn is_picture_removal(&self) -> bool {
+        matches!(self, Self::PictureRemoval(_))
+    }
+
+    const fn is_lifecycle(&self) -> bool {
+        matches!(
+            self,
+            Self::Text {
+                raw_structure: Some(_),
+                ..
+            } | Self::RemoveParagraph { .. }
+                | Self::RestoreParagraph { .. }
+                | Self::MoveParagraph { .. }
+                | Self::SwapParagraph { .. }
+        )
+    }
+
+    const fn is_paragraph_removal(&self) -> bool {
+        matches!(self, Self::RemoveParagraph { .. })
+    }
+
+    const fn is_raw_paragraph_structure(&self) -> bool {
+        matches!(
+            self,
+            Self::Text {
+                raw_structure: Some(_),
+                ..
+            }
+        )
+    }
+}
+
+impl Edit {
+    /// Options admitted for this detached edit.
+    #[must_use]
+    pub fn options(&self) -> EditOptions {
+        EditOptions::new().semantic_limits(self.limits)
+    }
+
+    pub(crate) fn new(source: Package) -> Self {
+        Self::new_with_options(source, EditOptions::default())
+    }
+
+    pub(crate) fn new_with_options(source: Package, options: EditOptions) -> Self {
+        Self {
+            source,
+            limits: options.semantic_limits_value(),
+            operations: Vec::new(),
+            replacement_bytes: 0,
+            paragraph_batch_len: None,
+            destination_effects: std::collections::HashSet::new(),
+            marks: Vec::new(),
+        }
+    }
+
+    pub(crate) fn stage_root_transfer(
+        &mut self,
+        vocabulary: &'static str,
+        effect: String,
+        after: Vec<u8>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_operation_room()?;
+        if !self.operations.is_empty() {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        }
+        if !self.source.opaque().is_empty() {
+            return Err(Error::unsupported_source(
+                "ordinary-root transfer refuses unknown target destinations",
+            ));
+        }
+        self.admit_replacement(after.len())?;
+        let before = self
+            .source
+            .source_bytes()
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?
+            .to_vec();
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::RootTransfer {
+            vocabulary,
+            effect,
+            before,
+            after,
+        });
+        Ok(self)
+    }
+
+    /// Returns the immutable source snapshot.
+    #[must_use]
+    pub const fn source(&self) -> &Package {
+        &self.source
+    }
+
+    /// Number of staged operations.
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.operations.len().saturating_add(self.marks.len())
+    }
+
+    /// Stages replacement of the complete ordinary body story.
+    ///
+    /// A newline creates an RTF paragraph break. This operation conflicts with
+    /// every other text-span operation, but independent paragraph properties
+    /// may compose when paragraph structure is unchanged.
+    ///
+    /// # Errors
+    /// Returns an error for invalid bounds, conflicts, or retained limits.
+    pub fn replace_body_text<'text>(
+        &mut self,
+        replacement: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        let span = TextSpan::new(0, self.source.text().len())?;
+        self.replace_text(span, replacement)
+    }
+
+    /// Stages replacement of one checked zero-based ordinary body paragraph.
+    ///
+    /// Selection resolves against the immutable source snapshot. Newlines in
+    /// the replacement create paragraph breaks, and therefore cannot compose
+    /// with paragraph-property operations in the same edit.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, conflicts, or retained limits.
+    pub fn replace_paragraph_text<'text>(
+        &mut self,
+        position: Position,
+        replacement: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        let position = position.get();
+        let range = paragraph_range(&self.source, position)?;
+        self.replace_text(TextSpan::new(range.start, range.end)?, replacement)
+    }
+
+    /// Atomically stages a bounded, source-ordered batch of paragraph replacements.
+    ///
+    /// The batch must be non-empty and its zero-based paragraph positions must
+    /// be strictly increasing. Every selector and conflict is preflighted with
+    /// one forward paragraph traversal before any operation is appended, so a
+    /// late failure leaves this edit unchanged. Newlines retain the scalar
+    /// replacement semantics and therefore form structural operations.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// a conflict, a structural/property conflict, or retained limits.
+    pub fn replace_body_paragraph_texts(
+        &mut self,
+        replacements: &[ParagraphTextReplacement],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        if replacements.is_empty() {
+            return Err(Error::EmptyParagraphBatch);
+        }
+        for (previous, incoming) in replacements.iter().zip(replacements.iter().skip(1)) {
+            let previous = previous.position;
+            let incoming = incoming.position;
+            if incoming <= previous {
+                return Err(Error::ParagraphBatchOutOfOrder {
+                    previous: previous.get(),
+                    incoming: incoming.get(),
+                });
+            }
+        }
+
+        self.ensure_operation_room_for(replacements.len())?;
+        let replacement_bytes = replacements.iter().fold(0usize, |total, replacement| {
+            total.saturating_add(replacement.replacement.len())
+        });
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
+        let replacement_limit = self.source.limits().max_input_bytes();
+
+        let batch_len = replacements.len();
+        let has_property_operation = self.operations.iter().any(Operation::is_property);
+        let mut staged = Vec::with_capacity(replacements.len());
+        let mut replacements = replacements.iter().peekable();
+        let mut paragraph_start = 0usize;
+        for (position, paragraph) in self.source.body().paragraphs().enumerate() {
+            let paragraph_end =
+                paragraph_start
+                    .checked_add(paragraph.len())
+                    .ok_or(Error::InputTooLarge {
+                        observed: usize::MAX,
+                        limit: replacement_limit,
+                    })?;
+            if replacements
+                .peek()
+                .is_some_and(|replacement| replacement.position.get() == position)
+            {
+                let replacement = replacements.next().ok_or(Error::Internal(
+                    "paragraph replacement cursor became inconsistent",
+                ))?;
+                let span = TextSpan::new(paragraph_start, paragraph_end)?;
+                let before = self
+                    .source
+                    .text()
+                    .get(span.start..span.end)
+                    .ok_or(Error::SpanNotOnCharacterBoundary {
+                        position: span.start,
+                    })?
+                    .to_string();
+                let structural = before.contains('\n') || replacement.replacement.contains('\n');
+                if structural && has_property_operation {
+                    return Err(Error::unsupported_operation(
+                        "paragraph-structure and property changes cannot compose safely",
+                    ));
+                }
+                let incoming = self.operations.len().saturating_add(staged.len());
+                for (existing, operation) in self.operations.iter().enumerate() {
+                    if operation
+                        .span()
+                        .is_some_and(|existing_span| spans_conflict(existing_span, span))
+                    {
+                        return Err(Error::Conflict { existing, incoming });
+                    }
+                }
+                staged.push(Operation::Text {
+                    span,
+                    before,
+                    after: replacement.replacement.clone(),
+                    structural,
+                    raw_structure: None,
+                });
+            }
+            paragraph_start = paragraph_end.checked_add(1).ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: replacement_limit,
+            })?;
+        }
+        if let Some(replacement) = replacements.next() {
+            return Err(Error::ParagraphOutOfRange {
+                position: replacement.position.get(),
+                count: self.source.paragraph_count(),
+            });
+        }
+
+        let starts_empty = self.operations.is_empty();
+        self.replacement_bytes = observed_replacement_bytes;
+        self.operations.append(&mut staged);
+        if starts_empty {
+            self.paragraph_batch_len = Some(batch_len);
+        }
+        Ok(self)
+    }
+
+    /// Stages one UTF-8 semantic body splice.
+    ///
+    /// Every selector resolves against the immutable base text. Disjoint spans
+    /// compose regardless of staging order; overlap returns a deterministic
+    /// conflict instead of applying last-writer-wins behavior.
+    ///
+    /// # Errors
+    /// Returns an error for invalid UTF-8 boundaries, conflicts, or limits.
+    pub fn replace_text<'text>(
+        &mut self,
+        span: TextSpan,
+        replacement: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        let after = self.admit_text(replacement, 0)?;
+        let before = body
+            .get(span.start..span.end)
+            .ok_or(Error::SpanNotOnCharacterBoundary {
+                position: span.start,
+            })?
+            .to_string();
+        let structural = before.contains('\n') || after.contains('\n');
+        if structural && self.operations.iter().any(Operation::is_property) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::Text {
+            span,
+            before,
+            after,
+            structural,
+            raw_structure: None,
+        });
+        Ok(self)
+    }
+
+    /// Stages bold state for one non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one effective bold state and may
+    /// not consume a paragraph boundary. Unknown or mixed character ranges
+    /// are refused rather than normalized.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_bold(&mut self, span: TextSpan, bold: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "bold edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = bold_for_span(&self.source, span)?;
+        self.operations.push(Operation::Bold {
+            span,
+            before,
+            after: bold,
+        });
+        Ok(self)
+    }
+
+    /// Stages italic state for one non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one effective italic state and may
+    /// not consume a paragraph boundary. Unknown or mixed character ranges
+    /// are refused rather than normalized.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_italic(&mut self, span: TextSpan, italic: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "italic edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = italic_for_span(&self.source, span)?;
+        self.operations.push(Operation::Italic {
+            span,
+            before,
+            after: italic,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact underline style for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one effective underline style and
+    /// may not consume a paragraph boundary. Unknown or mixed character
+    /// ranges are refused rather than normalized.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_underline(
+        &mut self,
+        span: TextSpan,
+        underline: UnderlineStyle,
+    ) -> Result<&mut Self, Error> {
+        // With no staged operation, the compatibility and paragraph-layout
+        // scans are vacuous. Keep the operation-limit check first, then reject
+        // only the two empty positions whose UTF-8 boundary is proven without
+        // materializing the lazy text projection.
+        if self.operations.is_empty() {
+            self.ensure_operation_room()?;
+            if span.is_empty() {
+                if span.start == 0 {
+                    return Err(Error::unsupported_source(
+                        "underline edits require non-empty text within one paragraph",
+                    ));
+                }
+                if span.start == self.source.raw().retained_text_len() {
+                    return Err(Error::unsupported_source(
+                        "underline edits require non-empty text within one paragraph",
+                    ));
+                }
+            }
+        } else {
+            self.ensure_body_compatible()?;
+            self.ensure_operation_room()?;
+            if self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+            {
+                return Err(Error::unsupported_operation(
+                    "paragraph-layout updates cannot compose with body text or character changes",
+                ));
+            }
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "underline edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = underline_for_span(&self.source, span)?;
+        self.operations.push(Operation::Underline {
+            span,
+            before,
+            after: underline,
+        });
+        Ok(self)
+    }
+
+    /// Sets the ordinary body font size on one non-empty paragraph span.
+    ///
+    /// # Errors
+    /// Returns the same bounded, structural, mixed-format, and source
+    /// capability refusals as the other ordinary character properties.
+    pub fn set_text_font_size(
+        &mut self,
+        span: TextSpan,
+        font_size: NonZeroU16,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "font-size edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            operation
+                .span()
+                .is_some_and(|existing| spans_conflict(existing, span))
+        }) {
+            return Err(Error::Conflict {
+                existing: self
+                    .operations
+                    .iter()
+                    .position(|operation| {
+                        operation
+                            .span()
+                            .is_some_and(|existing| spans_conflict(existing, span))
+                    })
+                    .unwrap_or(0),
+                incoming: self.operations.len(),
+            });
+        }
+        let before = font_size_for_span(&self.source, span)?;
+        self.operations.push(Operation::FontSize {
+            span,
+            before,
+            after: font_size,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective character baseline on one non-empty paragraph span.
+    ///
+    /// The selected source range must have one effective baseline. The typed
+    /// baseline is kept coherent with the legacy superscript/subscript flags;
+    /// expansion, scale, kerning, and all unrelated character properties are
+    /// preserved.
+    pub fn set_text_baseline(
+        &mut self,
+        span: TextSpan,
+        baseline: CharacterBaseline,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        validate_character_baseline(baseline)?;
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "baseline edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = baseline_for_span(&self.source, span)?;
+        self.operations.push(Operation::Baseline {
+            span,
+            before,
+            after: baseline,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective character expansion on one non-empty paragraph span.
+    ///
+    /// Zero-valued tagged expansions are canonicalized to [`CharacterExpansion::None`].
+    /// The legacy `char_spacing` alias is updated together with the typed value.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_expansion(
+        &mut self,
+        span: TextSpan,
+        expansion: CharacterExpansion,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        let expansion = normalize_character_expansion(expansion)?;
+        self.ensure_character_property_span(span, "expansion")?;
+        let before = expansion_for_span(&self.source, span)?;
+        self.operations.push(Operation::Expansion {
+            span,
+            before,
+            after: expansion,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective horizontal character scale percentage on one span.
+    ///
+    /// The accepted range is `1..=600`; the legacy `char_scale` alias is
+    /// updated together with the typed value.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_horizontal_scale_percent(
+        &mut self,
+        span: TextSpan,
+        scale_percent: u16,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        validate_character_scale(scale_percent)?;
+        self.ensure_character_property_span(span, "horizontal scale")?;
+        let before = horizontal_scale_for_span(&self.source, span)?;
+        self.operations.push(Operation::HorizontalScale {
+            span,
+            before,
+            after: scale_percent,
+        });
+        Ok(self)
+    }
+
+    /// Sets the effective character kerning in half-points on one span.
+    ///
+    /// The accepted range is `0..=32767`; the legacy `kerning` alias is
+    /// updated together with the typed value.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_kerning(
+        &mut self,
+        span: TextSpan,
+        kerning_half_points: u16,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        validate_character_kerning(kerning_half_points)?;
+        self.ensure_character_property_span(span, "kerning")?;
+        let before = kerning_for_span(&self.source, span)?;
+        self.operations.push(Operation::Kerning {
+            span,
+            before,
+            after: kerning_half_points,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact single-strike state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw single-strike state. Double
+    /// strikethrough is retained as an independent formatting facet and is
+    /// never normalized by this operation.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_strike(&mut self, span: TextSpan, strike: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "strike edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = strike_for_span(&self.source, span)?;
+        self.operations.push(Operation::Strike {
+            span,
+            before,
+            after: strike,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact double-strike state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw double-strike state.
+    /// Single strikethrough is retained as an independent formatting facet
+    /// and is never normalized by this operation.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_double_strike(
+        &mut self,
+        span: TextSpan,
+        double_strike: bool,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "double-strike edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = double_strike_for_span(&self.source, span)?;
+        self.operations.push(Operation::DoubleStrike {
+            span,
+            before,
+            after: double_strike,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact hidden-text state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw hidden state. This operates
+    /// only on ordinary body runs and does not interpret stylesheet controls or
+    /// hidden destinations as body formatting.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_hidden(&mut self, span: TextSpan, hidden: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "hidden edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = hidden_for_span(&self.source, span)?;
+        self.operations.push(Operation::Hidden {
+            span,
+            before,
+            after: hidden,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact small-caps state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw small-caps state. This
+    /// operates only on ordinary body runs and does not interpret associated
+    /// or paragraph-numbering small-caps controls as body formatting.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_small_caps(
+        &mut self,
+        span: TextSpan,
+        small_caps: bool,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "small-caps edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = small_caps_for_span(&self.source, span)?;
+        self.operations.push(Operation::SmallCaps {
+            span,
+            before,
+            after: small_caps,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact all-caps state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw all-caps state. This
+    /// operates only on ordinary body runs and does not interpret associated
+    /// or paragraph-numbering caps controls as body formatting.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_all_caps(
+        &mut self,
+        span: TextSpan,
+        all_caps: bool,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "all-caps edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = all_caps_for_span(&self.source, span)?;
+        self.operations.push(Operation::AllCaps {
+            span,
+            before,
+            after: all_caps,
+        });
+        Ok(self)
+    }
+
+    /// Stages one exact outline state for a non-empty UTF-8 body span.
+    ///
+    /// The selected source range must have one raw outline state. This
+    /// operates only on ordinary body runs and preserves every unrelated
+    /// character-formatting facet.
+    ///
+    /// # Errors
+    /// Returns an error for invalid geometry, conflicts, structure changes,
+    /// mixed formatting, or finite bounds.
+    pub fn set_text_outline(&mut self, span: TextSpan, outline: bool) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(
+                "outline edits require non-empty text within one paragraph",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        let before = outline_for_span(&self.source, span)?;
+        self.operations.push(Operation::Outline {
+            span,
+            before,
+            after: outline,
+        });
+        Ok(self)
+    }
+
+    /// Inserts one ordinary paragraph immediately after a checked paragraph.
+    ///
+    /// This is the transaction's explicit structural class. The inserted text
+    /// cannot contain another paragraph break; multiple disjoint insertions
+    /// may compose, while paragraph/character property edits conflict.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, newline-bearing input,
+    /// conflicts, or finite bounds.
+    pub fn insert_paragraph_after<'text>(
+        &mut self,
+        position: Position,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        let position = position.get();
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room()?;
+        if self.operations.iter().any(Operation::is_property) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let text = self.admit_text(input, 1)?;
+        if text.contains('\n') {
+            return Err(Error::unsupported_source(
+                "one structural insertion authors exactly one paragraph",
+            ));
+        }
+        let range = paragraph_range(&self.source, position)?;
+        let span = TextSpan::new(range.end, range.end)?;
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        self.charge_replacement(text.len().saturating_add(1))?;
+        self.operations.push(Operation::InsertParagraph {
+            position,
+            span,
+            text,
+        });
+        Ok(self)
+    }
+
+    /// Removes one ordinary body paragraph selected against the immutable base.
+    ///
+    /// The selector is the paragraph's zero-based position before this edit.
+    /// Removing the sole paragraph produces an empty visible body story. This
+    /// lifecycle operation is intentionally exclusive: it cannot compose with
+    /// another body, property, destination, or structural operation in the same
+    /// edit, so staging order never becomes last-writer-wins behavior.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, conflicting staged work, or
+    /// the finite operation bound. Changed publication additionally refuses
+    /// non-plain, ambiguous, compressed, opaque, or protected sources.
+    pub fn remove_paragraph(&mut self, position: Position) -> Result<&mut Self, Error> {
+        let position = position.get();
+        let text = paragraph_text_at(&self.source, position)?.to_string();
+        self.ensure_lifecycle_room()?;
+        self.operations
+            .push(Operation::RemoveParagraph { position, text });
+        Ok(self)
+    }
+
+    /// Atomically stages removal of several ordinary body paragraphs.
+    ///
+    /// Positions are zero-based ordinals in the immutable source snapshot and
+    /// must be strictly increasing.  The complete selection is preflighted
+    /// before any operation is appended, so an invalid late position leaves
+    /// this edit unchanged.  Publication removes each selected paragraph and
+    /// its exact source boundary while retaining every unrelated source byte.
+    /// Multiple positions require literal ASCII paragraph ranges with default
+    /// formatting; one position uses [`Self::remove_paragraph`] and retains its
+    /// support for decoded and explicitly repaired source text. Multi-removal
+    /// patches support exact process-local replay and inverse, but their
+    /// durable projection is not yet supported.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// incompatible staged work, unsupported source ranges, or finite limits.
+    /// Changed publication preserves the source's protection and open policies.
+    ///
+    /// ```compile_fail
+    /// use litchi_rtf::Package;
+    ///
+    /// let package = Package::parse(r#"{\rtf1 First\par Second}"#).unwrap();
+    /// let mut edit = package.edit();
+    /// let _ = edit.remove_body_paragraphs(&[0]);
+    /// ```
+    pub fn remove_body_paragraphs(&mut self, positions: &[Position]) -> Result<&mut Self, Error> {
+        if let [position] = positions {
+            return self.remove_paragraph(*position);
+        }
+        if positions.is_empty() {
+            return Err(Error::EmptyParagraphRemovalBatch);
+        }
+        for (previous, incoming) in positions.iter().zip(positions.iter().skip(1)) {
+            if incoming <= previous {
+                return Err(Error::ParagraphRemovalBatchOutOfOrder {
+                    previous: previous.get(),
+                    incoming: incoming.get(),
+                });
+            }
+        }
+        let count = self.source.paragraph_count();
+        for position in positions {
+            let position = position.get();
+            if position >= count {
+                return Err(Error::ParagraphOutOfRange { position, count });
+            }
+        }
+        self.ensure_lifecycle_room_for(positions.len())?;
+        let map = ordinary_paragraph_source_map(&self.source)?;
+        let semantic_text = self.source.text();
+        let mut texts = Vec::new();
+        texts
+            .try_reserve_exact(positions.len())
+            .map_err(|_| Error::Write("could not reserve paragraph removals".to_string()))?;
+        for position in positions {
+            let position = position.get();
+            let paragraph = map
+                .paragraphs
+                .get(position)
+                .ok_or(Error::ParagraphOutOfRange { position, count })?;
+            let text =
+                semantic_text
+                    .get(paragraph.text.clone())
+                    .ok_or(Error::unsupported_source(
+                        "ordinary paragraph source map has an invalid semantic range",
+                    ))?;
+            texts.push(clone_bounded_text(
+                text,
+                self.source.limits(),
+                "could not reserve ordinary paragraph text",
+            )?);
+        }
+        self.operations
+            .try_reserve(positions.len())
+            .map_err(|_| Error::Write("could not reserve paragraph operations".to_string()))?;
+        for (position, text) in positions.iter().copied().zip(texts) {
+            let position = position.get();
+            self.operations
+                .push(Operation::RemoveParagraph { position, text });
+        }
+        Ok(self)
+    }
+
+    /// Moves one ordinary body paragraph to a final zero-based position.
+    ///
+    /// Both positions resolve against the immutable base paragraph list.
+    /// `final_position` is the paragraph's ordinal in the completed list, after
+    /// removal and reinsertion. Equal positions are an exact no-op that shares
+    /// the source snapshot. Like removal, a move is an exclusive structural
+    /// lifecycle operation and cannot compose with other staged work.
+    ///
+    /// # Errors
+    /// Returns an error when either position is outside the immutable base,
+    /// conflicting work is already staged, or finite limits are exceeded.
+    /// Changed publication additionally refuses non-plain, ambiguous,
+    /// compressed, opaque, or protected sources.
+    pub fn move_paragraph(
+        &mut self,
+        position: Position,
+        final_position: Position,
+    ) -> Result<&mut Self, Error> {
+        let position = position.get();
+        let final_position = final_position.get();
+        let count = self.source.paragraph_count();
+        let text = paragraph_text_at(&self.source, position)?.to_string();
+        if final_position >= count {
+            return Err(Error::ParagraphOutOfRange {
+                position: final_position,
+                count,
+            });
+        }
+        self.ensure_lifecycle_room()?;
+        self.operations.push(Operation::MoveParagraph {
+            position,
+            final_position,
+            text,
+        });
+        Ok(self)
+    }
+
+    /// Atomically swaps two ordinary body paragraphs selected against the
+    /// immutable source snapshot.
+    ///
+    /// Positions are zero-based and are interpreted against the source list;
+    /// unlike two moves, the pair is one lifecycle operation and is published
+    /// as one candidate. Equal positions are an exact no-op, including for a
+    /// protected or otherwise unsupported source. Distinct positions retain
+    /// the source paragraph text as typed preconditions for the in-memory
+    /// reversible patch.
+    ///
+    /// # Errors
+    /// Returns an error when either position is outside the immutable base,
+    /// conflicting work is already staged, or finite limits are exceeded.
+    /// Changed publication additionally refuses non-plain, ambiguous,
+    /// compressed, opaque, or protected sources.
+    pub fn swap_paragraphs(
+        &mut self,
+        first: Position,
+        second: Position,
+    ) -> Result<&mut Self, Error> {
+        let first = first.get();
+        let second = second.get();
+        let count = self.source.paragraph_count();
+        for position in [first, second] {
+            if position >= count {
+                return Err(Error::ParagraphOutOfRange { position, count });
+            }
+        }
+        self.ensure_lifecycle_room()?;
+        self.operations.try_reserve(1).map_err(|_error| {
+            Error::Write("could not reserve paragraph swap operation".to_string())
+        })?;
+
+        // Do not inspect or copy the source text for an exact no-op. This
+        // keeps staging usable for protected and unsupported source closures.
+        if first == second {
+            self.operations.push(Operation::SwapParagraph {
+                first,
+                second,
+                first_text: String::new(),
+                second_text: String::new(),
+            });
+            return Ok(self);
+        }
+
+        let first_text = clone_bounded_text(
+            paragraph_text_at(&self.source, first)?,
+            self.source.limits(),
+            "could not reserve first swapped paragraph text",
+        )?;
+        let second_text = clone_bounded_text(
+            paragraph_text_at(&self.source, second)?,
+            self.source.limits(),
+            "could not reserve second swapped paragraph text",
+        )?;
+        self.operations.push(Operation::SwapParagraph {
+            first,
+            second,
+            first_text,
+            second_text,
+        });
+        Ok(self)
+    }
+
+    /// Splits one ordinary body paragraph at a checked UTF-8 byte offset.
+    ///
+    /// The offset is measured in the selected paragraph's semantic UTF-8
+    /// text, and must lie on a Unicode scalar boundary. This deliberately
+    /// narrow transaction accepts only an ASCII, ungrouped, ordinary source
+    /// with uniform formatting; publication inserts exactly one `\\par`
+    /// control sequence at the proven source boundary and preserves every
+    /// unrelated source byte.
+    ///
+    /// ```rust,no_run
+    /// use litchi_core::Position;
+    /// use litchi_rtf::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::parse(r#"{\rtf1\ansi Caf\u233? au\par}"#)?;
+    /// let mut edit = package.edit();
+    /// // The selector is typed, while the split offset remains a UTF-8 byte
+    /// // offset: "Café" is five bytes even though it has four characters.
+    /// let café_end = "Café".len();
+    /// assert_eq!(café_end, 5);
+    /// edit.split_paragraph(Position::new(0), café_end)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector or offset, unsupported body
+    /// syntax, incompatible formatting, a protected source, or finite limits.
+    pub fn split_paragraph(
+        &mut self,
+        position: Position,
+        offset: usize,
+    ) -> Result<&mut Self, Error> {
+        let position = position.get();
+        self.split_paragraph_with_boundary(position, offset, PARAGRAPH_SPLIT_BYTES)
+    }
+
+    fn split_paragraph_with_boundary(
+        &mut self,
+        position: usize,
+        offset: usize,
+        boundary: &[u8],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_lifecycle_room()?;
+        let semantic_range = paragraph_range(&self.source, position)?;
+        let semantic_text =
+            self.source
+                .text()
+                .get(semantic_range.clone())
+                .ok_or(Error::unsupported_source(
+                    "ordinary paragraph selector did not resolve to UTF-8 text",
+                ))?;
+        if offset > semantic_text.len() {
+            return Err(Error::ParagraphSplitOffsetOutOfRange {
+                position,
+                offset,
+                length: semantic_text.len(),
+            });
+        }
+        if !semantic_text.is_char_boundary(offset) {
+            return Err(Error::SpanNotOnCharacterBoundary {
+                position: semantic_range.start.saturating_add(offset),
+            });
+        }
+        let map = ordinary_paragraph_source_map(&self.source)?;
+        let paragraph = map
+            .paragraphs
+            .get(position)
+            .ok_or(Error::ParagraphOutOfRange {
+                position,
+                count: map.paragraphs.len(),
+            })?;
+        let text =
+            self.source
+                .text()
+                .get(paragraph.text.clone())
+                .ok_or(Error::unsupported_source(
+                    "ordinary paragraph source map has an invalid semantic range",
+                ))?;
+        if paragraph.text != semantic_range || text != semantic_text {
+            return Err(Error::StalePrecondition(
+                "ordinary paragraph source map does not match the semantic selector",
+            ));
+        }
+        if offset == semantic_text.len() && paragraph.boundary_after.is_none() {
+            return Err(Error::ParagraphSplitAtEndRequiresBoundary { position });
+        }
+        validate_paragraph_boundary_bytes(boundary)?;
+        let source_offset =
+            paragraph
+                .source
+                .start
+                .checked_add(offset)
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })?;
+        if source_offset > paragraph.source.end {
+            return Err(Error::unsupported_source(
+                "ordinary paragraph split escaped its proven source range",
+            ));
+        }
+        self.admit_replacement(boundary.len())?;
+        let before = clone_bounded_text(
+            text,
+            self.source.limits(),
+            "could not reserve ordinary paragraph text",
+        )?;
+        let after = clone_bounded_text(
+            "\n",
+            self.source.limits(),
+            "could not reserve ordinary paragraph break",
+        )?;
+        let boundary = clone_bounded_bytes(
+            boundary,
+            self.source.limits(),
+            "could not reserve ordinary paragraph boundary",
+        )?;
+        self.operations.try_reserve(1).map_err(|_error| {
+            Error::Write("could not reserve ordinary paragraph operation".to_string())
+        })?;
+        self.charge_replacement(boundary.len())?;
+        self.operations.push(Operation::Text {
+            span: TextSpan {
+                start: paragraph.text.start.saturating_add(offset),
+                end: paragraph.text.start.saturating_add(offset),
+            },
+            before: String::new(),
+            after,
+            structural: true,
+            raw_structure: Some(RawParagraphOperation::Split {
+                position,
+                offset,
+                source_offset,
+                boundary,
+                before,
+            }),
+        });
+        Ok(self)
+    }
+
+    /// Merges two adjacent ordinary body paragraphs.
+    ///
+    /// `first` and `second` are zero-based positions in the immutable source
+    /// snapshot. Only the exact source span of their `\\par` boundary is
+    /// removed; all text, controls, and bytes outside that boundary remain
+    /// untouched.
+    ///
+    /// # Errors
+    /// Returns an error for invalid selectors, non-adjacent positions,
+    /// unsupported body syntax, incompatible formatting, a protected source,
+    /// or finite limits.
+    pub fn merge_paragraphs(
+        &mut self,
+        first: Position,
+        second: Position,
+    ) -> Result<&mut Self, Error> {
+        let first = first.get();
+        let second = second.get();
+        self.ensure_lifecycle_room()?;
+        let map = ordinary_paragraph_source_map(&self.source)?;
+        let left = map
+            .paragraphs
+            .get(first)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: first,
+                count: map.paragraphs.len(),
+            })?;
+        let right = map
+            .paragraphs
+            .get(second)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: second,
+                count: map.paragraphs.len(),
+            })?;
+        let expected_second = first
+            .checked_add(1)
+            .ok_or(Error::ParagraphMergeNonAdjacent { first, second })?;
+        if second != expected_second {
+            return Err(Error::ParagraphMergeNonAdjacent { first, second });
+        }
+        let boundary = left
+            .boundary_after
+            .clone()
+            .ok_or(Error::unsupported_source(
+                "ordinary paragraph has no exact source boundary",
+            ))?;
+        let source_bytes = self
+            .source
+            .source_bytes()
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?;
+        let boundary_bytes =
+            source_bytes
+                .get(boundary.clone())
+                .ok_or(Error::unsupported_source(
+                    "ordinary paragraph boundary is outside the source",
+                ))?;
+        let left_text =
+            self.source
+                .text()
+                .get(left.text.clone())
+                .ok_or(Error::unsupported_source(
+                    "ordinary paragraph source map has an invalid left range",
+                ))?;
+        let right_text =
+            self.source
+                .text()
+                .get(right.text.clone())
+                .ok_or(Error::unsupported_source(
+                    "ordinary paragraph source map has an invalid right range",
+                ))?;
+        // `ordinary_paragraph_source_map` has already proved uniform body
+        // formatting through `plain_body_text_editability`.
+        self.operations.try_reserve(1).map_err(|_error| {
+            Error::Write("could not reserve ordinary paragraph operation".to_string())
+        })?;
+        let left_owned = clone_bounded_text(
+            left_text,
+            self.source.limits(),
+            "could not reserve left ordinary paragraph text",
+        )?;
+        let right_owned = clone_bounded_text(
+            right_text,
+            self.source.limits(),
+            "could not reserve right ordinary paragraph text",
+        )?;
+        let before = clone_bounded_text(
+            "\n",
+            self.source.limits(),
+            "could not reserve ordinary paragraph boundary",
+        )?;
+        let boundary_bytes = clone_bounded_bytes(
+            boundary_bytes,
+            self.source.limits(),
+            "could not reserve ordinary paragraph boundary bytes",
+        )?;
+        self.operations.push(Operation::Text {
+            span: TextSpan {
+                start: left.text.end,
+                end: left.text.end.saturating_add(1),
+            },
+            before,
+            after: String::new(),
+            structural: true,
+            raw_structure: Some(RawParagraphOperation::Merge {
+                position: first,
+                boundary,
+                boundary_bytes,
+                left: left_owned,
+                right: right_owned,
+            }),
+        });
+        Ok(self)
+    }
+
+    /// Merges one ordinary paragraph with its immediate successor.
+    pub fn merge_paragraph_with_next(&mut self, position: Position) -> Result<&mut Self, Error> {
+        let position = position.get();
+        let second = position.checked_add(1).ok_or(Error::ParagraphOutOfRange {
+            position,
+            count: self.source.paragraph_count(),
+        })?;
+        self.merge_paragraphs(Position::new(position), Position::new(second))
+    }
+
+    /// Inserts one ordinary body paragraph at a checked zero-based position.
+    ///
+    /// The position is resolved against the immutable source snapshot and may
+    /// equal the source paragraph count to append.  An empty input is a
+    /// real paragraph, including when the source story itself is empty; it is
+    /// not collapsed into a no-op.  The operation retains the existing
+    /// `paragraph.insert` durable vocabulary so its inverse remains a source
+    /// checked paragraph removal.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid position, newline-bearing input,
+    /// conflicting staged work, or finite semantic limits.  Changed
+    /// publication additionally refuses protected, opaque, formatted, or
+    /// otherwise ambiguous body sources through the established lifecycle
+    /// policy.
+    pub fn insert_paragraph<'text>(
+        &mut self,
+        position: Position,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        let input = input.into();
+        if input.contains('\n') {
+            return Err(Error::unsupported_source(
+                "one restored paragraph cannot contain an ambiguous newline",
+            ));
+        }
+        let position = position.get();
+        let count = self.source.paragraph_count();
+        if position > count {
+            return Err(Error::ParagraphOutOfRange { position, count });
+        }
+        self.ensure_lifecycle_room()?;
+        let text = self.admit_text(input, 1)?;
+        self.charge_replacement(text.len().saturating_add(1))?;
+        self.operations
+            .push(Operation::RestoreParagraph { position, text });
+        Ok(self)
+    }
+
+    fn restore_paragraph(&mut self, position: usize, text: &str) -> Result<&mut Self, Error> {
+        self.insert_paragraph(Position::new(position), text)
+    }
+
+    fn ensure_lifecycle_room(&self) -> Result<(), Error> {
+        self.ensure_lifecycle_room_for(1)
+    }
+
+    fn ensure_lifecycle_room_for(&self, additional: usize) -> Result<(), Error> {
+        self.ensure_body_compatible()?;
+        self.ensure_operation_room_for(additional)?;
+        if self.operations.iter().any(Operation::is_property) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        if !self.operations.is_empty() {
+            return Err(Error::Conflict {
+                existing: 0,
+                incoming: self.operations.len(),
+            });
+        }
+        Ok(())
+    }
+
+    fn remove_paragraph_after(
+        &mut self,
+        position: usize,
+        expected: &str,
+    ) -> Result<&mut Self, Error> {
+        let owner = paragraph_range(&self.source, position)?;
+        let removed = paragraph_range(&self.source, position.saturating_add(1))?;
+        let actual = self
+            .source
+            .text()
+            .get(removed.clone())
+            .ok_or(Error::StalePrecondition("inserted paragraph disappeared"))?;
+        if actual != expected {
+            return Err(Error::StalePrecondition("inserted paragraph text differs"));
+        }
+        self.replace_text(TextSpan::new(owner.end, removed.end)?, "")
+    }
+
+    /// Stages one omission-preserving character-format patch for an ordinary
+    /// body run.
+    pub fn patch_run_format(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        patch: RunFormatPatch,
+    ) -> Result<&mut Self, Error> {
+        self.patch_body_run_formats(&[RunFormatUpdate::new(paragraph, run, patch)])
+    }
+
+    /// Stages replacement of one ordinary body run's text.
+    ///
+    /// The selector is resolved against the immutable source run axis. Use
+    /// [`Self::replace_body_run_texts`] when several source-ordered runs must
+    /// be changed in one bounded operation batch.
+    pub fn replace_run_text(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        text: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.replace_body_run_texts(&[RunTextReplacement::new(paragraph, run, text)])
+    }
+
+    /// Stages insertion of one ordinary body run at a checked run boundary.
+    ///
+    /// `run` may equal the selected paragraph's run count to append. The
+    /// supplied patch overrides named local character facets; an empty patch
+    /// inherits the complete effective formatting of the adjacent source run.
+    /// Empty text is rejected because the native model has no addressable
+    /// empty run. Use [`Self::insert_body_runs`] for one atomic batch.
+    ///
+    /// ```rust,no_run
+    /// use litchi_core::Position;
+    /// use litchi_rtf::edit::RunFormatPatch;
+    /// use litchi_rtf::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::parse(r#"{\rtf1\ansi Text}"#)?;
+    /// let mut edit = package.edit();
+    /// edit.insert_run(Position::new(0), Position::new(0), "prefix", RunFormatPatch::new())?;
+    /// let _commit = edit.commit()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use litchi_rtf::edit::RunFormatPatch;
+    ///
+    /// let _ = litchi_rtf::Package::parse(r#"{\rtf1\ansi Text}"#)
+    ///     .unwrap()
+    ///     .edit()
+    ///     .insert_run(0, 0, "prefix", RunFormatPatch::new());
+    /// ```
+    pub fn insert_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        text: impl Into<String>,
+        patch: RunFormatPatch,
+    ) -> Result<&mut Self, Error> {
+        self.insert_body_runs(&[RunTextInsertion::new(paragraph, run, text).with_format(patch)])
+    }
+
+    /// Atomically stages source-ordered insertions of ordinary body runs.
+    ///
+    /// Selectors resolve against the immutable source paragraph/run axes and
+    /// must be nondecreasing by `(paragraph, run)`; equal boundaries retain
+    /// input order. A boundary is in
+    /// `0..=run_count`; boundary zero inherits the right run, interior
+    /// boundaries inherit the right run, and the append boundary inherits the
+    /// left run. An empty paragraph inherits the effective character state at
+    /// its boundary, including authored resources and character metadata; a
+    /// native default boundary uses native defaults. The insertion
+    /// batch publishes one source splice and preserves all bytes outside the
+    /// new grouped runs. Inserted scalars are emitted as one scoped sequence
+    /// of UTF-16 `\\uN` controls, so Unicode fallback fragmentation cannot
+    /// split the inserted native run or its projected created path.
+    pub fn insert_body_runs(
+        &mut self,
+        insertions: &[RunTextInsertion],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if insertions.is_empty() {
+            return Err(Error::EmptyRunInsertionBatch);
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RunInsert { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        for (previous, incoming) in insertions.iter().zip(insertions.iter().skip(1)) {
+            let previous_key = (previous.paragraph.get(), previous.run.get());
+            let incoming_key = (incoming.paragraph.get(), incoming.run.get());
+            if incoming_key < previous_key {
+                return Err(Error::RunInsertionBatchOutOfOrder {
+                    previous_paragraph: previous_key.0,
+                    previous_run: previous_key.1,
+                    incoming_paragraph: incoming_key.0,
+                    incoming_run: incoming_key.1,
+                });
+            }
+        }
+        if let Some(Operation::RunInsert { paragraph, run, .. }) = self.operations.last() {
+            let first = insertions
+                .first()
+                .map(|insertion| (insertion.paragraph.get(), insertion.run.get()))
+                .ok_or(Error::EmptyRunInsertionBatch)?;
+            if first < (*paragraph, *run) {
+                return Err(Error::RunInsertionBatchOutOfOrder {
+                    previous_paragraph: *paragraph,
+                    previous_run: *run,
+                    incoming_paragraph: first.0,
+                    incoming_run: first.1,
+                });
+            }
+        }
+        self.ensure_operation_room_for(insertions.len())?;
+        let replacement_bytes = insertions.iter().try_fold(0usize, |total, insertion| {
+            if insertion.text.is_empty() {
+                return Err(Error::EmptyRunTextInsertion {
+                    paragraph: insertion.paragraph.get(),
+                    run: insertion.run.get(),
+                });
+            }
+            if insertion.text.contains('\n') {
+                return Err(Error::unsupported_source(
+                    "run insertions cannot contain paragraph breaks",
+                ));
+            }
+            total
+                .checked_add(insertion.text.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })
+        })?;
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
+        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
+        let paragraph_runs = paragraphs
+            .iter()
+            .map(|paragraph| paragraph.runs().collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let mut paragraph_run_offsets = Vec::new();
+        paragraph_run_offsets
+            .try_reserve_exact(paragraph_runs.len())
+            .map_err(|_error| Error::Write("could not reserve run offsets".to_string()))?;
+        for runs in &paragraph_runs {
+            let mut offsets = Vec::new();
+            offsets
+                .try_reserve_exact(runs.len().saturating_add(1))
+                .map_err(|_error| Error::Write("could not reserve run offsets".to_string()))?;
+            offsets.push(0);
+            let mut offset = 0usize;
+            for run in runs {
+                offset = offset
+                    .checked_add(run.text().len())
+                    .ok_or(Error::InputTooLarge {
+                        observed: usize::MAX,
+                        limit: self.source.limits().max_input_bytes(),
+                    })?;
+                offsets.push(offset);
+            }
+            paragraph_run_offsets.push(offsets);
+        }
+        let mut paragraph_starts = Vec::new();
+        paragraph_starts
+            .try_reserve_exact(paragraphs.len())
+            .map_err(|_error| Error::Write("could not reserve paragraph offsets".to_string()))?;
+        let mut paragraph_offset = 0usize;
+        for paragraph in &paragraphs {
+            paragraph_starts.push(paragraph_offset);
+            paragraph_offset = paragraph_offset
+                .checked_add(paragraph.len())
+                .and_then(|value| value.checked_add(1))
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })?;
+        }
+        let empty_paragraphs = paragraph_runs.iter().map(Vec::is_empty).collect::<Vec<_>>();
+        let empty_paragraph_formats = if empty_paragraphs.iter().any(|empty| *empty) {
+            empty_paragraph_boundary_formats(&self.source, &paragraph_starts, &empty_paragraphs)?
+        } else {
+            vec![None; paragraphs.len()]
+        };
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(insertions.len())
+            .map_err(|_error| {
+                Error::Write("could not reserve run-insertion operations".to_string())
+            })?;
+        for insertion in insertions {
+            let paragraph_index = insertion.paragraph.get();
+            let runs = paragraph_runs
+                .get(paragraph_index)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: paragraph_index,
+                    count: paragraph_runs.len(),
+                })?;
+            let run_index = insertion.run.get();
+            if run_index > runs.len() {
+                return Err(Error::RunInsertionOutOfRange {
+                    paragraph: paragraph_index,
+                    run: run_index,
+                    count: runs.len(),
+                });
+            }
+            let run_offset = *paragraph_run_offsets
+                .get(paragraph_index)
+                .and_then(|offsets| offsets.get(run_index))
+                .ok_or(Error::RunInsertionOutOfRange {
+                    paragraph: paragraph_index,
+                    run: run_index,
+                    count: runs.len(),
+                })?;
+            let body_offset = paragraph_starts
+                .get(paragraph_index)
+                .copied()
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: paragraph_index,
+                    count: paragraph_starts.len(),
+                })?
+                .checked_add(run_offset)
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })?;
+            let inherited = if let Some(selected) = runs.get(run_index) {
+                *selected.format().raw()
+            } else if run_index != 0 {
+                *runs
+                    .get(run_index.saturating_sub(1))
+                    .ok_or(Error::RunInsertionOutOfRange {
+                        paragraph: paragraph_index,
+                        run: run_index,
+                        count: runs.len(),
+                    })?
+                    .format()
+                    .raw()
+            } else {
+                empty_paragraph_formats
+                    .get(paragraph_index)
+                    .and_then(|formatting| *formatting)
+                    .unwrap_or_default()
+            };
+            let mut after = inherited;
+            if let Some(patch) = insertion.format {
+                patch.apply_to(&mut after);
+            }
+            let span = TextSpan {
+                start: body_offset,
+                end: body_offset,
+            };
+            staged.push(Operation::RunInsert {
+                paragraph: paragraph_index,
+                run: run_index,
+                span,
+                text: insertion.text.clone(),
+                format: insertion.format,
+                inherited: Box::new(inherited),
+                after,
+            });
+        }
+        self.replacement_bytes = observed_replacement_bytes;
+        self.operations.extend(staged);
+        Ok(self)
+    }
+
+    /// Atomically stages source-ordered character-format patches for ordinary
+    /// body runs.
+    ///
+    /// Run selectors resolve against the immutable source paragraph/run axes.
+    /// They must be strictly increasing by `(paragraph, run)` and each target
+    /// contributes one bounded operation, even when several facets change.
+    /// Every selector, source capability, mixed-source mapping, and limit is
+    /// preflighted before any operation is appended. Character patches cannot
+    /// compose with text, paragraph, lifecycle, or retained-destination work;
+    /// the source bytes are spliced around the selected literal run text so
+    /// omitted and unrelated properties remain byte-for-byte untouched.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an empty patch, an
+    /// invalid selector, unsupported source dependencies, conflicting staged
+    /// work, or finite operation limits.
+    pub fn patch_body_run_formats(
+        &mut self,
+        updates: &[RunFormatUpdate],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if updates.is_empty() {
+            return Err(Error::EmptyRunFormatBatch);
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RunFormat { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
+            let previous_key = (previous.paragraph.get(), previous.run.get());
+            let incoming_key = (incoming.paragraph.get(), incoming.run.get());
+            if incoming_key <= previous_key {
+                return Err(Error::RunFormatBatchOutOfOrder {
+                    previous_paragraph: previous_key.0,
+                    previous_run: previous_key.1,
+                    incoming_paragraph: incoming_key.0,
+                    incoming_run: incoming_key.1,
+                });
+            }
+        }
+        if let Some(Operation::RunFormat { paragraph, run, .. }) = self.operations.last() {
+            let first = updates
+                .first()
+                .map(|update| (update.paragraph.get(), update.run.get()))
+                .ok_or(Error::EmptyRunFormatBatch)?;
+            if first <= (*paragraph, *run) {
+                return Err(Error::RunFormatBatchOutOfOrder {
+                    previous_paragraph: *paragraph,
+                    previous_run: *run,
+                    incoming_paragraph: first.0,
+                    incoming_run: first.1,
+                });
+            }
+        }
+        self.ensure_operation_room_for(updates.len())?;
+
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(updates.len()).map_err(|_error| {
+            Error::Write("could not reserve run-format operations".to_string())
+        })?;
+        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
+        for update in updates {
+            if update.patch.is_empty() {
+                return Err(Error::EmptyRunFormatPatch {
+                    paragraph: update.paragraph.get(),
+                    run: update.run.get(),
+                });
+            }
+        }
+        let mut update_index = 0usize;
+        for (paragraph, selected_paragraph) in paragraphs.iter().enumerate() {
+            let Some(first) = updates.get(update_index) else {
+                break;
+            };
+            if first.paragraph.get() > paragraph {
+                continue;
+            }
+            if first.paragraph.get() < paragraph {
+                return Err(Error::Internal(
+                    "run-format selector cursor became inconsistent",
+                ));
+            }
+            let mut runs = selected_paragraph.runs();
+            let mut run_index = 0usize;
+            while let Some(update) = updates.get(update_index) {
+                if update.paragraph.get() != paragraph {
+                    break;
+                }
+                let requested_run = update.run.get();
+                while run_index <= requested_run {
+                    let Some(selected_run) = runs.next() else {
+                        return Err(Error::RunOutOfRange {
+                            paragraph,
+                            run: requested_run,
+                            count: run_index,
+                        });
+                    };
+                    if run_index == requested_run {
+                        let before =
+                            RunFormatPatch::from_format(selected_run.format().raw(), update.patch);
+                        staged.push(Operation::RunFormat {
+                            paragraph,
+                            run: requested_run,
+                            before,
+                            after: update.patch,
+                            text_before: None,
+                            text_after: None,
+                        });
+                    }
+                    run_index = run_index.saturating_add(1);
+                }
+                update_index = update_index.saturating_add(1);
+            }
+        }
+        if let Some(update) = updates.get(update_index) {
+            return Err(Error::ParagraphOutOfRange {
+                position: update.paragraph.get(),
+                count: paragraphs.len(),
+            });
+        }
+        self.operations.extend(staged);
+        Ok(self)
+    }
+
+    /// Stages one source-ordered batch of ordinary body run text replacements.
+    ///
+    /// Selectors resolve against the immutable source paragraph/run axis and
+    /// must be strictly increasing. Each target contributes one native
+    /// operation; an optional character-format patch is published together
+    /// with the replacement text. Omitted facets inherit the selected run's
+    /// effective format. Newline-bearing text is rejected because this API
+    /// addresses a run inside one source paragraph; tabs, escaped characters,
+    /// and Unicode are emitted through the ordinary RTF text writer.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// structural replacement text, unsupported source syntax, conflicting
+    /// staged work, or finite operation/replacement limits.
+    pub fn replace_body_run_texts(
+        &mut self,
+        replacements: &[RunTextReplacement],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if replacements.is_empty() {
+            return Err(Error::EmptyRunTextBatch);
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RunFormat { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        for (previous, incoming) in replacements.iter().zip(replacements.iter().skip(1)) {
+            let previous_key = (previous.paragraph.get(), previous.run.get());
+            let incoming_key = (incoming.paragraph.get(), incoming.run.get());
+            if incoming_key <= previous_key {
+                return Err(Error::RunTextBatchOutOfOrder {
+                    previous_paragraph: previous_key.0,
+                    previous_run: previous_key.1,
+                    incoming_paragraph: incoming_key.0,
+                    incoming_run: incoming_key.1,
+                });
+            }
+        }
+        if let Some(Operation::RunFormat { paragraph, run, .. }) = self.operations.last() {
+            let first = replacements
+                .first()
+                .map(|replacement| (replacement.paragraph.get(), replacement.run.get()))
+                .ok_or(Error::EmptyRunTextBatch)?;
+            if first <= (*paragraph, *run) {
+                return Err(Error::RunTextBatchOutOfOrder {
+                    previous_paragraph: *paragraph,
+                    previous_run: *run,
+                    incoming_paragraph: first.0,
+                    incoming_run: first.1,
+                });
+            }
+        }
+        self.ensure_operation_room_for(replacements.len())?;
+        let replacement_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
+            if replacement.text.contains('\n') {
+                return Err(Error::unsupported_source(
+                    "run-text replacements cannot contain paragraph breaks",
+                ));
+            }
+            total
+                .checked_add(replacement.text.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })
+        })?;
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
+
+        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(replacements.len())
+            .map_err(|_error| Error::Write("could not reserve run-text operations".to_string()))?;
+        let mut replacement_index = 0usize;
+        for (paragraph, selected_paragraph) in paragraphs.iter().enumerate() {
+            let Some(first) = replacements.get(replacement_index) else {
+                break;
+            };
+            if first.paragraph.get() > paragraph {
+                continue;
+            }
+            if first.paragraph.get() < paragraph {
+                return Err(Error::Internal(
+                    "run-text selector cursor became inconsistent",
+                ));
+            }
+            let mut runs = selected_paragraph.runs();
+            let mut run_index = 0usize;
+            while let Some(replacement) = replacements.get(replacement_index) {
+                if replacement.paragraph.get() != paragraph {
+                    break;
+                }
+                let requested_run = replacement.run.get();
+                while run_index <= requested_run {
+                    let Some(selected_run) = runs.next() else {
+                        return Err(Error::RunOutOfRange {
+                            paragraph,
+                            run: requested_run,
+                            count: run_index,
+                        });
+                    };
+                    if run_index == requested_run {
+                        let before_format =
+                            RunFormatPatch::all_from_format(selected_run.format().raw());
+                        let mut target_format = *selected_run.format().raw();
+                        if let Some(patch) = replacement.format {
+                            patch.apply_to(&mut target_format);
+                        }
+                        let after_format = RunFormatPatch::all_from_format(&target_format);
+                        staged.push(Operation::RunFormat {
+                            paragraph,
+                            run: requested_run,
+                            before: before_format,
+                            after: after_format,
+                            text_before: Some(selected_run.text().to_owned()),
+                            text_after: Some(replacement.text.clone()),
+                        });
+                    }
+                    run_index = run_index.saturating_add(1);
+                }
+                replacement_index = replacement_index.saturating_add(1);
+            }
+        }
+        if let Some(replacement) = replacements.get(replacement_index) {
+            return Err(Error::ParagraphOutOfRange {
+                position: replacement.paragraph.get(),
+                count: paragraphs.len(),
+            });
+        }
+        self.replacement_bytes = observed_replacement_bytes;
+        self.operations.extend(staged);
+        Ok(self)
+    }
+
+    /// Stages the local alignment of one checked base-snapshot paragraph.
+    ///
+    /// This is a property facet, not a raw control-word API. The commit writes
+    /// the RTF 1.9.1 `ql`, `qr`, `qc`, or `qj` selector and verifies semantic
+    /// readback before publication.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, a duplicate facet, structural
+    /// text changes in the same transaction, or retained limits.
+    pub fn set_paragraph_alignment(
+        &mut self,
+        position: Position,
+        alignment: Alignment,
+    ) -> Result<&mut Self, Error> {
+        self.set_body_paragraph_alignments(&[ParagraphAlignmentUpdate::new(position, alignment)])
+    }
+
+    /// Atomically stages source-ordered alignment updates for ordinary body
+    /// paragraphs.
+    ///
+    /// Every selector, conflict, and operation bound is preflighted before
+    /// any operation is appended.  The source paragraph story is traversed
+    /// once to resolve all before-values, so callers updating many paragraphs
+    /// do not pay the scalar setter's repeated traversal cost.  Updates are
+    /// interpreted against the immutable source snapshot and must be strictly
+    /// increasing by zero-based [`Position`].  Alignment composes with
+    /// ordinary non-structural text and other paragraph-property updates, as
+    /// the scalar setter does.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// a duplicate alignment facet, structural text changes, or retained
+    /// operation limits.  Changed publication retains the scalar alignment
+    /// source-closure and readback policy.
+    pub fn set_body_paragraph_alignments(
+        &mut self,
+        updates: &[ParagraphAlignmentUpdate],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if updates.is_empty() {
+            return Err(Error::EmptyParagraphAlignmentBatch);
+        }
+        for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
+            let previous = previous.position.get();
+            let incoming = incoming.position.get();
+            if incoming <= previous {
+                return Err(Error::ParagraphAlignmentBatchOutOfOrder { previous, incoming });
+            }
+        }
+        self.ensure_operation_room_for(updates.len())?;
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+
+        // Search only existing alignment facets against the ordered request.
+        // In particular, a text-plus-alignment batch must not scan all text
+        // operations again for every selected paragraph.
+        let conflict = self
+            .operations
+            .iter()
+            .enumerate()
+            .filter_map(|(existing, operation)| {
+                let Operation::Alignment { position, .. } = operation else {
+                    return None;
+                };
+                updates
+                    .binary_search_by_key(position, |update| update.position.get())
+                    .ok()
+                    .map(|index| (index, existing))
+            })
+            .min_by_key(|&(index, existing)| (index, existing));
+        if let Some((index, existing)) = conflict {
+            return Err(Error::Conflict {
+                existing,
+                incoming: self.operations.len().saturating_add(index),
+            });
+        }
+
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(updates.len()).map_err(|_error| {
+            Error::Write("could not reserve paragraph-alignment batch".to_string())
+        })?;
+        let mut updates = updates.iter().peekable();
+        for (position, paragraph) in self.source.body().paragraphs().enumerate() {
+            if updates
+                .peek()
+                .is_some_and(|update| update.position.get() == position)
+            {
+                let update = updates.next().ok_or(Error::Internal(
+                    "paragraph-alignment selector cursor became inconsistent",
+                ))?;
+                staged.push(Operation::Alignment {
+                    position,
+                    before: paragraph.format().alignment(),
+                    after: update.alignment,
+                });
+            }
+        }
+        if let Some(update) = updates.next() {
+            return Err(Error::ParagraphOutOfRange {
+                position: update.position.get(),
+                count: self.source.paragraph_count(),
+            });
+        }
+        self.operations.append(&mut staged);
+        Ok(self)
+    }
+
+    /// Stages one typed dependency-free local paragraph-layout delta.
+    ///
+    /// Selection and the complete before-state resolve against the immutable
+    /// source snapshot. Zero numeric values and false flags clear the selected
+    /// facet. Alignment may compose independently; body text, character, and
+    /// structural work is deliberately refused by this lossless seam.
+    ///
+    /// # Errors
+    /// Returns an error for an empty delta, invalid selector, overlapping
+    /// facet, unsupported source closure, or retained operation bound.
+    pub fn patch_paragraph_layout(
+        &mut self,
+        position: Position,
+        patch: ParagraphLayoutPatch,
+    ) -> Result<&mut Self, Error> {
+        self.patch_body_paragraph_layouts(&[ParagraphLayoutUpdate::new(position, patch)])
+    }
+
+    /// Atomically stages a bounded source-ordered paragraph-layout batch.
+    ///
+    /// Every selector, dependency, limit, and effect conflict is preflighted
+    /// before any operation is appended. Updates must be strictly ordered by
+    /// source paragraph position. Different facets, including multiple
+    /// independently prepared deltas for different paragraphs, compose.
+    ///
+    /// # Errors
+    /// Returns an error for an empty/unordered batch or delta, unsupported
+    /// source, invalid selector, conflict, mixed text/character work, or bound.
+    pub fn patch_body_paragraph_layouts(
+        &mut self,
+        updates: &[ParagraphLayoutUpdate],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if updates.is_empty() {
+            return Err(Error::EmptyParagraphLayoutBatch);
+        }
+        for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
+            if incoming.position <= previous.position {
+                return Err(Error::ParagraphLayoutBatchOutOfOrder {
+                    previous: previous.position.get(),
+                    incoming: incoming.position.get(),
+                });
+            }
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text { .. }
+                    | Operation::RunFormat { .. }
+                    | Operation::RunInsert { .. }
+                    | Operation::Bold { .. }
+                    | Operation::Italic { .. }
+                    | Operation::Underline { .. }
+                    | Operation::FontSize { .. }
+                    | Operation::Baseline { .. }
+                    | Operation::Expansion { .. }
+                    | Operation::HorizontalScale { .. }
+                    | Operation::Kerning { .. }
+                    | Operation::Strike { .. }
+                    | Operation::DoubleStrike { .. }
+                    | Operation::Hidden { .. }
+                    | Operation::SmallCaps { .. }
+                    | Operation::AllCaps { .. }
+                    | Operation::Outline { .. }
+                    | Operation::InsertParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        self.ensure_operation_room_for(updates.len())?;
+        ensure_paragraph_layout_source(&self.source)?;
+
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(updates.len()).map_err(|_error| {
+            Error::Write("could not reserve paragraph-layout batch".to_string())
+        })?;
+        let layout_count = self
+            .operations
+            .iter()
+            .filter(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+            .count();
+        let mut existing_layouts = Vec::new();
+        existing_layouts
+            .try_reserve_exact(layout_count)
+            .map_err(|_error| {
+                Error::Write("could not reserve paragraph-layout conflict index".to_string())
+            })?;
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if let Operation::ParagraphLayout {
+                position, fields, ..
+            } = operation
+            {
+                existing_layouts.push((*position, *fields, existing));
+            }
+        }
+        existing_layouts
+            .sort_unstable_by_key(|(position, _fields, existing)| (*position, *existing));
+        let mut updates = updates.iter().peekable();
+        for (position, paragraph) in self.source.body().paragraphs().enumerate() {
+            if updates
+                .peek()
+                .is_some_and(|update| update.position.get() == position)
+            {
+                let update = updates.next().ok_or(Error::Internal(
+                    "paragraph-layout selector cursor became inconsistent",
+                ))?;
+                if let Some(Some(frame)) = update.patch.frame {
+                    frame.validate()?
+                }
+                let fields = update.patch.fields();
+                if let Some(Some(frame)) = update.patch.frame {
+                    frame.validate()?;
+                }
+                if fields.is_empty() {
+                    return Err(Error::EmptyParagraphLayoutPatch { position });
+                }
+                let before = ParagraphLayout::from_raw(paragraph.format().raw());
+                let mut after = before;
+                update.patch.apply(&mut after);
+                let incoming = self.operations.len().saturating_add(staged.len());
+                if let Some(existing) = first_layout_conflict(&existing_layouts, position, fields) {
+                    return Err(Error::Conflict { existing, incoming });
+                }
+                staged.push(Operation::ParagraphLayout {
+                    position,
+                    fields,
+                    before,
+                    after,
+                });
+            }
+        }
+        if let Some(update) = updates.next() {
+            return Err(Error::ParagraphOutOfRange {
+                position: update.position.get(),
+                count: self.source.paragraph_count(),
+            });
+        }
+        self.operations.append(&mut staged);
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained table-cell text story.
+    ///
+    /// The complete cell path is resolved against the immutable base. Cell
+    /// drawings, fields, nested tables, and positional events remain retained;
+    /// their positions must still validate against the replacement.
+    ///
+    /// Outer cells publish by splicing the replacement into the retained
+    /// source at the cell's recorded text range, so every other byte —
+    /// including the table's position in the body and unknown destinations —
+    /// is preserved.  A cell whose text range contains state-changing or
+    /// destination controls is refused at commit.  Nested cells use the
+    /// canonical writer only in documents without body tables.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid path, dependent story geometry,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_table_cell_text<'text>(
+        &mut self,
+        path: TableCellPath,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = self.admit_text(input, 0)?;
+        let before = table_cell(&self.source, &path)?.text().to_string();
+        let effect = table_cell_effect(&path);
+        self.ensure_unique_destination(&effect)?;
+
+        // Exercise the retained model's dependency validation before staging.
+        let mut candidate = table_cell(&self.source, &path)?.clone();
+        candidate.set_text(Cow::Owned(after.clone()))?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::TableCellText {
+            path,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained header/footer paragraph.
+    ///
+    /// The paragraph's formatting is preserved. Destinations with drawings,
+    /// fields, or other positional story events are refused because changing
+    /// text could stale dependent offsets.  Publication splices the
+    /// replacement into the paragraph's recorded source range (see
+    /// [`Self::set_table_cell_text`]).
+    ///
+    /// # Errors
+    /// Returns an error for an invalid selector, dependent story content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_header_footer_text<'text>(
+        &mut self,
+        target: HeaderFooterParagraph,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = self.admit_text(input, 0)?;
+        if after.contains('\n') {
+            return Err(Error::unsupported_source(
+                "one header/footer paragraph cannot contain a paragraph break",
+            ));
+        }
+        let header_footer = header_footer(&self.source, target)?;
+        if !header_footer.shapes.is_empty()
+            || !header_footer.shape_groups.is_empty()
+            || !header_footer.story_events.is_empty()
+        {
+            return Err(Error::unsupported_source(
+                "header/footer text has dependent positioned content",
+            ));
+        }
+        let before = header_footer
+            .paragraphs
+            .get(target.paragraph)
+            .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
+            .text
+            .to_string();
+        let effect = header_footer_effect(target);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::HeaderFooterText {
+            target,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained comment body.
+    ///
+    /// The comment's range identity, author metadata, and body anchor are
+    /// preserved. Positioned drawings or fields are refused because replacing
+    /// the complete text could stale their offsets.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid index, dependent story content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_annotation_text<'text>(
+        &mut self,
+        index: usize,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = self.admit_text(input, 0)?;
+        let annotation = annotation(&self.source, index)?;
+        if !annotation.shapes.is_empty()
+            || !annotation.shape_groups.is_empty()
+            || !annotation.story_events.is_empty()
+        {
+            return Err(Error::unsupported_source(
+                "annotation text has dependent positioned content",
+            ));
+        }
+        let mut candidate = annotation.clone();
+        candidate.text = Cow::Owned(after.clone());
+        candidate.validate()?;
+        let before = annotation.text.to_string();
+        let effect = annotation_effect(index);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::AnnotationText {
+            index,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained footnote or endnote body.
+    ///
+    /// The note kind, reference mark, formatting, and main-story anchor are
+    /// preserved. Positioned drawings or fields are refused because replacing
+    /// the complete text could stale their offsets.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid index, dependent story content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_note_text<'text>(
+        &mut self,
+        index: usize,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = self.admit_text(input, 0)?;
+        let note = note(&self.source, index)?;
+        if !note.shapes.is_empty() || !note.shape_groups.is_empty() || !note.story_events.is_empty()
+        {
+            return Err(Error::unsupported_source(
+                "note text has dependent positioned content",
+            ));
+        }
+        let mut candidate = note.clone();
+        candidate.content = Cow::Owned(after.clone());
+        candidate.validate()?;
+        let before = note.content.to_string();
+        let effect = note_effect(index);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::NoteText {
+            index,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    /// Stages replacement of one retained root shape text frame.
+    ///
+    /// Geometry, scalar properties, formatting, name, and body position are
+    /// preserved. Shapes without an existing text destination and shapes with
+    /// hyperlinks, legacy fallbacks, or nested positioned story content are
+    /// refused.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid index, active/dependent drawing content,
+    /// duplicate destination, mixed body work, or finite limits.
+    pub fn set_shape_text<'text>(
+        &mut self,
+        index: usize,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let after = self.admit_text(input, 0)?;
+        let shape = shape(&self.source, index)?;
+        if !shape.text_destination_present {
+            return Err(Error::unsupported_source(
+                "shape text editing requires an existing text destination",
+            ));
+        }
+        if shape.result.is_some()
+            || !shape.text_shapes.is_empty()
+            || !shape.text_shape_groups.is_empty()
+            || !shape.text_drawing_order.is_empty()
+            || !shape.text_story_events.is_empty()
+        {
+            return Err(Error::unsupported_source(
+                "shape text has dependent positioned or fallback content",
+            ));
+        }
+        if shape_has_active_link(shape) {
+            return Err(Error::unsupported_source(
+                "shape text editing refuses active hyperlink metadata",
+            ));
+        }
+        let mut candidate = shape.clone();
+        candidate.set_text(Cow::Owned(after.clone()));
+        candidate.validate()?;
+        let before = shape.text.to_string();
+        let effect = shape_effect(index);
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.len())?;
+        self.operations.push(Operation::ShapeText {
+            index,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    /// Stages replacement of one inert SmartTag/factoid metadata record.
+    ///
+    /// The factoid name, namespace, and attributes may change.  Its body
+    /// position and covered text must remain identical so source-bound story
+    /// offsets stay valid.  The operation is canonical-writer backed and
+    /// therefore refuses snapshots containing opaque destination syntax.
+    pub fn set_smart_tag(
+        &mut self,
+        index: usize,
+        value: crate::SmartTag<'_>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        let replacement_bytes = smart_tag_replacement_bytes(&value);
+        self.admit_replacement(replacement_bytes)?;
+        let before = self
+            .source
+            .smart_tags()
+            .get(index)
+            .ok_or(Error::DestinationOutOfRange("SmartTag"))?
+            .clone()
+            .into_owned();
+        let after = value.into_owned();
+        after.validate()?;
+        if before.position != after.position || before.content != after.content {
+            return Err(Error::unsupported_source(
+                "SmartTag edits cannot change the body range",
+            ));
+        }
+        let effect = format!("body:smart-tag:{index}");
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(replacement_bytes)?;
+        self.operations.push(Operation::SmartTag {
+            index,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    /// Stages replacement of one inert tracked-move bookmark's revision
+    /// metadata.  Identity and body range stay source-bound; move execution is
+    /// never performed.
+    pub fn set_move_bookmark(
+        &mut self,
+        index: usize,
+        value: crate::MoveBookmark<'_>,
+    ) -> Result<&mut Self, Error> {
+        self.ensure_destination_compatible()?;
+        self.ensure_operation_room()?;
+        self.admit_replacement(value.tag.len().saturating_add(value.content.len()))?;
+        let before = self
+            .source
+            .move_bookmarks()
+            .get(index)
+            .ok_or(Error::DestinationOutOfRange("move-bookmark"))?
+            .clone()
+            .into_owned();
+        let after = value.into_owned();
+        after.validate()?;
+        if before.kind != after.kind
+            || before.tag != after.tag
+            || before.position != after.position
+            || before.content != after.content
+        {
+            return Err(Error::unsupported_source(
+                "move-bookmark edits cannot change identity or body range",
+            ));
+        }
+        let effect = format!("body:move-bookmark:{index}");
+        self.ensure_unique_destination(&effect)?;
+        self.charge_replacement(after.tag.len().saturating_add(after.content.len()))?;
+        self.operations.push(Operation::MoveBookmark {
+            index,
+            before,
+            after,
+        });
+        self.record_destination(effect)?;
+        Ok(self)
+    }
+
+    fn ensure_body_compatible(&self) -> Result<(), Error> {
+        if self.operations.iter().any(Operation::is_destination) {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        }
+        if let Some(existing) = self.operations.iter().position(Operation::is_lifecycle) {
+            return Err(Error::Conflict {
+                existing,
+                incoming: self.operations.len(),
+            });
+        }
+        Ok(())
+    }
+
+    fn ensure_destination_compatible(&self) -> Result<(), Error> {
+        if self
+            .operations
+            .iter()
+            .any(|operation| !operation.is_destination())
+        {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        }
+        Ok(())
+    }
+
+    fn ensure_unique_destination(&self, effect: &str) -> Result<(), Error> {
+        if !self.destination_effects.contains(effect) {
+            return Ok(());
+        }
+        // Locate the earlier operation for the typed conflict only on the
+        // error path.
+        let incoming = self.operations.len();
+        let existing = self
+            .operations
+            .iter()
+            .position(|operation| {
+                operation
+                    .effect_keys()
+                    .iter()
+                    .any(|candidate| candidate == effect)
+            })
+            .unwrap_or(0);
+        Err(Error::Conflict { existing, incoming })
+    }
+
+    /// Record a staged destination operation's effect key.
+    fn record_destination(&mut self, effect: String) -> Result<(), Error> {
+        self.destination_effects
+            .try_reserve(1)
+            .map_err(|_error| Error::Write("could not reserve destination effects".to_string()))?;
+        self.destination_effects.insert(effect);
+        Ok(())
+    }
+
+    /// Effect keys of every staged destination operation, for an edit whose
+    /// operations were assembled elsewhere.
+    fn destination_effects_of(operations: &[Operation]) -> std::collections::HashSet<String> {
+        operations
+            .iter()
+            .filter(|operation| operation.is_destination())
+            .flat_map(Operation::effect_keys)
+            .collect()
+    }
+
+    fn ensure_character_property_span(
+        &self,
+        span: TextSpan,
+        property: &'static str,
+    ) -> Result<(), Error> {
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+        {
+            return Err(Error::unsupported_operation(
+                "paragraph-layout updates cannot compose with body text or character changes",
+            ));
+        }
+        let body = self.source.text();
+        validate_span(body, span)?;
+        if span.is_empty()
+            || body
+                .get(span.start..span.end)
+                .is_some_and(|text| text.contains('\n'))
+        {
+            return Err(Error::unsupported_source(match property {
+                "expansion" => "expansion edits require non-empty text within one paragraph",
+                "horizontal scale" => {
+                    "horizontal-scale edits require non-empty text within one paragraph"
+                },
+                "kerning" => "kerning edits require non-empty text within one paragraph",
+                _ => "character-property edits require non-empty text within one paragraph",
+            }));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Text {
+                    structural: true,
+                    ..
+                } | Operation::InsertParagraph { .. }
+                    | Operation::RemoveParagraph { .. }
+                    | Operation::RestoreParagraph { .. }
+                    | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
+            )
+        }) {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        }
+        let incoming = self.operations.len();
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if operation
+                .span()
+                .is_some_and(|existing_span| spans_conflict(existing_span, span))
+            {
+                return Err(Error::Conflict { existing, incoming });
+            }
+        }
+        Ok(())
+    }
+
+    fn ensure_operation_room(&self) -> Result<(), Error> {
+        self.ensure_operation_room_for(1)
+    }
+
+    fn ensure_operation_room_for(&self, additional: usize) -> Result<(), Error> {
+        let observed = self.operations.len().saturating_add(additional);
+        if observed > self.limits.max_operations() {
+            return Err(Error::Limit {
+                kind: SemanticLimitKind::Operations,
+                observed,
+                maximum: self.limits.max_operations(),
+            });
+        }
+        Ok(())
+    }
+
+    fn admit_text<'text>(
+        &self,
+        input: impl Into<Cow<'text, str>>,
+        extra: usize,
+    ) -> Result<String, Error> {
+        let input = input.into();
+        self.admit_replacement(input.len().saturating_add(extra))?;
+        match input {
+            Cow::Owned(value) => Ok(value),
+            Cow::Borrowed(value) => {
+                let mut owned = String::new();
+                owned.try_reserve_exact(value.len()).map_err(|_| {
+                    crate::Error::AllocationFailed {
+                        resource: "edit replacement text",
+                        requested: value.len(),
+                    }
+                })?;
+                owned.push_str(value);
+                Ok(owned)
+            },
+        }
+    }
+
+    fn admit_replacement(&self, bytes: usize) -> Result<usize, Error> {
+        let observed = self.replacement_bytes.saturating_add(bytes);
+        let maximum = self.limits.max_replacement_bytes();
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: SemanticLimitKind::ReplacementBytes,
+                observed,
+                maximum,
+            });
+        }
+        let limit = self.source.limits().max_input_bytes();
+        if observed > limit {
+            return Err(Error::InputTooLarge { observed, limit });
+        }
+        Ok(observed)
+    }
+
+    fn charge_replacement(&mut self, bytes: usize) -> Result<(), Error> {
+        self.replacement_bytes = self.admit_replacement(bytes)?;
+        Ok(())
+    }
+
+    /// Validates and publishes the complete candidate atomically.
+    ///
+    /// # Errors
+    /// Returns an error when the changed source is outside the supported
+    /// closure or candidate validation/readback fails.
+    pub fn commit(self) -> Result<Commit, Error> {
+        if !self.marks.is_empty() {
+            return self.commit_marks();
+        }
+        // The plain-body paths keep their behaviour and cost; a paragraph
+        // insertion, removal, move or swap they refuse falls back to exact
+        // source splicing of producer paragraphs, whose typed refusal names the
+        // producer construct.
+        match self.operations.as_slice() {
+            [
+                operation @ (Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }),
+            ] => {
+                let operation = operation.clone();
+                let source = self.source.clone();
+                match self.commit_staged() {
+                    Err(Error::Refused(refusal))
+                        if refusal.kind() == RefusalKind::UnsupportedContent =>
+                    {
+                        producer_paragraphs::commit(source, &operation)
+                    },
+                    result => result,
+                }
+            },
+            _ => self.commit_staged(),
+        }
+    }
+
+    fn commit_staged(self) -> Result<Commit, Error> {
+        self.ensure_operation_room_for(0)?;
+        self.admit_replacement(0)?;
+        let operation_count = self.operations.len();
+        if operation_count == 0 {
+            return Ok(Commit::new(self.source.clone(), self.source, 0, Vec::new()));
+        }
+        if self
+            .operations
+            .iter()
+            .all(|operation| matches!(operation, Operation::RunInsert { .. }))
+        {
+            return commit_body_run_insertions(self, operation_count);
+        }
+        if self
+            .operations
+            .iter()
+            .all(|operation| matches!(operation, Operation::RunFormat { .. }))
+        {
+            if self.operations.iter().any(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunFormat {
+                        text_after: Some(_),
+                        ..
+                    }
+                )
+            }) {
+                return commit_body_run_texts(self, operation_count);
+            }
+            return commit_body_run_formats(self, operation_count);
+        }
+
+        if matches!(
+            self.operations.as_slice(),
+            [Operation::RestoreParagraph { .. }]
+        ) {
+            // Positioned insertion has a source-splice implementation for the
+            // ordinary paragraph closure.  It is needed for an empty input:
+            // the semantic text can remain unchanged while the paragraph
+            // count still grows, so the generic text projection cannot prove
+            // the structural result.
+            if let Some((snapshot, semantic_delta)) = commit_body_paragraph_insertion(&self)? {
+                return Ok(Commit::new(
+                    self.source,
+                    snapshot,
+                    operation_count,
+                    semantic_delta,
+                ));
+            }
+        }
+
+        if self.operations.iter().all(Operation::is_paragraph_removal) {
+            match ordinary_paragraph_source_map(&self.source) {
+                Ok(map) => return commit_body_paragraph_removals(self, operation_count, map),
+                // Keep the established scalar lifecycle path for decoded or
+                // explicitly repaired sources without literal source ranges.
+                Err(Error::Refused(refusal))
+                    if refusal.kind() == RefusalKind::UnsupportedContent
+                        && operation_count == 1 => {},
+                Err(error) => return Err(error),
+            }
+        }
+        if self
+            .operations
+            .iter()
+            .any(Operation::is_raw_paragraph_structure)
+        {
+            if operation_count != 1 {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            }
+            return commit_raw_paragraph_structure(self, operation_count);
+        }
+        if self.paragraph_batch_len == Some(operation_count)
+            && self.source.body().inlines().any(|inline| {
+                matches!(inline, crate::text::Inline::Break(crate::text::Break::Line))
+            })
+        {
+            return commit_body_paragraph_batch(self, operation_count);
+        }
+
+        let destination_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_destination())
+            .count();
+        let root_transfer_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_root_transfer())
+            .count();
+        let picture_payload_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_picture_payload())
+            .count();
+        let picture_removal_count = self
+            .operations
+            .iter()
+            .filter(|operation| operation.is_picture_removal())
+            .count();
+        if picture_removal_count != 0 {
+            if picture_removal_count != operation_count {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            }
+            return picture_payload::commit_removals(self, operation_count);
+        }
+        if picture_payload_count != 0 {
+            if picture_payload_count != operation_count {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            }
+            return picture_payload::commit(self, operation_count);
+        }
+        if root_transfer_count != 0 {
+            if root_transfer_count != 1 || operation_count != 1 {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            }
+            return commit_root_transfer(self, operation_count);
+        }
+        if destination_count == operation_count {
+            return commit_destinations(self, operation_count);
+        }
+        if destination_count != 0 {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        }
+
+        let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
+        // A pure alignment transaction uses the lossless paragraph-property
+        // publication path as well.  The general character-property encoder
+        // intentionally requires one uniform character baseline, which is a
+        // needless restriction when alignment is the only changed facet: the
+        // paragraph-property writer can retain every source run verbatim.
+        let alignment_only_operation = !self.operations.is_empty()
+            && self
+                .operations
+                .iter()
+                .all(|operation| matches!(operation, Operation::Alignment { .. }));
+        let layout_operation = alignment_only_operation
+            || self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }));
+        let property_operation = self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::Alignment { .. }
+                    | Operation::ParagraphLayout { .. }
+                    | Operation::RunFormat { .. }
+                    | Operation::Bold { .. }
+                    | Operation::Italic { .. }
+                    | Operation::Underline { .. }
+                    | Operation::Strike { .. }
+                    | Operation::DoubleStrike { .. }
+                    | Operation::Hidden { .. }
+                    | Operation::SmallCaps { .. }
+                    | Operation::AllCaps { .. }
+                    | Operation::Outline { .. }
+                    | Operation::FontSize { .. }
+                    | Operation::Baseline { .. }
+                    | Operation::Expansion { .. }
+                    | Operation::HorizontalScale { .. }
+                    | Operation::Kerning { .. }
+            )
+        });
+        let has_font_size_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::FontSize { .. }));
+        let has_expansion_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Expansion { .. }));
+        let has_horizontal_scale_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::HorizontalScale { .. }));
+        let has_kerning_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Kerning { .. }));
+        let mut alignments = if property_operation {
+            source_alignments(&self.source)
+        } else {
+            Vec::new()
+        };
+        let base_bold = if property_operation && !layout_operation {
+            base_bold_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_italic = if property_operation && !layout_operation {
+            base_italic_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_underline = if property_operation && !layout_operation {
+            base_underline_for_edit(&self.source, &self.operations)?
+        } else {
+            UnderlineStyle::None
+        };
+        let base_font_size = if has_font_size_operation && !layout_operation {
+            base_font_size_for_edit(&self.source, &self.operations)?
+        } else {
+            self.source.body().runs().next().map_or_else(
+                || crate::types::Formatting::default().font_size,
+                |run| run.format().raw().font_size,
+            )
+        };
+        let base_expansion = if property_operation && !layout_operation {
+            base_expansion_for_edit(&self.source, &self.operations)?
+        } else {
+            CharacterExpansion::None
+        };
+        let base_horizontal_scale = if property_operation && !layout_operation {
+            base_horizontal_scale_for_edit(&self.source, &self.operations)?
+        } else {
+            100
+        };
+        let base_kerning = if property_operation && !layout_operation {
+            base_kerning_for_edit(&self.source, &self.operations)?
+        } else {
+            0
+        };
+        let base_strike = if property_operation && !layout_operation {
+            base_strike_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_double_strike = if property_operation && !layout_operation {
+            base_double_strike_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_hidden = if property_operation && !layout_operation {
+            base_hidden_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_small_caps = if property_operation && !layout_operation {
+            base_small_caps_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_all_caps = if property_operation && !layout_operation {
+            base_all_caps_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_outline = if property_operation && !layout_operation {
+            base_outline_for_edit(&self.source, &self.operations)?
+        } else {
+            false
+        };
+        let base_baseline = if property_operation && !layout_operation {
+            base_baseline_for_edit(&self.source, &self.operations)?
+        } else {
+            CharacterBaseline::Normal
+        };
+        let mut baseline = self
+            .source
+            .body()
+            .runs()
+            .next()
+            .map_or_else(crate::types::Formatting::default, |run| *run.format().raw());
+        baseline.bold = base_bold;
+        baseline.italic = base_italic;
+        baseline.underline = base_underline;
+        baseline.font_size = base_font_size;
+        baseline.character_positioning.expansion = base_expansion;
+        baseline.char_spacing = match base_expansion {
+            CharacterExpansion::None => 0,
+            CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value) => {
+                i32::from(value)
+            },
+        };
+        baseline.character_positioning.horizontal_scale_percent = base_horizontal_scale;
+        baseline.char_scale = i32::from(base_horizontal_scale);
+        baseline.character_positioning.kerning_half_points = base_kerning;
+        baseline.kerning = i32::from(base_kerning);
+        baseline.strike = base_strike;
+        baseline.double_strike = base_double_strike;
+        baseline.hidden = base_hidden;
+        baseline.smallcaps = base_small_caps;
+        baseline.all_caps = base_all_caps;
+        baseline.outline = base_outline;
+        baseline.character_positioning.baseline = base_baseline;
+        baseline.superscript = matches!(base_baseline, CharacterBaseline::Superscript);
+        baseline.subscript = matches!(base_baseline, CharacterBaseline::Subscript);
+        let mut projected_bold_ranges = Vec::new();
+        let mut projected_italic_ranges = Vec::new();
+        let mut projected_underline_ranges = Vec::new();
+        let mut projected_font_size_ranges = Vec::new();
+        let mut projected_expansion_ranges = Vec::new();
+        let mut projected_horizontal_scale_ranges = Vec::new();
+        let mut projected_kerning_ranges = Vec::new();
+        let mut projected_strike_ranges = Vec::new();
+        let mut projected_double_strike_ranges = Vec::new();
+        let mut projected_hidden_ranges = Vec::new();
+        let mut projected_small_caps_ranges = Vec::new();
+        let mut projected_all_caps_ranges = Vec::new();
+        let mut projected_outline_ranges = Vec::new();
+        let mut projected_baseline_ranges = Vec::new();
+        let mut paragraph_properties = if layout_operation {
+            source_paragraph_properties(&self.source)?
+        } else {
+            Vec::new()
+        };
+        for operation in &self.operations {
+            match operation {
+                Operation::Alignment {
+                    position, after, ..
+                } => {
+                    let count = alignments.len();
+                    let slot = alignments
+                        .get_mut(*position)
+                        .ok_or(Error::ParagraphOutOfRange {
+                            position: *position,
+                            count,
+                        })?;
+                    *slot = *after;
+                    if layout_operation {
+                        let count = paragraph_properties.len();
+                        let paragraph = paragraph_properties.get_mut(*position).ok_or(
+                            Error::ParagraphOutOfRange {
+                                position: *position,
+                                count,
+                            },
+                        )?;
+                        paragraph.alignment = *after;
+                    }
+                },
+                Operation::ParagraphLayout {
+                    position,
+                    fields,
+                    after,
+                    ..
+                } => {
+                    let count = paragraph_properties.len();
+                    let paragraph = paragraph_properties.get_mut(*position).ok_or(
+                        Error::ParagraphOutOfRange {
+                            position: *position,
+                            count,
+                        },
+                    )?;
+                    apply_layout_to_raw(paragraph, *after, *fields);
+                },
+                Operation::Bold { span, after, .. } => {
+                    projected_bold_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Italic { span, after, .. } => {
+                    projected_italic_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Underline { span, after, .. } => {
+                    projected_underline_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::FontSize { span, after, .. } => {
+                    projected_font_size_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Expansion { span, after, .. } => {
+                    projected_expansion_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::HorizontalScale { span, after, .. } => {
+                    projected_horizontal_scale_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Kerning { span, after, .. } => {
+                    projected_kerning_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Strike { span, after, .. } => {
+                    projected_strike_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::DoubleStrike { span, after, .. } => {
+                    projected_double_strike_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Hidden { span, after, .. } => {
+                    projected_hidden_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::SmallCaps { span, after, .. } => {
+                    projected_small_caps_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::AllCaps { span, after, .. } => {
+                    projected_all_caps_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Outline { span, after, .. } => {
+                    projected_outline_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Baseline { span, after, .. } => {
+                    projected_baseline_ranges
+                        .push((project_base_span(*span, &self.operations)?, *after));
+                },
+                Operation::Text { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. } => {},
+                Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_) => {
+                    return Err(Error::unsupported_operation(
+                        "body splices and retained-destination edits cannot compose safely",
+                    ));
+                },
+                Operation::RootTransfer { .. } => {
+                    return Err(Error::unsupported_operation(
+                        "body splices and retained-destination edits cannot compose safely",
+                    ));
+                },
+            }
+        }
+        let original_alignments = if property_operation {
+            source_alignments(&self.source)
+        } else {
+            Vec::new()
+        };
+        let has_bold_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Bold { before, after, .. } if before != after)
+        });
+        let has_italic_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Italic { before, after, .. } if before != after)
+        });
+        let has_underline_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Underline { before, after, .. } if before != after)
+        });
+        let has_font_size_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::FontSize { before, after, .. } if before != after)
+        });
+        let has_strike_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Strike { before, after, .. } if before != after)
+        });
+        let has_double_strike_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::DoubleStrike { before, after, .. } if before != after)
+        });
+        let has_hidden_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Hidden { before, after, .. } if before != after)
+        });
+        let has_small_caps_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::SmallCaps { before, after, .. } if before != after)
+        });
+        let has_all_caps_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::AllCaps { before, after, .. } if before != after)
+        });
+        let has_outline_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Outline { before, after, .. } if before != after)
+        });
+        let has_baseline_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Baseline { before, after, .. } if before != after)
+        });
+        let has_expansion_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Expansion { before, after, .. } if before != after)
+        });
+        let has_horizontal_scale_delta = self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::HorizontalScale { before, after, .. } if before != after
+            )
+        });
+        let has_kerning_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::Kerning { before, after, .. } if before != after)
+        });
+        let has_layout_delta = self.operations.iter().any(|operation| {
+            matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
+        });
+        let has_restore_paragraph = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::RestoreParagraph { .. }));
+        let did_change = replacement != self.source.text()
+            || alignments != original_alignments
+            || has_layout_delta
+            || has_bold_delta
+            || has_italic_delta
+            || has_underline_delta
+            || has_font_size_delta
+            || has_strike_delta
+            || has_double_strike_delta
+            || has_hidden_delta
+            || has_small_caps_delta
+            || has_all_caps_delta
+            || has_outline_delta
+            || has_baseline_delta
+            || has_expansion_delta
+            || has_horizontal_scale_delta
+            || has_kerning_delta
+            || has_restore_paragraph;
+        let semantic_delta =
+            semantic_changes_with_replacement(&self.operations, &projected_spans, &replacement);
+        if !did_change {
+            return Ok(Commit::new(
+                self.source.clone(),
+                self.source,
+                operation_count,
+                semantic_delta,
+            ));
+        }
+        ensure_changed_publication_allowed(&self.source)?;
+
+        let source_bytes = self
+            .source
+            .source_bytes()
+            .ok_or(Error::unsupported_operation(
+                "snapshot has no exact RTF source",
+            ))?;
+        if crate::compressed::is_compressed_rtf(source_bytes) {
+            return Err(Error::unsupported_source(
+                "compressed RTF needs a transport-aware rewrite",
+            ));
+        }
+        let has_bold_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Bold { .. }));
+        let has_italic_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Italic { .. }));
+        let has_underline_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Underline { .. }));
+        let has_strike_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Strike { .. }));
+        let has_double_strike_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::DoubleStrike { .. }));
+        let has_hidden_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Hidden { .. }));
+        let has_small_caps_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::SmallCaps { .. }));
+        let has_all_caps_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::AllCaps { .. }));
+        let has_outline_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Outline { .. }));
+        let has_baseline_operation = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::Baseline { .. }));
+        if has_italic_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "italic edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_underline_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "underline edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_font_size_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "font-size edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_strike_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "strike edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_double_strike_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "double-strike edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_hidden_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "hidden edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_small_caps_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "small-caps edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_all_caps_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "all-caps edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_outline_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "outline edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_baseline_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "baseline edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_expansion_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "expansion edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_horizontal_scale_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "horizontal-scale edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if has_kerning_operation && !source_bytes.is_ascii() {
+            return Err(Error::unsupported_source(
+                "kerning edits refuse non-ASCII transport encodings",
+            ));
+        }
+        if layout_operation {
+            self.source
+                .model()
+                .positioned_paragraph_property_editability()
+                .map_err(Error::unsupported_source)?;
+        } else if has_bold_operation
+            || has_italic_operation
+            || has_underline_operation
+            || has_font_size_operation
+            || has_strike_operation
+            || has_double_strike_operation
+            || has_hidden_operation
+            || has_small_caps_operation
+            || has_all_caps_operation
+            || has_outline_operation
+            || has_baseline_operation
+            || has_expansion_operation
+            || has_horizontal_scale_operation
+            || has_kerning_operation
+        {
+            if has_bold_operation
+                && !has_italic_operation
+                && !has_underline_operation
+                && !has_font_size_operation
+                && !has_strike_operation
+                && !has_double_strike_operation
+                && !has_hidden_operation
+                && !has_small_caps_operation
+                && !has_all_caps_operation
+                && !has_outline_operation
+                && !has_baseline_operation
+                && !has_expansion_operation
+                && !has_horizontal_scale_operation
+                && !has_kerning_operation
+            {
+                self.source
+                    .model()
+                    .plain_body_bold_editability()
+                    .map_err(Error::unsupported_source)?;
+            } else {
+                plain_body_character_editability(
+                    &self.source,
+                    CharacterEditabilityOptions {
+                        allow_mixed_bold: has_bold_operation,
+                        allow_mixed_italic: has_italic_operation,
+                        allow_mixed_underline: has_underline_operation,
+                        allow_mixed_font_size: has_font_size_operation,
+                        allow_mixed_strike: has_strike_operation,
+                        allow_mixed_double_strike: has_double_strike_operation,
+                        allow_mixed_hidden: has_hidden_operation,
+                        allow_mixed_small_caps: has_small_caps_operation,
+                        allow_mixed_all_caps: has_all_caps_operation,
+                        allow_mixed_outline: has_outline_operation,
+                        allow_mixed_baseline: has_baseline_operation,
+                        allow_mixed_expansion: has_expansion_operation,
+                        allow_mixed_horizontal_scale: has_horizontal_scale_operation,
+                        allow_mixed_kerning: has_kerning_operation,
+                    },
+                )
+                .map_err(Error::unsupported_source)?;
+            }
+        } else {
+            self.source
+                .model()
+                .plain_body_text_editability()
+                .map_err(Error::unsupported_source)?;
+        }
+        let layout_source = layout_operation
+            .then(|| layout_source::plan(&self.source, source_bytes))
+            .transpose()?;
+        let span = if let Some(plan) = &layout_source {
+            plan.span.clone()
+        } else {
+            retained_or_located_body_source_span(&self.source, source_bytes)?
+        };
+        let replacement_bytes = if layout_operation {
+            if replacement != self.source.text()
+                || has_bold_operation
+                || has_italic_operation
+                || has_underline_operation
+                || has_font_size_operation
+                || has_strike_operation
+                || has_double_strike_operation
+                || has_hidden_operation
+                || has_small_caps_operation
+                || has_all_caps_operation
+                || has_outline_operation
+                || has_baseline_operation
+                || has_expansion_operation
+                || has_horizontal_scale_operation
+                || has_kerning_operation
+            {
+                return Err(Error::unsupported_operation(
+                    "paragraph-layout updates cannot compose with body text or character changes",
+                ));
+            }
+            ensure_paragraph_layout_source(&self.source)?;
+            encoded_body_with_paragraph_properties(
+                &self.source,
+                &paragraph_properties,
+                self.source.limits(),
+                &span,
+                &layout_source
+                    .as_ref()
+                    .ok_or(Error::Internal("layout source plan is missing"))?
+                    .event_offsets,
+            )?
+        } else if property_operation {
+            encoded_body_with_properties(
+                &replacement,
+                &alignments,
+                baseline,
+                CharacterPropertyOverlays {
+                    base_bold,
+                    bold_changes: &projected_bold_ranges,
+                    base_italic,
+                    italic_changes: &projected_italic_ranges,
+                    base_underline,
+                    underline_changes: &projected_underline_ranges,
+                    base_font_size,
+                    font_size_changes: &projected_font_size_ranges,
+                    base_expansion,
+                    expansion_changes: &projected_expansion_ranges,
+                    base_horizontal_scale,
+                    horizontal_scale_changes: &projected_horizontal_scale_ranges,
+                    base_kerning,
+                    kerning_changes: &projected_kerning_ranges,
+                    base_strike,
+                    strike_changes: &projected_strike_ranges,
+                    base_double_strike,
+                    double_strike_changes: &projected_double_strike_ranges,
+                    base_hidden,
+                    hidden_changes: &projected_hidden_ranges,
+                    base_small_caps,
+                    small_caps_changes: &projected_small_caps_ranges,
+                    base_all_caps,
+                    all_caps_changes: &projected_all_caps_ranges,
+                    base_outline,
+                    outline_changes: &projected_outline_ranges,
+                    base_baseline,
+                    baseline_changes: &projected_baseline_ranges,
+                },
+                self.source.limits(),
+            )?
+        } else {
+            encoded_body_text(&replacement, self.source.limits())?
+        };
+        let bytes = splice_body(source_bytes, span, &replacement_bytes, self.source.limits())?;
+        let snapshot = Package::from_bytes_with_options(&bytes, self.source.options())?;
+        validate_opaque_preservation(&self.source, &snapshot, &self.operations)?;
+        if snapshot.text() != replacement {
+            return Err(Error::unsupported_source(
+                "candidate body text did not survive RTF validation",
+            ));
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::RestoreParagraph { .. }))
+            && snapshot.paragraph_count() != self.source.paragraph_count().saturating_add(1)
+        {
+            return Err(Error::unsupported_source(
+                "candidate paragraph insertion did not preserve the new paragraph boundary",
+            ));
+        }
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::MoveParagraph { .. } | Operation::SwapParagraph { .. }
+            )
+        }) && snapshot.paragraph_count() != self.source.paragraph_count()
+        {
+            return Err(Error::unsupported_source(
+                "candidate paragraph reorder did not preserve body paragraph boundaries",
+            ));
+        }
+        if property_operation && source_alignments(&snapshot) != alignments {
+            return Err(Error::unsupported_source(
+                "candidate paragraph alignment did not survive RTF validation",
+            ));
+        }
+        if layout_operation {
+            if source_paragraph_properties(&snapshot)? != paragraph_properties {
+                return Err(Error::unsupported_source(
+                    "candidate paragraph properties did not survive RTF validation",
+                ));
+            }
+        }
+        if property_operation && !layout_operation {
+            let mut expected = source_paragraph_properties(&self.source)?;
+            if expected.len() != alignments.len() {
+                return Err(Error::unsupported_operation(
+                    "paragraph-structure and property changes cannot compose safely",
+                ));
+            }
+            for (paragraph, alignment) in expected.iter_mut().zip(&alignments) {
+                paragraph.alignment = *alignment;
+            }
+            if source_paragraph_properties(&snapshot)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate paragraph properties did not survive character publication",
+                ));
+            }
+        }
+        if layout_operation {
+            if !same_layout_resources(&snapshot, &self.source) {
+                return Err(Error::unsupported_source(
+                    "paragraph-layout publication changed document resources",
+                ));
+            }
+            if !same_source_runs(&snapshot, &self.source) {
+                return Err(Error::unsupported_source(
+                    "candidate character runs did not survive paragraph-layout publication",
+                ));
+            }
+        }
+        for (bold_span, expected) in projected_bold_ranges {
+            if bold_for_span(&snapshot, bold_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate bold property did not survive RTF validation",
+                ));
+            }
+        }
+        for (italic_span, expected) in projected_italic_ranges {
+            if italic_for_span(&snapshot, italic_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate italic property did not survive RTF validation",
+                ));
+            }
+        }
+        for (underline_span, expected) in projected_underline_ranges {
+            if underline_for_span(&snapshot, underline_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate underline property did not survive RTF validation",
+                ));
+            }
+        }
+        for (font_size_span, expected) in projected_font_size_ranges {
+            if font_size_for_span(&snapshot, font_size_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate font-size property did not survive RTF validation",
+                ));
+            }
+        }
+        for (expansion_span, expected) in projected_expansion_ranges {
+            if expansion_for_span(&snapshot, expansion_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate expansion property did not survive RTF validation",
+                ));
+            }
+        }
+        for (scale_span, expected) in projected_horizontal_scale_ranges {
+            if horizontal_scale_for_span(&snapshot, scale_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate horizontal-scale property did not survive RTF validation",
+                ));
+            }
+        }
+        for (kerning_span, expected) in projected_kerning_ranges {
+            if kerning_for_span(&snapshot, kerning_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate kerning property did not survive RTF validation",
+                ));
+            }
+        }
+        for (strike_span, expected) in projected_strike_ranges {
+            if strike_for_span(&snapshot, strike_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate strike property did not survive RTF validation",
+                ));
+            }
+        }
+        for (hidden_span, expected) in projected_hidden_ranges {
+            if hidden_for_span(&snapshot, hidden_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate hidden property did not survive RTF validation",
+                ));
+            }
+        }
+        for (small_caps_span, expected) in projected_small_caps_ranges {
+            if small_caps_for_span(&snapshot, small_caps_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate small-caps property did not survive RTF validation",
+                ));
+            }
+        }
+        for (all_caps_span, expected) in projected_all_caps_ranges {
+            if all_caps_for_span(&snapshot, all_caps_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate all-caps property did not survive RTF validation",
+                ));
+            }
+        }
+        for (outline_span, expected) in projected_outline_ranges {
+            if outline_for_span(&snapshot, outline_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate outline property did not survive RTF validation",
+                ));
+            }
+        }
+        for (baseline_span, expected) in projected_baseline_ranges {
+            if baseline_for_span(&snapshot, baseline_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate baseline property did not survive RTF validation",
+                ));
+            }
+        }
+        for (double_strike_span, expected) in projected_double_strike_ranges {
+            if double_strike_for_span(&snapshot, double_strike_span)? != expected {
+                return Err(Error::unsupported_source(
+                    "candidate double-strike property did not survive RTF validation",
+                ));
+            }
+        }
+        Ok(Commit::new(
+            self.source,
+            snapshot,
+            operation_count,
+            semantic_delta,
+        ))
+    }
+}
+
+fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let source_runs = ordinary_run_source_map(&edit.source)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(edit.operations.len().saturating_mul(2))
+        .map_err(|_error| Error::Write("could not reserve run-format replacements".to_string()))?;
+    let mut source_run_index = 0usize;
+    for operation in &edit.operations {
+        let Operation::RunFormat {
+            paragraph,
+            run,
+            before,
+            after,
+            text_before: None,
+            text_after: None,
+        } = operation
+        else {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        };
+        while source_runs
+            .get(source_run_index)
+            .is_some_and(|candidate| (candidate.paragraph, candidate.run) < (*paragraph, *run))
+        {
+            source_run_index = source_run_index.saturating_add(1);
+        }
+        let source_run = source_runs
+            .get(source_run_index)
+            .filter(|candidate| candidate.paragraph == *paragraph && candidate.run == *run)
+            .ok_or(Error::RunOutOfRange {
+                paragraph: *paragraph,
+                run: *run,
+                count: 0,
+            })?;
+        source_run_index = source_run_index.saturating_add(1);
+        let changed = RunFormatPatch::changed_from(*before, *after);
+        let restore = RunFormatPatch::changed_from(*after, *before);
+        let target_bold = after.bold.unwrap_or(source_run.bold);
+        replacements.push((
+            source_run.source.start..source_run.source.start,
+            encoded_run_format_boundary_controls(source_run.bold, changed, edit.source.limits())?,
+        ));
+        replacements.push((
+            source_run.source.end..source_run.source.end,
+            encoded_run_format_boundary_controls(target_bold, restore, edit.source.limits())?,
+        ));
+    }
+    replacements.sort_by_key(|replacement| replacement.0.start);
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    validate_run_format_candidate(&edit.source, &snapshot, &edit.operations)?;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn ordinary_run_insertion_source_offsets(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<Vec<usize>, Error> {
+    let source_runs = ordinary_run_source_map(source)?;
+    let paragraph_run_counts = source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.runs().count())
+        .collect::<Vec<_>>();
+    let paragraph_boundaries = ordinary_run_paragraph_source_boundaries(source)?;
+    let mut offsets = Vec::new();
+    offsets
+        .try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve run-insertion offsets".to_string()))?;
+    let mut source_run_cursor = 0usize;
+    for operation in operations {
+        let Operation::RunInsert { paragraph, run, .. } = operation else {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        };
+        let run_count =
+            *paragraph_run_counts
+                .get(*paragraph)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *paragraph,
+                    count: paragraph_run_counts.len(),
+                })?;
+        let source_offset = if *run < run_count {
+            while source_runs
+                .get(source_run_cursor)
+                .is_some_and(|candidate| (candidate.paragraph, candidate.run) < (*paragraph, *run))
+            {
+                source_run_cursor = source_run_cursor.saturating_add(1);
+            }
+            let candidate = source_runs
+                .get(source_run_cursor)
+                .filter(|candidate| candidate.paragraph == *paragraph && candidate.run == *run)
+                .ok_or(Error::RunInsertionOutOfRange {
+                    paragraph: *paragraph,
+                    run: *run,
+                    count: run_count,
+                })?;
+            candidate.source.start
+        } else if *run != 0 {
+            let target_run = run.saturating_sub(1);
+            while source_runs.get(source_run_cursor).is_some_and(|candidate| {
+                (candidate.paragraph, candidate.run) < (*paragraph, target_run)
+            }) {
+                source_run_cursor = source_run_cursor.saturating_add(1);
+            }
+            let candidate = source_runs
+                .get(source_run_cursor)
+                .filter(|candidate| {
+                    candidate.paragraph == *paragraph && candidate.run == target_run
+                })
+                .ok_or(Error::RunInsertionOutOfRange {
+                    paragraph: *paragraph,
+                    run: *run,
+                    count: run_count,
+                })?;
+            candidate.source.end
+        } else {
+            *paragraph_boundaries
+                .get(*paragraph)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *paragraph,
+                    count: paragraph_boundaries.len(),
+                })?
+        };
+        offsets.push(source_offset);
+    }
+    Ok(offsets)
+}
+
+fn commit_body_run_insertions(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let source_offsets = ordinary_run_insertion_source_offsets(&edit.source, &edit.operations)?;
+    let paragraph_run_counts = edit
+        .source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.runs().count())
+        .collect::<Vec<_>>();
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(edit.operations.len())
+        .map_err(|_error| {
+            Error::Write("could not reserve run-insertion replacements".to_string())
+        })?;
+    for (operation, source_offset) in edit.operations.iter().zip(&source_offsets) {
+        let Operation::RunInsert {
+            paragraph,
+            text,
+            format,
+            after,
+            ..
+        } = operation
+        else {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        };
+        let paragraph_run_count =
+            *paragraph_run_counts
+                .get(*paragraph)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *paragraph,
+                    count: paragraph_run_counts.len(),
+                })?;
+        let encoding_format = if paragraph_run_count == 0 {
+            RunFormatPatch::all_from_format(after)
+        } else {
+            format.unwrap_or_default()
+        };
+        let encoded = encoded_run_insertion(text, encoding_format, edit.source.limits())?;
+        replacements.push((*source_offset..*source_offset, encoded));
+    }
+    replacements.sort_by_key(|replacement| replacement.0.start);
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    validate_run_insert_candidate(&edit.source, &snapshot, &edit.operations)?;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let source_runs = ordinary_run_source_map(&edit.source)?;
+    let preserve_terminal_empty = terminal_paragraph_becomes_empty(&edit.source, &edit.operations);
+    let terminal_run = edit
+        .source
+        .body()
+        .paragraphs()
+        .nth(edit.source.paragraph_count().saturating_sub(1))
+        .map_or(0, |paragraph| paragraph.runs().count().saturating_sub(1));
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(edit.operations.len().saturating_mul(2))
+        .map_err(|_error| Error::Write("could not reserve run-text replacements".to_string()))?;
+    let mut source_run_index = 0usize;
+    for operation in &edit.operations {
+        let Operation::RunFormat {
+            paragraph,
+            run,
+            before,
+            after,
+            text_before,
+            text_after,
+        } = operation
+        else {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        };
+        while source_runs
+            .get(source_run_index)
+            .is_some_and(|candidate| (candidate.paragraph, candidate.run) < (*paragraph, *run))
+        {
+            source_run_index = source_run_index.saturating_add(1);
+        }
+        let source_run = source_runs
+            .get(source_run_index)
+            .filter(|candidate| candidate.paragraph == *paragraph && candidate.run == *run)
+            .ok_or(Error::RunOutOfRange {
+                paragraph: *paragraph,
+                run: *run,
+                count: 0,
+            })?;
+        source_run_index = source_run_index.saturating_add(1);
+        let changed = RunFormatPatch::changed_from(*before, *after);
+        if let Some(text_after) = text_after {
+            let _text_before = text_before.as_deref().ok_or(Error::Internal(
+                "run-text operation has no source text precondition",
+            ))?;
+            let encoded = if preserve_terminal_empty
+                && text_after.is_empty()
+                && *paragraph == edit.source.paragraph_count().saturating_sub(1)
+                && *run == terminal_run
+            {
+                PARAGRAPH_SPLIT_BYTES.to_vec()
+            } else {
+                encoded_run_text_replacement(text_after, changed, edit.source.limits())?
+            };
+            replacements.push((source_run.source.clone(), encoded));
+        } else {
+            replacements.push((
+                source_run.source.start..source_run.source.start,
+                encoded_run_format_boundary_controls(
+                    source_run.bold,
+                    changed,
+                    edit.source.limits(),
+                )?,
+            ));
+            replacements.push((
+                source_run.source.end..source_run.source.end,
+                encoded_run_format_boundary_controls(
+                    after.bold.unwrap_or(source_run.bold),
+                    RunFormatPatch::changed_from(*after, *before),
+                    edit.source.limits(),
+                )?,
+            ));
+        }
+    }
+    replacements.sort_by_key(|replacement| replacement.0.start);
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    validate_run_text_candidate(&edit.source, &snapshot, &edit.operations)?;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn terminal_paragraph_becomes_empty(source: &Package, operations: &[Operation]) -> bool {
+    if source.text().ends_with('\n') {
+        return false;
+    }
+    let paragraph_index = source.paragraph_count().saturating_sub(1);
+    let Some(paragraph) = source.body().paragraphs().nth(paragraph_index) else {
+        return false;
+    };
+    let mut operation_index = 0usize;
+    let mut has_run = false;
+    for (run_index, source_run) in paragraph.runs().enumerate() {
+        has_run = true;
+        while operations.get(operation_index).is_some_and(|operation| {
+            matches!(
+                operation,
+                Operation::RunFormat { paragraph, run, .. }
+                    if (*paragraph, *run) < (paragraph_index, run_index)
+            )
+        }) {
+            operation_index = operation_index.saturating_add(1);
+        }
+        let text = match operations.get(operation_index) {
+            Some(Operation::RunFormat {
+                paragraph: operation_paragraph,
+                run: operation_run,
+                text_after: Some(text),
+                ..
+            }) if *operation_paragraph == paragraph_index && *operation_run == run_index => {
+                operation_index = operation_index.saturating_add(1);
+                text.as_str()
+            },
+            _ => source_run.text(),
+        };
+        if !text.is_empty() {
+            return false;
+        }
+    }
+    has_run
+}
+
+fn encoded_run_insertion(
+    text: &str,
+    format: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let encoded = encoded_unicode_run_text(text, limits)?;
+    let controls = encoded_run_format_controls(format, limits)?;
+    let total = 7usize
+        .saturating_add(controls.len())
+        .saturating_add(encoded.len());
+    if total > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: total,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    output.append(br"{\uc0 ")?;
+    output.append(&controls)?;
+    output.append(&encoded)?;
+    output.append(b"}")?;
+    Ok(output.into_inner())
+}
+
+fn validate_run_insert_candidate(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
+    if source_paragraphs.len() != target_paragraphs.len() {
+        return Err(Error::unsupported_source(
+            "candidate run-insertion publication changed paragraph boundaries",
+        ));
+    }
+    let mut operation_index = 0usize;
+    for (paragraph_index, (source_paragraph, target_paragraph)) in
+        source_paragraphs.iter().zip(&target_paragraphs).enumerate()
+    {
+        if source_paragraph.format().raw() != target_paragraph.format().raw() {
+            return Err(Error::unsupported_source(
+                "candidate run-insertion publication changed paragraph properties",
+            ));
+        }
+        let source_runs = source_paragraph.runs().collect::<Vec<_>>();
+        let mut expected = Vec::new();
+        for (run_index, source_run) in source_runs.iter().enumerate() {
+            while operations.get(operation_index).is_some_and(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunInsert { paragraph, run, .. }
+                        if *paragraph == paragraph_index && *run <= run_index
+                )
+            }) {
+                let Operation::RunInsert {
+                    text,
+                    after,
+                    run,
+                    inherited,
+                    format,
+                    ..
+                } = operations
+                    .get(operation_index)
+                    .ok_or(Error::unsupported_source(
+                        "run-insertion operation cursor disappeared",
+                    ))?
+                else {
+                    return Err(Error::unsupported_operation(
+                        "paragraph-structure and property changes cannot compose safely",
+                    ));
+                };
+                if *run != run_index {
+                    return Err(Error::Internal(
+                        "run-insertion operation order is inconsistent",
+                    ));
+                }
+                if format.is_none() && after != inherited.as_ref() {
+                    return Err(Error::unsupported_source(
+                        "run-insertion inheritance precondition changed",
+                    ));
+                }
+                expected.push((text.clone(), *after));
+                operation_index = operation_index.saturating_add(1);
+            }
+            expected.push((source_run.text().to_owned(), *source_run.format().raw()));
+        }
+        while operations.get(operation_index).is_some_and(|operation| {
+            matches!(
+                operation,
+                Operation::RunInsert { paragraph, run, .. }
+                    if *paragraph == paragraph_index && *run == source_runs.len()
+            )
+        }) {
+            let Operation::RunInsert {
+                text,
+                after,
+                inherited,
+                format,
+                ..
+            } = operations
+                .get(operation_index)
+                .ok_or(Error::unsupported_source(
+                    "run-insertion append cursor disappeared",
+                ))?
+            else {
+                return Err(Error::unsupported_operation(
+                    "paragraph-structure and property changes cannot compose safely",
+                ));
+            };
+            if format.is_none() && after != inherited.as_ref() {
+                return Err(Error::unsupported_source(
+                    "run-insertion inheritance precondition changed",
+                ));
+            }
+            expected.push((text.clone(), *after));
+            operation_index = operation_index.saturating_add(1);
+        }
+        let mut expected_index = 0usize;
+        let mut expected_offset = 0usize;
+        for target_run in target_paragraph.runs() {
+            let mut remaining = target_run.text();
+            while !remaining.is_empty() {
+                let (expected_text, expected_format) =
+                    expected
+                        .get(expected_index)
+                        .ok_or(Error::unsupported_source(
+                            "candidate run-insertion publication has excess text",
+                        ))?;
+                if *expected_format != *target_run.format().raw() {
+                    return Err(Error::unsupported_source(
+                        "candidate run-insertion publication changed character formatting",
+                    ));
+                }
+                let expected_remaining =
+                    expected_text
+                        .get(expected_offset..)
+                        .ok_or(Error::unsupported_source(
+                            "candidate run-insertion expected text boundary is invalid",
+                        ))?;
+                let common_limit = expected_remaining.len().min(remaining.len());
+                let common = expected_remaining
+                    .char_indices()
+                    .map(|(offset, _)| offset)
+                    .chain(std::iter::once(expected_remaining.len()))
+                    .take_while(|offset| *offset <= common_limit)
+                    .last()
+                    .unwrap_or(0);
+                if common == 0
+                    || expected_remaining
+                        .get(..common)
+                        .is_none_or(|prefix| !remaining.starts_with(prefix))
+                {
+                    return Err(Error::unsupported_source(
+                        "candidate run-insertion publication changed run text",
+                    ));
+                }
+                expected_offset = expected_offset.saturating_add(common);
+                remaining = remaining.get(common..).ok_or(Error::unsupported_source(
+                    "candidate run-insertion suffix is not a character boundary",
+                ))?;
+                if expected_offset == expected_text.len() {
+                    expected_index = expected_index.saturating_add(1);
+                    expected_offset = 0;
+                }
+            }
+        }
+        if expected_index != expected.len() || expected_offset != 0 {
+            return Err(Error::unsupported_source(
+                "candidate run-insertion publication dropped expected text",
+            ));
+        }
+    }
+    if operation_index != operations.len() {
+        return Err(Error::unsupported_source(
+            "candidate run-insertion publication left an unapplied operation",
+        ));
+    }
+    Ok(())
+}
+
+fn encoded_run_text_replacement(
+    text: &str,
+    format: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let encoded = encoded_body_text(text, limits)?;
+    let controls = encoded_run_format_controls(format, limits)?;
+    let total = 7usize
+        .saturating_add(controls.len())
+        .saturating_add(encoded.len());
+    if total > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: total,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    // Scope the fallback width so a source \uc0 or \uc2 state cannot change
+    // the meaning of the writer's one-character `?` fallbacks.
+    output.append(br"{\uc1 ")?;
+    output.append(&controls)?;
+    output.append(&encoded)?;
+    output.append(b"}")?;
+    Ok(output.into_inner())
+}
+
+fn validate_run_text_candidate(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
+    if source_paragraphs.len() != target_paragraphs.len() {
+        return Err(Error::unsupported_source(
+            "candidate run-text publication changed paragraph boundaries",
+        ));
+    }
+    let mut operation_index = 0usize;
+    for (paragraph_index, (source_paragraph, target_paragraph)) in
+        source_paragraphs.iter().zip(&target_paragraphs).enumerate()
+    {
+        if source_paragraph.format().raw() != target_paragraph.format().raw() {
+            return Err(Error::unsupported_source(
+                "candidate run-text publication changed paragraph properties",
+            ));
+        }
+        let mut expected = Vec::new();
+        for (run_index, source_run) in source_paragraph.runs().enumerate() {
+            while operations.get(operation_index).is_some_and(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunFormat { paragraph, run, .. }
+                        if *paragraph == paragraph_index && *run < run_index
+                )
+            }) {
+                operation_index = operation_index.saturating_add(1);
+            }
+            let mut formatting = *source_run.format().raw();
+            let mut text = source_run.text().to_owned();
+            if let Some(Operation::RunFormat {
+                paragraph,
+                run,
+                after,
+                text_after,
+                ..
+            }) = operations.get(operation_index)
+                && *paragraph == paragraph_index
+                && *run == run_index
+            {
+                after.apply_to(&mut formatting);
+                if let Some(text_after) = text_after {
+                    text = text_after.clone();
+                }
+                operation_index = operation_index.saturating_add(1);
+            }
+            if !text.is_empty() {
+                expected.push((text, formatting));
+            }
+        }
+        let target_runs = target_paragraph.runs().collect::<Vec<_>>();
+        let mut expected_index = 0usize;
+        let mut expected_offset = 0usize;
+        for target_run in target_runs {
+            let mut remaining = target_run.text();
+            if remaining.is_empty() {
+                continue;
+            }
+            while !remaining.is_empty() {
+                let (expected_text, expected_format) =
+                    expected
+                        .get(expected_index)
+                        .ok_or(Error::unsupported_source(
+                            "candidate run-text publication has excess text",
+                        ))?;
+                if *expected_format != *target_run.format().raw() {
+                    return Err(Error::unsupported_source(
+                        "candidate run-text publication changed character formatting",
+                    ));
+                }
+                let expected_remaining =
+                    expected_text
+                        .get(expected_offset..)
+                        .ok_or(Error::unsupported_source(
+                            "candidate run-text expected text boundary is invalid",
+                        ))?;
+                let common_limit = expected_remaining.len().min(remaining.len());
+                let common = expected_remaining
+                    .char_indices()
+                    .map(|(offset, _)| offset)
+                    .chain(std::iter::once(expected_remaining.len()))
+                    .take_while(|offset| *offset <= common_limit)
+                    .last()
+                    .unwrap_or(0);
+                if common == 0
+                    || expected_remaining
+                        .get(..common)
+                        .is_none_or(|prefix| !remaining.starts_with(prefix))
+                {
+                    return Err(Error::unsupported_source(
+                        "candidate run-text publication changed run text",
+                    ));
+                }
+                expected_offset = expected_offset.saturating_add(common);
+                remaining = remaining.get(common..).ok_or(Error::unsupported_source(
+                    "candidate run-text suffix is not a character boundary",
+                ))?;
+                if expected_offset == expected_text.len() {
+                    expected_index = expected_index.saturating_add(1);
+                    expected_offset = 0;
+                }
+            }
+        }
+        if expected_index != expected.len() || expected_offset != 0 {
+            return Err(Error::unsupported_source(
+                "candidate run-text publication dropped expected text",
+            ));
+        }
+    }
+    if operation_index != operations.len() {
+        return Err(Error::unsupported_source(
+            "candidate run-text publication left an unapplied operation",
+        ));
+    }
+    Ok(())
+}
+
+fn encoded_run_format_controls(
+    patch: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    if let Some(value) = patch.bold {
+        write_bold(&mut output, value)?;
+    }
+    if let Some(value) = patch.italic {
+        write_italic(&mut output, value)?;
+    }
+    if let Some(value) = patch.underline {
+        write_underline(&mut output, value)?;
+    }
+    if let Some(value) = patch.size {
+        write_font_size(&mut output, value)?;
+    }
+    if let Some(value) = patch.strike {
+        write_strike(&mut output, value)?;
+    }
+    if let Some(value) = patch.double_strike {
+        write_double_strike(&mut output, value)?;
+    }
+    if let Some(value) = patch.hidden {
+        write_hidden(&mut output, value)?;
+    }
+    if let Some(value) = patch.all_caps {
+        write_all_caps(&mut output, value)?;
+    }
+    if let Some(value) = patch.small_caps {
+        write_small_caps(&mut output, value)?;
+    }
+    if let Some(value) = patch.outline {
+        write_outline(&mut output, value)?;
+    }
+    Ok(output.into_inner())
+}
+
+fn encoded_run_format_boundary_controls(
+    boundary_bold: bool,
+    patch: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    write_bold(&mut output, boundary_bold)?;
+    let controls = encoded_run_format_controls(patch, limits)?;
+    output.append(&controls)?;
+    Ok(output.into_inner())
+}
+
+fn validate_run_format_candidate(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
+    if source_paragraphs.len() != target_paragraphs.len() {
+        return Err(Error::unsupported_source(
+            "candidate run-format publication changed paragraph boundaries",
+        ));
+    }
+    let mut operation_index = 0usize;
+    for (paragraph_index, (source_paragraph, target_paragraph)) in
+        source_paragraphs.iter().zip(&target_paragraphs).enumerate()
+    {
+        if source_paragraph.format().raw() != target_paragraph.format().raw() {
+            return Err(Error::unsupported_source(
+                "candidate run-format publication changed paragraph properties",
+            ));
+        }
+        let source_runs = source_paragraph.runs().collect::<Vec<_>>();
+        let target_runs = target_paragraph.runs().collect::<Vec<_>>();
+        if source_runs.len() != target_runs.len() {
+            return Err(Error::unsupported_source(
+                "candidate run-format publication changed the run axis",
+            ));
+        }
+        while operations.get(operation_index).is_some_and(|operation| {
+            matches!(
+                operation,
+                Operation::RunFormat { paragraph, .. } if *paragraph < paragraph_index
+            )
+        }) {
+            operation_index = operation_index.saturating_add(1);
+        }
+        for (run_index, (source_run, target_run)) in
+            source_runs.iter().zip(&target_runs).enumerate()
+        {
+            if source_run.text() != target_run.text() {
+                return Err(Error::unsupported_source(
+                    "candidate run-format publication changed run text",
+                ));
+            }
+            let mut expected = *source_run.format().raw();
+            while operations.get(operation_index).is_some_and(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunFormat {
+                        paragraph,
+                        run,
+                        ..
+                    } if *paragraph == paragraph_index && *run < run_index
+                )
+            }) {
+                operation_index = operation_index.saturating_add(1);
+            }
+            if let Some(Operation::RunFormat {
+                paragraph,
+                run,
+                after,
+                ..
+            }) = operations.get(operation_index)
+            {
+                if *paragraph == paragraph_index && *run == run_index {
+                    after.apply_to(&mut expected);
+                    operation_index = operation_index.saturating_add(1);
+                }
+            }
+            if expected != *target_run.format().raw() {
+                return Err(Error::unsupported_source(
+                    "candidate run-format publication changed unrelated run properties",
+                ));
+            }
+        }
+    }
+    if operation_index != operations.len() {
+        return Err(Error::unsupported_source(
+            "candidate run-format publication left an unapplied operation",
+        ));
+    }
+    Ok(())
+}
+
+fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let map = ordinary_paragraph_source_map(&edit.source)?;
+    let operation = edit
+        .operations
+        .first()
+        .ok_or(Error::Internal("missing ordinary paragraph operation"))?;
+    let (snapshot, semantic_delta) =
+        match operation {
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Split {
+                        position,
+                        offset,
+                        source_offset,
+                        boundary,
+                        before,
+                    }),
+                ..
+            } => {
+                let paragraph =
+                    map.paragraphs
+                        .get(*position)
+                        .ok_or(Error::ParagraphOutOfRange {
+                            position: *position,
+                            count: map.paragraphs.len(),
+                        })?;
+                let actual = edit.source.text().get(paragraph.text.clone()).ok_or(
+                    Error::unsupported_source(
+                        "ordinary paragraph split selector lost its source text",
+                    ),
+                )?;
+                if actual != before {
+                    return Err(Error::StalePrecondition("ordinary paragraph text differs"));
+                }
+                if *offset > actual.len() || !actual.is_char_boundary(*offset) {
+                    return Err(Error::SpanNotOnCharacterBoundary {
+                        position: paragraph.text.start.saturating_add(*offset),
+                    });
+                }
+                let expected_source_offset =
+                    paragraph
+                        .source
+                        .start
+                        .checked_add(*offset)
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: edit.source.limits().max_input_bytes(),
+                        })?;
+                if expected_source_offset != *source_offset
+                    || source_bytes.get(*source_offset..*source_offset) != Some(&[])
+                {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split source boundary differs",
+                    ));
+                }
+                let bytes = splice_body(
+                    source_bytes,
+                    *source_offset..*source_offset,
+                    boundary,
+                    edit.source.limits(),
+                )?;
+                let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+                ordinary_paragraph_source_map(&snapshot)?;
+                let (left, right) = actual.split_at(*offset);
+                if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_add(1)
+                    || paragraph_text_at(&snapshot, *position)? != left
+                    || paragraph_text_at(&snapshot, position.saturating_add(1))? != right
+                {
+                    return Err(Error::unsupported_source(
+                        "split candidate failed ordinary paragraph readback",
+                    ));
+                }
+                let semantic_delta = vec![Change::SplitParagraph {
+                    position: *position,
+                    offset: *offset,
+                    before: before.clone(),
+                    boundary: boundary.clone(),
+                    left: left.to_string(),
+                    right: right.to_string(),
+                }];
+                (snapshot, semantic_delta)
+            },
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Merge {
+                        position,
+                        boundary,
+                        boundary_bytes,
+                        left,
+                        right,
+                    }),
+                ..
+            } => {
+                let paragraph =
+                    map.paragraphs
+                        .get(*position)
+                        .ok_or(Error::ParagraphOutOfRange {
+                            position: *position,
+                            count: map.paragraphs.len(),
+                        })?;
+                let next_position = position.saturating_add(1);
+                let next = map
+                    .paragraphs
+                    .get(next_position)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: next_position,
+                        count: map.paragraphs.len(),
+                    })?;
+                if paragraph.boundary_after.as_ref() != Some(boundary)
+                    || boundary.start != paragraph.source.end
+                    || boundary.end > next.source.start
+                    || source_bytes.get(boundary.clone()) != Some(boundary_bytes.as_slice())
+                    || edit.source.text().get(paragraph.text.clone()) != Some(left.as_str())
+                    || edit.source.text().get(next.text.clone()) != Some(right.as_str())
+                {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph merge boundary or text differs",
+                    ));
+                }
+                let bytes = splice_body(source_bytes, boundary.clone(), &[], edit.source.limits())?;
+                let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+                let merged = merged_paragraph_text(left, right, edit.source.limits())?;
+                if snapshot.paragraph_count() != edit.source.paragraph_count().saturating_sub(1)
+                    || paragraph_text_at(&snapshot, *position)? != merged
+                {
+                    return Err(Error::unsupported_source(
+                        "merge candidate failed ordinary paragraph readback",
+                    ));
+                }
+                let semantic_delta = vec![Change::MergeParagraph {
+                    position: *position,
+                    boundary: boundary_bytes.clone(),
+                    left: left.clone(),
+                    right: right.clone(),
+                }];
+                (snapshot, semantic_delta)
+            },
+            Operation::Text { .. } | Operation::RunFormat { .. } | Operation::RunInsert { .. } => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
+            _ => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
+        };
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+/// Publishes a positioned paragraph insertion by splicing the proven ordinary
+/// body source range.  Returning `Ok(None)` leaves decoded, formatted, or
+/// otherwise non-literal sources to the established lifecycle projection,
+/// which reports its existing typed refusal when it cannot preserve them.
+fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<Change>)>, Error> {
+    // This splice explicitly supplies missing control-word delimiters. Other
+    // structural routes retain their stricter undelimited-source admission.
+    let map = match ordinary_paragraph_source_map_inner(&edit.source, false, true) {
+        Ok(map) => map,
+        Err(Error::Refused(refusal)) if refusal.kind() == RefusalKind::UnsupportedContent => {
+            return Ok(None);
+        },
+        Err(error) => return Err(error),
+    };
+    let Operation::RestoreParagraph { position, text } =
+        edit.operations.first().ok_or(Error::unsupported_operation(
+            "body splices and retained-destination edits cannot compose safely",
+        ))?
+    else {
+        return Err(Error::unsupported_operation(
+            "body splices and retained-destination edits cannot compose safely",
+        ));
+    };
+    if *position > map.paragraphs.len() {
+        return Err(Error::ParagraphOutOfRange {
+            position: *position,
+            count: map.paragraphs.len(),
+        });
+    }
+    ensure_default_body_formatting(&edit.source)?;
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let body_span = ordinary_paragraph_body_source_span(
+        source_bytes,
+        edit.source.text(),
+        edit.source.options(),
+    )?;
+    let encoded = encoded_body_text(text, edit.source.limits())?;
+    let (offset, replacement) =
+        paragraph_insertion_source_bytes(source_bytes, &map, &body_span, *position, text, encoded)?;
+    let bytes = splice_body(
+        source_bytes,
+        offset..offset,
+        &replacement,
+        edit.source.limits(),
+    )?;
+    if bytes == source_bytes {
+        return Ok(Some((
+            edit.source.clone(),
+            semantic_changes(&edit.operations, &[]),
+        )));
+    }
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    let mut expected = edit
+        .source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    expected.insert(*position, text.clone());
+    let actual = snapshot
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    if actual != expected || snapshot.paragraph_count() != expected.len() {
+        return Err(Error::unsupported_source(
+            "candidate paragraph insertion failed ordinary-story readback",
+        ));
+    }
+    Ok(Some((snapshot, semantic_changes(&edit.operations, &[]))))
+}
+
+fn paragraph_insertion_source_bytes(
+    source_bytes: &[u8],
+    map: &OrdinaryParagraphSourceMap,
+    body_span: &Range<usize>,
+    position: usize,
+    text: &str,
+    encoded: Vec<u8>,
+) -> Result<(usize, Vec<u8>), Error> {
+    let mut replacement = Vec::new();
+    if map.paragraphs.is_empty() {
+        if position != 0 || body_span.start != body_span.end {
+            return Err(Error::unsupported_source(
+                "empty ordinary paragraph body has no contiguous source span",
+            ));
+        }
+        let needs_delimiter = !encoded.is_empty()
+            && body_span.start != 0
+            && source_bytes
+                .get(body_span.start.saturating_sub(1))
+                .is_some_and(u8::is_ascii_alphanumeric);
+        let boundary_bytes = usize::from(text.is_empty()).saturating_mul(5);
+        replacement
+            .try_reserve_exact(
+                encoded
+                    .len()
+                    .saturating_add(boundary_bytes)
+                    .saturating_add(usize::from(needs_delimiter)),
+            )
+            .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+        if needs_delimiter {
+            replacement.push(b' ');
+        }
+        replacement.extend_from_slice(&encoded);
+        if text.is_empty() {
+            replacement.extend_from_slice(br"\par ");
+        }
+        return Ok((body_span.start, replacement));
+    }
+
+    if position < map.paragraphs.len() {
+        let paragraph = map
+            .paragraphs
+            .get(position)
+            .ok_or(Error::ParagraphOutOfRange {
+                position,
+                count: map.paragraphs.len(),
+            })?;
+        let needs_delimiter = !encoded.is_empty()
+            && paragraph.source.start != 0
+            && source_bytes
+                .get(paragraph.source.start.saturating_sub(1))
+                .is_some_and(u8::is_ascii_alphanumeric);
+        replacement
+            .try_reserve_exact(
+                encoded
+                    .len()
+                    .saturating_add(5)
+                    .saturating_add(usize::from(needs_delimiter)),
+            )
+            .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+        if needs_delimiter {
+            replacement.push(b' ');
+        }
+        replacement.extend_from_slice(&encoded);
+        replacement.extend_from_slice(br"\par ");
+        return Ok((paragraph.source.start, replacement));
+    }
+
+    let last = map
+        .paragraphs
+        .last()
+        .ok_or(Error::unsupported_source("ordinary paragraph map is empty"))?;
+    let terminal_boundary_end = last.boundary_after.as_ref().map(|boundary| boundary.end);
+    let has_terminal_boundary = terminal_boundary_end.is_some();
+    let terminal_boundary_needs_delimiter = terminal_boundary_end
+        .and_then(|end| end.checked_sub(1))
+        .and_then(|index| source_bytes.get(index))
+        .is_some_and(u8::is_ascii_alphanumeric);
+    let insertion_prefix = if text.is_empty() {
+        if has_terminal_boundary {
+            br"\par ".as_slice()
+        } else {
+            br"\par\par ".as_slice()
+        }
+    } else if has_terminal_boundary {
+        // The existing terminal \par is the separator before the appended
+        // paragraph.  A trailing source space was already consumed as its
+        // control-word delimiter; add one only when the control word ends at
+        // the insertion point without that delimiter.
+        if terminal_boundary_needs_delimiter {
+            br" ".as_slice()
+        } else {
+            br"".as_slice()
+        }
+    } else {
+        br"\par ".as_slice()
+    };
+    replacement
+        .try_reserve_exact(insertion_prefix.len().saturating_add(encoded.len()))
+        .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+    replacement.extend_from_slice(insertion_prefix);
+    replacement.extend_from_slice(&encoded);
+    Ok((body_span.end, replacement))
+}
+
+fn commit_body_paragraph_removals(
+    edit: Edit,
+    operation_count: usize,
+    map: OrdinaryParagraphSourceMap,
+) -> Result<Commit, Error> {
+    ensure_default_body_formatting(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(operation_count)
+        .map_err(|_| Error::Write("could not reserve paragraph removal ranges".to_string()))?;
+
+    for operation in &edit.operations {
+        let Operation::RemoveParagraph { position, text } = operation else {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        };
+        let paragraph = map
+            .paragraphs
+            .get(*position)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: *position,
+                count: map.paragraphs.len(),
+            })?;
+        if edit.source.text().get(paragraph.text.clone()) != Some(text.as_str()) {
+            return Err(Error::StalePrecondition("paragraph text differs"));
+        }
+        let range =
+            if let Some(boundary) = &paragraph.boundary_after {
+                paragraph.source.start..boundary.end
+            } else if *position == 0 {
+                paragraph.source.clone()
+            } else {
+                let previous = map.paragraphs.get(position.saturating_sub(1)).ok_or(
+                    Error::ParagraphOutOfRange {
+                        position: position.saturating_sub(1),
+                        count: map.paragraphs.len(),
+                    },
+                )?;
+                let previous_text = edit.source.text().get(previous.text.clone()).ok_or(
+                    Error::unsupported_source(
+                        "ordinary paragraph source map has an invalid semantic range",
+                    ),
+                )?;
+                if previous_text.is_empty() {
+                    paragraph.source.clone()
+                } else {
+                    let boundary =
+                        previous
+                            .boundary_after
+                            .as_ref()
+                            .ok_or(Error::unsupported_source(
+                                "ordinary paragraph has no exact source boundary",
+                            ))?;
+                    boundary.start..paragraph.source.end
+                }
+            };
+        ranges.push((range, Vec::new()));
+    }
+
+    // A selected paragraph owns its following boundary when one exists.  A
+    // final paragraph normally owns its preceding boundary, except when that
+    // predecessor is empty: its boundary is the only source representation of
+    // the unselected empty survivor and must remain intact.
+    ranges.sort_unstable_by_key(|(range, _)| (range.start, range.end));
+    let mut merged: Vec<(Range<usize>, Vec<u8>)> = Vec::with_capacity(ranges.len());
+    for (range, replacement) in ranges {
+        if let Some((previous, _)) = merged.last_mut()
+            && range.start <= previous.end
+        {
+            previous.end = previous.end.max(range.end);
+            continue;
+        }
+        merged.push((range, replacement));
+    }
+    for (range, replacement) in &mut merged {
+        if paragraph_removal_needs_delimiter(source_bytes, range) {
+            replacement.push(b' ');
+        }
+    }
+
+    let bytes = splice_body_ranges(source_bytes, &merged, edit.source.limits())?;
+    let semantic_delta = {
+        let mut changes = semantic_changes(&edit.operations, &[]);
+        // Keep removals high-to-low for any future batch-aware durable
+        // projection; the current wire adapter refuses multi-removal batches
+        // until it can carry their source-bound preconditions.
+        changes.reverse();
+        changes
+    };
+    if bytes == source_bytes {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    let selected = edit
+        .operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::RemoveParagraph { position, .. } => Some(*position),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let mut actual = snapshot.body().paragraphs();
+    for (position, expected) in edit.source.body().paragraphs().enumerate() {
+        if selected.binary_search(&position).is_ok() {
+            continue;
+        }
+        let Some(observed) = actual.next() else {
+            return Err(Error::unsupported_source(
+                "candidate paragraph removal dropped an unselected paragraph",
+            ));
+        };
+        if expected.to_text() != observed.to_text() {
+            return Err(Error::unsupported_source(
+                "candidate paragraph removal changed an unselected paragraph",
+            ));
+        }
+    }
+    if actual.next().is_some()
+        || snapshot.paragraph_count()
+            != edit
+                .source
+                .paragraph_count()
+                .saturating_sub(operation_count)
+    {
+        return Err(Error::unsupported_source(
+            "candidate paragraph removal failed ordinary-story readback",
+        ));
+    }
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let (replacement, projected_spans) = project_text(&edit.source, &edit.operations)?;
+    let semantic_delta =
+        semantic_changes_with_replacement(&edit.operations, &projected_spans, &replacement);
+    if replacement == edit.source.text() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    let map = ordinary_paragraph_source_map_with_lines(&edit.source)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(operation_count)
+        .map_err(|_error| {
+            Error::Write("could not reserve paragraph source replacements".to_string())
+        })?;
+    for operation in &edit.operations {
+        let Operation::Text {
+            span,
+            before,
+            after,
+            raw_structure: None,
+            ..
+        } = operation
+        else {
+            return Err(Error::unsupported_operation(
+                "body splices and retained-destination edits cannot compose safely",
+            ));
+        };
+        let paragraph = map
+            .paragraphs
+            .iter()
+            .find(|paragraph| paragraph.text == (span.start..span.end))
+            .ok_or(Error::unsupported_source(
+                "paragraph batch selector lost its source range",
+            ))?;
+        if edit.source.text().get(span.start..span.end) != Some(before.as_str()) {
+            return Err(Error::StalePrecondition("paragraph text differs"));
+        }
+        let mut encoded = encoded_body_text(after, edit.source.limits())?;
+        let previous_is_control_tail = paragraph
+            .source
+            .start
+            .checked_sub(1)
+            .and_then(|index| source_bytes.get(index))
+            .is_some_and(u8::is_ascii_alphanumeric);
+        if paragraph.source.start == paragraph.source.end
+            && !encoded.is_empty()
+            && previous_is_control_tail
+        {
+            encoded.insert(0, b' ');
+        }
+        replacements.push((paragraph.source.clone(), encoded));
+    }
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    if snapshot.text() != replacement {
+        return Err(Error::unsupported_source(
+            "candidate body text did not survive RTF paragraph publication",
+        ));
+    }
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn merged_paragraph_text(
+    left: &str,
+    right: &str,
+    limits: crate::SourceLimits,
+) -> Result<String, Error> {
+    let length = left
+        .len()
+        .checked_add(right.len())
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: limits.max_input_bytes(),
+        })?;
+    if length > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: length,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut merged = String::new();
+    merged
+        .try_reserve_exact(length)
+        .map_err(|_error| Error::Write("could not reserve merged paragraph text".to_string()))?;
+    merged.push_str(left);
+    merged.push_str(right);
+    Ok(merged)
+}
+
+fn clone_bounded_text(
+    text: &str,
+    limits: crate::SourceLimits,
+    allocation_context: &'static str,
+) -> Result<String, Error> {
+    if text.len() > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: text.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(text.len())
+        .map_err(|_error| Error::Write(allocation_context.to_string()))?;
+    owned.push_str(text);
+    Ok(owned)
+}
+
+fn clone_bounded_bytes(
+    bytes: &[u8],
+    limits: crate::SourceLimits,
+    allocation_context: &'static str,
+) -> Result<Vec<u8>, Error> {
+    if bytes.len() > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: bytes.len(),
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(bytes.len())
+        .map_err(|_error| Error::Write(allocation_context.to_string()))?;
+    owned.extend_from_slice(bytes);
+    Ok(owned)
+}
+
+fn validate_paragraph_boundary_bytes(boundary: &[u8]) -> Result<(), Error> {
+    let keyword_is_par = match boundary.get(..4) {
+        Some([slash, p, a, r]) => {
+            *slash == b'\\'
+                && p.eq_ignore_ascii_case(&b'p')
+                && a.eq_ignore_ascii_case(&b'a')
+                && r.eq_ignore_ascii_case(&b'r')
+        },
+        _ => false,
+    };
+    let valid_delimiter = matches!(boundary.get(4..), Some([]) | Some([b' ']));
+    if !keyword_is_par || !valid_delimiter {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph boundary is not an exact \\par control",
+        ));
+    }
+    Ok(())
+}
+
+fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    if destination_splice::supports(&edit.operations) {
+        match destination_splice::publish(&edit.source, &edit.operations) {
+            Ok(snapshot) => {
+                return Ok(Commit::new(
+                    edit.source,
+                    snapshot,
+                    operation_count,
+                    semantic_delta,
+                ));
+            },
+            // Without body tables the canonical writer below retains story
+            // order; with tables it would relocate them after the body.
+            Err(error) if !edit.source.tables().is_empty() => return Err(error),
+            Err(_) => {},
+        }
+    } else if !edit.source.tables().is_empty() {
+        return Err(Error::unsupported_source(
+            "canonical destination publication would relocate body tables",
+        ));
+    }
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::unsupported_source(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !edit.source.opaque().is_empty() {
+        return Err(Error::unsupported_source(
+            "canonical destination edits refuse unknown RTF destinations",
+        ));
+    }
+
+    let mut model = crate::document::Tree::parse_bytes(source_bytes, edit.source.options())?;
+    for operation in &edit.operations {
+        match operation {
+            Operation::TableCellText { path, after, .. } => {
+                model
+                    .table_cell_mut(path)?
+                    .set_text(Cow::Owned(after.clone()))?;
+            },
+            Operation::HeaderFooterText { target, after, .. } => {
+                let paragraph = model_header_footer_paragraph_mut(&mut model, *target)?;
+                paragraph.text = Cow::Owned(after.clone());
+            },
+            Operation::AnnotationText { index, after, .. } => {
+                model.set_annotation_text(*index, Cow::Owned(after.clone()))?;
+            },
+            Operation::NoteText { index, after, .. } => {
+                model.set_note_content(*index, Cow::Owned(after.clone()))?;
+            },
+            Operation::ShapeText { index, after, .. } => {
+                model.set_body_shape_text(*index, Cow::Owned(after.clone()))?;
+            },
+            Operation::SmartTag { index, after, .. } => {
+                model.replace_smart_tag(*index, after.clone().into_owned())?;
+            },
+            Operation::MoveBookmark { index, after, .. } => {
+                model.replace_move_bookmark(*index, after.clone().into_owned())?;
+            },
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
+        }
+    }
+
+    let mut bytes = Vec::new();
+    Writer::new(&mut bytes)
+        .write_document(&model)
+        .map_err(|error| Error::Write(error.to_string()))?;
+    let limit = edit.source.limits().max_input_bytes();
+    if bytes.len() > limit {
+        return Err(Error::InputTooLarge {
+            observed: bytes.len(),
+            limit,
+        });
+    }
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    if snapshot.text() != edit.source.text() {
+        return Err(Error::unsupported_source(
+            "canonical destination edit changed the ordinary body story",
+        ));
+    }
+    for operation in &edit.operations {
+        match operation {
+            Operation::TableCellText { path, after, .. } => {
+                if table_cell(&snapshot, path)?.text() != after {
+                    return Err(Error::unsupported_source(
+                        "table-cell text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::HeaderFooterText { target, after, .. } => {
+                let actual = header_footer(&snapshot, *target)?
+                    .paragraphs
+                    .get(target.paragraph)
+                    .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
+                    .text
+                    .as_ref();
+                if actual != after {
+                    return Err(Error::unsupported_source(
+                        "header/footer text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::AnnotationText { index, after, .. } => {
+                if annotation(&snapshot, *index)?.text != after.as_str() {
+                    return Err(Error::unsupported_source(
+                        "annotation text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::NoteText { index, after, .. } => {
+                if note(&snapshot, *index)?.content != after.as_str() {
+                    return Err(Error::unsupported_source(
+                        "note text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::ShapeText { index, after, .. } => {
+                if shape(&snapshot, *index)?.text != after.as_str() {
+                    return Err(Error::unsupported_source(
+                        "shape text did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::SmartTag { index, after, .. } => {
+                if snapshot.smart_tags().get(*index) != Some(after) {
+                    return Err(Error::unsupported_source(
+                        "SmartTag metadata did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::MoveBookmark { index, after, .. } => {
+                if snapshot.move_bookmarks().get(*index) != Some(after) {
+                    return Err(Error::unsupported_source(
+                        "move-bookmark metadata did not survive RTF validation",
+                    ));
+                }
+            },
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::RootTransfer { .. } => {
+                return Err(Error::unsupported_operation(
+                    "body splices and retained-destination edits cannot compose safely",
+                ));
+            },
+        }
+    }
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let operation = edit
+        .operations
+        .first()
+        .ok_or(Error::Internal("missing ordinary-root transfer"))?;
+    let Operation::RootTransfer {
+        before,
+        after,
+        vocabulary: _,
+        effect: _,
+    } = operation
+    else {
+        return Err(Error::unsupported_operation(
+            "body splices and retained-destination edits cannot compose safely",
+        ));
+    };
+    let source = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+    if source != before {
+        return Err(Error::PatchConflict);
+    }
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if source == after {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    if crate::compressed::is_compressed_rtf(source) {
+        return Err(Error::unsupported_source(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !edit.source.opaque().is_empty() {
+        return Err(Error::unsupported_source(
+            "ordinary-root transfer refuses unknown target destinations",
+        ));
+    }
+    let snapshot = Package::from_bytes_with_options(after, edit.source.options())?;
+    if !snapshot.opaque().is_empty() {
+        return Err(Error::unsupported_source(
+            "ordinary-root transfer produced unknown destinations",
+        ));
+    }
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn ensure_changed_publication_allowed(source: &Package) -> Result<(), Error> {
+    let protection = source.model().protection();
+    if protection.is_protected() {
+        return Err(Error::Refused(Refusal::new(
+            RefusalKind::Protected,
+            "edit",
+            "document protection refuses changed publication",
+        )));
+    }
+    if source.model().has_unmatched_move_bookmarks() {
+        return Err(Error::unsupported_source(
+            "changed publication refuses unmatched move-bookmark destinations",
+        ));
+    }
+    Ok(())
+}
+
+fn ensure_default_body_formatting(source: &Package) -> Result<(), Error> {
+    if source.model().retained_blocks().iter().any(|block| {
+        block.formatting != crate::types::Formatting::default()
+            || block.paragraph != crate::types::Paragraph::default()
+    }) {
+        return Err(Error::unsupported_source(
+            "paragraph lifecycle editing requires default body formatting",
+        ));
+    }
+    Ok(())
+}
+
+fn table_cell<'a>(source: &'a Package, path: &TableCellPath) -> Result<&'a crate::Cell<'a>, Error> {
+    let root = path.root;
+    let mut cell = source
+        .tables()
+        .get(root.table_index)
+        .and_then(|table| table.rows().get(root.row_index))
+        .and_then(|row| row.cells().get(root.cell_index))
+        .ok_or(Error::DestinationOutOfRange("table cell"))?;
+    for coordinate in &path.nested {
+        cell = cell
+            .nested_tables()
+            .get(coordinate.table_index)
+            .and_then(|nested| nested.table.rows().get(coordinate.row_index))
+            .and_then(|row| row.cells().get(coordinate.cell_index))
+            .ok_or(Error::DestinationOutOfRange("nested table cell"))?;
+    }
+    Ok(cell)
+}
+
+fn header_footer(
+    source: &Package,
+    target: HeaderFooterParagraph,
+) -> Result<&crate::HeaderFooter<'_>, Error> {
+    source
+        .sections()
+        .get(target.section)
+        .ok_or(Error::DestinationOutOfRange("section"))?
+        .headers_footers
+        .iter()
+        .find(|candidate| candidate.header_type == target.kind)
+        .ok_or(Error::DestinationOutOfRange("header/footer"))
+}
+
+fn annotation(source: &Package, index: usize) -> Result<&crate::Annotation<'_>, Error> {
+    source
+        .annotations()
+        .get(index)
+        .ok_or(Error::DestinationOutOfRange("annotation"))
+}
+
+fn note(source: &Package, index: usize) -> Result<&crate::Note<'_>, Error> {
+    source
+        .notes()
+        .get(index)
+        .ok_or(Error::DestinationOutOfRange("note"))
+}
+
+fn shape(source: &Package, index: usize) -> Result<&crate::Shape<'_>, Error> {
+    source
+        .shapes()
+        .get(index)
+        .ok_or(Error::DestinationOutOfRange("shape"))
+}
+
+fn shape_has_active_link(shape: &crate::Shape<'_>) -> bool {
+    shape
+        .properties
+        .iter()
+        .any(|property| property.hyperlink.is_some())
+        || shape.text_shapes.iter().any(shape_has_active_link)
+        || shape
+            .text_shape_groups
+            .iter()
+            .any(shape_group_has_active_link)
+}
+
+fn shape_group_has_active_link(group: &crate::ShapeGroup<'_>) -> bool {
+    group.shapes.iter().any(shape_has_active_link)
+        || group.groups.iter().any(shape_group_has_active_link)
+}
+
+fn model_header_footer_paragraph_mut<'a>(
+    model: &'a mut crate::document::Tree<'static>,
+    target: HeaderFooterParagraph,
+) -> Result<&'a mut crate::HeaderFooterParagraph<'static>, Error> {
+    model
+        .sections_mut()
+        .get_mut(target.section)
+        .ok_or(Error::DestinationOutOfRange("section"))?
+        .headers_footers
+        .iter_mut()
+        .find(|candidate| candidate.header_type == target.kind)
+        .ok_or(Error::DestinationOutOfRange("header/footer"))?
+        .paragraphs
+        .get_mut(target.paragraph)
+        .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))
+}
+
+fn table_cell_effect(path: &TableCellPath) -> String {
+    let mut effect = format!(
+        "table:{}:row:{}:cell:{}",
+        path.root.table_index, path.root.row_index, path.root.cell_index
+    );
+    for coordinate in &path.nested {
+        effect.push_str(":nested:");
+        effect.push_str(&coordinate.table_index.to_string());
+        effect.push(':');
+        effect.push_str(&coordinate.row_index.to_string());
+        effect.push(':');
+        effect.push_str(&coordinate.cell_index.to_string());
+    }
+    effect.push_str(":text");
+    effect
+}
+
+fn header_footer_effect(target: HeaderFooterParagraph) -> String {
+    format!(
+        "section:{}:{}:paragraph:{}:text",
+        target.section,
+        header_footer_kind_name(target.kind),
+        target.paragraph
+    )
+}
+
+fn annotation_effect(index: usize) -> String {
+    format!("body:annotation:{index}:text")
+}
+
+fn note_effect(index: usize) -> String {
+    format!("body:note:{index}:text")
+}
+
+fn shape_effect(index: usize) -> String {
+    format!("body:shape:{index}:text")
+}
+
+const fn header_footer_kind_name(kind: HeaderFooterType) -> &'static str {
+    match kind {
+        HeaderFooterType::Header => "header",
+        HeaderFooterType::Footer => "footer",
+        HeaderFooterType::HeaderFirst => "header-first",
+        HeaderFooterType::FooterFirst => "footer-first",
+        HeaderFooterType::HeaderLeft => "header-left",
+        HeaderFooterType::FooterLeft => "footer-left",
+        HeaderFooterType::HeaderRight => "header-right",
+        HeaderFooterType::FooterRight => "footer-right",
+    }
+}
+
+fn validate_span(body: &str, span: TextSpan) -> Result<(), Error> {
+    if span.end > body.len() {
+        return Err(Error::SpanOutOfRange {
+            end: span.end,
+            length: body.len(),
+        });
+    }
+    if !body.is_char_boundary(span.start) {
+        return Err(Error::SpanNotOnCharacterBoundary {
+            position: span.start,
+        });
+    }
+    if !body.is_char_boundary(span.end) {
+        return Err(Error::SpanNotOnCharacterBoundary { position: span.end });
+    }
+    Ok(())
+}
+
+fn spans_conflict(left: TextSpan, right: TextSpan) -> bool {
+    if left.is_empty() && right.is_empty() {
+        return left.start == right.start;
+    }
+    if left.is_empty() {
+        return (right.start..=right.end).contains(&left.start);
+    }
+    if right.is_empty() {
+        return (left.start..=left.end).contains(&right.start);
+    }
+    left.start < right.end && right.start < left.end
+}
+
+#[derive(Debug, Clone)]
+struct OrdinaryParagraphSource {
+    text: Range<usize>,
+    source: Range<usize>,
+    boundary_after: Option<Range<usize>>,
+}
+
+#[derive(Debug, Clone)]
+struct OrdinaryParagraphSourceMap {
+    paragraphs: Vec<OrdinaryParagraphSource>,
+}
+
+/// Proves the deliberately narrow source closure used by paragraph
+/// split/merge and maps semantic paragraph offsets to exact source offsets.
+///
+/// The source map accepts literal ASCII text and `\\par` controls only. This
+/// makes every retained semantic byte correspond to exactly one source byte;
+/// encoded characters, visible control symbols, nested groups, and all other
+/// controls fail closed rather than being guessed around.
+fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSourceMap, Error> {
+    ordinary_paragraph_source_map_inner(source, false, false)
+}
+
+fn ordinary_paragraph_source_map_with_lines(
+    source: &Package,
+) -> Result<OrdinaryParagraphSourceMap, Error> {
+    ordinary_paragraph_source_map_inner(source, true, false)
+}
+
+fn ordinary_paragraph_source_map_inner(
+    source: &Package,
+    allow_inline_line: bool,
+    allow_undelimited_start: bool,
+) -> Result<OrdinaryParagraphSourceMap, Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph structure editing refuses compressed RTF",
+        ));
+    }
+    if !source_bytes.is_ascii() {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph structure editing requires an ASCII RTF transport",
+        ));
+    }
+    if !source.opaque().is_empty() || source.model().unknown_syntax_markers() != 0 {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph structure editing refuses unknown RTF syntax",
+        ));
+    }
+    if !source.model().external_references().is_empty()
+        || source.model().mail_merge().is_some()
+        || source.model().xsl_transform().is_some()
+        || source.model().xsl_transform_usage().is_requested()
+    {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph structure editing refuses external or transformation content",
+        ));
+    }
+    if !source.tables().is_empty()
+        || !source.fields().is_empty()
+        || !source.objects().is_empty()
+        || !source.pictures().is_empty()
+        || !source.shapes().is_empty()
+        || !source.model().form_fields().is_empty()
+        || !source.model().bookmarks().bookmarks().is_empty()
+        || !source.revisions().is_empty()
+        || !source.annotations().is_empty()
+        || !source.notes().is_empty()
+        || !source.model().math_zones().is_empty()
+        || !source.model().custom_xml_tags().is_empty()
+        || !source.model().protection_ranges().is_empty()
+        || !source.model().editable_regions().is_empty()
+        || !source.model().body_story_events().is_empty()
+    {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph structure editing refuses dependent destinations or review content",
+        ));
+    }
+    source
+        .model()
+        .plain_body_text_editability()
+        .map_err(Error::unsupported_source)?;
+    let body_span = if source.text().is_empty() && source.paragraph_count() == 0 {
+        ordinary_paragraph_body_source_span(source_bytes, source.text(), source.options())?
+    } else if !source.text().starts_with('\n') {
+        source
+            .model()
+            .ordinary_body_source_span()
+            .ok_or(Error::unsupported_source(
+                "ordinary paragraph source span is not losslessly proven",
+            ))?
+    } else {
+        ordinary_paragraph_body_source_span(source_bytes, source.text(), source.options())?
+    };
+    let empty_body_span = body_span.start == body_span.end
+        && source.paragraph_count() == 0
+        && source.text().is_empty();
+    if body_span.start > body_span.end
+        || body_span.end > source_bytes.len()
+        || (body_span.start == body_span.end && !empty_body_span)
+    {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph source span is malformed",
+        ));
+    }
+    let body_bytes = source_bytes
+        .get(body_span.clone())
+        .ok_or(Error::unsupported_source(
+            "ordinary paragraph source span is outside the source",
+        ))?;
+    if !allow_undelimited_start
+        && source.text().starts_with('\n')
+        && body_bytes
+            .get(..4)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(br"\par"))
+        && body_span.start != 0
+        && !source_bytes
+            .get(body_span.start - 1)
+            .is_some_and(u8::is_ascii_whitespace)
+    {
+        return Err(Error::unsupported_source(
+            "leading empty paragraph has no safe control-word delimiter",
+        ));
+    }
+    let body_input = std::str::from_utf8(body_bytes)
+        .map_err(|_error| Error::unsupported_source("ordinary paragraph source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
+        .with_leniency(source.options().leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut paragraphs = Vec::new();
+    paragraphs
+        .try_reserve_exact(source.paragraph_count())
+        .map_err(|_error| Error::Write("could not reserve paragraph source map".to_string()))?;
+    let semantic_text = source.text();
+    let mut semantic_position = 0usize;
+    let mut paragraph_start = 0usize;
+    let mut source_text_start = None;
+    let mut paragraph_has_inline_line = false;
+    let mut previous_boundary_end = body_span.start;
+
+    for (token, relative_span) in tokens.iter().zip(&spans) {
+        let absolute_span = relative_span
+            .start
+            .checked_add(body_span.start)
+            .and_then(|start| {
+                relative_span
+                    .end
+                    .checked_add(body_span.start)
+                    .map(|end| start..end)
+            })
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        if absolute_span.start < previous_boundary_end {
+            return Err(Error::unsupported_source(
+                "ordinary paragraph source tokens overlap",
+            ));
+        }
+        match token {
+            crate::lexer::Token::Text(value) => {
+                let source_fragment =
+                    source_bytes
+                        .get(absolute_span.clone())
+                        .ok_or(Error::unsupported_source(
+                            "ordinary paragraph text token is outside the source",
+                        ))?;
+                if value.is_empty() {
+                    if !source_fragment.is_empty() {
+                        return Err(Error::unsupported_source(
+                            "ordinary paragraph source contains an unmodeled control boundary",
+                        ));
+                    }
+                    continue;
+                }
+                if !value.is_ascii() || source_fragment != value.as_bytes() {
+                    return Err(Error::unsupported_source(
+                        "ordinary paragraph source text is not one-to-one ASCII text",
+                    ));
+                }
+                if source_text_start.is_none() {
+                    source_text_start = Some(absolute_span.start);
+                }
+                semantic_position =
+                    semantic_position
+                        .checked_add(value.len())
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_input_bytes(),
+                        })?;
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Line) if allow_inline_line => {
+                if source_text_start.is_none() {
+                    source_text_start = Some(absolute_span.start);
+                }
+                if semantic_text.as_bytes().get(semantic_position) != Some(&b'\n') {
+                    return Err(Error::unsupported_source(
+                        "ordinary paragraph line boundary does not match semantic text",
+                    ));
+                }
+                semantic_position =
+                    semantic_position
+                        .checked_add(1)
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_input_bytes(),
+                        })?;
+                paragraph_has_inline_line = true;
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
+                let source_start = source_text_start.unwrap_or(absolute_span.start);
+                let source_end = absolute_span.start;
+                let text_range = paragraph_start..semantic_position;
+                let source_range = source_start..source_end;
+                let literal_source = source_range.len() == text_range.len()
+                    && source_bytes.get(source_range.clone())
+                        == semantic_text.as_bytes().get(text_range.clone());
+                if !literal_source && !paragraph_has_inline_line {
+                    return Err(Error::unsupported_source(
+                        "ordinary paragraph boundary is not a literal source boundary",
+                    ));
+                }
+                paragraphs.push(OrdinaryParagraphSource {
+                    text: text_range,
+                    source: source_range,
+                    boundary_after: Some(absolute_span.clone()),
+                });
+                // The final `\\par` terminates the last paragraph but does
+                // not add a semantic newline to the native body text.  A
+                // trailing terminator is common in RTF and must remain an
+                // addressable source boundary for lossless removal.
+                if semantic_position < semantic_text.len() {
+                    semantic_position =
+                        semantic_position
+                            .checked_add(1)
+                            .ok_or(Error::InputTooLarge {
+                                observed: usize::MAX,
+                                limit: source.limits().max_input_bytes(),
+                            })?;
+                }
+                paragraph_start = semantic_position;
+                source_text_start = None;
+                paragraph_has_inline_line = false;
+                previous_boundary_end = absolute_span.end;
+            },
+            crate::lexer::Token::OpenBrace
+            | crate::lexer::Token::CloseBrace
+            | crate::lexer::Token::Control(_)
+            | crate::lexer::Token::Binary(_) => {
+                return Err(Error::unsupported_source(
+                    "ordinary paragraph source contains a group, binary payload, or non-paragraph control",
+                ));
+            },
+        }
+    }
+
+    if let Some(source_start) = source_text_start {
+        let text_range = paragraph_start..semantic_position;
+        let source_range = source_start..body_span.end;
+        let literal_source = source_range.len() == text_range.len()
+            && source_bytes.get(source_range.clone())
+                == semantic_text.as_bytes().get(text_range.clone());
+        if !literal_source && !paragraph_has_inline_line {
+            return Err(Error::unsupported_source(
+                "ordinary paragraph final source range is not literal text",
+            ));
+        }
+        paragraphs.push(OrdinaryParagraphSource {
+            text: text_range,
+            source: source_range,
+            boundary_after: None,
+        });
+    }
+    if semantic_position != semantic_text.len()
+        || paragraphs.len() != source.paragraph_count()
+        || (paragraphs.is_empty() && source.paragraph_count() != 0)
+    {
+        return Err(Error::unsupported_source(
+            "ordinary paragraph source map does not cover the complete body story",
+        ));
+    }
+    Ok(OrdinaryParagraphSourceMap { paragraphs })
+}
+
+#[derive(Debug, Clone)]
+struct OrdinaryRunSource {
+    paragraph: usize,
+    run: usize,
+    bold: bool,
+    source: Range<usize>,
+}
+
+fn ordinary_run_body_source_span(
+    source: &[u8],
+    semantic_text: &str,
+    options: crate::OpenOptions,
+) -> Result<Range<usize>, Error> {
+    let lexical = std::str::from_utf8(source)
+        .map_err(|_error| Error::unsupported_source("ordinary run source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer =
+        crate::lexer::Lexer::new_with_limits(lexical, &arena, options.source_limits_value())
+            .for_document(options.leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut end = None;
+    for (index, (token, span)) in tokens.iter().zip(&spans).enumerate() {
+        if depth == 1 && start.is_none() && index != 0 {
+            // Keep root-level defaults such as `\\uc0` in the lexical span.
+            // They affect the first grouped body run even when a destination
+            // group precedes it; the mapper skips those destinations below.
+            start = Some(span.start);
+        }
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                depth = depth.checked_add(1).ok_or(Error::unsupported_source(
+                    "ordinary run source group nesting overflowed",
+                ))?;
+            },
+            crate::lexer::Token::CloseBrace => {
+                if depth == 1 {
+                    end = Some(span.start);
+                    break;
+                }
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
+                    "ordinary run source has an unmatched closing group",
+                ))?;
+            },
+            _ => {},
+        }
+    }
+    let root_end = end.ok_or(Error::unsupported_source(
+        "ordinary run source root group has no closing boundary",
+    ))?;
+    match start {
+        Some(start) => Ok(start..root_end),
+        None if semantic_text.is_empty() => Ok(root_end..root_end),
+        None => Err(Error::unsupported_source(
+            "ordinary run source has no body text span",
+        )),
+    }
+}
+
+fn empty_paragraph_boundary_formats(
+    source: &Package,
+    paragraph_starts: &[usize],
+    empty_paragraphs: &[bool],
+) -> Result<Vec<Option<crate::types::Formatting>>, Error> {
+    if paragraph_starts.len() != empty_paragraphs.len() {
+        return Err(Error::unsupported_source(
+            "empty paragraph formatting map has inconsistent paragraph axes",
+        ));
+    }
+    let mut formats = vec![None; paragraph_starts.len()];
+    let mut next_empty = 0usize;
+    while empty_paragraphs.get(next_empty) == Some(&false) {
+        next_empty = next_empty.saturating_add(1);
+    }
+    let mut block_start = 0usize;
+    for block in source.model().blocks() {
+        let block_text = block.text();
+        let block_end = block_start
+            .checked_add(block_text.len())
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        while next_empty < empty_paragraphs.len() {
+            let paragraph_index = next_empty;
+            let paragraph_start =
+                *paragraph_starts
+                    .get(paragraph_index)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: paragraph_index,
+                        count: paragraph_starts.len(),
+                    })?;
+            if paragraph_start >= block_end {
+                break;
+            }
+            if paragraph_start < block_start {
+                return Err(Error::unsupported_source(
+                    "empty paragraph formatting map crossed a native block boundary",
+                ));
+            }
+            let offset = paragraph_start.saturating_sub(block_start);
+            if block_text.as_bytes().get(offset) != Some(&b'\n') {
+                return Err(Error::unsupported_source(
+                    "empty paragraph has no retained native newline block",
+                ));
+            }
+            let format = formats.get_mut(paragraph_index).ok_or(Error::Internal(
+                "empty paragraph formatting slot is missing",
+            ))?;
+            *format = Some(block.formatting);
+            next_empty = paragraph_index.saturating_add(1);
+            while empty_paragraphs.get(next_empty) == Some(&false) {
+                next_empty = next_empty.saturating_add(1);
+            }
+        }
+        block_start = block_end;
+    }
+    if next_empty < empty_paragraphs.len() {
+        return Err(Error::unsupported_source(
+            "empty paragraph formatting map did not cover a native newline block",
+        ));
+    }
+    if block_start != source.text().len() {
+        return Err(Error::unsupported_source(
+            "native style blocks do not cover the complete body text",
+        ));
+    }
+    Ok(formats)
+}
+
+fn ordinary_run_group_is_destination(
+    tokens: &[crate::lexer::Token<'_>],
+    open_index: usize,
+) -> bool {
+    let index = open_index.saturating_add(1);
+    if matches!(
+        tokens.get(index),
+        Some(crate::lexer::Token::Control(
+            crate::lexer::ControlWord::IgnorableDestination
+        ))
+    ) {
+        return true;
+    }
+    matches!(
+        tokens.get(index),
+        Some(crate::lexer::Token::Control(
+            crate::lexer::ControlWord::FontTable
+                | crate::lexer::ControlWord::ColorTable
+                | crate::lexer::ControlWord::StyleSheet
+                | crate::lexer::ControlWord::Info
+                | crate::lexer::ControlWord::FileTable
+                | crate::lexer::ControlWord::ListTable
+                | crate::lexer::ControlWord::ListOverrideTable
+                | crate::lexer::ControlWord::Header
+                | crate::lexer::ControlWord::HeaderFirst
+                | crate::lexer::ControlWord::HeaderLeft
+                | crate::lexer::ControlWord::HeaderRight
+                | crate::lexer::ControlWord::Footer
+                | crate::lexer::ControlWord::FooterFirst
+                | crate::lexer::ControlWord::FooterLeft
+                | crate::lexer::ControlWord::FooterRight
+                | crate::lexer::ControlWord::Footnote
+                | crate::lexer::ControlWord::Endnote
+                | crate::lexer::ControlWord::Annotation
+                | crate::lexer::ControlWord::Field
+                | crate::lexer::ControlWord::FieldInstruction
+                | crate::lexer::ControlWord::FieldResult
+                | crate::lexer::ControlWord::Object
+                | crate::lexer::ControlWord::Picture
+                | crate::lexer::ControlWord::Result
+                | crate::lexer::ControlWord::Shape(_)
+                | crate::lexer::ControlWord::ShapeGroup(_)
+                | crate::lexer::ControlWord::XmlNamespaceTable
+                | crate::lexer::ControlWord::DocumentVariable
+                | crate::lexer::ControlWord::UserProperties
+                | crate::lexer::ControlWord::DataStore
+                | crate::lexer::ControlWord::Generator
+        ))
+    )
+}
+
+/// Proves source ranges for the borrowed ordinary-body run axis.
+///
+/// The map keeps all original bytes between the mapped visible tokens. The
+/// lexer deliberately reports the source span of an escaped character (for
+/// example `\\{`) while returning its one-character semantic value; keeping
+/// those two widths separate is what lets a run splice retain escaped and
+/// hexadecimal text. Unicode controls are handled together with their RTF
+/// fallback tokens. Visible inline structure, binary data, and dependent
+/// destinations still fail closed because they have no ordinary run byte
+/// range that this operation can safely address.
+fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::unsupported_source(
+            "run-format editing refuses compressed RTF",
+        ));
+    }
+    if !source.tables().is_empty()
+        || !source.fields().is_empty()
+        || !source.objects().is_empty()
+        || !source.pictures().is_empty()
+        || !source.shapes().is_empty()
+        || !source.revisions().is_empty()
+        || !source.annotations().is_empty()
+        || !source.notes().is_empty()
+        || !source.model().form_fields().is_empty()
+    {
+        return Err(Error::unsupported_source(
+            "run-format editing refuses dependent body destinations or review content",
+        ));
+    }
+    if source
+        .body()
+        .inlines()
+        .any(|inline| matches!(inline, crate::text::Inline::Break(crate::text::Break::Line)))
+    {
+        return Err(Error::unsupported_source(
+            "run-format editing refuses inline line breaks",
+        ));
+    }
+    // The model's compact span cache starts at the first literal token. It
+    // cannot cover a leading Unicode control or a grouped run, so always use
+    // the destination-aware scanner here; it keeps root defaults in scope and
+    // skips header/opaque groups while retaining every body source byte.
+    let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
+    if body_span.start > body_span.end || body_span.end > source_bytes.len() {
+        return Err(Error::unsupported_source(
+            "ordinary run source span is malformed",
+        ));
+    }
+    let body_bytes = source_bytes
+        .get(body_span.clone())
+        .ok_or(Error::unsupported_source(
+            "ordinary run source span is outside the source",
+        ))?;
+    let body_input = std::str::from_utf8(body_bytes)
+        .map_err(|_error| Error::unsupported_source("ordinary run source is not UTF-8"))?;
+    let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    for paragraph in &paragraphs {
+        let raw = paragraph.format().raw();
+        if raw.paragraph_style.is_some()
+            || raw.list_override.is_some()
+            || raw.list_level.is_some()
+            || raw.legacy_numbering.is_some()
+        {
+            return Err(Error::unsupported_source(
+                "run-format editing refuses dependent style or list references",
+            ));
+        }
+    }
+    let paragraph_runs = paragraphs
+        .iter()
+        .map(|paragraph| paragraph.runs().collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
+        .with_leniency(source.options().leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    if tokens.len() != spans.len() {
+        return Err(Error::Internal(
+            "ordinary run source token map is inconsistent",
+        ));
+    }
+
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(source.body().runs().count())
+        .map_err(|_error| Error::Write("could not reserve run source map".to_string()))?;
+    let mut paragraph = 0usize;
+    let mut run = 0usize;
+    let mut run_offset = 0usize;
+    let mut run_source_start = None;
+    let mut unicode_skip = 1usize;
+    let mut encoding = crate::codec::parser::SourceTextEncoding::default();
+    let mut text_state_stack = Vec::new();
+    let mut ignored_group_depth = 0usize;
+    let mut text_offset = 0usize;
+    let mut token_index = 0usize;
+    while token_index < tokens.len() {
+        let token = tokens
+            .get(token_index)
+            .ok_or(Error::unsupported_source("ordinary run token disappeared"))?;
+        let relative_span = spans.get(token_index).ok_or(Error::unsupported_source(
+            "ordinary run token span disappeared",
+        ))?;
+        let absolute_span = relative_span
+            .start
+            .checked_add(body_span.start)
+            .and_then(|start| {
+                relative_span
+                    .end
+                    .checked_add(body_span.start)
+                    .map(|end| start..end)
+            })
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        let current_text_offset = text_offset;
+        text_offset = 0;
+        let ignored_before = ignored_group_depth;
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                text_state_stack.push((unicode_skip, encoding));
+                if ignored_before != 0 || ordinary_run_group_is_destination(&tokens, token_index) {
+                    ignored_group_depth = ignored_group_depth.saturating_add(1);
+                }
+            },
+            crate::lexer::Token::CloseBrace => {
+                (unicode_skip, encoding) = text_state_stack.pop().ok_or(
+                    Error::unsupported_source("ordinary run source has an unmatched closing group"),
+                )?;
+                if ignored_before != 0 {
+                    ignored_group_depth = ignored_group_depth.saturating_sub(1);
+                }
+            },
+            _ => {},
+        }
+        if ignored_before != 0
+            || (matches!(token, crate::lexer::Token::OpenBrace) && ignored_group_depth != 0)
+        {
+            token_index = token_index.saturating_add(1);
+            continue;
+        }
+        let mut visible = None;
+        let mut visible_span = absolute_span.clone();
+        match token {
+            crate::lexer::Token::OpenBrace | crate::lexer::Token::CloseBrace => {},
+            crate::lexer::Token::Text(value) => {
+                let value =
+                    value
+                        .as_ref()
+                        .get(current_text_offset..)
+                        .ok_or(Error::unsupported_source(
+                            "ordinary run text suffix is not a character boundary",
+                        ))?;
+                if !value.is_empty() {
+                    // Plain text tokens may consume physical CR/LF without
+                    // returning them as visible text. Keep that trivia out
+                    // of the edited run range, including a native CRLF split
+                    // across successive lexical tokens.
+                    let raw = source_bytes.get(absolute_span.clone()).ok_or(
+                        Error::unsupported_source("ordinary text span is outside the source"),
+                    )?;
+                    let leading = raw
+                        .iter()
+                        .take_while(|byte| matches!(byte, b'\r' | b'\n'))
+                        .count();
+                    let trailing = raw
+                        .iter()
+                        .rev()
+                        .take_while(|byte| matches!(byte, b'\r' | b'\n'))
+                        .count();
+                    let start = absolute_span
+                        .start
+                        .checked_add(leading)
+                        .and_then(|start| start.checked_add(current_text_offset))
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_input_bytes(),
+                        })?;
+                    visible_span = start..absolute_span.end.saturating_sub(trailing);
+                    let font = paragraph_runs
+                        .get(paragraph)
+                        .and_then(|runs| runs.get(run))
+                        .and_then(|run| {
+                            source.model().font_table().get(run.format().raw().font_ref)
+                        });
+                    visible = Some(encoding.decode_source_run(value, font)?);
+                }
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(_)) => {
+                let mut end = token_index;
+                let mut units = Vec::new();
+                let mut awaiting_fallback = 0usize;
+                loop {
+                    let Some(crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(
+                        value,
+                    ))) = tokens.get(end)
+                    else {
+                        return Err(Error::unsupported_source(
+                            "ordinary Unicode run lost its control token",
+                        ));
+                    };
+                    units.push(*value as u16);
+                    awaiting_fallback = awaiting_fallback.saturating_add(1);
+                    end = end.saturating_add(1);
+                    if matches!(
+                        tokens.get(end),
+                        Some(crate::lexer::Token::Control(
+                            crate::lexer::ControlWord::Unicode(_)
+                        ))
+                    ) {
+                        continue;
+                    }
+                    let high = units
+                        .last()
+                        .is_some_and(|unit| (0xd800..=0xdbff).contains(unit));
+                    let owed = unicode_skip.saturating_mul(awaiting_fallback);
+                    if high {
+                        let mut candidate = end;
+                        let mut remaining = owed;
+                        while remaining != 0 {
+                            let Some(fallback) = tokens.get(candidate) else {
+                                break;
+                            };
+                            match fallback {
+                                crate::lexer::Token::Text(value) => {
+                                    let count = value.chars().count();
+                                    if count > remaining {
+                                        break;
+                                    }
+                                    remaining = remaining.saturating_sub(count);
+                                },
+                                crate::lexer::Token::Control(control)
+                                    if run_control_symbol_text(control).is_some() =>
+                                {
+                                    remaining = remaining.saturating_sub(1);
+                                },
+                                _ => break,
+                            }
+                            candidate = candidate.saturating_add(1);
+                        }
+                        if remaining == 0
+                            && matches!(
+                                tokens.get(candidate),
+                                Some(crate::lexer::Token::Control(
+                                    crate::lexer::ControlWord::Unicode(value)
+                                )) if (0xdc00..=0xdfff).contains(&(*value as u16))
+                            )
+                        {
+                            end = candidate;
+                            awaiting_fallback = 0;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                let fallback_count = unicode_skip.saturating_mul(awaiting_fallback);
+                let mut remaining_fallback = fallback_count;
+                let mut fallback_cursor = end;
+                let mut partial_fallback_end = None;
+                while remaining_fallback != 0 {
+                    let Some(fallback) = tokens.get(fallback_cursor) else {
+                        break;
+                    };
+                    match fallback {
+                        crate::lexer::Token::Text(value) => {
+                            let count = value.chars().count();
+                            if count > remaining_fallback {
+                                let prefix_bytes = value
+                                    .char_indices()
+                                    .nth(remaining_fallback)
+                                    .map_or(value.len(), |(offset, _)| offset);
+                                let fallback_span =
+                                    spans.get(fallback_cursor).ok_or(Error::unsupported_source(
+                                        "ordinary Unicode fallback span disappeared",
+                                    ))?;
+                                partial_fallback_end = Some(
+                                    fallback_span
+                                        .start
+                                        .checked_add(prefix_bytes)
+                                        .and_then(|end| end.checked_add(body_span.start))
+                                        .ok_or(Error::InputTooLarge {
+                                            observed: usize::MAX,
+                                            limit: source.limits().max_input_bytes(),
+                                        })?,
+                                );
+                                text_offset = prefix_bytes;
+                                break;
+                            }
+                            remaining_fallback = remaining_fallback.saturating_sub(count);
+                        },
+                        crate::lexer::Token::Control(control)
+                            if run_control_symbol_text(control).is_some() =>
+                        {
+                            remaining_fallback = remaining_fallback.saturating_sub(1);
+                        },
+                        crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(_)) => {
+                            break;
+                        },
+                        _ => {
+                            return Err(Error::unsupported_source(
+                                "ordinary Unicode fallback contains structure",
+                            ));
+                        },
+                    }
+                    fallback_cursor = fallback_cursor.saturating_add(1);
+                }
+                let end_index = fallback_cursor.saturating_sub(1).max(end.saturating_sub(1));
+                let end_span = spans.get(end_index).ok_or(Error::unsupported_source(
+                    "ordinary Unicode span disappeared",
+                ))?;
+                let end = partial_fallback_end
+                    .unwrap_or_else(|| end_span.end.saturating_add(body_span.start));
+                visible_span = relative_span
+                    .start
+                    .checked_add(body_span.start)
+                    .map(|start| start..end)
+                    .ok_or(Error::InputTooLarge {
+                        observed: usize::MAX,
+                        limit: source.limits().max_input_bytes(),
+                    })?;
+                let decoded = String::from_utf16_lossy(&units);
+                visible = Some(decoded);
+                token_index = if partial_fallback_end.is_some() {
+                    fallback_cursor
+                } else {
+                    fallback_cursor.saturating_sub(1)
+                };
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
+                let selected_paragraph =
+                    paragraph_runs
+                        .get(paragraph)
+                        .ok_or(Error::unsupported_source(
+                            "ordinary run source has excess paragraph breaks",
+                        ))?;
+                if run < selected_paragraph.len() || run_offset != 0 {
+                    return Err(Error::unsupported_source(
+                        "ordinary run source paragraph ended inside a run",
+                    ));
+                }
+                paragraph = paragraph.saturating_add(1);
+                run = 0;
+                run_offset = 0;
+                run_source_start = None;
+                if paragraph > paragraphs.len() {
+                    return Err(Error::unsupported_source(
+                        "ordinary run source has excess paragraph breaks",
+                    ));
+                }
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::UnicodeSkip(value)) => {
+                unicode_skip = (*value).max(0) as usize;
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Line)
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineBreak(_))
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineHeight(_)) => {
+                return Err(Error::unsupported_source(
+                    "ordinary run source contains a visible or structural control",
+                ));
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Tab) => {
+                visible = Some("\t".to_owned());
+            },
+            crate::lexer::Token::Control(control) => {
+                encoding = encoding.with_control(control)?;
+                visible = run_control_symbol_text(control).map(str::to_owned);
+                if visible.is_none()
+                    && matches!(
+                        control,
+                        crate::lexer::ControlWord::NonBreakingSpace
+                            | crate::lexer::ControlWord::OptionalHyphen
+                            | crate::lexer::ControlWord::NonBreakingHyphen
+                            | crate::lexer::ControlWord::EmDash
+                            | crate::lexer::ControlWord::EnDash
+                            | crate::lexer::ControlWord::EmSpace
+                            | crate::lexer::ControlWord::EnSpace
+                            | crate::lexer::ControlWord::QuarterEmSpace
+                            | crate::lexer::ControlWord::Bullet
+                            | crate::lexer::ControlWord::LeftSingleQuote
+                            | crate::lexer::ControlWord::RightSingleQuote
+                            | crate::lexer::ControlWord::LeftDoubleQuote
+                            | crate::lexer::ControlWord::RightDoubleQuote
+                            | crate::lexer::ControlWord::LeftToRightMark
+                            | crate::lexer::ControlWord::RightToLeftMark
+                            | crate::lexer::ControlWord::ZeroWidthJoiner
+                            | crate::lexer::ControlWord::ZeroWidthNonJoiner
+                            | crate::lexer::ControlWord::ZeroWidthBreakOpportunity
+                            | crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity
+                    )
+                {
+                    return Err(Error::unsupported_source(
+                        "ordinary run source control symbol has no semantic mapping",
+                    ));
+                }
+            },
+            crate::lexer::Token::Binary(_) => {
+                return Err(Error::unsupported_source(
+                    "ordinary run source contains binary data",
+                ));
+            },
+        }
+        if let Some(value) = visible {
+            let value = value.as_str();
+            if value.is_empty() {
+                token_index = token_index.saturating_add(1);
+                continue;
+            }
+            let selected_paragraph =
+                paragraph_runs
+                    .get(paragraph)
+                    .ok_or(Error::unsupported_source(
+                        "ordinary run source has excess visible text",
+                    ))?;
+            let selected_run =
+                selected_paragraph
+                    .get(run)
+                    .copied()
+                    .ok_or(Error::unsupported_source(
+                        "ordinary run source has excess visible text",
+                    ))?;
+            let expected = selected_run.text();
+            let remaining = expected.get(run_offset..).ok_or(Error::unsupported_source(
+                "ordinary run source text offset is invalid",
+            ))?;
+            if !remaining.starts_with(value) {
+                return Err(Error::unsupported_source(
+                    "ordinary run source text does not match the run axis",
+                ));
+            }
+            if value.len() > remaining.len() {
+                return Err(Error::unsupported_source(
+                    "ordinary run source token crosses a native run boundary",
+                ));
+            }
+            run_source_start.get_or_insert(visible_span.start);
+            run_offset = run_offset.saturating_add(value.len());
+            if run_offset == expected.len() {
+                let start = run_source_start.take().ok_or(Error::unsupported_source(
+                    "ordinary run source has no text start",
+                ))?;
+                let end = visible_span.end;
+                if start >= end {
+                    return Err(Error::unsupported_source(
+                        "ordinary run source text range is empty",
+                    ));
+                }
+                result.push(OrdinaryRunSource {
+                    paragraph,
+                    run,
+                    bold: selected_run.format().raw().bold,
+                    source: start..end,
+                });
+                run = run.saturating_add(1);
+                run_offset = 0;
+            }
+        }
+        if text_offset != 0 {
+            continue;
+        }
+        token_index = token_index.saturating_add(1);
+    }
+    let final_unterminated_paragraph = paragraph
+        .checked_add(1)
+        .is_some_and(|next| next == paragraphs.len())
+        && paragraph_runs
+            .get(paragraph)
+            .is_some_and(|selected| run == selected.len() && run_offset == 0);
+    if !text_state_stack.is_empty()
+        || ignored_group_depth != 0
+        || (paragraph != paragraphs.len() && !final_unterminated_paragraph)
+        || paragraph_runs
+            .get(paragraph)
+            .is_some_and(|selected| run < selected.len() || run_offset != 0)
+        || result.len() != source.body().runs().count()
+    {
+        return Err(Error::unsupported_source(
+            "ordinary run source map does not cover the complete body story",
+        ));
+    }
+    Ok(result)
+}
+
+/// Returns one exact source insertion offset for every ordinary body
+/// paragraph. A non-empty paragraph uses its run source range instead; these
+/// offsets are needed for empty paragraphs, whose only native boundary is the
+/// literal `\\par` control (or the end of the body for an unterminated final
+/// paragraph).
+fn ordinary_run_paragraph_source_boundaries(source: &Package) -> Result<Vec<usize>, Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::unsupported_source(
+            "run insertion refuses compressed RTF",
+        ));
+    }
+    let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
+    let body_bytes = source_bytes
+        .get(body_span.clone())
+        .ok_or(Error::unsupported_source(
+            "ordinary run source span is outside the source",
+        ))?;
+    let body_input = std::str::from_utf8(body_bytes)
+        .map_err(|_error| Error::unsupported_source("ordinary run source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
+        .with_leniency(source.options().leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut boundaries = Vec::new();
+    boundaries
+        .try_reserve_exact(source.paragraph_count())
+        .map_err(|_error| Error::Write("could not reserve run paragraph boundaries".to_string()))?;
+    let mut ignored_group_depth = 0usize;
+    let mut paragraph = 0usize;
+    for (index, (token, relative_span)) in tokens.iter().zip(&spans).enumerate() {
+        let absolute_span = relative_span
+            .start
+            .checked_add(body_span.start)
+            .and_then(|start| {
+                relative_span
+                    .end
+                    .checked_add(body_span.start)
+                    .map(|end| start..end)
+            })
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        let ignored_before = ignored_group_depth;
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                if ignored_before != 0 || ordinary_run_group_is_destination(&tokens, index) {
+                    ignored_group_depth = ignored_group_depth.saturating_add(1);
+                }
+            },
+            crate::lexer::Token::CloseBrace => {
+                if ignored_before != 0 {
+                    ignored_group_depth = ignored_group_depth.saturating_sub(1);
+                }
+            },
+            _ => {},
+        }
+        if ignored_before != 0
+            || (matches!(token, crate::lexer::Token::OpenBrace) && ignored_group_depth != 0)
+        {
+            continue;
+        }
+        if matches!(
+            token,
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Par)
+        ) {
+            boundaries.push(absolute_span.start);
+            paragraph = paragraph.saturating_add(1);
+        }
+    }
+    if paragraph < source.paragraph_count() {
+        boundaries.push(body_span.end);
+    }
+    if ignored_group_depth != 0 || boundaries.len() != source.paragraph_count() {
+        return Err(Error::unsupported_source(
+            "ordinary run paragraph source boundaries do not cover the body story",
+        ));
+    }
+    Ok(boundaries)
+}
+
+fn run_control_symbol_text(control: &crate::lexer::ControlWord<'_>) -> Option<&'static str> {
+    match control {
+        crate::lexer::ControlWord::NonBreakingSpace => Some("\u{00a0}"),
+        crate::lexer::ControlWord::OptionalHyphen => Some("\u{00ad}"),
+        crate::lexer::ControlWord::NonBreakingHyphen => Some("\u{2011}"),
+        crate::lexer::ControlWord::EmDash => Some("\u{2014}"),
+        crate::lexer::ControlWord::EnDash => Some("\u{2013}"),
+        crate::lexer::ControlWord::EmSpace => Some("\u{2003}"),
+        crate::lexer::ControlWord::EnSpace => Some("\u{2002}"),
+        crate::lexer::ControlWord::QuarterEmSpace => Some("\u{2005}"),
+        crate::lexer::ControlWord::Bullet => Some("\u{2022}"),
+        crate::lexer::ControlWord::LeftSingleQuote => Some("\u{2018}"),
+        crate::lexer::ControlWord::RightSingleQuote => Some("\u{2019}"),
+        crate::lexer::ControlWord::LeftDoubleQuote => Some("\u{201c}"),
+        crate::lexer::ControlWord::RightDoubleQuote => Some("\u{201d}"),
+        crate::lexer::ControlWord::LeftToRightMark => Some("\u{200e}"),
+        crate::lexer::ControlWord::RightToLeftMark => Some("\u{200f}"),
+        crate::lexer::ControlWord::ZeroWidthJoiner => Some("\u{200d}"),
+        crate::lexer::ControlWord::ZeroWidthNonJoiner => Some("\u{200c}"),
+        crate::lexer::ControlWord::ZeroWidthBreakOpportunity => Some("\u{200b}"),
+        crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity => Some("\u{feff}"),
+        _ => None,
+    }
+}
+
+/// Locates the contiguous root-level ordinary body span, including leading
+/// `\\par` controls that represent empty paragraphs. The retained parser span
+/// intentionally starts at the first literal text, which is insufficient for
+/// replaying a split at offset zero on the first paragraph.
+fn ordinary_paragraph_body_source_span(
+    source: &[u8],
+    semantic_text: &str,
+    options: crate::OpenOptions,
+) -> Result<Range<usize>, Error> {
+    let lexical = std::str::from_utf8(source)
+        .map_err(|_error| Error::unsupported_source("ordinary paragraph source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer =
+        crate::lexer::Lexer::new_with_limits(lexical, &arena, options.source_limits_value())
+            .for_document(options.leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut end = None;
+    for (token, span) in tokens.iter().zip(&spans) {
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                if depth == 1 && start.is_some() {
+                    return Err(Error::unsupported_source(
+                        "the ordinary paragraph body is not one contiguous root-level span",
+                    ));
+                }
+                depth = depth.checked_add(1).ok_or(Error::unsupported_source(
+                    "RTF group nesting overflowed while locating the ordinary body",
+                ))?;
+            },
+            crate::lexer::Token::CloseBrace => {
+                if depth == 1 {
+                    end = Some(span.start);
+                    break;
+                }
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
+                    "RTF group nesting underflowed while locating the ordinary body",
+                ))?;
+            },
+            crate::lexer::Token::Text(_)
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::Par)
+                if depth == 1 && start.is_none() =>
+            {
+                start = Some(span.start);
+            },
+            crate::lexer::Token::Binary(_) if depth == 1 && start.is_some() => {
+                return Err(Error::unsupported_source(
+                    "the ordinary paragraph body contains binary data",
+                ));
+            },
+            crate::lexer::Token::Control(_)
+            | crate::lexer::Token::Text(_)
+            | crate::lexer::Token::Binary(_) => {},
+        }
+    }
+    let root_end = end.ok_or(Error::unsupported_source(
+        "RTF root group has no closing ordinary-body boundary",
+    ))?;
+    match start {
+        Some(start_offset) => Ok(start_offset..root_end),
+        None if semantic_text.is_empty() => Ok(root_end..root_end),
+        None => Err(Error::unsupported_source(
+            "the body has no literal source span for a lossless paragraph edit",
+        )),
+    }
+}
+
+fn paragraph_range(source: &Package, position: usize) -> Result<Range<usize>, Error> {
+    let mut start = 0usize;
+    for (paragraph_position, paragraph) in source.body().paragraphs().enumerate() {
+        let end = start
+            .checked_add(paragraph.len())
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        if paragraph_position == position {
+            return Ok(start..end);
+        }
+        start = end.checked_add(1).ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: source.limits().max_input_bytes(),
+        })?;
+    }
+    let count = source.paragraph_count();
+    Err(Error::ParagraphOutOfRange { position, count })
+}
+
+fn paragraph_text_at(source: &Package, position: usize) -> Result<&str, Error> {
+    let range = paragraph_range(source, position)?;
+    source.text().get(range).ok_or(Error::unsupported_source(
+        "paragraph selector did not resolve to one UTF-8 body range",
+    ))
+}
+
+fn project_text(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<(String, Vec<(usize, TextSpan)>), Error> {
+    if let [
+        operation @ (Operation::RemoveParagraph { .. }
+        | Operation::RestoreParagraph { .. }
+        | Operation::MoveParagraph { .. }
+        | Operation::SwapParagraph { .. }),
+    ] = operations
+    {
+        return Ok((project_lifecycle_text(source, operation)?, Vec::new()));
+    }
+    let mut text_operations = operations
+        .iter()
+        .enumerate()
+        .filter_map(|(operation_index, operation)| match operation {
+            Operation::Text {
+                span,
+                after,
+                before: _,
+                structural: _,
+                raw_structure: None,
+            } => Some((operation_index, *span, after.as_str(), false)),
+            Operation::Text {
+                raw_structure: Some(_),
+                ..
+            } => None,
+            Operation::InsertParagraph { span, text, .. } => {
+                Some((operation_index, *span, text.as_str(), true))
+            },
+            Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    text_operations.sort_unstable_by_key(|(_, span, _, _)| (span.start, span.end));
+    let source_text = source.text();
+    let mut final_len = source_text.len();
+    for (_, span, replacement, structural) in &text_operations {
+        let replacement_len = replacement.len().saturating_add(usize::from(*structural));
+        final_len = final_len
+            .checked_sub(span.end - span.start)
+            .and_then(|length| length.checked_add(replacement_len))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+    }
+    let limit = source.limits().max_input_bytes();
+    if final_len > limit {
+        return Err(Error::InputTooLarge {
+            observed: final_len,
+            limit,
+        });
+    }
+    let mut output = String::new();
+    output
+        .try_reserve_exact(final_len)
+        .map_err(|_error| Error::Write("could not reserve replacement body text".to_string()))?;
+    let mut cursor = 0usize;
+    let mut projected = Vec::new();
+    projected
+        .try_reserve_exact(text_operations.len())
+        .map_err(|_error| Error::Write("could not reserve projected text spans".to_string()))?;
+    for (index, span, replacement, structural) in text_operations {
+        output.push_str(
+            source_text
+                .get(cursor..span.start)
+                .ok_or(Error::unsupported_source(
+                    "staged text spans are not ordered UTF-8 boundaries",
+                ))?,
+        );
+        let projected_start = output.len();
+        if structural {
+            output.push('\n');
+        }
+        output.push_str(replacement);
+        projected.push((
+            index,
+            TextSpan {
+                start: projected_start,
+                end: output.len(),
+            },
+        ));
+        cursor = span.end;
+    }
+    output.push_str(source_text.get(cursor..).ok_or(Error::unsupported_source(
+        "staged text span ends outside the body",
+    ))?);
+    Ok((output, projected))
+}
+
+fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<String, Error> {
+    if matches!(
+        operation,
+        Operation::MoveParagraph {
+            position,
+            final_position,
+            ..
+        }
+        | Operation::SwapParagraph {
+            first: position,
+            second: final_position,
+            ..
+        } if position == final_position
+    ) {
+        return Ok(source.text().to_string());
+    }
+    let is_move = matches!(
+        operation,
+        Operation::MoveParagraph { .. } | Operation::SwapParagraph { .. }
+    );
+    let preserves_terminal_break =
+        is_move || matches!(operation, Operation::RestoreParagraph { .. });
+    let mut paragraphs = plain_lifecycle_paragraphs(source, preserves_terminal_break)?;
+    // A terminal `\par` is retained in the story text as one final newline,
+    // while the paragraph iterator treats that break as the terminator of the
+    // preceding paragraph. Keep the same boundary on a reordered or restored
+    // candidate; an empty final paragraph also needs one terminal break to
+    // remain addressable after either structural operation.
+    let preserve_terminal_break = preserves_terminal_break
+        && source.text().ends_with('\n')
+        && paragraphs
+            .last()
+            .is_some_and(|paragraph| !paragraph.is_empty());
+    match operation {
+        Operation::RemoveParagraph { position, text } => {
+            let actual = paragraphs
+                .get(*position)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count: paragraphs.len(),
+                })?;
+            if actual != text {
+                return Err(Error::StalePrecondition("paragraph text differs"));
+            }
+            paragraphs.remove(*position);
+        },
+        Operation::RestoreParagraph { position, text } => {
+            if *position > paragraphs.len() {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count: paragraphs.len(),
+                });
+            }
+            paragraphs.insert(*position, text.clone());
+        },
+        Operation::MoveParagraph {
+            position,
+            final_position,
+            text,
+        } => {
+            let count = paragraphs.len();
+            if *position >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count,
+                });
+            }
+            if *final_position >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *final_position,
+                    count,
+                });
+            }
+            let actual = paragraphs
+                .get(*position)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count,
+                })?;
+            if actual != text {
+                return Err(Error::StalePrecondition("moved paragraph text differs"));
+            }
+            let paragraph = paragraphs.remove(*position);
+            paragraphs.insert(*final_position, paragraph);
+        },
+        Operation::SwapParagraph {
+            first,
+            second,
+            first_text,
+            second_text,
+        } => {
+            let count = paragraphs.len();
+            if *first >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *first,
+                    count,
+                });
+            }
+            if *second >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *second,
+                    count,
+                });
+            }
+            if paragraphs.get(*first).map(String::as_str) != Some(first_text)
+                || paragraphs.get(*second).map(String::as_str) != Some(second_text)
+            {
+                return Err(Error::StalePrecondition("swapped paragraph text differs"));
+            }
+            paragraphs.swap(*first, *second);
+        },
+        Operation::Text { .. }
+        | Operation::Alignment { .. }
+        | Operation::ParagraphLayout { .. }
+        | Operation::RunFormat { .. }
+        | Operation::RunInsert { .. }
+        | Operation::Bold { .. }
+        | Operation::Italic { .. }
+        | Operation::Underline { .. }
+        | Operation::Strike { .. }
+        | Operation::DoubleStrike { .. }
+        | Operation::Hidden { .. }
+        | Operation::SmallCaps { .. }
+        | Operation::AllCaps { .. }
+        | Operation::Outline { .. }
+        | Operation::FontSize { .. }
+        | Operation::Baseline { .. }
+        | Operation::Expansion { .. }
+        | Operation::HorizontalScale { .. }
+        | Operation::Kerning { .. }
+        | Operation::InsertParagraph { .. }
+        | Operation::TableCellText { .. }
+        | Operation::HeaderFooterText { .. }
+        | Operation::AnnotationText { .. }
+        | Operation::NoteText { .. }
+        | Operation::ShapeText { .. }
+        | Operation::SmartTag { .. }
+        | Operation::MoveBookmark { .. }
+        | Operation::PicturePayload(_)
+        | Operation::PictureRemoval(_)
+        | Operation::RootTransfer { .. } => {
+            return Err(Error::unsupported_source(
+                "non-lifecycle operation entered lifecycle projection",
+            ));
+        },
+    }
+    let mut projected = paragraphs.join("\n");
+    if preserve_terminal_break
+        || (preserves_terminal_break && paragraphs.last().is_some_and(String::is_empty))
+    {
+        projected.push('\n');
+    }
+    Ok(projected)
+}
+
+fn plain_lifecycle_paragraphs(
+    source: &Package,
+    allow_terminal_break: bool,
+) -> Result<Vec<String>, Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::unsupported_source(
+            "compressed RTF needs a transport-aware rewrite",
+        ));
+    }
+    if !source_bytes.is_ascii() {
+        return Err(Error::unsupported_source(
+            "paragraph lifecycle editing refuses non-ASCII transport encodings",
+        ));
+    }
+    if !source.opaque().is_empty() {
+        return Err(Error::unsupported_source(
+            "paragraph lifecycle editing refuses unknown RTF syntax",
+        ));
+    }
+    source
+        .model()
+        .plain_body_text_editability()
+        .map_err(Error::unsupported_source)?;
+    ensure_default_body_formatting(source)?;
+    let paragraphs = source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    if paragraphs.iter().any(|paragraph| paragraph.contains('\n')) {
+        return Err(Error::unsupported_source(
+            "paragraph lifecycle editing requires an unambiguous ordinary body story",
+        ));
+    }
+    let joined = paragraphs.join("\n");
+    let text = source.text();
+    let matches_joined = text == joined
+        || (allow_terminal_break
+            && text.ends_with('\n')
+            && text.len() == joined.len().saturating_add(1)
+            && text.strip_suffix('\n') == Some(joined.as_str()));
+    if !matches_joined {
+        return Err(Error::unsupported_source(
+            "paragraph lifecycle editing requires an unambiguous ordinary body story",
+        ));
+    }
+    Ok(paragraphs)
+}
+
+fn source_alignments(source: &Package) -> Vec<Alignment> {
+    source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.format().alignment())
+        .collect()
+}
+
+fn source_paragraph_properties(source: &Package) -> Result<Vec<crate::types::Paragraph>, Error> {
+    let mut properties = Vec::new();
+    properties
+        .try_reserve_exact(source.paragraph_count())
+        .map_err(|_error| Error::Write("could not reserve paragraph properties".to_string()))?;
+    properties.extend(
+        source
+            .body()
+            .paragraphs()
+            .map(|paragraph| *paragraph.format().raw()),
+    );
+    Ok(properties)
+}
+
+fn same_layout_resources(left: &Package, right: &Package) -> bool {
+    let left = left.raw();
+    let right = right.raw();
+    left.font_table().fonts() == right.font_table().fonts()
+        && left.color_table().colors() == right.color_table().colors()
+        && (0..left.color_table().colors().len()).all(|index| {
+            left.color_table().is_automatic_at(index) == right.color_table().is_automatic_at(index)
+        })
+        && left.stylesheet() == right.stylesheet()
+        && left.info() == right.info()
+        && left.theme() == right.theme()
+        && left.data_store() == right.data_store()
+}
+
+// Canonical Unicode escapes can split one source run into several parsed
+// runs. Compare exact text and every formatting field over their shared
+// byte ranges without allocating a per-character projection.
+fn same_source_runs(left: &Package, right: &Package) -> bool {
+    let mut left_runs = left.body().runs();
+    let mut right_runs = right.body().runs();
+    let mut left_run = left_runs.next();
+    let mut right_run = right_runs.next();
+    let mut left_offset = 0;
+    let mut right_offset = 0;
+    loop {
+        match (left_run, right_run) {
+            (Some(left), Some(right)) => {
+                if left.format().raw() != right.format().raw() {
+                    return false;
+                }
+                let (Some(left_bytes), Some(right_bytes)) = (
+                    left.text().as_bytes().get(left_offset..),
+                    right.text().as_bytes().get(right_offset..),
+                ) else {
+                    return false;
+                };
+                if left_bytes.is_empty() != right_bytes.is_empty() {
+                    return false;
+                }
+                let length = left_bytes.len().min(right_bytes.len());
+                if left_bytes
+                    .get(..length)
+                    .zip(right_bytes.get(..length))
+                    .is_none_or(|(left, right)| left != right)
+                {
+                    return false;
+                }
+                left_offset += length;
+                right_offset += length;
+                if left_offset == left.text().len() {
+                    left_run = left_runs.next();
+                    left_offset = 0;
+                }
+                if right_offset == right.text().len() {
+                    right_run = right_runs.next();
+                    right_offset = 0;
+                }
+            },
+            (None, None) => return true,
+            _ => return false,
+        }
+    }
+}
+
+fn apply_layout_to_raw(
+    paragraph: &mut crate::types::Paragraph,
+    layout: ParagraphLayout,
+    fields: LayoutFields,
+) {
+    if fields.0 & LayoutFields::SPACE_BEFORE != 0 {
+        paragraph.spacing.before = layout.space_before;
+    }
+    if fields.0 & LayoutFields::SPACE_AFTER != 0 {
+        paragraph.spacing.after = layout.space_after;
+    }
+    if fields.0 & LayoutFields::LEFT_INDENT != 0 {
+        paragraph.indentation.left = layout.left_indent;
+    }
+    if fields.0 & LayoutFields::RIGHT_INDENT != 0 {
+        paragraph.indentation.right = layout.right_indent;
+    }
+    if fields.0 & LayoutFields::FIRST_LINE_INDENT != 0 {
+        paragraph.indentation.first_line = layout.first_line_indent;
+    }
+    if fields.0 & LayoutFields::KEEP_TOGETHER != 0 {
+        paragraph.keep_together = layout.keep_together;
+    }
+    if fields.0 & LayoutFields::KEEP_WITH_NEXT != 0 {
+        paragraph.keep_next = layout.keep_with_next;
+    }
+    if fields.0 & LayoutFields::PAGE_BREAK_BEFORE != 0 {
+        paragraph.page_break_before = layout.page_break_before;
+    }
+    if fields.0 & LayoutFields::FRAME != 0 {
+        paragraph.frame = layout.frame;
+    }
+}
+
+fn uniform_body_bold(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let bold = run.format().bold();
+        if value.is_some_and(|existing| existing != bold) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(bold);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+#[derive(Clone, Copy, Default)]
+struct CharacterEditabilityOptions {
+    allow_mixed_bold: bool,
+    allow_mixed_italic: bool,
+    allow_mixed_underline: bool,
+    allow_mixed_font_size: bool,
+    allow_mixed_strike: bool,
+    allow_mixed_double_strike: bool,
+    allow_mixed_hidden: bool,
+    allow_mixed_small_caps: bool,
+    allow_mixed_all_caps: bool,
+    allow_mixed_outline: bool,
+    allow_mixed_baseline: bool,
+    allow_mixed_expansion: bool,
+    allow_mixed_horizontal_scale: bool,
+    allow_mixed_kerning: bool,
+}
+
+fn plain_body_character_editability(
+    source: &Package,
+    options: CharacterEditabilityOptions,
+) -> Result<(), &'static str> {
+    source.model().local_paragraph_property_editability()?;
+    let mut paragraph_format = None;
+    let mut character_format = None;
+    for paragraph in source.body().paragraphs() {
+        let raw_paragraph = *paragraph.format().raw();
+        if paragraph_format.is_some_and(|existing| existing != raw_paragraph) {
+            return Err("the body has mixed run or paragraph formatting");
+        }
+        paragraph_format = Some(raw_paragraph);
+        for run in paragraph.runs() {
+            let mut raw_character = *run.format().raw();
+            if options.allow_mixed_bold {
+                raw_character.bold = false;
+            }
+            if options.allow_mixed_italic {
+                raw_character.italic = false;
+            }
+            if options.allow_mixed_underline {
+                raw_character.underline = UnderlineStyle::None;
+            }
+            if options.allow_mixed_font_size {
+                raw_character.font_size = crate::types::Formatting::default().font_size;
+            }
+            if options.allow_mixed_strike {
+                raw_character.strike = false;
+            }
+            if options.allow_mixed_double_strike {
+                raw_character.double_strike = false;
+            }
+            if options.allow_mixed_hidden {
+                raw_character.hidden = false;
+            }
+            if options.allow_mixed_small_caps {
+                raw_character.smallcaps = false;
+            }
+            if options.allow_mixed_all_caps {
+                raw_character.all_caps = false;
+            }
+            if options.allow_mixed_outline {
+                raw_character.outline = false;
+            }
+            if options.allow_mixed_baseline {
+                raw_character.character_positioning.baseline = CharacterBaseline::Normal;
+                raw_character.superscript = false;
+                raw_character.subscript = false;
+            }
+            if options.allow_mixed_expansion {
+                raw_character.character_positioning.expansion = CharacterExpansion::None;
+                raw_character.char_spacing = 0;
+            }
+            if options.allow_mixed_horizontal_scale {
+                raw_character.character_positioning.horizontal_scale_percent = 100;
+                raw_character.char_scale = 100;
+            }
+            if options.allow_mixed_kerning {
+                raw_character.character_positioning.kerning_half_points = 0;
+                raw_character.kerning = 0;
+            }
+            if character_format.is_some_and(|existing| existing != raw_character) {
+                return Err("the body has mixed run or paragraph formatting");
+            }
+            character_format = Some(raw_character);
+        }
+    }
+    Ok(())
+}
+
+fn span_fully_covered(span: TextSpan, selected: &[TextSpan]) -> bool {
+    let covered = selected.iter().fold(0usize, |total, selected| {
+        let start = span.start.max(selected.start);
+        let end = span.end.min(selected.end);
+        total.saturating_add(end.saturating_sub(start))
+    });
+    covered >= span.end.saturating_sub(span.start)
+}
+
+fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let bold_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Bold { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if bold_spans.is_empty() {
+        return uniform_body_bold(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &bold_spans) {
+                let value = run.format().bold();
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed bold state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Bold { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_italic(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let italic = run.format().italic();
+        if value.is_some_and(|existing| existing != italic) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(italic);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let italic_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Italic { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if italic_spans.is_empty() {
+        return uniform_body_italic(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &italic_spans) {
+                let value = run.format().italic();
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed italic state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Italic { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_underline(source: &Package) -> Result<UnderlineStyle, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let underline = run.format().underline();
+        if value.is_some_and(|existing| existing != underline) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(underline);
+    }
+    Ok(value.unwrap_or(UnderlineStyle::None))
+}
+
+fn base_underline_for_edit(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<UnderlineStyle, Error> {
+    let underline_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Underline { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if underline_spans.is_empty() {
+        return uniform_body_underline(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &underline_spans) {
+                let value = run.format().underline();
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed underline state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Underline { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(UnderlineStyle::None)
+    }))
+}
+
+fn uniform_body_font_size(source: &Package) -> Result<NonZeroU16, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let font_size = run.format().raw().font_size;
+        if value.is_some_and(|existing| existing != font_size) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(font_size);
+    }
+    Ok(value.unwrap_or_else(|| crate::types::Formatting::default().font_size))
+}
+
+fn base_font_size_for_edit(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<NonZeroU16, Error> {
+    let font_size_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::FontSize { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if font_size_spans.is_empty() {
+        return uniform_body_font_size(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &font_size_spans) {
+                let value = run.format().raw().font_size;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed font-size state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::FontSize { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or_else(|| crate::types::Formatting::default().font_size)
+    }))
+}
+
+fn validate_character_baseline(baseline: CharacterBaseline) -> Result<(), Error> {
+    match baseline {
+        CharacterBaseline::RaisedHalfPoints(value)
+        | CharacterBaseline::LoweredHalfPoints(value)
+            if value == 0 || i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS =>
+        {
+            Err(Error::unsupported_source(
+                "character baseline is out of range",
+            ))
+        },
+        CharacterBaseline::Normal
+        | CharacterBaseline::Superscript
+        | CharacterBaseline::Subscript
+        | CharacterBaseline::RaisedHalfPoints(_)
+        | CharacterBaseline::LoweredHalfPoints(_) => Ok(()),
+    }
+}
+
+fn effective_baseline(formatting: &crate::types::Formatting) -> CharacterBaseline {
+    match formatting.character_positioning.baseline {
+        CharacterBaseline::Normal if formatting.superscript => CharacterBaseline::Superscript,
+        CharacterBaseline::Normal if formatting.subscript => CharacterBaseline::Subscript,
+        baseline => baseline,
+    }
+}
+
+fn map_positioning_error(error: crate::Error, fallback: &'static str) -> Error {
+    match error {
+        crate::Error::MalformedDocument(message) => match message.as_str() {
+            "RTF legacy character spacing is out of range" => {
+                Error::unsupported_source("legacy character spacing is out of range")
+            },
+            "RTF legacy character scale is out of range" => {
+                Error::unsupported_source("legacy character scale is out of range")
+            },
+            "RTF legacy character kerning is out of range" => {
+                Error::unsupported_source("legacy character kerning is out of range")
+            },
+            _ => Error::unsupported_source(fallback),
+        },
+        _ => Error::unsupported_source(fallback),
+    }
+}
+
+fn normalize_character_expansion(
+    expansion: CharacterExpansion,
+) -> Result<CharacterExpansion, Error> {
+    crate::text::character_positioning::normalize_character_expansion(expansion)
+        .map_err(|error| map_positioning_error(error, "character expansion is out of range"))
+}
+
+fn validate_character_scale(value: u16) -> Result<(), Error> {
+    crate::text::character_positioning::validate_character_scale(value)
+        .map_err(|error| map_positioning_error(error, "character horizontal scale is out of range"))
+}
+
+fn validate_character_kerning(value: u16) -> Result<(), Error> {
+    crate::text::character_positioning::validate_character_kerning(value)
+        .map_err(|error| map_positioning_error(error, "character kerning is out of range"))
+}
+
+fn effective_character_expansion(
+    formatting: &crate::types::Formatting,
+) -> Result<CharacterExpansion, Error> {
+    crate::text::character_positioning::effective_character_expansion(
+        formatting.character_positioning.expansion,
+        formatting.char_spacing,
+    )
+    .map_err(|error| map_positioning_error(error, "character expansion is out of range"))
+}
+
+fn effective_character_scale(formatting: &crate::types::Formatting) -> Result<u16, Error> {
+    crate::text::character_positioning::effective_character_scale(
+        formatting.character_positioning.horizontal_scale_percent,
+        formatting.char_scale,
+    )
+    .map_err(|error| map_positioning_error(error, "character horizontal scale is out of range"))
+}
+
+fn effective_character_kerning(formatting: &crate::types::Formatting) -> Result<u16, Error> {
+    crate::text::character_positioning::effective_character_kerning(
+        formatting.character_positioning.kerning_half_points,
+        formatting.kerning,
+    )
+    .map_err(|error| map_positioning_error(error, "character kerning is out of range"))
+}
+
+fn base_character_property_for_edit<T: Copy + PartialEq>(
+    source: &Package,
+    selected_spans: &[TextSpan],
+    getter: fn(&crate::types::Formatting) -> Result<T, Error>,
+    fallback: T,
+    mixed_error: &'static str,
+) -> Result<T, Error> {
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, selected_spans) {
+                let value = getter(run.format().raw())?;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(mixed_error));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or(fallback))
+}
+
+fn expansion_for_span(source: &Package, span: TextSpan) -> Result<CharacterExpansion, Error> {
+    character_property_for_span(
+        source,
+        span,
+        effective_character_expansion,
+        "the selected character span has mixed expansion state",
+        "the selected character span has no character expansion",
+    )
+}
+
+fn horizontal_scale_for_span(source: &Package, span: TextSpan) -> Result<u16, Error> {
+    character_property_for_span(
+        source,
+        span,
+        effective_character_scale,
+        "the selected character span has mixed horizontal-scale state",
+        "the selected character span has no character scale",
+    )
+}
+
+fn kerning_for_span(source: &Package, span: TextSpan) -> Result<u16, Error> {
+    character_property_for_span(
+        source,
+        span,
+        effective_character_kerning,
+        "the selected character span has mixed kerning state",
+        "the selected character span has no character kerning",
+    )
+}
+
+fn character_property_for_span<T: Copy + PartialEq>(
+    source: &Package,
+    span: TextSpan,
+    getter: fn(&crate::types::Formatting) -> Result<T, Error>,
+    mixed_error: &'static str,
+    empty_error: &'static str,
+) -> Result<T, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let current = getter(run.format().raw())?;
+                if value.is_some_and(|existing| existing != current) {
+                    return Err(Error::unsupported_source(mixed_error));
+                }
+                value = Some(current);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(empty_error))
+}
+
+fn base_expansion_for_edit(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<CharacterExpansion, Error> {
+    let selected = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Expansion { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let fallback = operations
+        .iter()
+        .find_map(|operation| match operation {
+            Operation::Expansion { after, .. } => Some(*after),
+            _ => None,
+        })
+        .unwrap_or(CharacterExpansion::None);
+    base_character_property_for_edit(
+        source,
+        &selected,
+        effective_character_expansion,
+        fallback,
+        "unselected body text has mixed expansion state",
+    )
+}
+
+fn base_horizontal_scale_for_edit(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<u16, Error> {
+    let selected = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::HorizontalScale { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let fallback = operations
+        .iter()
+        .find_map(|operation| match operation {
+            Operation::HorizontalScale { after, .. } => Some(*after),
+            _ => None,
+        })
+        .unwrap_or(100);
+    base_character_property_for_edit(
+        source,
+        &selected,
+        effective_character_scale,
+        fallback,
+        "unselected body text has mixed horizontal-scale state",
+    )
+}
+
+fn base_kerning_for_edit(source: &Package, operations: &[Operation]) -> Result<u16, Error> {
+    let selected = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Kerning { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let fallback = operations
+        .iter()
+        .find_map(|operation| match operation {
+            Operation::Kerning { after, .. } => Some(*after),
+            _ => None,
+        })
+        .unwrap_or(0);
+    base_character_property_for_edit(
+        source,
+        &selected,
+        effective_character_kerning,
+        fallback,
+        "unselected body text has mixed kerning state",
+    )
+}
+
+fn uniform_body_baseline(source: &Package) -> Result<CharacterBaseline, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let baseline = effective_baseline(run.format().raw());
+        if value.is_some_and(|existing| existing != baseline) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(baseline);
+    }
+    Ok(value.unwrap_or(CharacterBaseline::Normal))
+}
+
+fn base_baseline_for_edit(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<CharacterBaseline, Error> {
+    let baseline_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Baseline { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if baseline_spans.is_empty() {
+        return uniform_body_baseline(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &baseline_spans) {
+                let value = effective_baseline(run.format().raw());
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed baseline state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Baseline { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(CharacterBaseline::Normal)
+    }))
+}
+
+fn uniform_body_strike(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let strike = run.format().raw().strike;
+        if value.is_some_and(|existing| existing != strike) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(strike);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn uniform_body_double_strike(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let double_strike = run.format().raw().double_strike;
+        if value.is_some_and(|existing| existing != double_strike) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(double_strike);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let strike_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Strike { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if strike_spans.is_empty() {
+        return uniform_body_strike(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &strike_spans) {
+                let value = run.format().raw().strike;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed strike state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Strike { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let double_strike_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::DoubleStrike { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if double_strike_spans.is_empty() {
+        return uniform_body_double_strike(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &double_strike_spans) {
+                let value = run.format().raw().double_strike;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed double-strike state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::DoubleStrike { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_hidden(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let hidden = run.format().raw().hidden;
+        if value.is_some_and(|existing| existing != hidden) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(hidden);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let hidden_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Hidden { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if hidden_spans.is_empty() {
+        return uniform_body_hidden(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &hidden_spans) {
+                let value = run.format().raw().hidden;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed hidden state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Hidden { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_small_caps(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let small_caps = run.format().raw().smallcaps;
+        if value.is_some_and(|existing| existing != small_caps) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(small_caps);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let small_caps_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::SmallCaps { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if small_caps_spans.is_empty() {
+        return uniform_body_small_caps(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &small_caps_spans) {
+                let value = run.format().raw().smallcaps;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed small-caps state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::SmallCaps { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::AllCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_all_caps(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let all_caps = run.format().raw().all_caps;
+        if value.is_some_and(|existing| existing != all_caps) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(all_caps);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    let all_caps_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::AllCaps { span, .. } => Some(*span),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::InsertParagraph { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect::<Vec<_>>();
+    if all_caps_spans.is_empty() {
+        return uniform_body_all_caps(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &all_caps_spans) {
+                let value = run.format().raw().all_caps;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed all-caps state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::AllCaps { after, .. } => Some(*after),
+                Operation::Text { .. }
+                | Operation::Alignment { .. }
+                | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
+                | Operation::Bold { .. }
+                | Operation::Italic { .. }
+                | Operation::Underline { .. }
+                | Operation::Strike { .. }
+                | Operation::DoubleStrike { .. }
+                | Operation::Hidden { .. }
+                | Operation::SmallCaps { .. }
+                | Operation::Outline { .. }
+                | Operation::FontSize { .. }
+                | Operation::Baseline { .. }
+                | Operation::Expansion { .. }
+                | Operation::HorizontalScale { .. }
+                | Operation::Kerning { .. }
+                | Operation::InsertParagraph { .. }
+                | Operation::RemoveParagraph { .. }
+                | Operation::RestoreParagraph { .. }
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
+                | Operation::TableCellText { .. }
+                | Operation::HeaderFooterText { .. }
+                | Operation::AnnotationText { .. }
+                | Operation::NoteText { .. }
+                | Operation::ShapeText { .. }
+                | Operation::PicturePayload(_)
+                | Operation::PictureRemoval(_)
+                | Operation::SmartTag { .. }
+                | Operation::MoveBookmark { .. }
+                | Operation::RootTransfer { .. } => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn uniform_body_outline(source: &Package) -> Result<bool, Error> {
+    let mut value = None;
+    for run in source.body().runs() {
+        let outline = run.format().raw().outline;
+        if value.is_some_and(|existing| existing != outline) {
+            return Err(Error::unsupported_source(
+                "the body has mixed character formatting",
+            ));
+        }
+        value = Some(outline);
+    }
+    Ok(value.unwrap_or(false))
+}
+
+fn operation_changes_semantics(operation: &Operation) -> bool {
+    match operation {
+        Operation::Text { before, after, .. }
+        | Operation::TableCellText { before, after, .. }
+        | Operation::HeaderFooterText { before, after, .. }
+        | Operation::AnnotationText { before, after, .. }
+        | Operation::NoteText { before, after, .. }
+        | Operation::ShapeText { before, after, .. } => before != after,
+        Operation::Alignment { before, after, .. } => before != after,
+        Operation::ParagraphLayout { before, after, .. } => before != after,
+        Operation::RunFormat {
+            before,
+            after,
+            text_before,
+            text_after,
+            ..
+        } => before != after || text_before != text_after,
+        Operation::Bold { before, after, .. }
+        | Operation::Italic { before, after, .. }
+        | Operation::Strike { before, after, .. }
+        | Operation::DoubleStrike { before, after, .. }
+        | Operation::Hidden { before, after, .. }
+        | Operation::SmallCaps { before, after, .. }
+        | Operation::AllCaps { before, after, .. }
+        | Operation::Outline { before, after, .. } => before != after,
+        Operation::Underline { before, after, .. } => before != after,
+        Operation::FontSize { before, after, .. } => before != after,
+        Operation::Baseline { before, after, .. } => before != after,
+        Operation::Expansion { before, after, .. } => before != after,
+        Operation::HorizontalScale { before, after, .. } => before != after,
+        Operation::Kerning { before, after, .. } => before != after,
+        Operation::MoveParagraph {
+            position,
+            final_position,
+            ..
+        } => position != final_position,
+        Operation::SwapParagraph { first, second, .. } => first != second,
+        Operation::SmartTag { before, after, .. } => before != after,
+        Operation::MoveBookmark { before, after, .. } => before != after,
+        Operation::RootTransfer { before, after, .. } => before != after,
+        Operation::RunInsert { .. } => true,
+        Operation::InsertParagraph { .. }
+        | Operation::RemoveParagraph { .. }
+        | Operation::RestoreParagraph { .. }
+        | Operation::PicturePayload(_)
+        | Operation::PictureRemoval(_) => true,
+    }
+}
+
+fn base_outline_for_edit(source: &Package, operations: &[Operation]) -> Result<bool, Error> {
+    if !operations.iter().any(operation_changes_semantics) {
+        return Ok(source
+            .body()
+            .runs()
+            .next()
+            .is_some_and(|run| run.format().raw().outline));
+    }
+    let outline_spans = operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::Outline { span, .. } => Some(*span),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    if outline_spans.is_empty() {
+        return uniform_body_outline(source);
+    }
+    let mut body_position = 0usize;
+    let mut base = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            if !span_fully_covered(run_span, &outline_spans) {
+                let value = run.format().raw().outline;
+                if base.is_some_and(|existing| existing != value) {
+                    return Err(Error::unsupported_source(
+                        "unselected body text has mixed outline state",
+                    ));
+                }
+                base = Some(value);
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    Ok(base.unwrap_or_else(|| {
+        operations
+            .iter()
+            .find_map(|operation| match operation {
+                Operation::Outline { after, .. } => Some(*after),
+                _ => None,
+            })
+            .unwrap_or(false)
+    }))
+}
+
+fn bold_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let bold = run.format().bold();
+                if value.is_some_and(|existing| existing != bold) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed bold state",
+                    ));
+                }
+                value = Some(bold);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn italic_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let italic = run.format().italic();
+                if value.is_some_and(|existing| existing != italic) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed italic state",
+                    ));
+                }
+                value = Some(italic);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn underline_for_span(source: &Package, span: TextSpan) -> Result<UnderlineStyle, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let underline = run.format().underline();
+                if value.is_some_and(|existing| existing != underline) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed underline state",
+                    ));
+                }
+                value = Some(underline);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn strike_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let strike = run.format().raw().strike;
+                if value.is_some_and(|existing| existing != strike) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed strike state",
+                    ));
+                }
+                value = Some(strike);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn double_strike_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let double_strike = run.format().raw().double_strike;
+                if value.is_some_and(|existing| existing != double_strike) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed double-strike state",
+                    ));
+                }
+                value = Some(double_strike);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn hidden_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let hidden = run.format().raw().hidden;
+                if value.is_some_and(|existing| existing != hidden) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed hidden state",
+                    ));
+                }
+                value = Some(hidden);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn small_caps_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let small_caps = run.format().raw().smallcaps;
+                if value.is_some_and(|existing| existing != small_caps) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed small-caps state",
+                    ));
+                }
+                value = Some(small_caps);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn font_size_for_span(source: &Package, span: TextSpan) -> Result<NonZeroU16, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut value = None;
+    let mut covered = 0usize;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            let start = run_span.start.max(span.start);
+            let end = run_span.end.min(span.end);
+            if start < end {
+                let font_size = run.format().raw().font_size;
+                if value.is_some_and(|existing| existing != font_size) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed font-size state",
+                    ));
+                }
+                value = Some(font_size);
+                covered = covered.saturating_add(end.saturating_sub(start));
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected span is not entirely ordinary body text",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected span has no character formatting",
+    ))
+}
+
+fn baseline_for_span(source: &Package, span: TextSpan) -> Result<CharacterBaseline, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut value = None;
+    let mut covered = 0usize;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_span = TextSpan {
+                start: run_position,
+                end: run_position.saturating_add(run.text().len()),
+            };
+            let start = run_span.start.max(span.start);
+            let end = run_span.end.min(span.end);
+            if start < end {
+                let baseline = effective_baseline(run.format().raw());
+                if value.is_some_and(|existing| existing != baseline) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed baseline state",
+                    ));
+                }
+                value = Some(baseline);
+                covered = covered.saturating_add(end.saturating_sub(start));
+            }
+            run_position = run_span.end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected span is not entirely ordinary body text",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected span has no character formatting",
+    ))
+}
+
+fn all_caps_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let all_caps = run.format().raw().all_caps;
+                if value.is_some_and(|existing| existing != all_caps) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed all-caps state",
+                    ));
+                }
+                value = Some(all_caps);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn outline_for_span(source: &Package, span: TextSpan) -> Result<bool, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let outline = run.format().raw().outline;
+                if value.is_some_and(|existing| existing != outline) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed outline state",
+                    ));
+                }
+                value = Some(outline);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn formatting_for_span(
+    source: &Package,
+    span: TextSpan,
+) -> Result<crate::types::Formatting, Error> {
+    validate_span(source.text(), span)?;
+    let mut body_position = 0usize;
+    let mut covered = 0usize;
+    let mut value = None;
+    for paragraph in source.body().paragraphs() {
+        let mut run_position = body_position;
+        for run in paragraph.runs() {
+            let run_end = run_position.saturating_add(run.text().len());
+            let start = run_position.max(span.start);
+            let end = run_end.min(span.end);
+            if start < end {
+                let formatting = *run.format().raw();
+                if value.is_some_and(|existing| existing != formatting) {
+                    return Err(Error::unsupported_source(
+                        "the selected character span has mixed formatting",
+                    ));
+                }
+                value = Some(formatting);
+                covered = covered.saturating_add(end - start);
+            }
+            run_position = run_end;
+        }
+        body_position = body_position
+            .saturating_add(paragraph.len())
+            .saturating_add(1);
+    }
+    if covered != span.end.saturating_sub(span.start) {
+        return Err(Error::unsupported_source(
+            "the selected character span crosses non-text inline content",
+        ));
+    }
+    value.ok_or(Error::unsupported_source(
+        "the selected character span has no text run",
+    ))
+}
+
+fn project_base_span(span: TextSpan, operations: &[Operation]) -> Result<TextSpan, Error> {
+    let changes = base_position_changes(None, operations)?;
+    Ok(TextSpan {
+        start: project_base_position_from_changes(span.start, &changes)?,
+        end: project_base_position_from_changes(span.end, &changes)?,
+    })
+}
+
+fn ordinary_run_text_spans(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<Vec<(TextSpan, usize)>, Error> {
+    let mut requested = Vec::new();
+    requested
+        .try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve run-text selectors".to_string()))?;
+    for operation in operations {
+        if let Operation::RunFormat {
+            paragraph,
+            run,
+            text_before: Some(_),
+            text_after: Some(after),
+            ..
+        } = operation
+        {
+            requested.push((*paragraph, *run, after.len()));
+        }
+    }
+    if requested
+        .windows(2)
+        .any(|pair| matches!(pair, [left, right] if (right.0, right.1) <= (left.0, left.1)))
+    {
+        return Err(Error::unsupported_source(
+            "run-text operations are not source ordered",
+        ));
+    }
+    let mut spans = Vec::new();
+    spans
+        .try_reserve_exact(requested.len())
+        .map_err(|_error| Error::Write("could not reserve run-text spans".to_string()))?;
+    if requested.is_empty() {
+        return Ok(spans);
+    }
+    let preserve_terminal_empty = terminal_paragraph_becomes_empty(source, operations);
+    let terminal_paragraph = source.paragraph_count().saturating_sub(1);
+    let terminal_run = source
+        .body()
+        .paragraphs()
+        .nth(terminal_paragraph)
+        .map_or(0, |paragraph| paragraph.runs().count().saturating_sub(1));
+    let mut body_position = 0usize;
+    let mut requested_index = 0usize;
+    for (paragraph_index, paragraph) in source.body().paragraphs().enumerate() {
+        let paragraph_end =
+            body_position
+                .checked_add(paragraph.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                })?;
+        let mut run_start = body_position;
+        for (run_index, run) in paragraph.runs().enumerate() {
+            let run_end = run_start
+                .checked_add(run.text().len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                })?;
+            while requested
+                .get(requested_index)
+                .is_some_and(|(paragraph, run, _)| {
+                    *paragraph == paragraph_index && *run == run_index
+                })
+            {
+                let (requested_paragraph, requested_run, replacement_len) = requested
+                    .get(requested_index)
+                    .copied()
+                    .ok_or(Error::unsupported_source(
+                        "run-text selector cursor disappeared",
+                    ))?;
+                let replacement_len = replacement_len.saturating_add(usize::from(
+                    preserve_terminal_empty
+                        && replacement_len == 0
+                        && requested_paragraph == terminal_paragraph
+                        && requested_run == terminal_run,
+                ));
+                spans.push((
+                    TextSpan {
+                        start: run_start,
+                        end: run_end,
+                    },
+                    replacement_len,
+                ));
+                requested_index = requested_index.saturating_add(1);
+            }
+            run_start = run_end;
+        }
+        let terminated = source.text().as_bytes().get(paragraph_end) == Some(&b'\n');
+        body_position =
+            paragraph_end
+                .checked_add(usize::from(terminated))
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                })?;
+    }
+    if let Some((paragraph, run, _)) = requested.get(requested_index).copied() {
+        if paragraph >= source.paragraph_count() {
+            return Err(Error::ParagraphOutOfRange {
+                position: paragraph,
+                count: source.paragraph_count(),
+            });
+        }
+        let count = source
+            .body()
+            .paragraphs()
+            .nth(paragraph)
+            .map_or(0, |value| value.runs().count());
+        return Err(Error::RunOutOfRange {
+            paragraph,
+            run,
+            count,
+        });
+    }
+    Ok(spans)
+}
+
+#[derive(Clone, Copy)]
+struct BasePositionChange {
+    span: TextSpan,
+    source_end: usize,
+    projected_end: usize,
+    shift_start: bool,
+}
+
+/// Collect the semantic body replacements which move positioned body
+/// metadata.  Run-text operations address a native run rather than storing a
+/// [`TextSpan`], so their source span is derived from the immutable run axis
+/// when the caller supplies the source package.
+fn base_position_changes(
+    source: Option<&Package>,
+    operations: &[Operation],
+) -> Result<Vec<BasePositionChange>, Error> {
+    let run_text_spans = source
+        .map(|source| ordinary_run_text_spans(source, operations))
+        .transpose()?
+        .unwrap_or_default();
+    let mut run_text_index = 0usize;
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve body position changes".to_string()))?;
+    for operation in operations {
+        match operation {
+            Operation::Text { span, after, .. } => raw.push((*span, after.len(), false)),
+            Operation::InsertParagraph { span, text, .. } => {
+                raw.push((*span, text.len().saturating_add(1), false));
+            },
+            Operation::RunFormat {
+                text_before: Some(_),
+                text_after: Some(_),
+                ..
+            } => {
+                if source.is_some() {
+                    let (span, replacement_len) =
+                        run_text_spans.get(run_text_index).copied().ok_or(
+                            Error::unsupported_source("run-text source span cursor disappeared"),
+                        )?;
+                    raw.push((span, replacement_len, false));
+                    run_text_index = run_text_index.saturating_add(1);
+                }
+            },
+            Operation::RunInsert { span, text, .. } => {
+                raw.push((*span, text.len(), true));
+            },
+            Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::RemoveParagraph { .. }
+            | Operation::RestoreParagraph { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::PicturePayload(_)
+            | Operation::PictureRemoval(_)
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::RootTransfer { .. } => {},
+        }
+    }
+    raw.sort_unstable_by_key(|(span, _, _)| (span.start, span.end));
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(raw.len())
+        .map_err(|_error| Error::Write("could not reserve body position changes".to_string()))?;
+    let mut source_cursor = 0usize;
+    let mut projected_cursor = 0usize;
+    for (span, replacement_len, shift_start) in raw {
+        projected_cursor = projected_cursor
+            .checked_add(span.start.saturating_sub(source_cursor))
+            .and_then(|value| value.checked_add(replacement_len))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: usize::MAX,
+            })?;
+        source_cursor = span.end;
+        changes.push(BasePositionChange {
+            span,
+            source_end: source_cursor,
+            projected_end: projected_cursor,
+            shift_start,
+        });
+    }
+    Ok(changes)
+}
+
+fn project_base_position_from_changes(
+    position: usize,
+    changes: &[BasePositionChange],
+) -> Result<usize, Error> {
+    // The strict comparison preserves the existing boundary rule: an opaque
+    // node at a replacement's start remains before inserted text, while a
+    // node after the replaced span follows the new text.  Binary search keeps
+    // validation bounded when a source carries many opaque anchors and run
+    // replacements.
+    let change_count = changes.partition_point(|change| {
+        change.span.start < position || (change.shift_start && change.span.start == position)
+    });
+    let (source_cursor, projected_cursor) = if change_count == 0 {
+        (0, 0)
+    } else {
+        let change =
+            changes
+                .get(change_count.saturating_sub(1))
+                .ok_or(Error::unsupported_source(
+                    "body position change cursor disappeared",
+                ))?;
+        (change.source_end, change.projected_end)
+    };
+    projected_cursor
+        .checked_add(position.saturating_sub(source_cursor))
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: usize::MAX,
+        })
+}
+
+#[inline(never)]
+fn retained_or_located_body_source_span(
+    source: &Package,
+    source_bytes: &[u8],
+) -> Result<Range<usize>, Error> {
+    match source.model().ordinary_body_source_span() {
+        Some(span)
+            if source_bytes.is_ascii()
+                && span.start <= span.end
+                && span.end <= source_bytes.len() =>
+        {
+            Ok(span)
+        },
+        Some(_) | None => ordinary_body_source_span(source_bytes, source.text(), source.options()),
+    }
+}
+
+fn ordinary_body_source_span(
+    source: &[u8],
+    semantic_text: &str,
+    options: crate::OpenOptions,
+) -> Result<Range<usize>, Error> {
+    let lexical = if source.is_ascii() {
+        std::str::from_utf8(source)
+            .map(str::to_owned)
+            .map_err(|error| Error::Write(error.to_string()))?
+    } else {
+        source.iter().map(|byte| char::from(*byte)).collect()
+    };
+    let arena = Bump::new();
+    let mut lexer =
+        crate::lexer::Lexer::new_with_limits(&lexical, &arena, options.source_limits_value())
+            .for_document(options.leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut end = None;
+    for (token, span) in tokens.iter().zip(&spans) {
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                if depth == 1 && start.is_some() {
+                    return Err(Error::unsupported_source(
+                        "the body source is not one contiguous root-level span",
+                    ));
+                }
+                depth = depth.checked_add(1).ok_or(Error::unsupported_source(
+                    "RTF group nesting overflowed while locating the body",
+                ))?;
+            },
+            crate::lexer::Token::CloseBrace => {
+                if depth == 1 {
+                    end = Some(span.start);
+                    break;
+                }
+                depth = depth.checked_sub(1).ok_or(Error::unsupported_source(
+                    "RTF group nesting underflowed while locating the body",
+                ))?;
+            },
+            crate::lexer::Token::Text(text)
+                if depth == 1
+                    && start.is_none()
+                    && text.bytes().any(|b| !matches!(b, b'\r' | b'\n')) =>
+            {
+                start = Some(span.start);
+            },
+            crate::lexer::Token::Binary(_) if start.is_some() => {
+                return Err(Error::unsupported_source(
+                    "the body source contains binary data",
+                ));
+            },
+            crate::lexer::Token::Control(_)
+            | crate::lexer::Token::Text(_)
+            | crate::lexer::Token::Binary(_) => {},
+        }
+    }
+    let root_end = end.ok_or(Error::unsupported_source(
+        "RTF root group has no closing boundary",
+    ))?;
+    match start {
+        Some(start_offset) => Ok(start_offset..root_end),
+        None if semantic_text.is_empty() => Ok(root_end..root_end),
+        None => Err(Error::unsupported_source(
+            "the body has no literal source span for a lossless replacement",
+        )),
+    }
+}
+
+fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
+    let mut search_start = body_span.start;
+    let mut offsets = Vec::new();
+    for node in source
+        .opaque()
+        .iter()
+        .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
+    {
+        let node_source = node.source();
+        if node_source.is_empty() {
+            return Err(Error::unsupported_source(
+                "an empty body-anchored opaque node cannot be located",
+            ));
+        }
+        let haystack =
+            source_bytes
+                .get(search_start..body_span.end)
+                .ok_or(Error::unsupported_source(
+                    "body opaque search range is outside the source",
+                ))?;
+        let relative = haystack
+            .windows(node_source.len())
+            .position(|window| window == node_source)
+            .ok_or(Error::unsupported_source(
+                "body-anchored opaque syntax cannot be located in source",
+            ))?;
+        let offset = search_start.saturating_add(relative);
+        offsets.push(offset);
+        search_start = offset.saturating_add(node_source.len());
+    }
+    Ok(offsets)
+}
+
+#[derive(Clone, Copy)]
+struct RunInsertionPositionChange {
+    semantic_position: usize,
+    source_offset: usize,
+    prefix_inserted_len: usize,
+}
+
+fn run_insertion_position_changes(
+    operations: &[Operation],
+    source_offsets: &[usize],
+) -> Result<Vec<RunInsertionPositionChange>, Error> {
+    if operations.len() != source_offsets.len() {
+        return Err(Error::unsupported_source(
+            "run-insertion source offsets do not cover every operation",
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve opaque insertion changes".to_string()))?;
+    for (operation, source_offset) in operations.iter().zip(source_offsets) {
+        let Operation::RunInsert { span, text, .. } = operation else {
+            return Err(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ));
+        };
+        changes.push(RunInsertionPositionChange {
+            semantic_position: span.start,
+            source_offset: *source_offset,
+            prefix_inserted_len: text.len(),
+        });
+    }
+    changes.sort_by_key(|change| (change.semantic_position, change.source_offset));
+    let mut prefix_inserted_len = 0usize;
+    for change in &mut changes {
+        prefix_inserted_len = prefix_inserted_len
+            .checked_add(change.prefix_inserted_len)
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: usize::MAX,
+            })?;
+        change.prefix_inserted_len = prefix_inserted_len;
+    }
+    Ok(changes)
+}
+
+fn project_run_insertion_opaque_position(
+    source_position: usize,
+    node_source_offset: usize,
+    changes: &[RunInsertionPositionChange],
+) -> Result<usize, Error> {
+    let change_count = changes.partition_point(|change| {
+        change.semantic_position < source_position
+            || (change.semantic_position == source_position
+                && change.source_offset <= node_source_offset)
+    });
+    let prefix_inserted_len = change_count
+        .checked_sub(1)
+        .and_then(|index| changes.get(index))
+        .map_or(0, |change| change.prefix_inserted_len);
+    source_position
+        .checked_add(prefix_inserted_len)
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: usize::MAX,
+        })
+}
+
+fn validate_opaque_preservation(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_nodes = source
+        .opaque()
+        .iter()
+        .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
+        .collect::<Vec<_>>();
+    let target_nodes = target
+        .opaque()
+        .iter()
+        .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
+        .collect::<Vec<_>>();
+    if source_nodes.len() != target_nodes.len() {
+        return Err(Error::unsupported_source(
+            "body-anchored opaque syntax changed during publication",
+        ));
+    }
+    if source_nodes.is_empty() {
+        return Ok(());
+    }
+    let run_insert_source_offsets = operations
+        .iter()
+        .any(|operation| matches!(operation, Operation::RunInsert { .. }))
+        .then(|| ordinary_run_insertion_source_offsets(source, operations))
+        .transpose()?;
+    let opaque_source_offsets = run_insert_source_offsets
+        .as_ref()
+        .map(|_| body_opaque_source_offsets(source))
+        .transpose()?;
+    let insertion_position_changes = run_insert_source_offsets
+        .as_ref()
+        .map(|source_offsets| run_insertion_position_changes(operations, source_offsets))
+        .transpose()?;
+    let position_changes = run_insert_source_offsets
+        .is_none()
+        .then(|| base_position_changes(Some(source), operations))
+        .transpose()?;
+    for (node_index, (source_node, target_node)) in
+        source_nodes.iter().zip(&target_nodes).enumerate()
+    {
+        let crate::opaque::Anchor::Body(source_position) = source_node.anchor() else {
+            return Err(Error::unsupported_source(
+                "source opaque anchor is not a body position",
+            ));
+        };
+        let crate::opaque::Anchor::Body(target_position) = target_node.anchor() else {
+            return Err(Error::unsupported_source(
+                "target opaque anchor is not a body position",
+            ));
+        };
+        let projected_position = if let (Some(_source_offsets), Some(opaque_offsets)) =
+            (&run_insert_source_offsets, &opaque_source_offsets)
+        {
+            let node_source_offset =
+                *opaque_offsets
+                    .get(node_index)
+                    .ok_or(Error::unsupported_source(
+                        "body opaque source cursor disappeared",
+                    ))?;
+            let changes = insertion_position_changes
+                .as_ref()
+                .ok_or(Error::unsupported_source(
+                    "run-insertion position changes are unavailable",
+                ))?;
+            project_run_insertion_opaque_position(source_position, node_source_offset, changes)?
+        } else {
+            let changes = position_changes.as_ref().ok_or(Error::unsupported_source(
+                "body position changes are unavailable",
+            ))?;
+            project_base_position_from_changes(source_position, changes)?
+        };
+        if target_position != projected_position
+            || target_node.kind() != source_node.kind()
+            || target_node.source() != source_node.source()
+        {
+            return Err(Error::unsupported_source(
+                "body-anchored opaque syntax changed during publication",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    match Writer::new(&mut output).write_text(text) {
+        Ok(()) => Ok(output.into_inner()),
+        Err(error) => Err(output.map_io_error(error)),
+    }
+}
+
+fn encoded_unicode_run_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    for unit in text.encode_utf16() {
+        output.append(br"\u")?;
+        let signed = unit as i16;
+        output.append(signed.to_string().as_bytes())?;
+        output.append(b" ")?;
+    }
+    Ok(output.into_inner())
+}
+
+#[derive(Clone, Copy)]
+enum CharacterPropertyChange {
+    Bold(bool),
+    Italic(bool),
+    Underline(UnderlineStyle),
+    FontSize(NonZeroU16),
+    Baseline(CharacterBaseline),
+    Expansion(CharacterExpansion),
+    HorizontalScale(u16),
+    Kerning(u16),
+    Strike(bool),
+    DoubleStrike(bool),
+    Hidden(bool),
+    SmallCaps(bool),
+    AllCaps(bool),
+    Outline(bool),
+}
+
+struct CharacterPropertyOverlays<'a> {
+    base_bold: bool,
+    bold_changes: &'a [(TextSpan, bool)],
+    base_italic: bool,
+    italic_changes: &'a [(TextSpan, bool)],
+    base_underline: UnderlineStyle,
+    underline_changes: &'a [(TextSpan, UnderlineStyle)],
+    base_font_size: NonZeroU16,
+    font_size_changes: &'a [(TextSpan, NonZeroU16)],
+    base_expansion: CharacterExpansion,
+    expansion_changes: &'a [(TextSpan, CharacterExpansion)],
+    base_horizontal_scale: u16,
+    horizontal_scale_changes: &'a [(TextSpan, u16)],
+    base_kerning: u16,
+    kerning_changes: &'a [(TextSpan, u16)],
+    base_baseline: CharacterBaseline,
+    baseline_changes: &'a [(TextSpan, CharacterBaseline)],
+    base_strike: bool,
+    strike_changes: &'a [(TextSpan, bool)],
+    base_double_strike: bool,
+    double_strike_changes: &'a [(TextSpan, bool)],
+    base_hidden: bool,
+    hidden_changes: &'a [(TextSpan, bool)],
+    base_small_caps: bool,
+    small_caps_changes: &'a [(TextSpan, bool)],
+    base_all_caps: bool,
+    all_caps_changes: &'a [(TextSpan, bool)],
+    base_outline: bool,
+    outline_changes: &'a [(TextSpan, bool)],
+}
+
+fn encoded_body_with_properties(
+    text: &str,
+    alignments: &[Alignment],
+    baseline: crate::types::Formatting,
+    overlays: CharacterPropertyOverlays<'_>,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let encoded_text_length = encoded_body_len(text)?;
+    if encoded_text_length > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: encoded_text_length,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    let mut paragraph = 0usize;
+    let mut paragraph_start = 0usize;
+    loop {
+        let paragraph_end = text
+            .get(paragraph_start..)
+            .and_then(|remainder| remainder.find('\n'))
+            .map_or(text.len(), |offset| paragraph_start.saturating_add(offset));
+        if paragraph_start == text.len() && text.ends_with('\n') {
+            break;
+        }
+        let alignment = alignments
+            .get(paragraph)
+            .copied()
+            .ok_or(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ))?;
+        output.append(br"\plain ")?;
+        let result = Writer::new(&mut output).write_formatting(&baseline);
+        if let Err(error) = result {
+            return Err(output.map_io_error(error));
+        }
+        write_alignment(&mut output, Some(alignment))?;
+        let mut cursor = paragraph_start;
+        let mut paragraph_changes = overlays
+            .bold_changes
+            .iter()
+            .copied()
+            .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+            .map(|(span, value)| (span, CharacterPropertyChange::Bold(value)))
+            .chain(
+                overlays
+                    .italic_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Italic(value))),
+            )
+            .chain(
+                overlays
+                    .underline_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Underline(value))),
+            )
+            .chain(
+                overlays
+                    .font_size_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::FontSize(value))),
+            )
+            .chain(
+                overlays
+                    .expansion_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Expansion(value))),
+            )
+            .chain(
+                overlays
+                    .horizontal_scale_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::HorizontalScale(value))),
+            )
+            .chain(
+                overlays
+                    .kerning_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Kerning(value))),
+            )
+            .chain(
+                overlays
+                    .baseline_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Baseline(value))),
+            )
+            .chain(
+                overlays
+                    .strike_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Strike(value))),
+            )
+            .chain(
+                overlays
+                    .double_strike_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::DoubleStrike(value))),
+            )
+            .chain(
+                overlays
+                    .hidden_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Hidden(value))),
+            )
+            .chain(
+                overlays
+                    .small_caps_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::SmallCaps(value))),
+            )
+            .chain(
+                overlays
+                    .all_caps_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::AllCaps(value))),
+            )
+            .chain(
+                overlays
+                    .outline_changes
+                    .iter()
+                    .copied()
+                    .filter(|(span, _)| span.start >= paragraph_start && span.end <= paragraph_end)
+                    .map(|(span, value)| (span, CharacterPropertyChange::Outline(value))),
+            )
+            .collect::<Vec<_>>();
+        paragraph_changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+        for (span, change) in paragraph_changes {
+            write_encoded_fragment(&mut output, text, cursor..span.start)?;
+            match change {
+                CharacterPropertyChange::Bold(value) => {
+                    write_bold(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                },
+                CharacterPropertyChange::Italic(value) => {
+                    // The parser flushes body text at bold controls but not at
+                    // italic controls. Reasserting the current bold state around
+                    // this italic fragment creates a run boundary without
+                    // changing the effective formatting or source envelope.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_italic(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_italic(&mut output, overlays.base_italic)?;
+                },
+                CharacterPropertyChange::Underline(value) => {
+                    // Underline controls do not by themselves flush all parser
+                    // run state. Bold controls force the same safe boundary as
+                    // the existing italic property path.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_underline(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_underline(&mut output, overlays.base_underline)?;
+                },
+                CharacterPropertyChange::FontSize(value) => {
+                    // Font-size controls are local character state. Reassert
+                    // bold around the fragment to force a stable run boundary
+                    // while preserving associated font size and every other
+                    // baseline facet.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_font_size(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_font_size(&mut output, overlays.base_font_size)?;
+                },
+                CharacterPropertyChange::Expansion(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_expansion(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_expansion(&mut output, overlays.base_expansion)?;
+                },
+                CharacterPropertyChange::HorizontalScale(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_horizontal_scale(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_horizontal_scale(&mut output, overlays.base_horizontal_scale)?;
+                },
+                CharacterPropertyChange::Kerning(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_kerning(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_kerning(&mut output, overlays.base_kerning)?;
+                },
+                CharacterPropertyChange::Baseline(value) => {
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_baseline(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_baseline(&mut output, overlays.base_baseline)?;
+                },
+                CharacterPropertyChange::Strike(value) => {
+                    // Strike controls do not by themselves flush all parser
+                    // run state. Bold controls force the same safe boundary
+                    // while the baseline's double-strike facet remains intact.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_strike(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_strike(&mut output, overlays.base_strike)?;
+                },
+                CharacterPropertyChange::DoubleStrike(value) => {
+                    // Double-strike controls are local character state. Keep
+                    // single strike untouched and reassert bold for a stable
+                    // run boundary around the selected fragment.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_double_strike(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_double_strike(&mut output, overlays.base_double_strike)?;
+                },
+                CharacterPropertyChange::Hidden(value) => {
+                    // Hidden controls are local character state. Reasserting
+                    // bold around the fragment forces the same run boundary
+                    // used by the other character-property encoders.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_hidden(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_hidden(&mut output, overlays.base_hidden)?;
+                },
+                CharacterPropertyChange::SmallCaps(value) => {
+                    // Small-caps controls are local character state. Reassert
+                    // bold around the fragment to force a stable run boundary
+                    // without changing all-caps or any other facet.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_small_caps(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_small_caps(&mut output, overlays.base_small_caps)?;
+                },
+                CharacterPropertyChange::AllCaps(value) => {
+                    // All-caps controls are local character state. Reassert
+                    // bold around the fragment to force a stable run boundary
+                    // without changing small-caps or any other facet.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_all_caps(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_all_caps(&mut output, overlays.base_all_caps)?;
+                },
+                CharacterPropertyChange::Outline(value) => {
+                    // Outline controls are local character state. Reassert
+                    // bold around the fragment to force a stable run boundary
+                    // while preserving every unrelated character facet.
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_outline(&mut output, value)?;
+                    write_encoded_fragment(&mut output, text, span.start..span.end)?;
+                    write_bold(&mut output, overlays.base_bold)?;
+                    write_outline(&mut output, overlays.base_outline)?;
+                },
+            }
+            cursor = span.end;
+        }
+        write_encoded_fragment(&mut output, text, cursor..paragraph_end)?;
+        paragraph = paragraph.saturating_add(1);
+        if paragraph_end == text.len() {
+            break;
+        }
+        output.append(br"\par ")?;
+        paragraph_start = paragraph_end.saturating_add(1);
+    }
+    if paragraph != alignments.len() {
+        return Err(Error::unsupported_operation(
+            "paragraph-structure and property changes cannot compose safely",
+        ));
+    }
+    Ok(output.into_inner())
+}
+
+fn encoded_body_with_paragraph_properties(
+    source: &Package,
+    properties: &[crate::types::Paragraph],
+    limits: crate::SourceLimits,
+    source_span: &Range<usize>,
+    event_source_offsets: &[usize],
+) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    let opaque_nodes = body_opaque_nodes(source, source_span)?;
+    let mut opaque_index = 0usize;
+    let layout_events = body_layout_events(source, source_span, event_source_offsets)?;
+    let mut layout_event_index = 0usize;
+    let mut body_position = 0usize;
+    let mut paragraph_count = 0usize;
+    for (position, paragraph) in source.body().paragraphs().enumerate() {
+        let properties = properties
+            .get(position)
+            .ok_or(Error::unsupported_operation(
+                "paragraph-structure and property changes cannot compose safely",
+            ))?;
+        let paragraph_end =
+            body_position
+                .checked_add(paragraph.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: limits.max_input_bytes(),
+                })?;
+        let terminated = source.text().as_bytes().get(paragraph_end) == Some(&b'\n');
+        let mut runs = paragraph.runs().peekable();
+        if runs.peek().is_none() {
+            write_bounded(&mut output, br"\plain\pard ")?;
+            let result = {
+                let mut writer = Writer::new(&mut output);
+                writer.write_paragraph_properties(properties)
+            };
+            if let Err(error) = result {
+                return Err(output.map_io_error(error));
+            }
+            write_text_with_body_opaque(
+                &mut output,
+                source.text(),
+                body_position..paragraph_end,
+                &opaque_nodes,
+                &mut opaque_index,
+                &layout_events,
+                &mut layout_event_index,
+                source.model().bookmarks(),
+            )?;
+            if terminated {
+                write_bounded(&mut output, br"\par ")?;
+            }
+        } else {
+            let mut run_position = body_position;
+            while let Some(run) = runs.next() {
+                let run_end =
+                    run_position
+                        .checked_add(run.text().len())
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: limits.max_input_bytes(),
+                        })?;
+                if run_end > paragraph_end {
+                    return Err(Error::unsupported_operation(
+                        "paragraph-structure and property changes cannot compose safely",
+                    ));
+                }
+                write_bounded(&mut output, br"\plain\pard ")?;
+                let result = {
+                    let mut writer = Writer::new(&mut output);
+                    writer
+                        .write_formatting(run.format().raw())
+                        .and_then(|()| writer.write_paragraph_properties(properties))
+                };
+                if let Err(error) = result {
+                    return Err(output.map_io_error(error));
+                }
+                write_bounded(&mut output, b" ")?;
+                write_text_with_body_opaque(
+                    &mut output,
+                    source.text(),
+                    run_position..run_end,
+                    &opaque_nodes,
+                    &mut opaque_index,
+                    &layout_events,
+                    &mut layout_event_index,
+                    source.model().bookmarks(),
+                )?;
+                if terminated && runs.peek().is_none() {
+                    write_bounded(&mut output, br"\par ")?;
+                }
+                run_position = run_end;
+            }
+            if run_position != paragraph_end {
+                return Err(Error::unsupported_operation(
+                    "paragraph-structure and property changes cannot compose safely",
+                ));
+            }
+        }
+        body_position = paragraph_end.saturating_add(usize::from(terminated));
+        paragraph_count = paragraph_count.saturating_add(1);
+    }
+    if paragraph_count != properties.len() {
+        return Err(Error::unsupported_operation(
+            "paragraph-structure and property changes cannot compose safely",
+        ));
+    }
+    write_text_with_body_opaque(
+        &mut output,
+        source.text(),
+        source.text().len()..source.text().len(),
+        &opaque_nodes,
+        &mut opaque_index,
+        &layout_events,
+        &mut layout_event_index,
+        source.model().bookmarks(),
+    )?;
+    if opaque_index != opaque_nodes.len() {
+        return Err(Error::unsupported_source(
+            "body-anchored opaque syntax was not covered by the source span",
+        ));
+    }
+    if layout_event_index != layout_events.len() {
+        return Err(Error::unsupported_source(
+            "body story metadata was not covered by the rewritten body",
+        ));
+    }
+    Ok(output.into_inner())
+}
+
+fn write_bounded(output: &mut BoundedVec, bytes: &[u8]) -> Result<(), Error> {
+    match output.write_all(bytes) {
+        Ok(()) => Ok(()),
+        Err(error) => Err(output.map_io_error(error)),
+    }
+}
+
+fn body_opaque_nodes<'a>(
+    source: &'a Package,
+    source_span: &Range<usize>,
+) -> Result<Vec<&'a crate::opaque::Node>, Error> {
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    let mut nodes = Vec::new();
+    nodes
+        .try_reserve(source.opaque().len())
+        .map_err(|_error| Error::Write("could not reserve opaque body nodes".to_string()))?;
+    let mut previous = None;
+    let mut source_cursor = 0usize;
+    for node in source.opaque() {
+        if node.source().is_empty() {
+            return Err(Error::unsupported_source(
+                "body-anchored opaque syntax has no stable source span",
+            ));
+        }
+        let node_start = source_bytes
+            .get(source_cursor..)
+            .and_then(|remaining| {
+                remaining
+                    .windows(node.source().len())
+                    .position(|window| window == node.source())
+            })
+            .map(|relative| source_cursor.saturating_add(relative))
+            .ok_or(Error::unsupported_source(
+                "body-anchored opaque syntax is absent from the source span",
+            ))?;
+        let node_end = node_start.saturating_add(node.source().len());
+        source_cursor = node_end;
+        let crate::opaque::Anchor::Body(offset) = node.anchor() else {
+            continue;
+        };
+        if offset > source.text().len()
+            || !source.text().is_char_boundary(offset)
+            || previous.is_some_and(|value| value > offset)
+        {
+            return Err(Error::unsupported_source(
+                "body-anchored opaque syntax has no stable source span",
+            ));
+        }
+        previous = Some(offset);
+        if node_start < source_span.start {
+            if node_end > source_span.start {
+                return Err(Error::unsupported_source(
+                    "body-anchored opaque syntax crosses the source span boundary",
+                ));
+            }
+            continue;
+        }
+        if node_start >= source_span.end {
+            continue;
+        }
+        if node_end > source_span.end {
+            return Err(Error::unsupported_source(
+                "body-anchored opaque syntax exceeds the source span",
+            ));
+        }
+        nodes.push(node);
+    }
+    Ok(nodes)
+}
+
+#[derive(Clone, Copy)]
+enum BodyLayoutEventKind {
+    BookmarkStart(usize),
+    BookmarkEnd(usize),
+    PageBreak,
+    ColumnBreak,
+    SoftBreak(crate::SoftBreak),
+}
+
+#[derive(Clone, Copy)]
+struct BodyLayoutEvent {
+    position: usize,
+    source_order: usize,
+    kind: BodyLayoutEventKind,
+}
+
+fn body_layout_events(
+    source: &Package,
+    source_span: &Range<usize>,
+    event_source_offsets: &[usize],
+) -> Result<Vec<BodyLayoutEvent>, Error> {
+    let bookmarks = source.model().bookmarks().bookmarks();
+    let mut events = Vec::new();
+    events
+        .try_reserve(source.model().body_story_events().len())
+        .map_err(|_error| Error::Write("could not reserve bookmark events".to_string()))?;
+    for (source_order, event) in source.model().body_story_events().iter().enumerate() {
+        let (position, kind) = match *event {
+            crate::BodyStoryEvent::BookmarkStart(index) => {
+                let bookmark = bookmarks.get(index).ok_or(Error::unsupported_source(
+                    "bookmark metadata references a missing body bookmark",
+                ))?;
+                (bookmark.position, BodyLayoutEventKind::BookmarkStart(index))
+            },
+            crate::BodyStoryEvent::BookmarkEnd(index) => {
+                let bookmark = bookmarks.get(index).ok_or(Error::unsupported_source(
+                    "bookmark metadata references a missing body bookmark",
+                ))?;
+                (
+                    bookmark
+                        .position
+                        .checked_add(bookmark.content.len())
+                        .ok_or(Error::unsupported_source("bookmark body range overflow"))?,
+                    BodyLayoutEventKind::BookmarkEnd(index),
+                )
+            },
+            crate::BodyStoryEvent::PageBreak(page_break) => {
+                (page_break.position, BodyLayoutEventKind::PageBreak)
+            },
+            crate::BodyStoryEvent::ColumnBreak(column_break) => {
+                (column_break.position, BodyLayoutEventKind::ColumnBreak)
+            },
+            crate::BodyStoryEvent::SoftBreak(soft_break) => (
+                soft_break.position,
+                BodyLayoutEventKind::SoftBreak(soft_break),
+            ),
+            _ => {
+                return Err(Error::unsupported_source(
+                    "body contains unsupported positioned structure",
+                ));
+            },
+        };
+        // Events in the retained prefix or trailer are already preserved.
+        // A leading event inside a replaced formatting group must be emitted.
+        let source_offset = *event_source_offsets
+            .get(source_order)
+            .ok_or(Error::Internal("layout event source offset is missing"))?;
+        if !source_span.contains(&source_offset) {
+            continue;
+        }
+        if source.text().get(position..position).is_none() {
+            return Err(Error::unsupported_source(
+                "bookmark metadata is outside a UTF-8 body boundary",
+            ));
+        }
+        events.push(BodyLayoutEvent {
+            position,
+            source_order,
+            kind,
+        });
+    }
+    events.sort_by_key(|event| (event.position, event.source_order));
+    Ok(events)
+}
+
+fn write_text_with_body_opaque(
+    output: &mut BoundedVec,
+    text: &str,
+    range: Range<usize>,
+    nodes: &[&crate::opaque::Node],
+    node_index: &mut usize,
+    layout_events: &[BodyLayoutEvent],
+    layout_event_index: &mut usize,
+    bookmarks: &crate::BookmarkTable<'_>,
+) -> Result<(), Error> {
+    let mut cursor = range.start;
+    loop {
+        let node_offset = nodes.get(*node_index).map(|node| {
+            let crate::opaque::Anchor::Body(offset) = node.anchor() else {
+                return Err(Error::unsupported_source(
+                    "non-body opaque syntax entered body source publication",
+                ));
+            };
+            Ok(offset)
+        });
+        let node_offset = match node_offset.transpose()? {
+            Some(offset) => offset,
+            None => usize::MAX,
+        };
+        let layout_event_offset = layout_events
+            .get(*layout_event_index)
+            .map_or(usize::MAX, |event| event.position);
+        let Some(offset) = (node_offset.min(layout_event_offset) <= range.end)
+            .then_some(node_offset.min(layout_event_offset))
+        else {
+            break;
+        };
+        if offset < range.start {
+            return Err(Error::unsupported_source(
+                "body metadata fell outside its source span",
+            ));
+        }
+        write_encoded_fragment(output, text, cursor..offset)?;
+        while layout_events
+            .get(*layout_event_index)
+            .is_some_and(|event| event.position == offset)
+        {
+            let event = *layout_events
+                .get(*layout_event_index)
+                .ok_or(Error::Internal(
+                    "body story metadata index became inconsistent",
+                ))?;
+            let result = match event.kind {
+                BodyLayoutEventKind::BookmarkStart(index) => {
+                    let bookmark =
+                        bookmarks
+                            .bookmarks()
+                            .get(index)
+                            .ok_or(Error::unsupported_source(
+                                "bookmark metadata references a missing bookmark",
+                            ))?;
+                    let mut writer = Writer::new(&mut *output);
+                    writer.write_bookmark_start(bookmark)
+                },
+                BodyLayoutEventKind::BookmarkEnd(index) => {
+                    let bookmark =
+                        bookmarks
+                            .bookmarks()
+                            .get(index)
+                            .ok_or(Error::unsupported_source(
+                                "bookmark metadata references a missing bookmark",
+                            ))?;
+                    let mut writer = Writer::new(&mut *output);
+                    writer.write_bookmark_end(bookmark.name.as_ref())
+                },
+                BodyLayoutEventKind::PageBreak => {
+                    let mut writer = Writer::new(&mut *output);
+                    writer.write_str("\\page ")
+                },
+                BodyLayoutEventKind::ColumnBreak => {
+                    let mut writer = Writer::new(&mut *output);
+                    writer.write_str("\\column ")
+                },
+                BodyLayoutEventKind::SoftBreak(soft_break) => {
+                    let mut writer = Writer::new(&mut *output);
+                    match soft_break.kind {
+                        crate::SoftBreakKind::Page => writer.write_str("\\softpage "),
+                        crate::SoftBreakKind::Column => writer.write_str("\\softcol "),
+                        crate::SoftBreakKind::Line => writer.write_str("\\softline "),
+                        crate::SoftBreakKind::LineHeight(height) => writer
+                            .write_control_word("softlheight", Some(height))
+                            .and_then(|()| writer.write_str(" ")),
+                    }
+                },
+            };
+            if let Err(error) = result {
+                return Err(output.map_io_error(error));
+            }
+            *layout_event_index = layout_event_index.saturating_add(1);
+        }
+        if node_offset == offset {
+            let node = nodes.get(*node_index).ok_or(Error::Internal(
+                "body opaque node index became inconsistent",
+            ))?;
+            write_bounded(output, node.source())?;
+            if node.needs_control_separator() {
+                // A space would become part of the retained control's source.
+                // An ignored line break terminates it without adding a scope.
+                write_bounded(output, b"\n")?;
+            }
+            cursor = offset;
+            *node_index = node_index.saturating_add(1);
+        } else {
+            cursor = offset;
+        }
+    }
+    write_encoded_fragment(output, text, cursor..range.end)
+}
+
+struct BoundedVec {
+    bytes: Vec<u8>,
+    limit: usize,
+    overflow_observed: Option<usize>,
+}
+
+impl BoundedVec {
+    const fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit,
+            overflow_observed: None,
+        }
+    }
+
+    fn append(&mut self, bytes: &[u8]) -> Result<(), Error> {
+        match self.write_all(bytes) {
+            Ok(()) => Ok(()),
+            Err(error) => Err(self.map_io_error(error)),
+        }
+    }
+
+    fn map_io_error(&self, error: io::Error) -> Error {
+        self.overflow_observed.map_or_else(
+            || Error::Write(error.to_string()),
+            |observed| Error::InputTooLarge {
+                observed,
+                limit: self.limit,
+            },
+        )
+    }
+
+    fn into_inner(self) -> Vec<u8> {
+        self.bytes
+    }
+}
+
+impl io::Write for BoundedVec {
+    fn write(&mut self, input: &[u8]) -> io::Result<usize> {
+        let observed = match self.bytes.len().checked_add(input.len()) {
+            Some(observed) => observed,
+            None => {
+                self.overflow_observed = Some(usize::MAX);
+                return Err(io::Error::other(
+                    "RTF paragraph-layout output size overflow",
+                ));
+            },
+        };
+        if observed > self.limit {
+            self.overflow_observed = Some(observed);
+            return Err(io::Error::other(
+                "RTF paragraph-layout output exceeds the source limit",
+            ));
+        }
+        self.bytes
+            .try_reserve(input.len())
+            .map_err(|_error| io::Error::other("could not reserve paragraph-layout output"))?;
+        self.bytes.extend_from_slice(input);
+        Ok(input.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn write_encoded_fragment(
+    output: &mut BoundedVec,
+    text: &str,
+    range: Range<usize>,
+) -> Result<(), Error> {
+    let fragment = text.get(range).ok_or(Error::unsupported_source(
+        "property span is not a UTF-8 text boundary",
+    ))?;
+    match Writer::new(&mut *output).write_text(fragment) {
+        Ok(()) => Ok(()),
+        Err(error) => Err(output.map_io_error(error)),
+    }
+}
+
+fn write_bold(output: &mut BoundedVec, bold: bool) -> Result<(), Error> {
+    output.append(if bold { br"\b " } else { br"\b0 " })
+}
+
+fn write_italic(output: &mut BoundedVec, italic: bool) -> Result<(), Error> {
+    output.append(if italic { br"\i " } else { br"\i0 " })
+}
+
+fn write_underline(output: &mut BoundedVec, underline: UnderlineStyle) -> Result<(), Error> {
+    output.append(match underline {
+        UnderlineStyle::None => br"\ulnone ",
+        UnderlineStyle::Single => br"\ul ",
+        UnderlineStyle::Double => br"\uldb ",
+        UnderlineStyle::Dotted => br"\uld ",
+        UnderlineStyle::Dashed => br"\uldash ",
+        UnderlineStyle::DashDot => br"\uldashd ",
+        UnderlineStyle::DashDotDot => br"\uldashdd ",
+        UnderlineStyle::Words => br"\ulw ",
+        UnderlineStyle::Thick => br"\ulth ",
+        UnderlineStyle::Wave => br"\ulwave ",
+        UnderlineStyle::Hairline => br"\ulhair ",
+        UnderlineStyle::ThickDotted => br"\ulthd ",
+        UnderlineStyle::ThickDashed => br"\ulthdash ",
+        UnderlineStyle::ThickDashDot => br"\ulthdashd ",
+        UnderlineStyle::ThickDashDotDot => br"\ulthdashdd ",
+        UnderlineStyle::ThickLongDash => br"\ulthldash ",
+        UnderlineStyle::LongDash => br"\ulldash ",
+        UnderlineStyle::HeavyWave => br"\ulhwave ",
+        UnderlineStyle::DoubleWave => br"\ululdbwave ",
+    })
+}
+
+fn write_alignment(output: &mut BoundedVec, alignment: Option<Alignment>) -> Result<(), Error> {
+    let bytes = match alignment.ok_or(Error::unsupported_operation(
+        "paragraph-structure and property changes cannot compose safely",
+    ))? {
+        Alignment::Left => br"\ql ".as_slice(),
+        Alignment::Right => br"\qr ".as_slice(),
+        Alignment::Center => br"\qc ".as_slice(),
+        Alignment::Justify => br"\qj ".as_slice(),
+    };
+    output.append(bytes)
+}
+
+fn encoded_body_len(text: &str) -> Result<usize, Error> {
+    text.chars().try_fold(0usize, |total, character| {
+        let width = match character {
+            '\\' | '{' | '}' => 2,
+            '\n' | '\t' => 5,
+            value if (value as u32) < 0x20 => 4,
+            value if value.is_ascii() => 1,
+            value => 10 * value.len_utf16(),
+        };
+        total.checked_add(width).ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: usize::MAX,
+        })
+    })
+}
+
+fn splice_body(
+    source: &[u8],
+    span: Range<usize>,
+    replacement: &[u8],
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let retained = source
+        .len()
+        .checked_sub(span.end.saturating_sub(span.start))
+        .ok_or(Error::unsupported_source("body source span is invalid"))?;
+    let total = retained
+        .checked_add(replacement.len())
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: limits.max_input_bytes(),
+        })?;
+    if total > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: total,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(total)
+        .map_err(|_error| Error::Write("could not reserve candidate RTF bytes".to_string()))?;
+    output.extend_from_slice(source.get(..span.start).ok_or(Error::unsupported_source(
+        "body source span starts outside the document",
+    ))?);
+    output.extend_from_slice(replacement);
+    output.extend_from_slice(source.get(span.end..).ok_or(Error::unsupported_source(
+        "body source span ends outside the document",
+    ))?);
+    Ok(output)
+}
+
+fn splice_body_ranges(
+    source: &[u8],
+    replacements: &[(Range<usize>, Vec<u8>)],
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut retained = source.len();
+    let mut previous_end = 0usize;
+    for (span, replacement) in replacements {
+        if span.start < previous_end || span.end < span.start || span.end > source.len() {
+            return Err(Error::unsupported_source(
+                "paragraph source replacement ranges overlap",
+            ));
+        }
+        retained = retained
+            .checked_sub(span.end - span.start)
+            .and_then(|length| length.checked_add(replacement.len()))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: limits.max_input_bytes(),
+            })?;
+        previous_end = span.end;
+    }
+    if retained > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: retained,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = Vec::new();
+    output.try_reserve_exact(retained).map_err(|_error| {
+        Error::Write("could not reserve paragraph candidate bytes".to_string())
+    })?;
+    let mut cursor = 0usize;
+    for (span, replacement) in replacements {
+        output.extend_from_slice(source.get(cursor..span.start).ok_or(
+            Error::unsupported_source("paragraph source replacement starts outside the source"),
+        )?);
+        output.extend_from_slice(replacement);
+        cursor = span.end;
+    }
+    output.extend_from_slice(source.get(cursor..).ok_or(Error::unsupported_source(
+        "paragraph source replacement ends outside the source",
+    ))?);
+    Ok(output)
+}
+
+fn paragraph_removal_needs_delimiter(source: &[u8], range: &Range<usize>) -> bool {
+    source
+        .get(..range.start)
+        .and_then(|prefix| prefix.last())
+        .is_some_and(|byte| byte.is_ascii_alphabetic())
+        && source
+            .get(range.end..)
+            .and_then(|suffix| suffix.first())
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b' '))
+}
+
+/// Deterministic facts about a published transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    operation_count: usize,
+    changed: bool,
+}
+
+impl Diagnostics {
+    /// Number of staged semantic operations represented by the commit.
+    #[must_use]
+    pub const fn operation_count(self) -> usize {
+        self.operation_count
+    }
+
+    /// Whether the transaction changed the exact source artifact.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+}
+
+fn write_font_size(output: &mut BoundedVec, font_size: NonZeroU16) -> Result<(), Error> {
+    output.append(br"\fs")?;
+    output.append(font_size.get().to_string().as_bytes())?;
+    output.append(b" ")
+}
+
+fn write_expansion(output: &mut BoundedVec, expansion: CharacterExpansion) -> Result<(), Error> {
+    match expansion {
+        CharacterExpansion::None => output.append(br"\expnd0 "),
+        CharacterExpansion::QuarterPoints(value) => {
+            output.append(br"\expnd")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
+        },
+        CharacterExpansion::Twips(value) => {
+            output.append(br"\expndtw")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
+        },
+    }
+}
+
+fn write_horizontal_scale(output: &mut BoundedVec, scale_percent: u16) -> Result<(), Error> {
+    output.append(br"\charscalex")?;
+    output.append(scale_percent.to_string().as_bytes())?;
+    output.append(b" ")
+}
+
+fn write_kerning(output: &mut BoundedVec, kerning_half_points: u16) -> Result<(), Error> {
+    output.append(br"\kerning")?;
+    output.append(kerning_half_points.to_string().as_bytes())?;
+    output.append(b" ")
+}
+
+fn write_strike(output: &mut BoundedVec, strike: bool) -> Result<(), Error> {
+    output.append(if strike { br"\strike " } else { br"\strike0 " })
+}
+
+fn write_double_strike(output: &mut BoundedVec, double_strike: bool) -> Result<(), Error> {
+    output.append(if double_strike {
+        br"\striked "
+    } else {
+        br"\striked0 "
+    })
+}
+
+fn write_hidden(output: &mut BoundedVec, hidden: bool) -> Result<(), Error> {
+    output.append(if hidden { br"\v " } else { br"\v0 " })
+}
+
+fn write_small_caps(output: &mut BoundedVec, small_caps: bool) -> Result<(), Error> {
+    output.append(if small_caps {
+        br"\scaps "
+    } else {
+        br"\scaps0 "
+    })
+}
+
+fn write_all_caps(output: &mut BoundedVec, all_caps: bool) -> Result<(), Error> {
+    output.append(if all_caps { br"\caps " } else { br"\caps0 " })
+}
+
+fn write_outline(output: &mut BoundedVec, outline: bool) -> Result<(), Error> {
+    output.append(if outline { br"\outl " } else { br"\outl0 " })
+}
+
+fn write_baseline(output: &mut BoundedVec, baseline: CharacterBaseline) -> Result<(), Error> {
+    match baseline {
+        CharacterBaseline::Normal => output.append(br"\nosupersub "),
+        CharacterBaseline::Superscript => output.append(br"\super "),
+        CharacterBaseline::Subscript => output.append(br"\sub "),
+        CharacterBaseline::RaisedHalfPoints(value) => {
+            output.append(br"\up")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
+        },
+        CharacterBaseline::LoweredHalfPoints(value) => {
+            output.append(br"\dn")?;
+            output.append(value.to_string().as_bytes())?;
+            output.append(b" ")
+        },
+    }
+}
+
+#[derive(Clone)]
+enum ChangeStorage {
+    Owned(Box<[Change]>),
+    Shared(Arc<[Change]>),
+}
+
+impl ChangeStorage {
+    fn from_vec(changes: Vec<Change>) -> Self {
+        Self::Owned(changes.into_boxed_slice())
+    }
+
+    fn to_shared(&self) -> Arc<[Change]> {
+        // `apply` borrows the source patch but returns an owned commit. The
+        // returned patch therefore needs an owner that remains valid after
+        // this patch is dropped. The cached Arc is shared by every replay
+        // commit; only the first replay copies the owned descriptors.
+        match self {
+            Self::Owned(changes) => Arc::from(&changes[..]),
+            Self::Shared(changes) => changes.clone(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Owned(changes) => changes.len(),
+            Self::Shared(changes) => changes.len(),
+        }
+    }
+
+    fn iter(&self) -> std::slice::Iter<'_, Change> {
+        match self {
+            Self::Owned(changes) => changes.iter(),
+            Self::Shared(changes) => changes.iter(),
+        }
+    }
+}
+
+/// Result of an atomically validated RTF edit.
+pub struct Commit {
+    snapshot: Package,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+impl Commit {
+    fn new(
+        before: Package,
+        snapshot: Package,
+        operation_count: usize,
+        semantic_delta: Vec<Change>,
+    ) -> Self {
+        let changed = !same_artifact(&before, &snapshot);
+        Self {
+            patch: Patch {
+                before,
+                after: snapshot.clone(),
+                changes: ChangeStorage::from_vec(semantic_delta),
+                shared_changes: OnceLock::new(),
+            },
+            snapshot,
+            diagnostics: Diagnostics {
+                operation_count,
+                changed,
+            },
+        }
+    }
+
+    fn from_replay(source: &Package, snapshot: Package, patch: &Patch) -> Self {
+        let changed = !same_artifact(source, &snapshot);
+        let changes = patch
+            .shared_changes
+            .get_or_init(|| patch.changes.to_shared())
+            .clone();
+        Self {
+            patch: Patch {
+                before: source.clone(),
+                after: snapshot.clone(),
+                changes: ChangeStorage::Shared(changes),
+                shared_changes: OnceLock::new(),
+            },
+            snapshot,
+            diagnostics: Diagnostics {
+                operation_count: patch.changes.len(),
+                changed,
+            },
+        }
+    }
+
+    /// Returns the published immutable snapshot.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.snapshot
+    }
+
+    /// Returns the exact-source-checked reversible patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Returns deterministic commit diagnostics.
+    #[must_use]
+    pub const fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics
+    }
+
+    /// Consumes the commit and returns its immutable snapshot.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.snapshot
+    }
+
+    /// Consume the commit into its published package and reversible patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+#[derive(Debug, Clone)]
+enum Change {
+    Text {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: String,
+        after: String,
+    },
+    Alignment {
+        position: usize,
+        before: Alignment,
+        after: Alignment,
+    },
+    ParagraphLayout {
+        position: usize,
+        fields: LayoutFields,
+        before: ParagraphLayout,
+        after: ParagraphLayout,
+    },
+    RunFormat {
+        paragraph: usize,
+        run: usize,
+        before: RunFormatPatch,
+        after: RunFormatPatch,
+    },
+    RunText {
+        paragraph: usize,
+        run: usize,
+        before: String,
+        after: String,
+        before_format: RunFormatPatch,
+        after_format: RunFormatPatch,
+    },
+    RunInsert {
+        paragraph: usize,
+        run: usize,
+        text: String,
+        format: RunFormatPatch,
+        removing: bool,
+    },
+    Bold {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Italic {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Underline {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: UnderlineStyle,
+        after: UnderlineStyle,
+    },
+    FontSize {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: NonZeroU16,
+        after: NonZeroU16,
+    },
+    Baseline {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: CharacterBaseline,
+        after: CharacterBaseline,
+    },
+    Expansion {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: CharacterExpansion,
+        after: CharacterExpansion,
+    },
+    HorizontalScale {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: u16,
+        after: u16,
+    },
+    Kerning {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: u16,
+        after: u16,
+    },
+    Strike {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    DoubleStrike {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Hidden {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    SmallCaps {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    AllCaps {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    Outline {
+        span: TextSpan,
+        after_span: TextSpan,
+        before: bool,
+        after: bool,
+    },
+    InsertParagraph {
+        position: usize,
+        after_position: usize,
+        span: TextSpan,
+        after_span: TextSpan,
+        text: String,
+        removing: bool,
+    },
+    RemoveParagraph {
+        position: usize,
+        text: String,
+        restoring: bool,
+    },
+    MoveParagraph {
+        position: usize,
+        final_position: usize,
+        text: String,
+    },
+    SwapParagraph {
+        first: usize,
+        second: usize,
+        first_text: String,
+        second_text: String,
+    },
+    SplitParagraph {
+        position: usize,
+        offset: usize,
+        before: String,
+        boundary: Vec<u8>,
+        left: String,
+        right: String,
+    },
+    MergeParagraph {
+        position: usize,
+        boundary: Vec<u8>,
+        left: String,
+        right: String,
+    },
+    TableCellText {
+        path: TableCellPath,
+        before: String,
+        after: String,
+    },
+    HeaderFooterText {
+        target: HeaderFooterParagraph,
+        before: String,
+        after: String,
+    },
+    AnnotationText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    NoteText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    ShapeText {
+        index: usize,
+        before: String,
+        after: String,
+    },
+    SmartTag {
+        index: usize,
+        before: crate::SmartTag<'static>,
+        after: crate::SmartTag<'static>,
+    },
+    MoveBookmark {
+        index: usize,
+        before: crate::MoveBookmark<'static>,
+        after: crate::MoveBookmark<'static>,
+    },
+    PicturePayload(picture_payload::StagedPicturePayload),
+    PictureRemoval {
+        position: usize,
+        group_start: usize,
+        group: Vec<u8>,
+        removing: bool,
+    },
+    RootTransfer {
+        vocabulary: &'static str,
+        effect: String,
+        before: Vec<u8>,
+        after: Vec<u8>,
+    },
+}
+
+impl Change {
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Text {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Text {
+                span: *after_span,
+                after_span: *span,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::Alignment {
+                position,
+                before,
+                after,
+            } => Self::Alignment {
+                position: *position,
+                before: *after,
+                after: *before,
+            },
+            Self::ParagraphLayout {
+                position,
+                fields,
+                before,
+                after,
+            } => Self::ParagraphLayout {
+                position: *position,
+                fields: *fields,
+                before: *after,
+                after: *before,
+            },
+            Self::RunFormat {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::RunFormat {
+                paragraph: *paragraph,
+                run: *run,
+                before: *after,
+                after: *before,
+            },
+            Self::RunText {
+                paragraph,
+                run,
+                before,
+                after,
+                before_format,
+                after_format,
+            } => Self::RunText {
+                paragraph: *paragraph,
+                run: *run,
+                before: after.clone(),
+                after: before.clone(),
+                before_format: *after_format,
+                after_format: *before_format,
+            },
+            Self::RunInsert {
+                paragraph,
+                run,
+                text,
+                format,
+                removing,
+            } => Self::RunInsert {
+                paragraph: *paragraph,
+                run: *run,
+                text: text.clone(),
+                format: *format,
+                removing: !removing,
+            },
+            Self::Bold {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Bold {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Italic {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Italic {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Underline {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Underline {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::FontSize {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::FontSize {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Baseline {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Baseline {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Expansion {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Expansion {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::HorizontalScale {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::HorizontalScale {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Kerning {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Kerning {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Strike {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Strike {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::DoubleStrike {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::DoubleStrike {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Hidden {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Hidden {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::SmallCaps {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::SmallCaps {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::AllCaps {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::AllCaps {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::Outline {
+                span,
+                after_span,
+                before,
+                after,
+            } => Self::Outline {
+                span: *after_span,
+                after_span: *span,
+                before: *after,
+                after: *before,
+            },
+            Self::InsertParagraph {
+                position,
+                after_position,
+                span,
+                after_span,
+                text,
+                removing,
+            } => Self::InsertParagraph {
+                position: *after_position,
+                after_position: *position,
+                span: *after_span,
+                after_span: *span,
+                text: text.clone(),
+                removing: !removing,
+            },
+            Self::RemoveParagraph {
+                position,
+                text,
+                restoring,
+            } => Self::RemoveParagraph {
+                position: *position,
+                text: text.clone(),
+                restoring: !restoring,
+            },
+            Self::MoveParagraph {
+                position,
+                final_position,
+                text,
+            } => Self::MoveParagraph {
+                position: *final_position,
+                final_position: *position,
+                text: text.clone(),
+            },
+            Self::SwapParagraph {
+                first,
+                second,
+                first_text,
+                second_text,
+            } => Self::SwapParagraph {
+                first: *first,
+                second: *second,
+                first_text: second_text.clone(),
+                second_text: first_text.clone(),
+            },
+            Self::SplitParagraph {
+                position,
+                boundary,
+                left,
+                right,
+                ..
+            } => Self::MergeParagraph {
+                position: *position,
+                boundary: boundary.clone(),
+                left: left.clone(),
+                right: right.clone(),
+            },
+            Self::MergeParagraph {
+                position,
+                boundary,
+                left,
+                right,
+            } => Self::SplitParagraph {
+                position: *position,
+                offset: left.len(),
+                boundary: boundary.clone(),
+                before: {
+                    let mut before = String::new();
+                    before.push_str(left);
+                    before.push_str(right);
+                    before
+                },
+                left: left.clone(),
+                right: right.clone(),
+            },
+            Self::TableCellText {
+                path,
+                before,
+                after,
+            } => Self::TableCellText {
+                path: path.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::HeaderFooterText {
+                target,
+                before,
+                after,
+            } => Self::HeaderFooterText {
+                target: *target,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::AnnotationText {
+                index,
+                before,
+                after,
+            } => Self::AnnotationText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::NoteText {
+                index,
+                before,
+                after,
+            } => Self::NoteText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::ShapeText {
+                index,
+                before,
+                after,
+            } => Self::ShapeText {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::SmartTag {
+                index,
+                before,
+                after,
+            } => Self::SmartTag {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::MoveBookmark {
+                index,
+                before,
+                after,
+            } => Self::MoveBookmark {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+            Self::PicturePayload(operation) => Self::PicturePayload(operation.inverse()),
+            Self::PictureRemoval {
+                position,
+                group_start,
+                group,
+                removing,
+            } => Self::PictureRemoval {
+                position: *position,
+                group_start: *group_start,
+                group: group.clone(),
+                removing: !removing,
+            },
+            Self::RootTransfer {
+                vocabulary,
+                effect,
+                before,
+                after,
+            } => Self::RootTransfer {
+                vocabulary,
+                effect: effect.clone(),
+                before: after.clone(),
+                after: before.clone(),
+            },
+        }
+    }
+}
+
+impl Change {
+    /// Dynamic semantic data retained by this reversible change.
+    ///
+    /// The enum's discriminant and inline fields are charged by
+    /// `Patch::history_weight`; this method accounts for every heap-backed
+    /// string or byte/vector payload owned by the change.  Keeping the
+    /// accounting beside the private enum means callers cannot accidentally
+    /// substitute the smaller public replacement DTO for the actual patch
+    /// storage.
+    fn dynamic_weight(&self) -> u64 {
+        match self {
+            Self::Text { before, after, .. }
+            | Self::HeaderFooterText { before, after, .. }
+            | Self::AnnotationText { before, after, .. }
+            | Self::NoteText { before, after, .. }
+            | Self::ShapeText { before, after, .. }
+            | Self::RunText { before, after, .. } => {
+                weight_str(before).saturating_add(weight_str(after))
+            },
+            Self::RunInsert { text, .. } => weight_str(text),
+            Self::TableCellText {
+                path,
+                before,
+                after,
+            } => weight_str(before)
+                .saturating_add(weight_str(after))
+                .saturating_add(weight_usize(
+                    path.nested
+                        .len()
+                        .saturating_mul(size_of::<crate::TableCellCoordinate>()),
+                )),
+            Self::Alignment { .. }
+            | Self::ParagraphLayout { .. }
+            | Self::RunFormat { .. }
+            | Self::Bold { .. }
+            | Self::Italic { .. }
+            | Self::Underline { .. }
+            | Self::FontSize { .. }
+            | Self::Baseline { .. }
+            | Self::Expansion { .. }
+            | Self::HorizontalScale { .. }
+            | Self::Kerning { .. }
+            | Self::Strike { .. }
+            | Self::DoubleStrike { .. }
+            | Self::Hidden { .. }
+            | Self::SmallCaps { .. }
+            | Self::AllCaps { .. }
+            | Self::Outline { .. } => 0,
+            Self::InsertParagraph { text, .. }
+            | Self::RemoveParagraph { text, .. }
+            | Self::MoveParagraph { text, .. } => weight_str(text),
+            Self::SwapParagraph {
+                first_text,
+                second_text,
+                ..
+            } => weight_str(first_text).saturating_add(weight_str(second_text)),
+            Self::SplitParagraph {
+                before,
+                boundary,
+                left,
+                right,
+                ..
+            } => weight_str(before)
+                .saturating_add(weight_bytes(boundary))
+                .saturating_add(weight_str(left))
+                .saturating_add(weight_str(right)),
+            Self::MergeParagraph {
+                boundary,
+                left,
+                right,
+                ..
+            } => weight_bytes(boundary)
+                .saturating_add(weight_str(left))
+                .saturating_add(weight_str(right)),
+            Self::SmartTag { before, after, .. } => {
+                smart_tag_weight(before).saturating_add(smart_tag_weight(after))
+            },
+            Self::MoveBookmark { before, after, .. } => {
+                move_bookmark_weight(before).saturating_add(move_bookmark_weight(after))
+            },
+            Self::PicturePayload(operation) => weight_bytes(&operation.before)
+                .saturating_add(weight_bytes(&operation.after))
+                .saturating_add(weight_bytes(&operation.before_transport))
+                .saturating_add(weight_bytes(&operation.after_transport)),
+            Self::PictureRemoval { group, .. } => weight_bytes(group),
+            Self::RootTransfer {
+                effect,
+                before,
+                after,
+                ..
+            } => weight_str(effect)
+                .saturating_add(weight_bytes(before))
+                .saturating_add(weight_bytes(after)),
+        }
+    }
+}
+
+fn weight_str(value: &str) -> u64 {
+    u64::try_from(value.len()).unwrap_or(u64::MAX)
+}
+
+fn weight_bytes(value: &[u8]) -> u64 {
+    u64::try_from(value.len()).unwrap_or(u64::MAX)
+}
+
+fn smart_tag_weight(value: &crate::SmartTag<'_>) -> u64 {
+    let attributes = value.attributes.iter().fold(0_u64, |weight, attribute| {
+        weight
+            .saturating_add(weight_str(attribute.name.as_ref()))
+            .saturating_add(weight_str(attribute.value.as_ref()))
+    });
+    weight_str(value.name.as_ref())
+        .saturating_add(weight_str(value.content.as_ref()))
+        .saturating_add(attributes)
+        .saturating_add(weight_usize(
+            value
+                .attributes
+                .len()
+                .saturating_mul(size_of::<crate::SmartTagAttribute<'static>>()),
+        ))
+}
+
+fn move_bookmark_weight(value: &crate::MoveBookmark<'_>) -> u64 {
+    weight_str(value.tag.as_ref()).saturating_add(weight_str(value.content.as_ref()))
+}
+
+fn weight_usize(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+fn semantic_changes(
+    operations: &[Operation],
+    projected_spans: &[(usize, TextSpan)],
+) -> Vec<Change> {
+    semantic_changes_with_replacement(operations, projected_spans, "")
+}
+
+fn semantic_changes_with_replacement(
+    operations: &[Operation],
+    projected_spans: &[(usize, TextSpan)],
+    replacement: &str,
+) -> Vec<Change> {
+    operations
+        .iter()
+        .enumerate()
+        .filter_map(|(operation_index, operation)| match operation {
+            Operation::Text {
+                span,
+                before,
+                after,
+                structural: _,
+                raw_structure: None,
+            } if before != after => {
+                projected_spans
+                    .iter()
+                    .find_map(|(projected_index, projected)| {
+                        (*projected_index == operation_index).then_some(Change::Text {
+                            span: *span,
+                            after_span: *projected,
+                            before: before.clone(),
+                            after: after.clone(),
+                        })
+                    })
+            },
+            Operation::Alignment {
+                position,
+                before,
+                after,
+            } if before != after => Some(Change::Alignment {
+                position: *position,
+                before: *before,
+                after: *after,
+            }),
+            Operation::ParagraphLayout {
+                position,
+                fields,
+                before,
+                after,
+            } if before != after => Some(Change::ParagraphLayout {
+                position: *position,
+                fields: *fields,
+                before: *before,
+                after: *after,
+            }),
+            Operation::RunFormat {
+                paragraph,
+                run,
+                before,
+                after,
+                text_before: Some(text_before),
+                text_after: Some(text_after),
+            } if before != after || text_before != text_after => Some(Change::RunText {
+                paragraph: *paragraph,
+                run: *run,
+                before: text_before.clone(),
+                after: text_after.clone(),
+                before_format: *before,
+                after_format: *after,
+            }),
+            Operation::RunInsert {
+                paragraph,
+                run,
+                text,
+                format,
+                ..
+            } => Some(Change::RunInsert {
+                paragraph: *paragraph,
+                run: *run,
+                text: text.clone(),
+                format: format.unwrap_or_default(),
+                removing: false,
+            }),
+            Operation::RunFormat {
+                paragraph,
+                run,
+                before,
+                after,
+                text_before: None,
+                text_after: None,
+            } if before != after => Some(Change::RunFormat {
+                paragraph: *paragraph,
+                run: *run,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Bold {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Bold {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Italic {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Italic {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Underline {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Underline {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::FontSize {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::FontSize {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Baseline {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Baseline {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Expansion {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Expansion {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::HorizontalScale {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::HorizontalScale {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Kerning {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Kerning {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Strike {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Strike {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::DoubleStrike {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::DoubleStrike {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Hidden {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Hidden {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::SmallCaps {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::SmallCaps {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::AllCaps {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::AllCaps {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::Outline {
+                span,
+                before,
+                after,
+            } if before != after => Some(Change::Outline {
+                span: *span,
+                after_span: project_base_span(*span, operations).ok()?,
+                before: *before,
+                after: *after,
+            }),
+            Operation::InsertParagraph {
+                position,
+                span,
+                text,
+            } => projected_spans
+                .iter()
+                .find_map(|(projected_index, projected)| {
+                    if *projected_index != operation_index {
+                        return None;
+                    }
+                    let after_position = replacement
+                        .get(..projected.start)?
+                        .bytes()
+                        .filter(|byte| *byte == b'\n')
+                        .count();
+                    Some(Change::InsertParagraph {
+                        position: *position,
+                        after_position,
+                        span: *span,
+                        after_span: *projected,
+                        text: text.clone(),
+                        removing: false,
+                    })
+                }),
+            Operation::RemoveParagraph { position, text } => Some(Change::RemoveParagraph {
+                position: *position,
+                text: text.clone(),
+                restoring: false,
+            }),
+            Operation::RestoreParagraph { position, text } => Some(Change::RemoveParagraph {
+                position: *position,
+                text: text.clone(),
+                restoring: true,
+            }),
+            Operation::MoveParagraph {
+                position,
+                final_position,
+                text,
+            } if position != final_position => Some(Change::MoveParagraph {
+                position: *position,
+                final_position: *final_position,
+                text: text.clone(),
+            }),
+            Operation::SwapParagraph {
+                first,
+                second,
+                first_text,
+                second_text,
+            } if first != second => Some(Change::SwapParagraph {
+                first: *first,
+                second: *second,
+                first_text: first_text.clone(),
+                second_text: second_text.clone(),
+            }),
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Split {
+                        position,
+                        offset,
+                        boundary,
+                        before,
+                        ..
+                    }),
+                ..
+            } => {
+                let (left, right) = (before.get(..*offset)?, before.get(*offset..)?);
+                Some(Change::SplitParagraph {
+                    position: *position,
+                    offset: *offset,
+                    before: before.clone(),
+                    boundary: boundary.clone(),
+                    left: left.to_string(),
+                    right: right.to_string(),
+                })
+            },
+            Operation::Text {
+                raw_structure:
+                    Some(RawParagraphOperation::Merge {
+                        position,
+                        boundary_bytes,
+                        left,
+                        right,
+                        ..
+                    }),
+                ..
+            } => Some(Change::MergeParagraph {
+                position: *position,
+                boundary: boundary_bytes.clone(),
+                left: left.clone(),
+                right: right.clone(),
+            }),
+            Operation::TableCellText {
+                path,
+                before,
+                after,
+            } if before != after => Some(Change::TableCellText {
+                path: path.clone(),
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::HeaderFooterText {
+                target,
+                before,
+                after,
+            } if before != after => Some(Change::HeaderFooterText {
+                target: *target,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::AnnotationText {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::AnnotationText {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::NoteText {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::NoteText {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::ShapeText {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::ShapeText {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::SmartTag {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::SmartTag {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::MoveBookmark {
+                index,
+                before,
+                after,
+            } if before != after => Some(Change::MoveBookmark {
+                index: *index,
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::PicturePayload(operation) if operation.before != operation.after => {
+                Some(Change::PicturePayload(operation.clone()))
+            },
+            Operation::PictureRemoval(operation) => Some(operation.inverse_change().inverse()),
+            Operation::RootTransfer {
+                vocabulary,
+                effect,
+                before,
+                after,
+            } if before != after => Some(Change::RootTransfer {
+                vocabulary,
+                effect: effect.clone(),
+                before: before.clone(),
+                after: after.clone(),
+            }),
+            Operation::Text { .. }
+            | Operation::Alignment { .. }
+            | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
+            | Operation::Bold { .. }
+            | Operation::Italic { .. }
+            | Operation::Underline { .. }
+            | Operation::Strike { .. }
+            | Operation::DoubleStrike { .. }
+            | Operation::Hidden { .. }
+            | Operation::SmallCaps { .. }
+            | Operation::AllCaps { .. }
+            | Operation::Outline { .. }
+            | Operation::FontSize { .. }
+            | Operation::Baseline { .. }
+            | Operation::Expansion { .. }
+            | Operation::HorizontalScale { .. }
+            | Operation::Kerning { .. }
+            | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
+            | Operation::TableCellText { .. }
+            | Operation::HeaderFooterText { .. }
+            | Operation::AnnotationText { .. }
+            | Operation::NoteText { .. }
+            | Operation::ShapeText { .. }
+            | Operation::SmartTag { .. }
+            | Operation::MoveBookmark { .. }
+            | Operation::PicturePayload(_)
+            | Operation::RootTransfer { .. } => None,
+        })
+        .collect()
+}
+
+fn same_artifact(left: &Package, right: &Package) -> bool {
+    left.same_snapshot(right)
+        || matches!((left.source_bytes(), right.source_bytes()), (Some(a), Some(b)) if a == b)
+}
+
+/// In-memory exact-source patch with a durable shared semantic projection.
+pub struct Patch {
+    before: Package,
+    after: Package,
+    changes: ChangeStorage,
+    shared_changes: OnceLock<Arc<[Change]>>,
+}
+
+impl Clone for Patch {
+    fn clone(&self) -> Self {
+        Self {
+            before: self.before.clone(),
+            after: self.after.clone(),
+            changes: self.changes.clone(),
+            shared_changes: OnceLock::new(),
+        }
+    }
+}
+
+impl Patch {
+    /// Applies this patch only to the exact source bytes from which it was made.
+    ///
+    /// # Errors
+    /// Returns [`Error::PatchConflict`] when the supplied source bytes differ.
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package, Error> {
+        if !same_artifact(source, &self.before) {
+            return Err(Error::PatchConflict);
+        }
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        if source.options() == self.after.options() {
+            return Ok(self.after.clone());
+        }
+        let bytes = self.after.source_bytes().ok_or(Error::unsupported_source(
+            "patch target has no retained source artifact",
+        ))?;
+        Ok(Package::from_bytes_with_options(bytes, source.options())?)
+    }
+
+    /// Apply this patch and retain the published owner, patch, and diagnostics
+    /// as the facade replay commit.
+    pub(crate) fn apply_commit(&self, source: &Package) -> Result<Commit, Error> {
+        let snapshot = self.apply(source)?;
+        Ok(Commit::from_replay(source, snapshot, self))
+    }
+
+    /// Whether this patch preserves the exact source artifact.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        same_artifact(&self.before, &self.after)
+    }
+
+    /// Returns the patch that restores the accepted source bytes.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: self.after.clone(),
+            after: self.before.clone(),
+            changes: ChangeStorage::from_vec(
+                self.changes.iter().rev().map(Change::inverse).collect(),
+            ),
+            shared_changes: OnceLock::new(),
+        }
+    }
+
+    /// Conservative byte weight suitable for the common bounded history.
+    #[must_use]
+    pub fn history_weight(&self) -> u64 {
+        let before = self.before.source_bytes().map_or(0, <[u8]>::len);
+        let after = self.after.source_bytes().map_or(0, <[u8]>::len);
+        let change_descriptors = self.changes.len().saturating_mul(size_of::<Change>());
+        let semantic = self.changes.iter().fold(0_u64, |weight, change| {
+            weight.saturating_add(change.dynamic_weight())
+        });
+        u64::try_from(before)
+            .unwrap_or(u64::MAX)
+            .saturating_add(u64::try_from(after).unwrap_or(u64::MAX))
+            .saturating_add(weight_usize(change_descriptors))
+            .saturating_add(semantic)
+    }
+
+    /// Converts this patch to the shared versioned deterministic-JSON patch.
+    ///
+    /// Paragraph-layout changes remain source-bound because canonical RTF
+    /// rewrites cannot yet prove an imported exact artifact byte-for-byte;
+    /// callers retain exact undo through [`Self::inverse`] instead.
+    /// Moves involving explicit empty paragraphs or a terminal body break are
+    /// also source-bound: the current durable move vocabulary carries only
+    /// paragraph text and positions, so it cannot encode their exact boundary
+    /// spelling for inverse replay.
+    /// Appending an empty paragraph to a non-terminal ordinary story is
+    /// source-bound for the same reason: its two control boundaries are not
+    /// represented by the shared `paragraph.insert` payload.
+    /// Paragraph insertions and removals are admitted only when a forward
+    /// and inverse durable replay both reproduce the exact source artifacts.
+    ///
+    /// # Errors
+    /// Returns an error when caller-selected wire limits cannot represent the
+    /// semantic operations or their preconditions.
+    pub fn to_durable(
+        &self,
+        limits: litchi_core::patch::PatchLimits,
+    ) -> Result<
+        litchi_core::patch::Patch<litchi_core::patch::Reversible>,
+        litchi_core::patch::PatchError,
+    > {
+        use litchi_core::patch::{BlobBundle, ReversibleOperation};
+
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::ParagraphLayout { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph-layout durable patches are not supported",
+            });
+        }
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::RunFormat { .. } | Change::RunText { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF run-format and run-text patches are source-bound",
+            });
+        }
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::SwapParagraph { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph swaps are source-bound",
+            });
+        }
+        if self.changes.len() > 1
+            && self
+                .changes
+                .iter()
+                .all(|change| matches!(change, Change::RemoveParagraph { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF multi-paragraph removal durable patches require source-bound batch preconditions",
+            });
+        }
+        if self.changes.iter().any(|change| {
+            matches!(
+                change,
+                Change::RemoveParagraph {
+                    restoring: true,
+                    position,
+                    text,
+                    ..
+                } if text.is_empty()
+                    && *position == self.before.paragraph_count()
+                    && self.before.paragraph_count() != 0
+                    && !self.before.text().ends_with('\n')
+            )
+        }) {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF empty-paragraph insertions are source-bound",
+            });
+        }
+        let has_move = self.changes.iter().any(|change| {
+            matches!(
+                change,
+                Change::MoveParagraph { .. } | Change::SwapParagraph { .. }
+            )
+        });
+        let has_empty_or_terminal_boundary = has_move
+            && (self.before.text().ends_with('\n')
+                || self.after.text().ends_with('\n')
+                || self
+                    .before
+                    .body()
+                    .paragraphs()
+                    .any(|paragraph| paragraph.is_empty())
+                || self
+                    .after
+                    .body()
+                    .paragraphs()
+                    .any(|paragraph| paragraph.is_empty()));
+        if has_empty_or_terminal_boundary {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph moves involving empty or terminal-boundary paragraphs are source-bound",
+            });
+        }
+
+        let before =
+            self.before
+                .source_bytes()
+                .ok_or(litchi_core::patch::PatchError::InvalidText {
+                    field: "RTF source artifact",
+                })?;
+        let after =
+            self.after
+                .source_bytes()
+                .ok_or(litchi_core::patch::PatchError::InvalidText {
+                    field: "RTF target artifact",
+                })?;
+        let has_paragraph_lifecycle = self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::RemoveParagraph { .. }));
+        let operations = self
+            .changes
+            .iter()
+            .map(|change| {
+                let forward = durable_operation(limits, change, before, after)?;
+                let inverse_change = change.inverse();
+                let inverse = durable_operation(limits, &inverse_change, after, before)?;
+                Ok(ReversibleOperation::new(forward, inverse))
+            })
+            .collect::<Result<Vec<_>, litchi_core::patch::PatchError>>()?;
+        let durable = litchi_core::patch::Patch::<litchi_core::patch::Reversible>::new(
+            limits,
+            "litchi-rtf",
+            operations,
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )?;
+        if has_paragraph_lifecycle {
+            let exact_replay_error = || litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph lifecycle durable replay is not byte-exact",
+            };
+            let applied_commit =
+                apply_durable(&self.before, &durable).map_err(|_error| exact_replay_error())?;
+            let applied = applied_commit.package();
+            if applied.source_bytes() != Some(after) {
+                return Err(exact_replay_error());
+            }
+            let restored_commit = apply_durable(applied, &durable.inverse())
+                .map_err(|_error| exact_replay_error())?;
+            if restored_commit.package().source_bytes() != Some(before) {
+                return Err(exact_replay_error());
+            }
+        }
+        Ok(durable)
+    }
+}
+
+fn durable_operation(
+    limits: litchi_core::patch::PatchLimits,
+    change: &Change,
+    source: &[u8],
+    target: &[u8],
+) -> Result<litchi_core::patch::PatchOperation, litchi_core::patch::PatchError> {
+    let mut preconditions = BTreeMap::new();
+    preconditions.insert(
+        "artifact_sha256".to_string(),
+        Value::String(litchi_core::patch::BlobId::of(source).as_hex()),
+    );
+    match change {
+        Change::Text {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "body-text.replace",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::Alignment {
+            position,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "alignment".to_string(),
+                Value::String(alignment_name(*before).to_string()),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph-alignment.set",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::String(alignment_name(*after).to_string()),
+            )
+        },
+        Change::ParagraphLayout {
+            position: _,
+            fields: _,
+            before: _,
+            after: _,
+        } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF paragraph-layout durable patches are not supported",
+        }),
+        Change::RunFormat { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF run-format patches are source-bound",
+        }),
+        Change::RunText { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF run-text patches are source-bound",
+        }),
+        Change::RunInsert { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF run-insertion patches are source-bound",
+        }),
+        Change::Bold {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("bold".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-bold.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Italic {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("italic".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-italic.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Underline {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "underline".to_string(),
+                Value::String(underline_name(*before).to_string()),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-underline.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(underline_name(*after).to_string()),
+            )
+        },
+        Change::FontSize {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "font_size_half_points".to_string(),
+                Value::Number(serde_json::Number::from(u64::from(before.get()))),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-font-size.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Number(serde_json::Number::from(u64::from(after.get()))),
+            )
+        },
+        Change::Baseline {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "baseline".to_string(),
+                Value::String(baseline_name(*before)),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-baseline.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(baseline_name(*after)),
+            )
+        },
+        Change::Expansion {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "expansion".to_string(),
+                Value::String(expansion_name(*before)),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-expansion.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::String(expansion_name(*after)),
+            )
+        },
+        Change::HorizontalScale {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "horizontal_scale_percent".to_string(),
+                Value::Number(serde_json::Number::from(u64::from(*before))),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-horizontal-scale.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Number(serde_json::Number::from(u64::from(*after))),
+            )
+        },
+        Change::Kerning {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "kerning_half_points".to_string(),
+                Value::Number(serde_json::Number::from(u64::from(*before))),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-kerning.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Number(serde_json::Number::from(u64::from(*after))),
+            )
+        },
+        Change::Strike {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("strike".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-strike.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::DoubleStrike {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("double_strike".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-double-strike.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Hidden {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("hidden".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-hidden.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::SmallCaps {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("small_caps".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-small-caps.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::AllCaps {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("all_caps".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-all-caps.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::Outline {
+            span,
+            before,
+            after,
+            after_span: _,
+        } => {
+            preconditions.insert("outline".to_string(), Value::Bool(*before));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "character-outline.set",
+                format!("body:utf8:{}-{}", span.start, span.end),
+                preconditions,
+                Value::Bool(*after),
+            )
+        },
+        Change::InsertParagraph {
+            position,
+            after_position: _,
+            text,
+            removing,
+            span: _,
+            after_span: _,
+        } => {
+            preconditions.insert(
+                "text".to_string(),
+                Value::String(if *removing {
+                    text.clone()
+                } else {
+                    String::new()
+                }),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                if *removing {
+                    "paragraph.remove-after"
+                } else {
+                    "paragraph.insert-after"
+                },
+                format!("body:paragraph:{position}"),
+                preconditions,
+                if *removing {
+                    Value::Null
+                } else {
+                    Value::String(text.clone())
+                },
+            )
+        },
+        Change::RemoveParagraph {
+            position,
+            text,
+            restoring,
+        } => {
+            preconditions.insert(
+                "text".to_string(),
+                if *restoring {
+                    Value::Null
+                } else {
+                    Value::String(text.clone())
+                },
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                if *restoring {
+                    "paragraph.insert"
+                } else {
+                    "paragraph.remove"
+                },
+                format!("body:paragraph:{position}"),
+                preconditions,
+                if *restoring {
+                    Value::String(text.clone())
+                } else {
+                    Value::Null
+                },
+            )
+        },
+        Change::MoveParagraph {
+            position,
+            final_position,
+            text,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(text.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph.move",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::String(final_position.to_string()),
+            )
+        },
+        Change::SwapParagraph { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF paragraph swaps are source-bound",
+        }),
+        Change::SplitParagraph {
+            position,
+            offset,
+            before,
+            boundary,
+            left: _,
+            right: _,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            preconditions.insert("offset".to_string(), Value::from(*offset as u64));
+            preconditions.insert("boundary".to_string(), Value::String(hex_encode(boundary)));
+            preconditions.insert(
+                "result_artifact_sha256".to_string(),
+                Value::String(litchi_core::patch::BlobId::of(target).as_hex()),
+            );
+            preconditions.insert(
+                "boundary_mode".to_string(),
+                Value::String(
+                    if boundary == PARAGRAPH_SPLIT_BYTES {
+                        "canonical"
+                    } else {
+                        "exact"
+                    }
+                    .to_string(),
+                ),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph.split",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::Null,
+            )
+        },
+        Change::MergeParagraph {
+            position,
+            boundary,
+            left,
+            right,
+        } => {
+            preconditions.insert("left".to_string(), Value::String(left.clone()));
+            preconditions.insert("right".to_string(), Value::String(right.clone()));
+            preconditions.insert("boundary".to_string(), Value::String(hex_encode(boundary)));
+            preconditions.insert(
+                "result_artifact_sha256".to_string(),
+                Value::String(litchi_core::patch::BlobId::of(target).as_hex()),
+            );
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "paragraph.merge",
+                format!("body:paragraph:{position}"),
+                preconditions,
+                Value::Null,
+            )
+        },
+        Change::TableCellText {
+            path,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "table-cell-text.replace",
+                table_cell_effect(path),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::HeaderFooterText {
+            target,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "header-footer-text.replace",
+                header_footer_effect(*target),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::AnnotationText {
+            index,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "annotation-text.replace",
+                annotation_effect(*index),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::NoteText {
+            index,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "note-text.replace",
+                note_effect(*index),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::ShapeText {
+            index,
+            before,
+            after,
+        } => {
+            preconditions.insert("text".to_string(), Value::String(before.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                "shape-text.replace",
+                shape_effect(*index),
+                preconditions,
+                Value::String(after.clone()),
+            )
+        },
+        Change::SmartTag { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF SmartTag durable patches are not supported",
+        }),
+        Change::MoveBookmark { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF move-bookmark durable patches are not supported",
+        }),
+        Change::PicturePayload(operation) => {
+            picture_payload::durable_operation(limits, operation, source)
+        },
+        Change::PictureRemoval {
+            position,
+            group_start,
+            group,
+            removing,
+        } => picture_payload::durable_removal_operation(
+            limits,
+            *position,
+            *group_start,
+            group,
+            *removing,
+            source,
+        ),
+        Change::RootTransfer {
+            vocabulary,
+            effect,
+            before: _,
+            after,
+        } => {
+            preconditions.insert("feature".to_string(), Value::String(effect.clone()));
+            litchi_core::patch::PatchOperation::new(
+                limits,
+                *vocabulary,
+                effect.clone(),
+                preconditions,
+                Value::String(hex_encode(after)),
+            )
+        },
+    }
+}
+
+pub(crate) fn apply_durable<Mode>(
+    source: &Package,
+    patch: &litchi_core::patch::Patch<Mode>,
+) -> Result<litchi_core::edit::Commit<Package, litchi_core::patch::Patch<Mode>>, Error>
+where
+    Mode: Clone,
+{
+    if patch.format() != "litchi-rtf" {
+        return Err(Error::DurablePatch(
+            "unsupported durable patch format".to_string(),
+        ));
+    }
+    if patch.operations().is_empty() {
+        if !patch.blobs().is_empty() {
+            return Err(Error::DurablePatch(
+                "empty patch has an unreferenced blob bundle".to_string(),
+            ));
+        }
+        return Ok(durable_commit(source, patch, source.clone()));
+    }
+    if !patch.blobs().is_empty() {
+        return Err(Error::DurablePatch(
+            "RTF durable operations do not accept artifact blobs".to_string(),
+        ));
+    }
+    let source_bytes = source.source_bytes().ok_or(Error::unsupported_operation(
+        "snapshot has no exact RTF source",
+    ))?;
+    let source_hash = litchi_core::patch::BlobId::of(source_bytes).as_hex();
+    let picture_operation_count = patch
+        .operations()
+        .iter()
+        .filter(|operation| operation.op == "picture-payload.replace")
+        .count();
+    if picture_operation_count != 0 {
+        if picture_operation_count != patch.operations().len() {
+            return Err(Error::DurablePatch(
+                "picture payload operations cannot compose with other RTF vocabularies".to_string(),
+            ));
+        }
+        let snapshot =
+            picture_payload::apply_durable_patch(source, patch.operations(), &source_hash)?;
+        return Ok(durable_commit(source, patch, snapshot));
+    }
+    let picture_removal_count = patch
+        .operations()
+        .iter()
+        .filter(|operation| operation.op == "picture.remove")
+        .count();
+    if picture_removal_count != 0 {
+        if picture_removal_count != patch.operations().len() {
+            return Err(Error::DurablePatch(
+                "picture removal operations cannot compose with other RTF vocabularies".to_string(),
+            ));
+        }
+        let snapshot =
+            picture_payload::apply_durable_removal_patch(source, patch.operations(), &source_hash)?;
+        return Ok(durable_commit(source, patch, snapshot));
+    }
+    let picture_insertion_count = patch
+        .operations()
+        .iter()
+        .filter(|operation| operation.op == "picture.insert-exact")
+        .count();
+    if picture_insertion_count != 0 {
+        if picture_insertion_count != patch.operations().len() {
+            return Err(Error::DurablePatch(
+                "exact picture insertion operations cannot compose with other RTF vocabularies"
+                    .to_string(),
+            ));
+        }
+        let snapshot = picture_payload::apply_durable_insertion_patch(
+            source,
+            patch.operations(),
+            &source_hash,
+        )?;
+        return Ok(durable_commit(source, patch, snapshot));
+    }
+    // A durable operation may be admitted under a caller-selected patch
+    // bound larger than the ordinary edit default.  Bind replay to the
+    // validated patch's operation count so a valid 257+ operation patch does
+    // not fail merely because `Package::edit()` defaults to 256.
+    let profile = SemanticLimits::builder()
+        .max_operations(patch.operations().len())?
+        .max_replacement_bytes(source.source_limits().max_input_bytes())?
+        .build()?;
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(profile));
+    let mut expected_result_hash = None;
+    for operation in patch.operations() {
+        let expected_preconditions = match operation.op.as_str() {
+            "paragraph.split" => 6,
+            "paragraph.merge" => 5,
+            _ => 2,
+        };
+        if operation.preconditions.len() != expected_preconditions {
+            return Err(Error::DurablePatch(
+                "operation has an invalid precondition count".to_string(),
+            ));
+        }
+        let expected_hash = operation
+            .preconditions
+            .get("artifact_sha256")
+            .and_then(Value::as_str)
+            .ok_or_else(|| Error::DurablePatch("missing artifact digest".to_string()))?;
+        if expected_hash != source_hash {
+            return Err(Error::PatchConflict);
+        }
+        match operation.op.as_str() {
+            "body-text.replace" => {
+                let span = parse_text_target(&operation.target)?;
+                validate_span(source.text(), span)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| Error::DurablePatch("missing text precondition".to_string()))?;
+                let actual = source.text().get(span.start..span.end).ok_or(
+                    Error::SpanNotOnCharacterBoundary {
+                        position: span.start,
+                    },
+                )?;
+                if actual != expected {
+                    return Err(Error::StalePrecondition("body text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("text value must be a string".to_string())
+                })?;
+                edit.replace_text(span, replacement)?;
+            },
+            "paragraph-alignment.set" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let raw_position = position.get();
+                let expected = operation
+                    .preconditions
+                    .get("alignment")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing alignment precondition".to_string())
+                    })?;
+                let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+                let count = paragraphs.len();
+                let actual = paragraphs
+                    .get(raw_position)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: raw_position,
+                        count,
+                    })?
+                    .format()
+                    .alignment();
+                if alignment_name(actual) != expected {
+                    return Err(Error::StalePrecondition("paragraph alignment differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_alignment)
+                    .ok_or_else(|| Error::DurablePatch("invalid alignment value".to_string()))?;
+                edit.set_paragraph_alignment(position, replacement)?;
+            },
+            "paragraph-layout.patch" => {
+                return Err(Error::DurablePatch(
+                    "paragraph-layout durable patches are not supported".to_string(),
+                ));
+            },
+            "character-bold.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("bold")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| Error::DurablePatch("missing bold precondition".to_string()))?;
+                if bold_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character bold state differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_bool()
+                    .ok_or_else(|| Error::DurablePatch("bold value must be Boolean".to_string()))?;
+                edit.set_text_bold(span, replacement)?;
+            },
+            "character-italic.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("italic")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing italic precondition".to_string())
+                    })?;
+                if italic_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character italic state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("italic value must be Boolean".to_string())
+                })?;
+                edit.set_text_italic(span, replacement)?;
+            },
+            "character-underline.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("underline")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing underline precondition".to_string())
+                    })?;
+                if underline_name(underline_for_span(source, span)?) != expected {
+                    return Err(Error::StalePrecondition(
+                        "character underline state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_underline)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("underline value must be a string".to_string())
+                    })?;
+                edit.set_text_underline(span, replacement)?;
+            },
+            "character-font-size.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("font_size_half_points")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .and_then(NonZeroU16::new)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "font-size precondition must be an integer in 1..=65535".to_string(),
+                        )
+                    })?;
+                if font_size_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character font-size state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .and_then(NonZeroU16::new)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "font-size value must be an integer in 1..=65535".to_string(),
+                        )
+                    })?;
+                edit.set_text_font_size(span, replacement)?;
+            },
+            "character-baseline.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("baseline")
+                    .and_then(Value::as_str)
+                    .and_then(parse_baseline)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "baseline precondition must be a canonical string".to_string(),
+                        )
+                    })?;
+                if baseline_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character baseline state differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_baseline)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("baseline value must be a canonical string".to_string())
+                    })?;
+                edit.set_text_baseline(span, replacement)?;
+            },
+            "character-expansion.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("expansion")
+                    .and_then(Value::as_str)
+                    .and_then(parse_expansion)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "expansion precondition must be a canonical string".to_string(),
+                        )
+                    })?;
+                if expansion_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character expansion state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_str()
+                    .and_then(parse_expansion)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "expansion value must be a canonical string".to_string(),
+                        )
+                    })?;
+                edit.set_text_expansion(span, replacement)?;
+            },
+            "character-horizontal-scale.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("horizontal_scale_percent")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| (1..=crate::MAX_CHARACTER_SCALE_PERCENT as u16).contains(value))
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "horizontal scale precondition must be an integer in 1..=600"
+                                .to_string(),
+                        )
+                    })?;
+                if horizontal_scale_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character horizontal-scale state differs",
+                    ));
+                }
+                let replacement = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| (1..=crate::MAX_CHARACTER_SCALE_PERCENT as u16).contains(value))
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "horizontal scale value must be an integer in 1..=600".to_string(),
+                        )
+                    })?;
+                edit.set_text_horizontal_scale_percent(span, replacement)?;
+            },
+            "character-kerning.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("kerning_half_points")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| *value <= crate::MAX_CHARACTER_KERNING_HALF_POINTS as u16)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "kerning precondition must be an integer in 0..=32767".to_string(),
+                        )
+                    })?;
+                if kerning_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character kerning state differs"));
+                }
+                let replacement = operation
+                    .value
+                    .as_u64()
+                    .and_then(|value| u16::try_from(value).ok())
+                    .filter(|value| *value <= crate::MAX_CHARACTER_KERNING_HALF_POINTS as u16)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "kerning value must be an integer in 0..=32767".to_string(),
+                        )
+                    })?;
+                edit.set_text_kerning(span, replacement)?;
+            },
+            "character-strike.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("strike")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing strike precondition".to_string())
+                    })?;
+                if strike_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character strike state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("strike value must be Boolean".to_string())
+                })?;
+                edit.set_text_strike(span, replacement)?;
+            },
+            "character-double-strike.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("double_strike")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing double-strike precondition".to_string())
+                    })?;
+                if double_strike_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character double-strike state differs",
+                    ));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("double-strike value must be Boolean".to_string())
+                })?;
+                edit.set_text_double_strike(span, replacement)?;
+            },
+            "character-hidden.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("hidden")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing hidden precondition".to_string())
+                    })?;
+                if hidden_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character hidden state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("hidden value must be Boolean".to_string())
+                })?;
+                edit.set_text_hidden(span, replacement)?;
+            },
+            "character-small-caps.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("small_caps")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing small-caps precondition".to_string())
+                    })?;
+                if small_caps_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition(
+                        "character small-caps state differs",
+                    ));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("small-caps value must be Boolean".to_string())
+                })?;
+                edit.set_text_small_caps(span, replacement)?;
+            },
+            "character-all-caps.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("all_caps")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing all-caps precondition".to_string())
+                    })?;
+                if all_caps_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character all-caps state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("all-caps value must be Boolean".to_string())
+                })?;
+                edit.set_text_all_caps(span, replacement)?;
+            },
+            "character-outline.set" => {
+                let span = parse_text_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("outline")
+                    .and_then(Value::as_bool)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing outline precondition".to_string())
+                    })?;
+                if outline_for_span(source, span)? != expected {
+                    return Err(Error::StalePrecondition("character outline state differs"));
+                }
+                let replacement = operation.value.as_bool().ok_or_else(|| {
+                    Error::DurablePatch("outline value must be Boolean".to_string())
+                })?;
+                edit.set_text_outline(span, replacement)?;
+            },
+            "paragraph.insert-after" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("inserted paragraph text must be a string".to_string())
+                })?;
+                edit.insert_paragraph_after(position, replacement)?;
+            },
+            "paragraph.remove-after" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing inserted paragraph precondition".to_string())
+                    })?;
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph removal value must be null".to_string(),
+                    ));
+                }
+                edit.remove_paragraph_after(position.get(), expected)?;
+            },
+            "paragraph.remove" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing removed paragraph precondition".to_string())
+                    })?;
+                if paragraph_text_at(source, position.get())? != expected {
+                    return Err(Error::StalePrecondition("paragraph text differs"));
+                }
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph removal value must be null".to_string(),
+                    ));
+                }
+                edit.remove_paragraph(position)?;
+            },
+            "paragraph.insert" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                if !operation
+                    .preconditions
+                    .get("text")
+                    .is_some_and(Value::is_null)
+                {
+                    return Err(Error::DurablePatch(
+                        "paragraph insertion precondition must be null".to_string(),
+                    ));
+                }
+                let text = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("inserted paragraph text must be a string".to_string())
+                })?;
+                edit.restore_paragraph(position.get(), text)?;
+            },
+            "paragraph.move" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing moved paragraph precondition".to_string())
+                    })?;
+                if paragraph_text_at(source, position.get())? != expected {
+                    return Err(Error::StalePrecondition("moved paragraph text differs"));
+                }
+                let final_position = operation
+                    .value
+                    .as_str()
+                    .ok_or_else(|| {
+                        Error::DurablePatch("paragraph final position must be a string".to_string())
+                    })?
+                    .parse::<usize>()
+                    .map_err(|_error| {
+                        Error::DurablePatch("invalid paragraph final position".to_string())
+                    })?;
+                edit.move_paragraph(position, Position::new(final_position))?;
+            },
+            "paragraph.split" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph split value must be null".to_string(),
+                    ));
+                }
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing split paragraph text precondition".to_string())
+                    })?;
+                let offset = operation
+                    .preconditions
+                    .get("offset")
+                    .and_then(Value::as_u64)
+                    .and_then(|value| usize::try_from(value).ok())
+                    .ok_or_else(|| {
+                        Error::DurablePatch("invalid split paragraph offset".to_string())
+                    })?;
+                let encoded_boundary = operation
+                    .preconditions
+                    .get("boundary")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing split paragraph boundary".to_string())
+                    })?;
+                let boundary = hex_decode(encoded_boundary, source.limits().max_input_bytes())?;
+                let result_hash = operation
+                    .preconditions
+                    .get("result_artifact_sha256")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "missing split paragraph result artifact digest".to_string(),
+                        )
+                    })?;
+                if expected_result_hash.is_some() {
+                    return Err(Error::DurablePatch(
+                        "multiple structural durable results cannot compose".to_string(),
+                    ));
+                }
+                expected_result_hash = Some(result_hash);
+                let boundary_mode = operation
+                    .preconditions
+                    .get("boundary_mode")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing split paragraph boundary mode".to_string())
+                    })?;
+                let expected_boundary_mode = if boundary == PARAGRAPH_SPLIT_BYTES {
+                    "canonical"
+                } else {
+                    "exact"
+                };
+                if boundary_mode != expected_boundary_mode {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split boundary mode differs",
+                    ));
+                }
+                if paragraph_text_at(source, position.get())? != expected {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split text differs",
+                    ));
+                }
+                if boundary_mode == "canonical" {
+                    edit.split_paragraph(position, offset)?;
+                } else {
+                    edit.split_paragraph_with_boundary(position.get(), offset, &boundary)?;
+                }
+                let generated_boundary =
+                    edit.operations
+                        .last()
+                        .and_then(|operation| match operation {
+                            Operation::Text {
+                                raw_structure:
+                                    Some(RawParagraphOperation::Split {
+                                        position: generated_position,
+                                        offset: generated_offset,
+                                        boundary: generated_boundary,
+                                        ..
+                                    }),
+                                ..
+                            } if *generated_position == position.get()
+                                && *generated_offset == offset =>
+                            {
+                                Some(generated_boundary.as_slice())
+                            },
+                            _ => None,
+                        });
+                if generated_boundary != Some(boundary.as_slice()) {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph split boundary differs",
+                    ));
+                }
+            },
+            "paragraph.merge" => {
+                let position = parse_paragraph_target(&operation.target)?;
+                if !operation.value.is_null() {
+                    return Err(Error::DurablePatch(
+                        "paragraph merge value must be null".to_string(),
+                    ));
+                }
+                let expected_left = operation
+                    .preconditions
+                    .get("left")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing merge left paragraph precondition".to_string())
+                    })?;
+                let expected_right = operation
+                    .preconditions
+                    .get("right")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "missing merge right paragraph precondition".to_string(),
+                        )
+                    })?;
+                let encoded_boundary = operation
+                    .preconditions
+                    .get("boundary")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing merge paragraph boundary".to_string())
+                    })?;
+                let boundary = hex_decode(encoded_boundary, source.limits().max_input_bytes())?;
+                let result_hash = operation
+                    .preconditions
+                    .get("result_artifact_sha256")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch(
+                            "missing merge paragraph result artifact digest".to_string(),
+                        )
+                    })?;
+                if expected_result_hash.is_some() {
+                    return Err(Error::DurablePatch(
+                        "multiple structural durable results cannot compose".to_string(),
+                    ));
+                }
+                expected_result_hash = Some(result_hash);
+                let raw_position = position.get();
+                let second = raw_position
+                    .checked_add(1)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: raw_position,
+                        count: source.paragraph_count(),
+                    })?;
+                if paragraph_text_at(source, raw_position)? != expected_left
+                    || paragraph_text_at(source, second)? != expected_right
+                {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph merge text differs",
+                    ));
+                }
+                let map = ordinary_paragraph_source_map(source)?;
+                let actual_boundary = map
+                    .paragraphs
+                    .get(raw_position)
+                    .and_then(|paragraph| paragraph.boundary_after.as_ref())
+                    .and_then(|span| source.source_bytes()?.get(span.clone()))
+                    .ok_or(Error::unsupported_source(
+                        "ordinary paragraph merge has no exact source boundary",
+                    ))?;
+                if actual_boundary != boundary.as_slice() {
+                    return Err(Error::StalePrecondition(
+                        "ordinary paragraph merge boundary bytes differ",
+                    ));
+                }
+                edit.merge_paragraphs(position, Position::new(second))?;
+            },
+            "table-cell-text.replace" => {
+                let cell_path = parse_table_cell_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing table-cell text precondition".to_string())
+                    })?;
+                if table_cell(source, &cell_path)?.text() != expected {
+                    return Err(Error::StalePrecondition("table-cell text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("table-cell text value must be a string".to_string())
+                })?;
+                edit.set_table_cell_text(cell_path, replacement)?;
+            },
+            "header-footer-text.replace" => {
+                let target = parse_header_footer_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing header/footer text precondition".to_string())
+                    })?;
+                let actual = header_footer(source, target)?
+                    .paragraphs
+                    .get(target.paragraph)
+                    .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
+                    .text
+                    .as_ref();
+                if actual != expected {
+                    return Err(Error::StalePrecondition("header/footer text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("header/footer text value must be a string".to_string())
+                })?;
+                edit.set_header_footer_text(target, replacement)?;
+            },
+            "annotation-text.replace" => {
+                let index = parse_annotation_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing annotation text precondition".to_string())
+                    })?;
+                if annotation(source, index)?.text != expected {
+                    return Err(Error::StalePrecondition("annotation text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("annotation text value must be a string".to_string())
+                })?;
+                edit.set_annotation_text(index, replacement)?;
+            },
+            "note-text.replace" => {
+                let index = parse_note_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing note text precondition".to_string())
+                    })?;
+                if note(source, index)?.content != expected {
+                    return Err(Error::StalePrecondition("note text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("note text value must be a string".to_string())
+                })?;
+                edit.set_note_text(index, replacement)?;
+            },
+            "shape-text.replace" => {
+                let index = parse_shape_target(&operation.target)?;
+                let expected = operation
+                    .preconditions
+                    .get("text")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing shape text precondition".to_string())
+                    })?;
+                if shape(source, index)?.text != expected {
+                    return Err(Error::StalePrecondition("shape text differs"));
+                }
+                let replacement = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("shape text value must be a string".to_string())
+                })?;
+                edit.set_shape_text(index, replacement)?;
+            },
+            "picture-payload.replace" => {
+                picture_payload::apply_durable_operation(source, &mut edit, operation)?;
+            },
+            "picture.remove" | "picture.insert-exact" => {
+                return Err(Error::DurablePatch(
+                    "picture lifecycle operation escaped its atomic batch".to_string(),
+                ));
+            },
+            vocabulary if is_root_transfer_vocabulary(vocabulary) => {
+                let expected_feature = operation
+                    .preconditions
+                    .get("feature")
+                    .and_then(Value::as_str)
+                    .ok_or_else(|| {
+                        Error::DurablePatch("missing feature precondition".to_string())
+                    })?;
+                if expected_feature != operation.target {
+                    return Err(Error::StalePrecondition("ordinary-root feature differs"));
+                }
+                let encoded = operation.value.as_str().ok_or_else(|| {
+                    Error::DurablePatch("ordinary-root value must be hexadecimal".to_string())
+                })?;
+                let after = hex_decode(encoded, source.limits().max_input_bytes())?;
+                edit.stage_root_transfer(
+                    root_transfer_vocabulary(vocabulary)?,
+                    operation.target.clone(),
+                    after,
+                )?;
+            },
+            _ => {
+                return Err(Error::DurablePatch(
+                    "unsupported operation vocabulary".to_string(),
+                ));
+            },
+        }
+    }
+    let snapshot = edit.commit()?.into_package();
+    if let Some(expected_hash) = expected_result_hash {
+        let result_bytes = snapshot.source_bytes().ok_or(Error::unsupported_operation(
+            "snapshot has no exact RTF source",
+        ))?;
+        let actual_hash = litchi_core::patch::BlobId::of(result_bytes).as_hex();
+        if actual_hash != expected_hash {
+            return Err(Error::StalePrecondition("durable paragraph result differs"));
+        }
+    }
+    Ok(durable_commit(source, patch, snapshot))
+}
+
+fn durable_commit<Mode>(
+    source: &Package,
+    patch: &litchi_core::patch::Patch<Mode>,
+    snapshot: Package,
+) -> litchi_core::edit::Commit<Package, litchi_core::patch::Patch<Mode>>
+where
+    Mode: Clone,
+{
+    let diagnostics = litchi_core::edit::Diagnostics::new(!same_artifact(source, &snapshot));
+    litchi_core::edit::Commit::new(snapshot, patch.clone(), diagnostics)
+}
+
+fn is_root_transfer_vocabulary(vocabulary: &str) -> bool {
+    matches!(
+        vocabulary,
+        "field.transfer"
+            | "mark.transfer"
+            | "nested-table.transfer"
+            | "list.transfer"
+            | "style.transfer"
+            | "object.transfer"
+            | "shape.transfer"
+    )
+}
+
+fn root_transfer_vocabulary(vocabulary: &str) -> Result<&'static str, Error> {
+    match vocabulary {
+        "field.transfer" => Ok("field.transfer"),
+        "mark.transfer" => Ok("mark.transfer"),
+        "nested-table.transfer" => Ok("nested-table.transfer"),
+        "list.transfer" => Ok("list.transfer"),
+        "style.transfer" => Ok("style.transfer"),
+        "object.transfer" => Ok("object.transfer"),
+        "shape.transfer" => Ok("shape.transfer"),
+        _ => Err(Error::DurablePatch(
+            "unsupported ordinary-root vocabulary".to_string(),
+        )),
+    }
+}
+
+fn hex_encode(bytes: &[u8]) -> String {
+    let mut output = String::with_capacity(bytes.len().saturating_mul(2));
+    for byte in bytes {
+        output.push(hex_character(byte >> 4));
+        output.push(hex_character(byte & 0x0f));
+    }
+    output
+}
+
+fn hex_decode(input: &str, limit: usize) -> Result<Vec<u8>, Error> {
+    if !input.len().is_multiple_of(2) {
+        return Err(Error::DurablePatch(
+            "ordinary-root hexadecimal value has odd length".to_string(),
+        ));
+    }
+    let observed = input.len() / 2;
+    if observed > limit {
+        return Err(Error::InputTooLarge { observed, limit });
+    }
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(observed)
+        .map_err(|_error| Error::Write("could not reserve hexadecimal bytes".to_string()))?;
+    let mut digits = input.bytes();
+    while let Some(high) = digits.next() {
+        let low = digits.next().ok_or_else(|| {
+            Error::DurablePatch("ordinary-root hexadecimal value has odd length".to_string())
+        })?;
+        let high_nibble = hex_digit(high)?;
+        let low_nibble = hex_digit(low)?;
+        output.push((high_nibble << 4) | low_nibble);
+    }
+    Ok(output)
+}
+
+fn hex_character(value: u8) -> char {
+    match value {
+        0..=9 => char::from(b'0' + value),
+        _ => char::from(b'a' + value - 10),
+    }
+}
+
+fn hex_digit(value: u8) -> Result<u8, Error> {
+    match value {
+        b'0'..=b'9' => Ok(value - b'0'),
+        b'a'..=b'f' => Ok(value - b'a' + 10),
+        b'A'..=b'F' => Ok(value - b'A' + 10),
+        _ => Err(Error::DurablePatch(
+            "ordinary-root value contains non-hexadecimal data".to_string(),
+        )),
+    }
+}
+
+fn parse_text_target(target: &str) -> Result<TextSpan, Error> {
+    let coordinates = target
+        .strip_prefix("body:utf8:")
+        .ok_or_else(|| Error::DurablePatch("invalid text target".to_string()))?;
+    let (start_text, end_text) = coordinates
+        .split_once('-')
+        .ok_or_else(|| Error::DurablePatch("invalid text target span".to_string()))?;
+    let start = start_text
+        .parse::<usize>()
+        .map_err(|_error| Error::DurablePatch("invalid text target start".to_string()))?;
+    let end = end_text
+        .parse::<usize>()
+        .map_err(|_error| Error::DurablePatch("invalid text target end".to_string()))?;
+    TextSpan::new(start, end)
+}
+
+fn parse_paragraph_target(target: &str) -> Result<Position, Error> {
+    target
+        .strip_prefix("body:paragraph:")
+        .ok_or_else(|| Error::DurablePatch("invalid paragraph target".to_string()))?
+        .parse::<usize>()
+        .map(Position::new)
+        .map_err(|_error| Error::DurablePatch("invalid paragraph position".to_string()))
+}
+
+fn parse_table_cell_target(target: &str) -> Result<TableCellPath, Error> {
+    let mut parts = target.split(':');
+    if parts.next() != Some("table") {
+        return Err(Error::DurablePatch("invalid table-cell target".to_string()));
+    }
+    let table_index = parse_target_position(parts.next(), "table position")?;
+    if parts.next() != Some("row") {
+        return Err(Error::DurablePatch(
+            "invalid table-cell row target".to_string(),
+        ));
+    }
+    let row_index = parse_target_position(parts.next(), "row position")?;
+    if parts.next() != Some("cell") {
+        return Err(Error::DurablePatch(
+            "invalid table-cell column target".to_string(),
+        ));
+    }
+    let cell_index = parse_target_position(parts.next(), "cell position")?;
+    let mut path = TableCellPath::outer(table_index, row_index, cell_index);
+    loop {
+        match parts.next() {
+            Some("nested") => {
+                let nested_table = parse_target_position(parts.next(), "nested table position")?;
+                let nested_row = parse_target_position(parts.next(), "nested row position")?;
+                let nested_cell = parse_target_position(parts.next(), "nested cell position")?;
+                path = path.with_nested(crate::TableCellCoordinate {
+                    table_index: nested_table,
+                    row_index: nested_row,
+                    cell_index: nested_cell,
+                });
+            },
+            Some("text") if parts.next().is_none() => return Ok(path),
+            _ => {
+                return Err(Error::DurablePatch(
+                    "invalid nested table-cell target".to_string(),
+                ));
+            },
+        }
+    }
+}
+
+fn parse_header_footer_target(target: &str) -> Result<HeaderFooterParagraph, Error> {
+    let mut parts = target.split(':');
+    if parts.next() != Some("section") {
+        return Err(Error::DurablePatch(
+            "invalid header/footer section target".to_string(),
+        ));
+    }
+    let section = parse_target_position(parts.next(), "section position")?;
+    let kind = parts
+        .next()
+        .and_then(parse_header_footer_kind)
+        .ok_or_else(|| Error::DurablePatch("invalid header/footer kind".to_string()))?;
+    if parts.next() != Some("paragraph") {
+        return Err(Error::DurablePatch(
+            "invalid header/footer paragraph target".to_string(),
+        ));
+    }
+    let paragraph = parse_target_position(parts.next(), "header/footer paragraph position")?;
+    if parts.next() != Some("text") || parts.next().is_some() {
+        return Err(Error::DurablePatch(
+            "invalid header/footer text target".to_string(),
+        ));
+    }
+    Ok(HeaderFooterParagraph::new(section, kind, paragraph))
+}
+
+fn parse_annotation_target(target: &str) -> Result<usize, Error> {
+    parse_indexed_story_target(target, "annotation")
+}
+
+fn parse_note_target(target: &str) -> Result<usize, Error> {
+    parse_indexed_story_target(target, "note")
+}
+
+fn parse_shape_target(target: &str) -> Result<usize, Error> {
+    parse_indexed_story_target(target, "shape")
+}
+
+fn parse_indexed_story_target(target: &str, owner: &'static str) -> Result<usize, Error> {
+    let mut parts = target.split(':');
+    if parts.next() != Some("body") || parts.next() != Some(owner) {
+        return Err(Error::DurablePatch(format!("invalid {owner} text target")));
+    }
+    let index = parse_target_position(parts.next(), "story position")?;
+    if parts.next() != Some("text") || parts.next().is_some() {
+        return Err(Error::DurablePatch(format!("invalid {owner} text target")));
+    }
+    Ok(index)
+}
+
+fn parse_target_position(value: Option<&str>, name: &'static str) -> Result<usize, Error> {
+    value
+        .ok_or_else(|| Error::DurablePatch(format!("missing {name}")))?
+        .parse::<usize>()
+        .map_err(|_error| Error::DurablePatch(format!("invalid {name}")))
+}
+
+fn parse_header_footer_kind(value: &str) -> Option<HeaderFooterType> {
+    match value {
+        "header" => Some(HeaderFooterType::Header),
+        "footer" => Some(HeaderFooterType::Footer),
+        "header-first" => Some(HeaderFooterType::HeaderFirst),
+        "footer-first" => Some(HeaderFooterType::FooterFirst),
+        "header-left" => Some(HeaderFooterType::HeaderLeft),
+        "footer-left" => Some(HeaderFooterType::FooterLeft),
+        "header-right" => Some(HeaderFooterType::HeaderRight),
+        "footer-right" => Some(HeaderFooterType::FooterRight),
+        _ => None,
+    }
+}
+
+const fn alignment_name(alignment: Alignment) -> &'static str {
+    match alignment {
+        Alignment::Left => "left",
+        Alignment::Right => "right",
+        Alignment::Center => "center",
+        Alignment::Justify => "justify",
+    }
+}
+
+fn parse_alignment(value: &str) -> Option<Alignment> {
+    match value {
+        "left" => Some(Alignment::Left),
+        "right" => Some(Alignment::Right),
+        "center" => Some(Alignment::Center),
+        "justify" => Some(Alignment::Justify),
+        _ => None,
+    }
+}
+
+fn baseline_name(baseline: CharacterBaseline) -> String {
+    match baseline {
+        CharacterBaseline::Normal => "normal".to_string(),
+        CharacterBaseline::Superscript => "superscript".to_string(),
+        CharacterBaseline::Subscript => "subscript".to_string(),
+        CharacterBaseline::RaisedHalfPoints(value) => format!("raised-half-points:{value}"),
+        CharacterBaseline::LoweredHalfPoints(value) => format!("lowered-half-points:{value}"),
+    }
+}
+
+fn parse_baseline(value: &str) -> Option<CharacterBaseline> {
+    match value {
+        "normal" => Some(CharacterBaseline::Normal),
+        "superscript" => Some(CharacterBaseline::Superscript),
+        "subscript" => Some(CharacterBaseline::Subscript),
+        _ => {
+            let (raised, digits) = value
+                .strip_prefix("raised-half-points:")
+                .map(|digits| (true, digits))
+                .or_else(|| {
+                    value
+                        .strip_prefix("lowered-half-points:")
+                        .map(|digits| (false, digits))
+                })?;
+            if digits.is_empty()
+                || digits.starts_with('0')
+                || !digits.bytes().all(|byte| byte.is_ascii_digit())
+            {
+                return None;
+            }
+            let half_points = digits.parse::<u16>().ok()?;
+            if half_points == 0
+                || i32::from(half_points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
+            {
+                return None;
+            }
+            Some(if raised {
+                CharacterBaseline::RaisedHalfPoints(half_points)
+            } else {
+                CharacterBaseline::LoweredHalfPoints(half_points)
+            })
+        },
+    }
+}
+
+fn expansion_name(expansion: CharacterExpansion) -> String {
+    match expansion {
+        CharacterExpansion::None => "none".to_string(),
+        CharacterExpansion::QuarterPoints(0) | CharacterExpansion::Twips(0) => "none".to_string(),
+        CharacterExpansion::QuarterPoints(value) => format!("quarter-points:{value}"),
+        CharacterExpansion::Twips(value) => format!("twips:{value}"),
+    }
+}
+
+fn parse_expansion(value: &str) -> Option<CharacterExpansion> {
+    if value == "none" {
+        return Some(CharacterExpansion::None);
+    }
+    let (quarter_points, digits) = value
+        .strip_prefix("quarter-points:")
+        .map(|digits| (true, digits))
+        .or_else(|| value.strip_prefix("twips:").map(|digits| (false, digits)))?;
+    let unsigned_digits = digits.strip_prefix('-').unwrap_or(digits);
+    if unsigned_digits.is_empty()
+        || unsigned_digits.starts_with('0')
+        || !unsigned_digits.bytes().all(|byte| byte.is_ascii_digit())
+    {
+        return None;
+    }
+    let value = digits.parse::<i32>().ok()?;
+    if value == 0
+        || !(-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION).contains(&value)
+    {
+        return None;
+    }
+    let value = i16::try_from(value).ok()?;
+    Some(if quarter_points {
+        CharacterExpansion::QuarterPoints(value)
+    } else {
+        CharacterExpansion::Twips(value)
+    })
+}
+
+const fn underline_name(underline: UnderlineStyle) -> &'static str {
+    match underline {
+        UnderlineStyle::None => "none",
+        UnderlineStyle::Single => "single",
+        UnderlineStyle::Double => "double",
+        UnderlineStyle::Dotted => "dotted",
+        UnderlineStyle::Dashed => "dashed",
+        UnderlineStyle::DashDot => "dash-dot",
+        UnderlineStyle::DashDotDot => "dash-dot-dot",
+        UnderlineStyle::Words => "words",
+        UnderlineStyle::Thick => "thick",
+        UnderlineStyle::Wave => "wave",
+        UnderlineStyle::Hairline => "hairline",
+        UnderlineStyle::ThickDotted => "thick-dotted",
+        UnderlineStyle::ThickDashed => "thick-dashed",
+        UnderlineStyle::ThickDashDot => "thick-dash-dot",
+        UnderlineStyle::ThickDashDotDot => "thick-dash-dot-dot",
+        UnderlineStyle::ThickLongDash => "thick-long-dash",
+        UnderlineStyle::LongDash => "long-dash",
+        UnderlineStyle::HeavyWave => "heavy-wave",
+        UnderlineStyle::DoubleWave => "double-wave",
+    }
+}
+
+fn parse_underline(value: &str) -> Option<UnderlineStyle> {
+    match value {
+        "none" => Some(UnderlineStyle::None),
+        "single" => Some(UnderlineStyle::Single),
+        "double" => Some(UnderlineStyle::Double),
+        "dotted" => Some(UnderlineStyle::Dotted),
+        "dashed" => Some(UnderlineStyle::Dashed),
+        "dash-dot" => Some(UnderlineStyle::DashDot),
+        "dash-dot-dot" => Some(UnderlineStyle::DashDotDot),
+        "words" => Some(UnderlineStyle::Words),
+        "thick" => Some(UnderlineStyle::Thick),
+        "wave" => Some(UnderlineStyle::Wave),
+        "hairline" => Some(UnderlineStyle::Hairline),
+        "thick-dotted" => Some(UnderlineStyle::ThickDotted),
+        "thick-dashed" => Some(UnderlineStyle::ThickDashed),
+        "thick-dash-dot" => Some(UnderlineStyle::ThickDashDot),
+        "thick-dash-dot-dot" => Some(UnderlineStyle::ThickDashDotDot),
+        "thick-long-dash" => Some(UnderlineStyle::ThickLongDash),
+        "long-dash" => Some(UnderlineStyle::LongDash),
+        "heavy-wave" => Some(UnderlineStyle::HeavyWave),
+        "double-wave" => Some(UnderlineStyle::DoubleWave),
+        _ => None,
+    }
+}
+
+#[cfg(test)]
+mod payload_admission_tests {
+    use super::*;
+
+    #[test]
+    fn admitted_owned_text_keeps_its_allocation() {
+        let source = Package::parse(r"{\rtf1 original}").expect("source");
+        let input = String::from("owned replacement");
+        let pointer = input.as_ptr();
+        let admitted = source.edit().admit_text(input, 0).expect("admitted");
+        assert_eq!(admitted.as_ptr(), pointer);
+    }
+}
+
+#[cfg(test)]
+mod layout_character_coverage_tests {
+    use super::{Package, same_source_runs};
+
+    #[test]
+    fn equivalent_fragmentation_keeps_all_text_and_formatting_constraints() {
+        let plain = Package::parse(r"{\rtf1\ansi AB}").unwrap();
+        let split = Package::parse(r"{\rtf1\ansi A\b0 B}").unwrap();
+        assert_ne!(plain.body().runs().count(), split.body().runs().count());
+        assert!(same_source_runs(&plain, &split));
+        assert!(same_source_runs(&split, &plain));
+        for altered in [
+            r"{\rtf1\ansi AC}",
+            r"{\rtf1\ansi ABC}",
+            r"{\rtf1\ansi A{\b B}}",
+            r"{\rtf1\ansi A{\lang1031 B}}",
+            r"{\rtf1\ansi A{\insrsid1 B}}",
+            r"{\rtf1\ansi A{\fcs1 B}}",
+        ] {
+            let changed = Package::parse(altered).unwrap();
+            assert!(!same_source_runs(&plain, &changed));
+            assert!(!same_source_runs(&changed, &plain));
+        }
+    }
+}
+
+#[cfg(test)]
+mod layout_resource_guard_tests {
+    use super::{Package, same_layout_resources, same_source_runs};
+
+    #[test]
+    fn identical_run_references_do_not_mask_changed_palette_or_metadata() {
+        let automatic = Package::parse(r"{\rtf1\ansi{\colortbl;}AB}").unwrap();
+        let explicit = Package::parse(r"{\rtf1\ansi{\colortbl\red0\green0\blue0;}AB}").unwrap();
+        assert_eq!(
+            automatic.raw().color_table().colors(),
+            explicit.raw().color_table().colors()
+        );
+        assert!(same_source_runs(&automatic, &explicit));
+        assert!(!same_layout_resources(&automatic, &explicit));
+        for header in [
+            r"{\fonttbl{\f0\fnil Changed;}}",
+            r"{\info{\title Changed}}",
+            r"{\colortbl;\red12\green34\blue56;}",
+        ] {
+            let changed = Package::parse(&format!("{{\\rtf1\\ansi{header}AB}}")).unwrap();
+            assert!(same_source_runs(&automatic, &changed));
+            assert!(!same_layout_resources(&automatic, &changed));
+        }
+        assert!(same_layout_resources(&automatic, &automatic));
+    }
+}

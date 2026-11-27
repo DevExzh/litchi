@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<wetp:taskpanes xmlns:wetp="http://schemas.microsoft.com/office/webextensions/taskpanes/2010/11"
+                 xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+                 xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+                 xmlns:vendor="urn:litchi:test:web-extension">
+  <wetp:taskpane dockstate="right" visibility="1" width="360" row="0" locked="0">
+    <wetp:webextensionref r:id="rId1"/>
+    <wetp:extLst>
+      <a:ext uri="urn:litchi:task-pane">
+        <vendor:pane>pane text<![CDATA[<pane-data>]]><!--pane comment--></vendor:pane>
+      </a:ext>
+    </wetp:extLst>
+  </wetp:taskpane>
+</wetp:taskpanes>

@@ -17,13 +17,15 @@
 //! ## Usage
 //!
 //! ```bash
-//! cargo run --example pptx_writer_showcase
+//! cargo run -p litchi --example pptx_writer_showcase --features pptx
 //! ```
 //!
 //! Then open `pptx_writer_showcase.pptx` in PowerPoint to verify!
 
-use litchi::ooxml::pptx::transitions::{ShapeTransitionType, ZoomDirection};
-use litchi::ooxml::pptx::*;
+use litchi_pptx::transition::{
+    Axis, InOut, Kind, Ms, Shape as TransitionShape, Side, Speed, Spokes, Transition,
+};
+use litchi_pptx::{GradientStop, PatternType, SlideBackground};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -32,10 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("======================================================\n");
 
     // Create a new presentation package
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
 
     let slide_count = {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
 
         // Set widescreen dimensions (16:9)
         println!("✓ Setting widescreen slide size (16:9)");
@@ -68,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Save the presentation
     let output_path = "pptx_writer_showcase.pptx";
     println!("\n✓ Saving presentation to: {}", output_path);
+    let pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("\n======================================================");
@@ -94,7 +97,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 /// Slide 1: Title slide with fade transition
-fn create_title_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_title_slide(pres: &mut litchi_pptx::builder::Presentation) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slide 1: Title slide");
 
     let slide = pres.add_slide()?;
@@ -114,9 +117,9 @@ fn create_title_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
 
     // Fade transition
     slide.set_transition(
-        SlideTransition::new(TransitionType::Fade)
-            .with_speed(TransitionSpeed::Medium)
-            .with_advance_after_ms(1000),
+        Transition::new(Kind::Fade { black: None })
+            .with_speed(Speed::Medium)
+            .with_after(Ms::new(1000)?),
     );
 
     slide.set_notes("Welcome slide demonstrating title, background, and fade transition.");
@@ -125,38 +128,16 @@ fn create_title_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
 }
 
 /// Slides 2-5: Solid backgrounds in different colors
-fn create_solid_background_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_solid_background_slides(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 2-5: Solid backgrounds");
 
     let colors = vec![
-        (
-            "4472C4",
-            "Professional Blue",
-            TransitionType::Push {
-                direction: TransitionDirection::Left,
-            },
-        ),
-        (
-            "ED7D31",
-            "Warm Orange",
-            TransitionType::Push {
-                direction: TransitionDirection::Right,
-            },
-        ),
-        (
-            "70AD47",
-            "Fresh Green",
-            TransitionType::Push {
-                direction: TransitionDirection::Up,
-            },
-        ),
-        (
-            "FFC000",
-            "Bright Yellow",
-            TransitionType::Push {
-                direction: TransitionDirection::Down,
-            },
-        ),
+        ("4472C4", "Professional Blue", Kind::Push(Side::Left)),
+        ("ED7D31", "Warm Orange", Kind::Push(Side::Right)),
+        ("70AD47", "Fresh Green", Kind::Push(Side::Up)),
+        ("FFC000", "Bright Yellow", Kind::Push(Side::Down)),
     ];
 
     for (color, name, transition) in colors {
@@ -172,7 +153,7 @@ fn create_solid_background_slides(pres: &mut MutablePresentation) -> Result<(), 
             914400,
         );
 
-        slide.set_transition(SlideTransition::new(transition).with_speed(TransitionSpeed::Fast));
+        slide.set_transition(Transition::new(transition).with_speed(Speed::Fast));
 
         slide.set_notes(&format!("Solid {} background with push transition.", name));
     }
@@ -181,7 +162,9 @@ fn create_solid_background_slides(pres: &mut MutablePresentation) -> Result<(), 
 }
 
 /// Slides 6-7: Gradient backgrounds
-fn create_gradient_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_gradient_slides(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 6-7: Gradient backgrounds");
 
     // Linear gradient (3 colors)
@@ -215,12 +198,7 @@ fn create_gradient_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn 
         914400,
     );
 
-    slide.set_transition(
-        SlideTransition::new(TransitionType::Wipe {
-            direction: TransitionDirection::Left,
-        })
-        .with_speed(TransitionSpeed::Medium),
-    );
+    slide.set_transition(Transition::new(Kind::Wipe(Side::Left)).with_speed(Speed::Medium));
 
     slide.set_notes("Linear gradient with three color stops at 0%, 50%, and 100%.");
 
@@ -249,10 +227,11 @@ fn create_gradient_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn 
     );
 
     slide.set_transition(
-        SlideTransition::new(TransitionType::Split {
-            direction: TransitionDirection::Horizontal,
+        Transition::new(Kind::Split {
+            axis: Axis::Horizontal,
+            toward: None,
         })
-        .with_speed(TransitionSpeed::Medium),
+        .with_speed(Speed::Medium),
     );
 
     slide.set_notes("Radial gradient radiating from center outward.");
@@ -261,7 +240,9 @@ fn create_gradient_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn 
 }
 
 /// Slides 8-13: Pattern backgrounds
-fn create_pattern_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_pattern_slides(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 8-13: Pattern backgrounds");
 
     let patterns = vec![
@@ -270,42 +251,42 @@ fn create_pattern_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn E
             "Diagonal Cross",
             "FF0000",
             "FFFF00",
-            TransitionType::Circle,
+            Kind::Shape(TransitionShape::Circle),
         ),
         (
             PatternType::Cross,
             "Cross",
             "0000FF",
             "FFFFFF",
-            TransitionType::Diamond,
+            Kind::Shape(TransitionShape::Diamond),
         ),
         (
             PatternType::Horizontal,
             "Horizontal Lines",
             "00FF00",
             "000000",
-            TransitionType::Plus,
+            Kind::Shape(TransitionShape::Plus),
         ),
         (
             PatternType::Vertical,
             "Vertical Lines",
             "FF00FF",
             "FFFFFF",
-            TransitionType::Wedge,
+            Kind::Wedge,
         ),
         (
             PatternType::SmallGrid,
             "Small Grid",
             "000000",
             "E0E0E0",
-            TransitionType::Dissolve,
+            Kind::Dissolve,
         ),
         (
             PatternType::LargeCheck,
             "Large Checkerboard",
             "FF0000",
             "000000",
-            TransitionType::Random,
+            Kind::Random,
         ),
     ];
 
@@ -327,7 +308,7 @@ fn create_pattern_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn E
             914400,
         );
 
-        slide.set_transition(SlideTransition::new(transition).with_speed(TransitionSpeed::Slow));
+        slide.set_transition(Transition::new(transition).with_speed(Speed::Slow));
 
         slide.set_notes(&format!(
             "{} pattern with custom foreground and background colors.",
@@ -339,7 +320,7 @@ fn create_pattern_slides(pres: &mut MutablePresentation) -> Result<(), Box<dyn E
 }
 
 /// Slides 14-15: Shape demonstrations
-fn create_shape_demos(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_shape_demos(pres: &mut litchi_pptx::builder::Presentation) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 14-15: Shape demonstrations");
 
     // Slide with rectangles and ellipses
@@ -377,12 +358,7 @@ fn create_shape_demos(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
     );
     slide.add_text_box("Green Box", 6400800, 1828800, 1828800, 1371600);
 
-    slide.set_transition(
-        SlideTransition::new(TransitionType::Blinds {
-            direction: TransitionDirection::Horizontal,
-        })
-        .with_speed(TransitionSpeed::Fast),
-    );
+    slide.set_transition(Transition::new(Kind::Blinds(Axis::Horizontal)).with_speed(Speed::Fast));
 
     slide.set_notes("Demonstrates rectangles and ellipses with different colors.");
 
@@ -402,12 +378,8 @@ fn create_shape_demos(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
         slide.add_text_box(text, x, y, w, h);
     }
 
-    slide.set_transition(
-        SlideTransition::new(TransitionType::Checker {
-            direction: TransitionDirection::Horizontal,
-        })
-        .with_speed(TransitionSpeed::Medium),
-    );
+    slide
+        .set_transition(Transition::new(Kind::Checker(Axis::Horizontal)).with_speed(Speed::Medium));
 
     slide.set_notes("Multiple text boxes at different positions and sizes.");
 
@@ -415,7 +387,9 @@ fn create_shape_demos(pres: &mut MutablePresentation) -> Result<(), Box<dyn Erro
 }
 
 /// Slides 16-18: Transition showcase
-fn create_transition_showcase(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_transition_showcase(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slides 16-18: Transition showcase");
 
     // Zoom transition
@@ -423,12 +397,7 @@ fn create_transition_showcase(pres: &mut MutablePresentation) -> Result<(), Box<
     slide.set_title("Zoom In Transition");
     slide.set_background(SlideBackground::solid("E7E6E6"));
     slide.add_text_box("This slide zooms in", 914400, 2743200, 7315200, 914400);
-    slide.set_transition(
-        SlideTransition::new(TransitionType::Zoom {
-            direction: ZoomDirection::In,
-        })
-        .with_speed(TransitionSpeed::Medium),
-    );
+    slide.set_transition(Transition::new(Kind::Zoom(InOut::In)).with_speed(Speed::Medium));
 
     // Wheel transition
     let slide = pres.add_slide()?;
@@ -436,9 +405,9 @@ fn create_transition_showcase(pres: &mut MutablePresentation) -> Result<(), Box<
     slide.set_background(SlideBackground::solid("FFE699"));
     slide.add_text_box("Watch the wheel spin!", 914400, 2743200, 7315200, 914400);
     slide.set_transition(
-        SlideTransition::new(TransitionType::Wheel { spokes: 8 })
-            .with_speed(TransitionSpeed::Medium)
-            .with_advance_on_click(true),
+        Transition::new(Kind::Wheel(Spokes::Eight))
+            .with_speed(Speed::Medium)
+            .with_click(true),
     );
 
     // Shape transition
@@ -447,17 +416,14 @@ fn create_transition_showcase(pres: &mut MutablePresentation) -> Result<(), Box<
     slide.set_background(SlideBackground::solid("C6E0B4"));
     slide.add_text_box("Circle reveal animation", 914400, 2743200, 7315200, 914400);
     slide.set_transition(
-        SlideTransition::new(TransitionType::Shape {
-            shape_type: ShapeTransitionType::Circle,
-        })
-        .with_speed(TransitionSpeed::Slow),
+        Transition::new(Kind::Shape(TransitionShape::Circle)).with_speed(Speed::Slow),
     );
 
     Ok(())
 }
 
 /// Slide 19: Speaker notes demonstration
-fn create_notes_demo(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_notes_demo(pres: &mut litchi_pptx::builder::Presentation) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slide 19: Speaker notes");
 
     let slide = pres.add_slide()?;
@@ -480,9 +446,7 @@ fn create_notes_demo(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error
         685800,
     );
 
-    slide.set_transition(
-        SlideTransition::new(TransitionType::Fade).with_speed(TransitionSpeed::Medium),
-    );
+    slide.set_transition(Transition::new(Kind::Fade { black: None }).with_speed(Speed::Medium));
 
     slide.set_notes(
         "This is a detailed speaker note demonstrating the notes feature.\n\n\
@@ -498,7 +462,9 @@ fn create_notes_demo(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error
 }
 
 /// Slide 20: Summary
-fn create_summary_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Error>> {
+fn create_summary_slide(
+    pres: &mut litchi_pptx::builder::Presentation,
+) -> Result<(), Box<dyn Error>> {
     println!("✓ Creating slide 20: Summary");
 
     let slide = pres.add_slide()?;
@@ -520,9 +486,7 @@ fn create_summary_slide(pres: &mut MutablePresentation) -> Result<(), Box<dyn Er
         slide.add_text_box(text, x, y, 7315200, 457200);
     }
 
-    slide.set_transition(
-        SlideTransition::new(TransitionType::Fade).with_speed(TransitionSpeed::Medium),
-    );
+    slide.set_transition(Transition::new(Kind::Fade { black: None }).with_speed(Speed::Medium));
 
     slide.set_notes("Summary of all features demonstrated in this presentation.");
 

@@ -1,0 +1,1239 @@
+#![expect(
+    clippy::arbitrary_source_item_ordering,
+    reason = "items remain grouped by OOXML schema family and package lifecycle"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+//! Table types and implementation for DOCX documents.
+use crate::error::{Error, Result};
+use crate::namespace::normalize_xml_integer;
+use crate::paragraph::extensions::Ids;
+use crate::revision::conflict::Metadata as ConflictMetadata;
+use crate::table::VMergeState;
+use litchi_core::xml::escape_xml;
+use std::collections::HashSet;
+use std::fmt::Write as FmtWrite;
+
+// Import shared format types
+pub(crate) use super::super::format::TableBorderStyle;
+// Import paragraph types
+use super::paragraph::Paragraph;
+use super::revision::{
+    CellRevisionKind, ConflictKind, RevisionMetadata, RowRevisionKind, TableCellMergeRevisionState,
+    conflict_element_name, write_conflict_attributes,
+};
+
+const MAX_PROPERTY_CONFLICT_MARKERS: usize = 1_024;
+
+/// Border definition for table or cell.
+#[derive(Debug, Clone)]
+pub struct TableBorder {
+    /// Border style
+    pub style: TableBorderStyle,
+    /// Border width in eighths of a point (e.g., 8 = 1pt, 24 = 3pt)
+    pub size: u32,
+    /// Border color in hex RGB format (e.g., "FF0000" for red)
+    pub color: String,
+}
+
+impl Default for TableBorder {
+    fn default() -> Self {
+        Self {
+            style: TableBorderStyle::Single,
+            size: 4,
+            color: "000000".to_string(),
+        }
+    }
+}
+
+/// Table borders (all sides).
+#[derive(Debug, Clone, Default)]
+pub struct TableBorders {
+    pub top: Option<TableBorder>,
+    pub left: Option<TableBorder>,
+    pub bottom: Option<TableBorder>,
+    pub right: Option<TableBorder>,
+    pub inside_h: Option<TableBorder>,
+    pub inside_v: Option<TableBorder>,
+}
+
+/// Table properties.
+#[derive(Debug, Default, Clone)]
+pub(crate) struct TableProperties {
+    pub(crate) borders: TableBorders,
+    pub(crate) width_pct: Option<u32>,
+}
+
+/// Cell properties.
+#[derive(Debug, Default, Clone)]
+pub struct CellProperties {
+    /// Cell background color in hex RGB format
+    pub background_color: Option<String>,
+    /// Cell borders (if different from table borders)
+    pub borders: Option<TableBorders>,
+    /// Cell width in DXA units (twentieth of a point)
+    pub width_dxa: Option<u32>,
+    /// Normal vertical-merge state applied to this cell.
+    pub vertical_merge: Option<VMergeState>,
+}
+
+#[derive(Debug, Clone)]
+struct PropertyChange<T> {
+    metadata: RevisionMetadata,
+    previous: T,
+}
+
+#[derive(Debug, Clone)]
+struct CellMergeChange {
+    metadata: RevisionMetadata,
+    original: TableCellMergeRevisionState,
+    current: TableCellMergeRevisionState,
+}
+
+#[derive(Debug, Clone)]
+struct PropertyConflictMarker {
+    kind: ConflictKind,
+    metadata: ConflictMetadata,
+}
+
+fn add_property_conflict_marker(
+    markers: &mut Vec<PropertyConflictMarker>,
+    kind: ConflictKind,
+    metadata: ConflictMetadata,
+    owner: &'static str,
+) -> Result<()> {
+    if markers.len() >= MAX_PROPERTY_CONFLICT_MARKERS {
+        return Err(Error::InvalidFormat(format!(
+            "{owner} exceeds the limit of {MAX_PROPERTY_CONFLICT_MARKERS} conflict markers"
+        )));
+    }
+    if markers
+        .iter()
+        .any(|marker| marker.metadata.id == metadata.id)
+    {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate {owner} revision ID {}",
+            metadata.id.get()
+        )));
+    }
+    markers.try_reserve(1).map_err(|source| Error::Allocation {
+        resource: "row property conflict marker",
+        source,
+    })?;
+    markers.push(PropertyConflictMarker { kind, metadata });
+    Ok(())
+}
+
+fn write_property_container_start(
+    xml: &mut String,
+    element: &'static str,
+    has_conflicts: bool,
+) -> Result<()> {
+    if has_conflicts {
+        write!(
+            xml,
+            "<w:{element} xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\" \
+             xmlns:w14=\"http://schemas.microsoft.com/office/word/2010/wordml\" \
+             mc:Ignorable=\"w14\">"
+        )?;
+    } else {
+        write!(xml, "<w:{element}>")?;
+    }
+    Ok(())
+}
+
+fn write_property_conflict_markers(
+    xml: &mut String,
+    markers: &[PropertyConflictMarker],
+) -> Result<()> {
+    for marker in markers {
+        write!(xml, "<w14:{}", conflict_element_name(marker.kind))?;
+        write_conflict_attributes(&marker.metadata, xml)?;
+        xml.push_str("/>");
+    }
+    Ok(())
+}
+
+/// A mutable table.
+#[derive(Debug, Clone)]
+pub struct Table {
+    /// Table rows
+    pub(crate) rows: Vec<Row>,
+    /// Table properties
+    pub(crate) properties: TableProperties,
+    property_change: Option<PropertyChange<TableProperties>>,
+}
+
+impl Table {
+    pub(crate) fn new(rows: usize, cols: usize) -> Self {
+        let mut table = Self {
+            rows: Vec::with_capacity(rows),
+            properties: TableProperties::default(),
+            property_change: None,
+        };
+        for _ in 0..rows {
+            table.add_row(cols);
+        }
+        table
+    }
+
+    /// Add a new row with specified column count.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
+    pub fn add_row(&mut self, cols: usize) -> &mut Row {
+        self.rows.push(Row::new(cols));
+        self.rows.last_mut().unwrap()
+    }
+
+    /// Set table width as percentage (100-500 where 100=20%, 500=100%).
+    pub fn set_width_percent(&mut self, percent: u32) {
+        self.properties.width_pct = Some(percent * 50);
+    }
+
+    /// Set all table borders at once.
+    pub fn set_borders(&mut self, border: TableBorder) {
+        self.properties.borders.top = Some(border.clone());
+        self.properties.borders.left = Some(border.clone());
+        self.properties.borders.bottom = Some(border.clone());
+        self.properties.borders.right = Some(border.clone());
+        self.properties.borders.inside_h = Some(border.clone());
+        self.properties.borders.inside_v = Some(border);
+    }
+
+    /// Get a cell by row and column index.
+    pub fn cell(&mut self, row: usize, col: usize) -> Option<&mut Cell> {
+        self.rows.get_mut(row)?.cell(col)
+    }
+
+    /// Get the number of rows.
+    #[must_use]
+    pub fn row_count(&self) -> usize {
+        self.rows.len()
+    }
+
+    /// Get a row by index.
+    pub fn row(&mut self, index: usize) -> Option<&mut Row> {
+        self.rows.get_mut(index)
+    }
+
+    /// Mark every existing table row as inserted or deleted.
+    ///
+    /// WordprocessingML has no whole-table insertion or deletion marker. This
+    /// operation therefore applies the supplied row revision kind to each
+    /// existing row. Exactly one metadata record is required for every row;
+    /// callers retain control of all revision IDs and can use distinct IDs
+    /// when the rows represent one logical table operation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the metadata count does not equal the row count, a
+    /// row already has an insertion/deletion marker, or any supplied ID
+    /// conflicts with another revision in this table subtree. Validation is
+    /// completed before any row is changed.
+    pub fn set_row_revisions(
+        &mut self,
+        kind: RowRevisionKind,
+        metadata: impl IntoIterator<Item = RevisionMetadata>,
+    ) -> Result<&mut Self> {
+        let expected = self.rows.len();
+        let mut candidates = Vec::new();
+        candidates
+            .try_reserve_exact(expected)
+            .map_err(|source| Error::Allocation {
+                resource: "table row revisions",
+                source,
+            })?;
+        for candidate in metadata {
+            if candidates.len() == expected {
+                return Err(Error::InvalidFormat(format!(
+                    "table row revision metadata count must equal row count {expected}"
+                )));
+            }
+            candidates.push(candidate);
+        }
+        if candidates.len() != expected {
+            return Err(Error::InvalidFormat(format!(
+                "table row revision metadata count must equal row count {expected}, got {}",
+                candidates.len()
+            )));
+        }
+
+        let mut ids = self.revision_ids()?;
+        for (index, row) in self.rows.iter().enumerate() {
+            if row.revision.is_some() {
+                return Err(Error::InvalidFormat(format!(
+                    "table row {index} already has an insertion or deletion revision"
+                )));
+            }
+        }
+        for candidate in &candidates {
+            let id = i64::from(candidate.id());
+            if !ids.insert(id) {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate table subtree revision ID {id}"
+                )));
+            }
+        }
+
+        for (row, metadata) in self.rows.iter_mut().zip(candidates) {
+            row.revision = Some((kind, metadata));
+        }
+        Ok(self)
+    }
+
+    /// Record the table properties which existed before a tracked formatting change.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_property_change(
+        &mut self,
+        metadata: RevisionMetadata,
+        previous: &Table,
+    ) -> Result<&mut Self> {
+        if self.property_change.is_some() {
+            return Err(Error::InvalidFormat(
+                "table property revision already exists".into(),
+            ));
+        }
+        if previous.property_change.is_some() {
+            return Err(Error::InvalidFormat(
+                "previous table properties must not contain revision metadata".into(),
+            ));
+        }
+        self.ensure_local_id_available(metadata.id())?;
+        self.property_change = Some(PropertyChange {
+            metadata,
+            previous: previous.properties.clone(),
+        });
+        Ok(self)
+    }
+
+    fn write_border(xml: &mut String, name: &str, border: &TableBorder) -> Result<()> {
+        write!(
+            xml,
+            "<w:{} w:val=\"{}\" w:sz=\"{}\" w:space=\"0\" w:color=\"{}\"/>",
+            name,
+            border.style.as_str(),
+            border.size,
+            escape_xml(&border.color)
+        )
+        .map_err(|e| Error::Xml(e.to_string()))
+    }
+
+    fn write_borders(
+        xml: &mut String,
+        wrapper: &str,
+        borders: &TableBorders,
+        default_missing: bool,
+    ) -> Result<()> {
+        write!(xml, "<w:{wrapper}>")?;
+        for (name, border) in [
+            ("top", &borders.top),
+            ("left", &borders.left),
+            ("bottom", &borders.bottom),
+            ("right", &borders.right),
+            ("insideH", &borders.inside_h),
+            ("insideV", &borders.inside_v),
+        ] {
+            if let Some(border) = border {
+                Self::write_border(xml, name, border)?;
+            } else if default_missing {
+                write!(
+                    xml,
+                    "<w:{name} w:val=\"single\" w:sz=\"4\" w:space=\"0\" w:color=\"000000\"/>"
+                )?;
+            }
+        }
+        write!(xml, "</w:{wrapper}>")?;
+        Ok(())
+    }
+
+    fn write_property_values(xml: &mut String, properties: &TableProperties) -> Result<()> {
+        let width = properties.width_pct.unwrap_or(5000);
+        write!(xml, "<w:tblW w:w=\"{width}\" w:type=\"pct\"/>")?;
+        Self::write_borders(xml, "tblBorders", &properties.borders, true)
+    }
+
+    fn revision_ids(&self) -> Result<HashSet<i64>> {
+        let mut ids = HashSet::new();
+        let mut insert = |id: i64| {
+            if ids.insert(id) {
+                Ok(())
+            } else {
+                Err(Error::InvalidFormat(format!(
+                    "duplicate table subtree revision ID {id}"
+                )))
+            }
+        };
+        if let Some(change) = &self.property_change {
+            insert(i64::from(change.metadata.id()))?;
+        }
+        for row in &self.rows {
+            if let Some((_, metadata)) = &row.revision {
+                insert(i64::from(metadata.id()))?;
+            }
+            if let Some(change) = &row.property_change {
+                insert(i64::from(change.metadata.id()))?;
+            }
+            for marker in &row.property_conflicts {
+                insert(i64::from(marker.metadata.id.get()))?;
+            }
+            for cell in &row.cells {
+                if let Some((_, metadata)) = &cell.revision {
+                    insert(i64::from(metadata.id()))?;
+                }
+                if let Some(change) = &cell.merge_change {
+                    insert(i64::from(change.metadata.id()))?;
+                }
+                if let Some(change) = &cell.property_change {
+                    insert(i64::from(change.metadata.id()))?;
+                }
+            }
+        }
+        Ok(ids)
+    }
+
+    fn ensure_local_id_available(&self, id: u32) -> Result<()> {
+        if self.revision_ids()?.contains(&i64::from(id)) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate table subtree revision ID {id}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn validate_revision_ids(&self) -> Result<()> {
+        self.revision_ids().map(|_| ())
+    }
+
+    pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
+        self.validate_revision_ids()?;
+        xml.push_str("<w:tbl>");
+
+        // Write table properties
+        xml.push_str("<w:tblPr>");
+
+        Self::write_property_values(xml, &self.properties)?;
+        if let Some(change) = &self.property_change {
+            xml.push_str("<w:tblPrChange");
+            change.metadata.write_attributes(xml)?;
+            xml.push_str("><w:tblPr>");
+            Self::write_property_values(xml, &change.previous)?;
+            xml.push_str("</w:tblPr></w:tblPrChange>");
+        }
+        xml.push_str("</w:tblPr>");
+
+        // Write grid
+        if let Some(first_row) = self.rows.first() {
+            xml.push_str("<w:tblGrid>");
+            for _ in 0..first_row.cell_count() {
+                xml.push_str("<w:gridCol/>");
+            }
+            xml.push_str("</w:tblGrid>");
+        }
+
+        // Write rows
+        for row in &self.rows {
+            row.to_xml(xml)?;
+        }
+
+        xml.push_str("</w:tbl>");
+
+        Ok(())
+    }
+}
+
+/// A mutable table row.
+#[derive(Debug, Clone)]
+pub struct Row {
+    /// Table cells in this row
+    pub(crate) cells: Vec<Cell>,
+    /// HTML division ID referenced by this row
+    pub(crate) division_id: Option<String>,
+    /// Word 2010 row-level extension identifiers.
+    pub(crate) extension_ids: Ids,
+    revision: Option<(RowRevisionKind, RevisionMetadata)>,
+    property_change: Option<PropertyChange<Option<String>>>,
+    property_conflicts: Vec<PropertyConflictMarker>,
+}
+
+impl Row {
+    pub(crate) fn new(cols: usize) -> Self {
+        let mut row = Self {
+            cells: Vec::with_capacity(cols),
+            division_id: None,
+            extension_ids: Ids::new(),
+            revision: None,
+            property_change: None,
+            property_conflicts: Vec::new(),
+        };
+        for _ in 0..cols {
+            row.cells.push(Cell::new());
+        }
+        row
+    }
+
+    /// Get a cell by index.
+    pub fn cell(&mut self, index: usize) -> Option<&mut Cell> {
+        self.cells.get_mut(index)
+    }
+
+    /// Add a new cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
+    pub fn add_cell(&mut self) -> &mut Cell {
+        self.cells.push(Cell::new());
+        self.cells.last_mut().unwrap()
+    }
+
+    /// Get the number of cells.
+    #[must_use]
+    pub fn cell_count(&self) -> usize {
+        self.cells.len()
+    }
+
+    /// Set the HTML division ID referenced by this row.
+    ///
+    /// Division IDs are XML Schema integers and are kept as strings so values
+    /// larger than the native integer types can be written without truncation.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_division_id(&mut self, id: impl Into<String>) -> Result<&mut Self> {
+        self.division_id = Some(normalize_xml_integer(
+            id.into(),
+            "Word table-row division ID",
+        )?);
+        Ok(self)
+    }
+
+    /// Return the HTML division ID referenced by this row, if set.
+    #[must_use]
+    pub fn division_id(&self) -> Option<&str> {
+        self.division_id.as_deref()
+    }
+
+    /// Remove the HTML division reference from this row.
+    pub fn clear_division_id(&mut self) -> &mut Self {
+        self.division_id = None;
+        self
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_revision(
+        &mut self,
+        kind: RowRevisionKind,
+        metadata: RevisionMetadata,
+    ) -> Result<&mut Self> {
+        if self.revision.is_some() {
+            return Err(Error::InvalidFormat(
+                "row insertion and deletion revisions conflict".into(),
+            ));
+        }
+        self.ensure_local_id_available(metadata.id())?;
+        self.revision = Some((kind, metadata));
+        Ok(self)
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_property_change(
+        &mut self,
+        metadata: RevisionMetadata,
+        previous: &Row,
+    ) -> Result<&mut Self> {
+        if self.property_change.is_some() {
+            return Err(Error::InvalidFormat(
+                "row property revision already exists".into(),
+            ));
+        }
+        if previous.revision.is_some()
+            || previous.property_change.is_some()
+            || !previous.property_conflicts.is_empty()
+        {
+            return Err(Error::InvalidFormat(
+                "previous row properties must not contain revision metadata".into(),
+            ));
+        }
+        self.ensure_local_id_available(metadata.id())?;
+        self.property_change = Some(PropertyChange {
+            metadata,
+            previous: previous.division_id.clone(),
+        });
+        Ok(self)
+    }
+
+    #[must_use]
+    pub fn revision_kind(&self) -> Option<RowRevisionKind> {
+        self.revision.as_ref().map(|(kind, _)| *kind)
+    }
+
+    /// Append an inert Word 2010 conflict marker to this row's properties.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn add_property_conflict(
+        &mut self,
+        kind: ConflictKind,
+        metadata: ConflictMetadata,
+    ) -> Result<&mut Self> {
+        let metadata = ConflictMetadata::new(metadata.id, metadata.author, metadata.date)?;
+        self.ensure_local_conflict_id_available(metadata.id.get())?;
+        add_property_conflict_marker(&mut self.property_conflicts, kind, metadata, "row property")?;
+        Ok(self)
+    }
+
+    /// Number of Word 2010 conflict markers on this row's properties.
+    #[must_use]
+    pub fn property_conflict_count(&self) -> usize {
+        self.property_conflicts.len()
+    }
+
+    /// Remove all Word 2010 conflict markers from this row's properties.
+    pub fn clear_property_conflicts(&mut self) -> &mut Self {
+        self.property_conflicts.clear();
+        self
+    }
+
+    fn ensure_local_id_available(&self, id: u32) -> Result<()> {
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| value.id() == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
+            || self
+                .property_conflicts
+                .iter()
+                .any(|marker| i64::from(marker.metadata.id.get()) == i64::from(id))
+        {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate row revision ID {id}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn ensure_local_conflict_id_available(&self, id: i32) -> Result<()> {
+        let id = i64::from(id);
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| i64::from(value.id()) == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| i64::from(value.metadata.id()) == id)
+            || self
+                .property_conflicts
+                .iter()
+                .any(|marker| i64::from(marker.metadata.id.get()) == id)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate row revision ID {id}"
+            )));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
+        xml.push_str("<w:tr");
+        crate::paragraph::extensions::append_row_attributes(&self.extension_ids, xml)?;
+        xml.push('>');
+
+        if self.division_id.is_some()
+            || self.revision.is_some()
+            || self.property_change.is_some()
+            || !self.property_conflicts.is_empty()
+        {
+            write_property_container_start(xml, "trPr", !self.property_conflicts.is_empty())?;
+            if let Some(division_id) = &self.division_id {
+                write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))?;
+            }
+            if let Some((kind, metadata)) = &self.revision {
+                write!(xml, "<w:{}", kind.element())?;
+                metadata.write_attributes(xml)?;
+                xml.push_str("/>");
+            }
+            if let Some(change) = &self.property_change {
+                xml.push_str("<w:trPrChange");
+                change.metadata.write_attributes(xml)?;
+                xml.push_str("><w:trPr>");
+                if let Some(division_id) = &change.previous {
+                    write!(xml, "<w:divId w:val=\"{}\"/>", escape_xml(division_id))?;
+                }
+                xml.push_str("</w:trPr></w:trPrChange>");
+            }
+            write_property_conflict_markers(xml, &self.property_conflicts)?;
+            xml.push_str("</w:trPr>");
+        }
+
+        for cell in &self.cells {
+            cell.to_xml(xml)?;
+        }
+
+        xml.push_str("</w:tr>");
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{ConflictKind, RevisionMetadata, Row};
+    use crate::revision::conflict::{Id, Metadata};
+    use crate::table::Row as ReadRow;
+
+    #[test]
+    fn writes_row_division_id_for_reader_round_trip() {
+        let mut row = Row::new(1);
+        row.set_division_id("-123456789012345678901234567890")
+            .unwrap();
+
+        assert_eq!(row.division_id(), Some("-123456789012345678901234567890"));
+
+        let mut xml = String::new();
+        row.to_xml(&mut xml).unwrap();
+        let parsed = ReadRow::new(xml.into_bytes());
+        assert_eq!(
+            parsed.division_id().unwrap().as_deref(),
+            Some("-123456789012345678901234567890")
+        );
+
+        row.clear_division_id();
+        let mut cleared_xml = String::new();
+        row.to_xml(&mut cleared_xml).unwrap();
+        assert!(!cleared_xml.contains("<w:divId"));
+    }
+
+    #[test]
+    fn rejects_invalid_row_division_id() {
+        let mut row = Row::new(0);
+        assert!(row.set_division_id("+").is_err());
+        assert_eq!(row.division_id(), None);
+    }
+
+    #[test]
+    fn writes_ordered_row_property_conflicts_after_property_change() {
+        let mut previous = Row::new(0);
+        previous.set_division_id("7").unwrap();
+
+        let mut row = Row::new(0);
+        row.set_division_id("8").unwrap();
+        row.set_property_change(RevisionMetadata::new("40", "editor").unwrap(), &previous)
+            .unwrap();
+        row.add_property_conflict(
+            ConflictKind::Delete,
+            Metadata::new(Id::new(-2).unwrap(), "alice".to_owned(), None).unwrap(),
+        )
+        .unwrap();
+        row.add_property_conflict(
+            ConflictKind::Insert,
+            Metadata::new(
+                Id::new(41).unwrap(),
+                "bob".to_owned(),
+                Some("2026-08-08T12:00:00Z".to_owned()),
+            )
+            .unwrap(),
+        )
+        .unwrap();
+
+        let mut xml = String::new();
+        row.to_xml(&mut xml).unwrap();
+        let change = xml.find("</w:trPrChange>").unwrap();
+        let deletion = xml.find("<w14:conflictDel").unwrap();
+        let insertion = xml.find("<w14:conflictIns").unwrap();
+        assert!(change < deletion && deletion < insertion);
+        assert!(xml.contains("mc:Ignorable=\"w14\""));
+        assert!(xml.contains("<w14:conflictDel w:id=\"-2\" w:author=\"alice\"/>"));
+        assert!(xml.contains(
+            "<w14:conflictIns w:id=\"41\" w:author=\"bob\" w:date=\"2026-08-08T12:00:00Z\"/>"
+        ));
+        assert_eq!(row.property_conflict_count(), 2);
+    }
+}
+
+/// A mutable table cell.
+#[derive(Debug, Clone)]
+pub struct Cell {
+    /// Paragraphs in this cell
+    pub(crate) paragraphs: Vec<Paragraph>,
+    /// Cell properties
+    pub(crate) properties: CellProperties,
+    revision: Option<(CellRevisionKind, RevisionMetadata)>,
+    merge_change: Option<CellMergeChange>,
+    property_change: Option<PropertyChange<CellProperties>>,
+}
+
+impl Cell {
+    pub(crate) fn new() -> Self {
+        Self {
+            paragraphs: vec![Paragraph::new()],
+            properties: CellProperties::default(),
+            revision: None,
+            merge_change: None,
+            property_change: None,
+        }
+    }
+
+    /// Add a new paragraph to the cell.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
+    pub fn add_paragraph(&mut self) -> &mut Paragraph {
+        self.paragraphs.push(Paragraph::new());
+        self.paragraphs.last_mut().unwrap()
+    }
+
+    /// Get the number of paragraphs.
+    #[must_use]
+    pub fn paragraph_count(&self) -> usize {
+        self.paragraphs.len()
+    }
+
+    /// Get a paragraph by index.
+    pub fn paragraph(&mut self, index: usize) -> Option<&mut Paragraph> {
+        self.paragraphs.get_mut(index)
+    }
+
+    /// Set text in the first paragraph.
+    pub fn set_text(&mut self, text: &str) {
+        self.paragraphs.clear();
+        let para = self.add_paragraph();
+        para.add_run_with_text(text);
+    }
+
+    /// Set cell background color in hex RGB format (e.g., "FFFF00" for yellow).
+    pub fn set_background_color(&mut self, color: &str) {
+        self.properties.background_color = Some(color.to_string());
+    }
+
+    /// Set cell width in DXA units (twentieth of a point).
+    pub fn set_width_dxa(&mut self, width: u32) {
+        self.properties.width_dxa = Some(width);
+    }
+
+    pub fn set_borders(&mut self, borders: TableBorders) {
+        self.properties.borders = Some(borders);
+    }
+
+    pub fn set_vertical_merge(&mut self, state: Option<VMergeState>) {
+        self.properties.vertical_merge = state;
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_revision(
+        &mut self,
+        kind: CellRevisionKind,
+        metadata: RevisionMetadata,
+    ) -> Result<&mut Self> {
+        if self.revision.is_some() {
+            return Err(Error::InvalidFormat(
+                "cell insertion and deletion revisions conflict".into(),
+            ));
+        }
+        self.ensure_local_id_available(metadata.id())?;
+        self.revision = Some((kind, metadata));
+        Ok(self)
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_merge_revision(
+        &mut self,
+        metadata: RevisionMetadata,
+        original: TableCellMergeRevisionState,
+        current: TableCellMergeRevisionState,
+    ) -> Result<&mut Self> {
+        if original == current {
+            return Err(Error::InvalidFormat(
+                "cell merge revision must change the vertical merge state".into(),
+            ));
+        }
+        if self.merge_change.is_some() {
+            return Err(Error::InvalidFormat(
+                "cell merge revision already exists".into(),
+            ));
+        }
+        self.ensure_local_id_available(metadata.id())?;
+        self.merge_change = Some(CellMergeChange {
+            metadata,
+            original,
+            current,
+        });
+        Ok(self)
+    }
+
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_property_change(
+        &mut self,
+        metadata: RevisionMetadata,
+        previous: &Cell,
+    ) -> Result<&mut Self> {
+        if self.property_change.is_some() {
+            return Err(Error::InvalidFormat(
+                "cell property revision already exists".into(),
+            ));
+        }
+        if previous.revision.is_some()
+            || previous.merge_change.is_some()
+            || previous.property_change.is_some()
+        {
+            return Err(Error::InvalidFormat(
+                "previous cell properties must not contain revision metadata".into(),
+            ));
+        }
+        self.ensure_local_id_available(metadata.id())?;
+        self.property_change = Some(PropertyChange {
+            metadata,
+            previous: previous.properties.clone(),
+        });
+        Ok(self)
+    }
+
+    #[must_use]
+    pub fn revision_kind(&self) -> Option<CellRevisionKind> {
+        self.revision.as_ref().map(|(kind, _)| *kind)
+    }
+
+    fn ensure_local_id_available(&self, id: u32) -> Result<()> {
+        if self
+            .revision
+            .as_ref()
+            .is_some_and(|(_, value)| value.id() == id)
+            || self
+                .merge_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
+            || self
+                .property_change
+                .as_ref()
+                .is_some_and(|value| value.metadata.id() == id)
+        {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate cell revision ID {id}"
+            )));
+        }
+        Ok(())
+    }
+
+    fn has_properties(&self) -> bool {
+        self.properties.background_color.is_some()
+            || self.properties.borders.is_some()
+            || self.properties.width_dxa.is_some()
+            || self.properties.vertical_merge.is_some()
+    }
+
+    fn write_property_values(xml: &mut String, properties: &CellProperties) -> Result<()> {
+        if let Some(width) = properties.width_dxa {
+            write!(xml, "<w:tcW w:w=\"{width}\" w:type=\"dxa\"/>")?;
+        }
+        if let Some(state) = properties.vertical_merge {
+            match state {
+                VMergeState::Restart => xml.push_str("<w:vMerge w:val=\"restart\"/>"),
+                VMergeState::Continue => xml.push_str("<w:vMerge/>"),
+            }
+        }
+        if let Some(borders) = &properties.borders {
+            Table::write_borders(xml, "tcBorders", borders, false)?;
+        }
+        if let Some(color) = &properties.background_color {
+            write!(
+                xml,
+                "<w:shd w:val=\"clear\" w:color=\"auto\" w:fill=\"{}\"/>",
+                escape_xml(color)
+            )?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn to_xml(&self, xml: &mut String) -> Result<()> {
+        xml.push_str("<w:tc>");
+
+        // Write cell properties if any
+        if self.has_properties()
+            || self.revision.is_some()
+            || self.merge_change.is_some()
+            || self.property_change.is_some()
+        {
+            xml.push_str("<w:tcPr>");
+            Self::write_property_values(xml, &self.properties)?;
+            if let Some((kind, metadata)) = &self.revision {
+                write!(xml, "<w:{}", kind.element())?;
+                metadata.write_attributes(xml)?;
+                xml.push_str("/>");
+            }
+            if let Some(change) = &self.merge_change {
+                xml.push_str("<w:cellMerge");
+                change.metadata.write_attributes(xml)?;
+                write!(
+                    xml,
+                    " w:vMerge=\"{}\" w:vMergeOrig=\"{}\"/>",
+                    change.current.token(),
+                    change.original.token()
+                )?;
+            }
+            if let Some(change) = &self.property_change {
+                xml.push_str("<w:tcPrChange");
+                change.metadata.write_attributes(xml)?;
+                xml.push_str("><w:tcPr>");
+                Self::write_property_values(xml, &change.previous)?;
+                xml.push_str("</w:tcPr></w:tcPrChange>");
+            }
+            xml.push_str("</w:tcPr>");
+        }
+
+        for para in &self.paragraphs {
+            para.to_xml(xml)?;
+        }
+
+        xml.push_str("</w:tc>");
+
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod revision_tests {
+    use super::*;
+    use crate::revision::RevisionType;
+    use crate::table::Table as ReadTable;
+
+    fn metadata(id: &str) -> RevisionMetadata {
+        let mut metadata = RevisionMetadata::new(id, "表 & \"作者\"").unwrap();
+        metadata
+            .set_date(Some("2026-07-19T10:30:00+08:00"))
+            .unwrap();
+        metadata
+            .set_date_utc(Some("2026-07-19T02:30:00.123456Z"))
+            .unwrap();
+        metadata
+    }
+
+    #[test]
+    fn writes_and_parses_all_table_row_and_cell_revision_types() {
+        let mut previous_table = Table::new(1, 1);
+        previous_table.set_width_percent(42);
+        let mut table = Table::new(2, 2);
+        table.set_width_percent(80);
+        table
+            .set_row_revisions(RowRevisionKind::Insert, [metadata("1"), metadata("2")])
+            .unwrap();
+        table
+            .set_property_change(metadata("10"), &previous_table)
+            .unwrap();
+
+        let mut previous_row = Row::new(1);
+        previous_row.set_division_id("17").unwrap();
+        let row = table.row(0).unwrap();
+        row.set_division_id("18").unwrap();
+        row.set_property_change(metadata("11"), &previous_row)
+            .unwrap();
+
+        let mut previous_cell = Cell::new();
+        previous_cell.set_width_dxa(720);
+        previous_cell.set_background_color("00FF00");
+        previous_cell.set_vertical_merge(Some(VMergeState::Restart));
+        let cell = table.cell(0, 0).unwrap();
+        cell.set_width_dxa(1440);
+        cell.set_background_color("F0F0F0");
+        cell.set_vertical_merge(Some(VMergeState::Continue));
+        cell.set_revision(CellRevisionKind::Insert, metadata("5"))
+            .unwrap();
+        cell.set_merge_revision(
+            metadata("6"),
+            TableCellMergeRevisionState::Rest,
+            TableCellMergeRevisionState::Continue,
+        )
+        .unwrap();
+        cell.set_property_change(metadata("7"), &previous_cell)
+            .unwrap();
+
+        table
+            .cell(1, 0)
+            .unwrap()
+            .set_revision(CellRevisionKind::Delete, metadata("9"))
+            .unwrap();
+
+        let mut xml = String::new();
+        table.to_xml(&mut xml).unwrap();
+
+        assert!(xml.contains("<w:ins w:id=\"1\" w:author=\"表 &amp; &quot;作者&quot;\""));
+        assert!(xml.contains("<w:ins w:id=\"2\""));
+        assert!(xml.contains("<w:cellIns w:id=\"5\""));
+        assert!(xml.contains("<w:cellDel w:id=\"9\""));
+        assert!(xml.contains("<w:cellMerge w:id=\"6\""));
+        assert!(xml.contains("w:vMergeOrig=\"rest\""));
+        assert!(xml.contains("w:vMerge=\"cont\""));
+        assert!(xml.contains("<w:vMerge/>"));
+        assert!(xml.contains("<w:tblPr><w:tblW w:w=\"2100\""));
+        assert!(xml.contains("<w:trPr><w:divId w:val=\"17\"/></w:trPr></w:trPrChange>"));
+        assert!(xml.contains("<w:tcPr><w:tcW w:w=\"720\""));
+
+        let tbl_change = xml.find("<w:tblPrChange").unwrap();
+        let tbl_pr_end = xml.find("</w:tblPr>").unwrap();
+        assert!(tbl_change < tbl_pr_end);
+        let row_change = xml.find("<w:trPrChange").unwrap();
+        let row_pr_end = xml.find("</w:trPr>").unwrap();
+        assert!(row_change < row_pr_end);
+        let cell_marker = xml.find("<w:cellIns").unwrap();
+        let cell_merge = xml.find("<w:cellMerge").unwrap();
+        let cell_change = xml.find("<w:tcPrChange").unwrap();
+        assert!(cell_marker < cell_merge && cell_merge < cell_change);
+
+        let parsed = ReadTable::new(xml.into_bytes()).revisions().unwrap();
+        let kinds: Vec<_> = parsed
+            .iter()
+            .map(|revision| revision.revision_type())
+            .collect();
+        for kind in [
+            RevisionType::TablePropertiesChange,
+            RevisionType::RowInsert,
+            RevisionType::RowPropertiesChange,
+            RevisionType::CellInsert,
+            RevisionType::CellDelete,
+            RevisionType::CellMerge,
+            RevisionType::CellPropertiesChange,
+        ] {
+            assert!(kinds.contains(&kind), "missing parsed revision {kind:?}");
+        }
+        assert_eq!(parsed[0].author(), Some("表 & \"作者\""));
+        assert!(
+            parsed
+                .iter()
+                .all(|revision| revision.date_utc() == Some("2026-07-19T02:30:00.123456Z"))
+        );
+    }
+
+    #[test]
+    fn writes_table_row_deletions_and_parses_strict_namespace() {
+        let mut table = Table::new(1, 1);
+        table
+            .set_row_revisions(RowRevisionKind::Delete, [metadata("10")])
+            .unwrap();
+        let mut body = String::new();
+        table.to_xml(&mut body).unwrap();
+        assert!(body.contains("<w:del w:id=\"10\""));
+
+        let strict = body.replacen(
+            "<w:tbl>",
+            "<w:tbl xmlns:w=\"http://purl.oclc.org/ooxml/wordprocessingml/main\">",
+            1,
+        );
+        let revisions = ReadTable::new(strict.into_bytes()).revisions().unwrap();
+        assert_eq!(revisions.len(), 1);
+        assert_eq!(revisions[0].revision_type(), RevisionType::RowDelete);
+    }
+
+    #[test]
+    fn row_revision_batches_validate_count_ids_and_conflicts_atomically() {
+        let mut too_few = Table::new(2, 1);
+        assert!(
+            too_few
+                .set_row_revisions(RowRevisionKind::Insert, [metadata("20")])
+                .is_err()
+        );
+        assert_eq!(too_few.row(0).unwrap().revision_kind(), None);
+        assert_eq!(too_few.row(1).unwrap().revision_kind(), None);
+
+        let mut too_many = Table::new(1, 1);
+        assert!(
+            too_many
+                .set_row_revisions(RowRevisionKind::Delete, [metadata("21"), metadata("22")])
+                .is_err()
+        );
+        assert_eq!(too_many.row(0).unwrap().revision_kind(), None);
+
+        let mut duplicate = Table::new(2, 1);
+        assert!(
+            duplicate
+                .set_row_revisions(RowRevisionKind::Insert, [metadata("30"), metadata("30")])
+                .is_err()
+        );
+        assert_eq!(duplicate.row(0).unwrap().revision_kind(), None);
+        assert_eq!(duplicate.row(1).unwrap().revision_kind(), None);
+
+        let mut conflict = Table::new(2, 1);
+        conflict
+            .row(0)
+            .unwrap()
+            .set_revision(RowRevisionKind::Insert, metadata("40"))
+            .unwrap();
+        assert!(
+            conflict
+                .set_row_revisions(RowRevisionKind::Delete, [metadata("41"), metadata("42")])
+                .is_err()
+        );
+        assert_eq!(
+            conflict.row(0).unwrap().revision_kind(),
+            Some(RowRevisionKind::Insert)
+        );
+        assert_eq!(conflict.row(1).unwrap().revision_kind(), None);
+
+        let mut previous = Table::new(2, 1);
+        previous.set_width_percent(42);
+        let mut with_property = Table::new(2, 1);
+        with_property
+            .set_property_change(metadata("50"), &previous)
+            .unwrap();
+        assert!(
+            with_property
+                .set_row_revisions(RowRevisionKind::Insert, [metadata("50"), metadata("51")])
+                .is_err()
+        );
+        assert_eq!(with_property.row(0).unwrap().revision_kind(), None);
+        assert_eq!(with_property.row(1).unwrap().revision_kind(), None);
+
+        let mut with_history = Table::new(1, 1);
+        with_history
+            .set_row_revisions(RowRevisionKind::Insert, [metadata("60")])
+            .unwrap();
+        with_history
+            .set_property_change(metadata("61"), &Table::new(1, 1))
+            .unwrap();
+        let mut xml = String::new();
+        with_history.to_xml(&mut xml).unwrap();
+        assert!(xml.contains("<w:ins w:id=\"60\""));
+        assert!(xml.contains("<w:tblPrChange w:id=\"61\""));
+
+        let mut previous_with_history = Table::new(1, 1);
+        previous_with_history
+            .set_property_change(metadata("70"), &Table::new(1, 1))
+            .unwrap();
+        let mut target = Table::new(1, 1);
+        assert!(
+            target
+                .set_property_change(metadata("71"), &previous_with_history)
+                .is_err()
+        );
+    }
+}

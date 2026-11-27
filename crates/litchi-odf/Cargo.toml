@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-odf"
-description = "OpenDocument Format (ODF) parser for the Litchi office-formats library."
+description = "OpenDocument detection and feature-gated family facades for the Litchi office-formats library."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true
@@ -8,18 +8,48 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = ["odt", "ods", "odp"]
+all = ["odb", "odc", "formula", "odg", "odi", "odm", "odp", "ods", "odt", "oth"]
+odb = ["dep:litchi-odb"]
+odc = ["dep:litchi-odc"]
+formula = ["dep:litchi-odf-formula"]
+odg = ["dep:litchi-odg"]
+odi = ["dep:litchi-odi"]
+odm = ["dep:litchi-odm"]
+odp = ["dep:litchi-odp"]
+ods = ["dep:litchi-ods"]
+odt = ["dep:litchi-odt"]
+oth = ["dep:litchi-oth"]
+
 [dependencies]
-atoi_simd     = { workspace = true }
-chrono        = { workspace = true }
-fast-float2   = { workspace = true }
-litchi-core   = { workspace = true, features = ["odf"] }
-memchr        = { workspace = true }
-phf           = { workspace = true }
-quick-xml     = { workspace = true }
-smallvec      = { workspace = true }
-soapberry-zip = { workspace = true }
-xml-minifier  = { workspace = true }
+litchi-odb = { workspace = true, optional = true }
+litchi-odc = { workspace = true, optional = true }
+litchi-odf-common = { workspace = true }
+litchi-odf-formula = { workspace = true, optional = true }
+litchi-odg = { workspace = true, optional = true }
+litchi-odi = { workspace = true, optional = true }
+litchi-odm = { workspace = true, optional = true }
+litchi-odp = { workspace = true, optional = true }
+litchi-ods = { workspace = true, optional = true }
+litchi-odt = { workspace = true, optional = true }
+litchi-oth = { workspace = true, optional = true }
 
 [dev-dependencies]
 tempfile = { workspace = true }
-zip      = { version = "8", default-features = false, features = ["deflate"] }
+zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
+
+[[example]]
+name = "read_odp"
+required-features = ["odp"]
+
+[[example]]
+name = "read_odt"
+required-features = ["odt"]
+
+[[test]]
+name = "rdf_package_mutation"
+required-features = ["odp", "ods", "odt"]
+
+[lints]
+workspace = true

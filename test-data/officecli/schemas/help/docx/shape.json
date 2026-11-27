@@ -1,0 +1,145 @@
+{
+  "$schema": "../_schema.json",
+  "format": "docx",
+  "element": "shape",
+  "elementAliases": [
+    "sp"
+  ],
+  "parent": "body",
+  "operations": {
+    "add": true,
+    "set": true,
+    "get": true,
+    "query": false,
+    "remove": true
+  },
+  "paths": {
+    "positional": [
+      "/body/shape[N]"
+    ]
+  },
+  "note": "Floating geometric shape — a DrawingML anchored shape (wps:wsp) with a preset geometry, fill and outline, but no text body. Created via `add --type shape`; Get returns the raw drawing tree and Remove deletes the host paragraph. Set supports the spPr surface (fill / line / line.* / width / height / geometry) in place; position/anchor/wrap/rotation props are add-only (use Remove + re-Add, or the raw-set path, to change those). For a shape that carries text use `textbox`; for inline images use `picture`.",
+  "properties": {
+    "geometry": {
+      "type": "string",
+      "description": "preset shape geometry (rect, roundRect, ellipse, triangle, diamond, ...). Aliases: preset.",
+      "aliases": ["preset"],
+      "default": "rect",
+      "add": true,
+      "set": true,
+      "examples": ["--prop geometry=ellipse", "--prop geometry=roundRect"]
+    },
+    "width": {
+      "type": "length",
+      "description": "shape width (cm/in/pt/EMU). Default ~1in.",
+      "add": true,
+      "set": true,
+      "examples": ["--prop width=4cm"]
+    },
+    "height": {
+      "type": "length",
+      "description": "shape height (cm/in/pt/EMU). Default ~1in.",
+      "add": true,
+      "set": true,
+      "examples": ["--prop height=4cm"]
+    },
+    "wrap": {
+      "type": "enum",
+      "description": "text-wrap mode of surrounding body text around the shape.",
+      "values": ["square", "tight", "through", "topAndBottom", "behind", "front", "none"],
+      "default": "none",
+      "add": true,
+      "examples": ["--prop wrap=square"]
+    },
+    "hAlign": {
+      "type": "enum",
+      "description": "relative horizontal alignment (emits <wp:align>, replaces a positional offset on the X axis). Aliases: halign.",
+      "values": ["left", "center", "right", "inside", "outside"],
+      "aliases": ["halign"],
+      "add": true,
+      "examples": ["--prop hAlign=center"]
+    },
+    "vAlign": {
+      "type": "enum",
+      "description": "relative vertical alignment (emits <wp:align> on the Y axis). Aliases: valign.",
+      "values": ["top", "center", "bottom", "inside", "outside"],
+      "aliases": ["valign"],
+      "add": true,
+      "examples": ["--prop vAlign=center"]
+    },
+    "hRelative": {
+      "type": "enum",
+      "description": "what the horizontal position/alignment is measured from. Aliases: hrelative.",
+      "values": ["margin", "page", "column", "character", "leftMargin", "rightMargin", "insideMargin", "outsideMargin"],
+      "default": "column",
+      "aliases": ["hrelative"],
+      "add": true,
+      "examples": ["--prop hRelative=margin"]
+    },
+    "vRelative": {
+      "type": "enum",
+      "description": "what the vertical position/alignment is measured from. Aliases: vrelative.",
+      "values": ["margin", "page", "paragraph", "line", "topMargin", "bottomMargin", "insideMargin", "outsideMargin"],
+      "default": "paragraph",
+      "aliases": ["vrelative"],
+      "add": true,
+      "examples": ["--prop vRelative=paragraph"]
+    },
+    "anchor.x": {
+      "type": "length",
+      "description": "horizontal position offset from hRelative origin. Alias: hposition. Ignored when hAlign is set.",
+      "aliases": ["hposition"],
+      "add": true,
+      "examples": ["--prop anchor.x=2cm"]
+    },
+    "anchor.y": {
+      "type": "length",
+      "description": "vertical position offset from vRelative origin. Alias: vposition. Ignored when vAlign is set.",
+      "aliases": ["vposition"],
+      "add": true,
+      "examples": ["--prop anchor.y=1cm"]
+    },
+    "fill": {
+      "type": "color",
+      "description": "fill color (hex/name), or 'none' for no fill.",
+      "add": true,
+      "set": true,
+      "examples": ["--prop fill=FF0000", "--prop fill=none"]
+    },
+    "line": {
+      "type": "string",
+      "description": "composite outline 'STYLE;SIZE;COLOR' (or 'none'); split keys line.style/line.width/line.color also accepted.",
+      "add": true,
+      "set": true,
+      "examples": ["--prop line=solid;1pt;000000"]
+    },
+    "line.color": {
+      "type": "color",
+      "description": "outline color. Alias: linecolor.",
+      "aliases": ["linecolor"],
+      "add": true,
+      "set": true
+    },
+    "line.width": {
+      "type": "length",
+      "description": "outline width. Alias: linewidth.",
+      "aliases": ["linewidth"],
+      "add": true,
+      "set": true
+    },
+    "line.style": {
+      "type": "string",
+      "description": "outline dash style. Alias: linestyle.",
+      "aliases": ["linestyle"],
+      "add": true,
+      "set": true
+    },
+    "alt": {
+      "type": "string",
+      "description": "accessibility / object name (docPr name). Alias: name. Default 'Shape'.",
+      "aliases": ["name"],
+      "add": true,
+      "examples": ["--prop alt=\"Diagram box\""]
+    }
+  }
+}

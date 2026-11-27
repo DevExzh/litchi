@@ -1,0 +1,15 @@
+// Narrow scalar projection for one native Numbers duration format.
+//
+// The complete TSK.FormatStructArchive remains source-authoritative. This
+// sidecar exists only to parity-check the selected duration fields after the
+// handwritten codec has performed its complete bounded wire preflight.
+syntax = "proto2";
+package LitchiIwaNumbersTableCellDurationFormatProjection;
+
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+  optional uint32 duration_style = 7;
+  optional uint32 duration_unit_largest = 15;
+  optional uint32 duration_unit_smallest = 16;
+  optional bool use_automatic_duration_units = 40;
+}

@@ -1,0 +1,618 @@
+file	sha256	bytes	corpus	document	container	offset	extraction	documents
+blip/3gpp-25212-650-e4381592c6.blip	a0a95c16e633d72eb9d112f4e0bdef3f0bdfff42105399695547b51f3b56b78d	742	3gpp	25_series/25.212/25212-650.zip!25212-650.doc	ObjectPool/_1172648175/Data	168	blip	3
+blip/3gpp-25212_320-824f653440.blip	656b3d72bc7a2f3b9c847e3409cad090b1b0fd5c85a67265a432e0ecb2e251c3	242	3gpp	25_series/25.212/25212-320.zip!25212_320.doc	Data	76294	blip	2
+blip/govdocs1-000307-ppt-cca477f09a.blip	5cf8b903b129aaca21c4b649d9d9f8cf5a2c7b24964acad2fb4d86d886c6e31e	401	govdocs1	000/000307.ppt	Pictures	165	blip	1
+blip/govdocs1-018436-ppt-6211624f9e.blip	fe08df5822cd15908d9125695c652e122ebd6ce8562298bfaa6cfa8e98f43b8a	330	govdocs1	018/018436.ppt	Pictures	591709	blip	1
+blip/govdocs1-024473-doc-7490442f00.blip	d77dbf779ef0e13e9b1e235b9ee03ea83d546513540f353472f54f8224fcc6ff	456	govdocs1	024/024473.doc	Data	4913783	blip	2
+blip/govdocs1-026706-ppt-0921010778.blip	b06e185e2dde9adc878503d9adc12306a637f22ef600d5ca9feea5554fb97223	1395	govdocs1	026/026706.ppt	Pictures	1034100	blip	1
+blip/govdocs1-036316-ppt-3657bbc02c.blip	7ce8bb0deb2adf88639467e6c88b58e2db55a9f154b4e0e940d1548ce7e637ed	218	govdocs1	036/036316.ppt	Pictures	220455	blip	1
+blip/govdocs1-041075-ppt-8acac3c2b2.blip	324d0a4fe8c35023b92ca595b5c7dd4aa6e71b30cb8403bef371d0ff1be63790	1087	govdocs1	041/041075.ppt	Pictures	725128	blip	1
+blip/govdocs1-041703-doc-ea5d9c4904.blip	978fc8146e532b5f30d2e583c376c7d1098ccb9303c86f1d49ed3f1ca32d8cb1	4287	govdocs1	041/041703.doc	Data	7810	blip	1
+blip/govdocs1-045927-ppt-7d68b15b01.blip	a75b70d16b4d45db27add173c147f1b968ebfd84facdba0379e48349f2dfbd2d	197	govdocs1	045/045927.ppt	Pictures	19505	blip	1
+blip/govdocs1-047246-ppt-b6551745a6.blip	2d42c79a0df54ce087a6a325e180052cb95626496102f2d2d22e5ae6f96b274c	1113	govdocs1	047/047246.ppt	Pictures	23233	blip	1
+blip/govdocs1-049700-xls-ccdcd51b26.blip	ba32e5c0008cd77c8ffc40cade5bbf65a7d6839c9ec7eed6dbf1792b56b49eb3	703	govdocs1	049/049700.xls	Workbook#MsoDrawingGroup0	1623	blip	1
+blip/govdocs1-092641-doc-a7942154c3.blip	1b74dc88362fed8e60e93473c15623557d6a69197e4c3d8f7420fefb090e246f	8476	govdocs1	092/092641.doc	Data	940489	blip	1
+blip/govdocs1-093647-ppt-92a135cfa9.blip	1f23946f0ce081f5991a1d7116e3b0dc136687f35e077474923a3280ff04fd56	15814	govdocs1	093/093647.ppt	Pictures	53811	blip	1
+blip/govdocs1-095072-doc-91423cfd77.blip	31a2f49a99445a6db63d5b72bd110a76c918291422a3d94755affeffaaf0b791	152	govdocs1	095/095072.doc	ObjectPool/_1068009683/WordDocument	6186	blip	2
+blip/govdocs1-098167-ppt-e594dfed58.blip	ca088f267059d96e3f125e2cc80fded97a277c04782e4076a7503080e0048f3c	1803	govdocs1	098/098167.ppt	Pictures	364165	blip	1
+blip/govdocs1-102200-ppt-4d96316293.blip	807175108485aec475d1424196bf517d33abad2885b4b0e3102a0dca8c97674d	515	govdocs1	102/102200.ppt	Pictures	1229617	blip	1
+blip/govdocs1-112817-ppt-bc28c2f838.blip	ef4e90db597dbd8385be9d6658dbfe7392179ab7da674c15a07d452316ae96a0	472	govdocs1	112/112817.ppt	PowerPoint Document#ExOleObjStg@24150::Data	1211	blip	3
+blip/govdocs1-114223-ppt-58e2266400.blip	de62c621b66402d612d4fe04657adf4ffbcfea39c07c8e762bf5b8965e09d12b	9259	govdocs1	114/114223.ppt	Pictures	776621	blip	1
+blip/govdocs1-120641-ppt-5cedd77a4e.blip	c916cbaf537e9665d139ab6fc653521c2be4a6826e923d6e316bba7676c001d8	38177	govdocs1	120/120641.ppt	Pictures	11050	blip	1
+blip/govdocs1-121467-doc-5dd56ee443.blip	4da2dc837e676b9e404857933b2372cb134cc0dabe1e0a816b8ad676ef57e5db	491	govdocs1	121/121467.doc	Data	907	blip	1
+blip/govdocs1-122026-doc-d2a220e963.blip	6878cff51e7b4fea41b2a2123d3524eabebe25ea7ae3023e55921d54fb863d56	383	govdocs1	122/122026.doc	WordDocument	124644	blip	1
+blip/govdocs1-131813-ppt-45c61666b6.blip	52726222b534e3cfe8bec7f5621c3a5e66b6b56bc7b5f2119227c8c41b3a828d	1573	govdocs1	131/131813.ppt	Pictures	218667	blip	1
+blip/govdocs1-139900-ppt-009a7e432a.blip	d408f5167fd03eba7857a022de93c56ff6f6649d13382825a4b4fbc47fd90458	2444	govdocs1	139/139900.ppt	Pictures	19201	blip	1
+blip/govdocs1-144890-pps-2f68bab585.blip	6aa37190a19ff123820a17a682e58931fa915c67770254f24053d945eaf68f23	1002	govdocs1	144/144890.pps	Pictures	5401879	blip	1
+blip/govdocs1-153747-xls-e14908c494.blip	e80f390cecbb5dd9624086d4148853bbc86c344da55895e578b68d34e5eea6c1	369	govdocs1	153/153747.xls	Pictures	373125	blip	1
+blip/govdocs1-162613-ppt-96035a4ece.blip	d26070106fd4fd3f28c648f08f0fa6f1d46baa2592d651281546e9ace657ae68	195	govdocs1	162/162613.ppt	Pictures	418289	blip	1
+blip/govdocs1-167363-ppt-8ba1fb0611.blip	d46b14d915ea60648b74ba644ac1b8e8b1b2c0c9e4658795684701dd672d8d07	2517	govdocs1	167/167363.ppt	Pictures	373148	blip	1
+blip/govdocs1-170242-ppt-cecda149ae.blip	4d8a5bb6aa081376fe569fcc9eb850d56bc7dab391cbb43e6bfcaf22755616b9	286	govdocs1	170/170242.ppt	Pictures	38052	blip	1
+blip/govdocs1-193321-ppt-2586e521d1.blip	57a521d7419e8f73621e70a68e48aa2c1bd7b69eaa6afcf317c98e7353c9dd52	2702	govdocs1	193/193321.ppt	Pictures	667101	blip	1
+blip/govdocs1-199645-ppt-457d1b021b.blip	64bb4246b5e870b5b784335185100ad0fe04fa61fbdad3573ce8558a9498eb83	536	govdocs1	199/199645.ppt	Pictures	252661	blip	1
+blip/govdocs1-200136-ppt-56965862f8.blip	18028a6de14b0f6ccf1713fcd1dd0a8a30d76589b16f9664426dc3d26ff5597d	2523	govdocs1	200/200136.ppt	Pictures	577402	blip	1
+blip/govdocs1-223602-pps-cee774a61f.blip	f2ce6f7f85019b409d5b16374cf3e8e8a9837285bdf19768e0dc57f018537176	252	govdocs1	223/223602.pps	Pictures	598386	blip	1
+blip/govdocs1-223624-docx-4609ca883f.blip	51d7685e476fc6f8911b0feca30720b171f0f971834a315581a5c2ffb2593208	1560	govdocs1	223/223624.docx	!word/embeddings/Microsoft_Office_Word_97_-_2003_Document8.doc::WordDocument	166576	blip	1
+blip/govdocs1-234526-doc-39f101de7e.blip	8f4acea880b7d33738280539deb80114e7c188acfb080db1ecd3cc1449c9deaf	5400	govdocs1	234/234526.doc	Data	60233	blip	2
+blip/govdocs1-239048-ppt-d37aa31c5d.blip	c55b84d8c74377bd4b9120d241e90baf6a3a313e4f10c141c5c30959fe3634a0	252	govdocs1	239/239048.ppt	Pictures	203958	blip	3
+blip/govdocs1-243828-ppt-beba69da89.blip	55796ccb3c7a851a4c181d051b722c494e216589c20ad3b0d196e05fe40ba40a	712	govdocs1	243/243828.ppt	Pictures	4164	blip	1
+blip/govdocs1-244568-ppt-36e43dce75.blip	8b86bcc7d018bd7add55a3307df6dd6284740a2edb6b20cad39526722b4c7e5c	239	govdocs1	244/244568.ppt	Pictures	48595	blip	1
+blip/govdocs1-245653-pps-f00f9d3ca6.blip	583ac224acea062572cd8016d5d8229efa0570a73bbade94a322502c27e782ff	1116	govdocs1	245/245653.pps	Pictures	271557	blip	1
+blip/govdocs1-262896-doc-d0892c20cb.blip	67963c6d9c80db0d0fbffd414b71b00cd57cc54f3ec7a618a0528f6e8a56de2f	3762	govdocs1	262/262896.doc	Data	550439	blip	1
+blip/govdocs1-265406-ppt-aec4b434a2.blip	171d7c02afbef0c3f264346f6c9e0c341fc057c341a3748aec638c6f67c6192c	1559	govdocs1	265/265406.ppt	Pictures	13995	blip	1
+blip/govdocs1-267454-ppt-89321b0378.blip	52fa710d76173e70c4e28bb19014837954e4ddd755a9448bc9e4e7aa1476446d	2797	govdocs1	267/267454.ppt	Pictures	237090	blip	1
+blip/govdocs1-270512-ppt-a3ed55a751.blip	d85751f4b30d28659b38014fe77ba9150666ebb235247183d13b69a6e79e7ffd	510	govdocs1	270/270512.ppt	Pictures	45347	blip	1
+blip/govdocs1-279023-pps-0f456d182e.blip	1ac516c2f611d77ee88799a0704ec40068f2877b6ec0a419a0568d1487600729	414	govdocs1	279/279023.pps	Pictures	1441083	blip	1
+blip/govdocs1-284607-pps-3dfd8c06ec.blip	37e60db417d5e636dd67718e8d941213672144f4dfd58a7d4e1cc9d16e30a742	1099	govdocs1	284/284607.pps	Pictures	1530916	blip	1
+blip/govdocs1-289977-ppt-e385257e7e.blip	4b1a47eb2662ebf008e0364f06bcf2879d2e7ee602b090274e10c91b5feb015b	271	govdocs1	289/289977.ppt	Pictures	873421	blip	1
+blip/govdocs1-319839-pps-5f52fa6bdb.blip	b2f6d8baa77c84b5123a3efe5d1a38b99b7d49046aed6f532333a551d467ef0a	1543	govdocs1	319/319839.pps	PowerPoint Document#ExOleObjStg@423789::Pictures	48868	blip	1
+blip/govdocs1-325066-ppt-4c86b7dc07.blip	113a480ee2aeff00feeb8211b32732f6c35ff0f77edfb913158059df403d2f1e	272	govdocs1	325/325066.ppt	Pictures	0	blip	1
+blip/govdocs1-329497-doc-542439d568.blip	e4d9c4daf10699110181a5b6db38cff250d746ead6de8d122c4d475be0bc4d77	1089	govdocs1	329/329497.doc	Data	12397	blip	1
+blip/govdocs1-349885-ppt-d1bd8f2c90.blip	78ab1ccf976bfe1f9874b1dbb45cc38873507b5ede700435e17789abe450f9ef	450	govdocs1	349/349885.ppt	Pictures	1898044	blip	1
+blip/govdocs1-352097-doc-49b97b7513.blip	74c73b3a40fcd838fe5b1c19d04fc76376e055e19e99de83f02301e1c6177292	236	govdocs1	352/352097.doc	WordDocument	540758	blip	1
+blip/govdocs1-352595-ppt-58543d56f8.blip	806f2536960fae2f4143b4ef4806b0628dc5b0f58e636947cbd819f9ec82dc66	1908	govdocs1	352/352595.ppt	Pictures	6785576	blip	1
+blip/govdocs1-369422-ppt-9c91e3f169.blip	857aea4cb1b29ef5fa1c51e1867661bcb78a1e62adbd61972e46dcc92b5b4b88	70	govdocs1	369/369422.ppt	Pictures	417100	blip	16
+blip/govdocs1-369682-ppt-d1734271d1.blip	7d056f5558805e66df8b5961bfded98a288be7008cd917fb67d970bcb09774be	379	govdocs1	369/369682.ppt	Pictures	205408	blip	1
+blip/govdocs1-369956-pptx-5c678e47cd.blip	54b672fd2a61d28a370d2b8e7598bd70f7e3a3839246b5da41bfe7615e2992a1	500	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	182	blip	1
+blip/govdocs1-369956-pptx-662bcd38e0.blip	3c1734b96b3a10ad292cfcaba80c7f1cb8c121f7898311b28241c6860cea4e88	539	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	3049	blip	1
+blip/govdocs1-369956-pptx-a01c8a59b6.blip	a6f52400814f5711d4c22d4af2bf549f39dc12919b5c574063e39c69ca9fca01	545	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	864	blip	1
+blip/govdocs1-369956-pptx-cdbf5c3606.blip	7fd68e3fb8c398f7a51451f7aead02ad7c3bec9dc6e0c4420f3332a7db545fb4	452	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	3770	blip	1
+blip/govdocs1-374708-doc-ee63a30948.blip	9348f2d2d62c82328075968c91acc7affcb929f4c99ef7027da819967d736060	139	govdocs1	374/374708.doc	Data	1293	blip	1
+blip/govdocs1-377873-pps-557520f6b9.blip	c7ea4bf0a36e98b77c55aedceac72260a2af8a0b51e37fbc0c6dafe653e1b94b	1677	govdocs1	377/377873.pps	Pictures	70294	blip	1
+blip/govdocs1-387670-doc-4f593fcbcd.blip	bdce86f8815e7ba13e66e0b0e1cccc527b1daf25cbdb42558849002b0b0c2ee7	655	govdocs1	387/387670.doc	Data	4418355	blip	1
+blip/govdocs1-389432-ppt-c4f4a462f4.blip	a4bf2f2fd90b6edb3c442e23fdc4ede825645a09ce7740e8b512f183b584776e	12352	govdocs1	389/389432.ppt	Pictures	62497	blip	1
+blip/govdocs1-398644-ppt-a3de4b87c5.blip	52b77536aa442ca6e581f19afa3267deba0e3ee4285ff00dab2847d966527cd4	1075	govdocs1	398/398644.ppt	Pictures	293765	blip	12
+blip/govdocs1-405072-doc-193fd50675.blip	05f34091b4617583cc6f0ded8aa1c4898ce79b23597649f3a693280584bd0671	204	govdocs1	405/405072.doc	Data	107419	blip	1
+blip/govdocs1-408856-ppt-2be93bc44f.blip	9a9445e1ba5a04d17abd6513531f0d47d877d738597d63ecb7a6fc471f2a9472	78	govdocs1	408/408856.ppt	Pictures	2218137	blip	1
+blip/govdocs1-419811-ppt-c017c36628.blip	ef0cb3775327d4e824ca079126697f185e6d3a62c3f32ff9782b550f5d007169	173	govdocs1	419/419811.ppt	Pictures	0	blip	1
+blip/govdocs1-429217-pps-5512e28b52.blip	14753bb99e4bccf8de88c520e66a63c386f1bccf8316024e9053eb37c699a5ae	374	govdocs1	429/429217.pps	Pictures	492736	blip	1
+blip/govdocs1-435800-xls-a8a360d96f.blip	f0c3514e36598de766a210d1d3567a803df49719f1b1be2aed63d75747d7912a	745	govdocs1	435/435800.xls	Workbook#MsoDrawingGroup0	116	blip	1
+blip/govdocs1-439212-doc-8c2d4e5b69.blip	2e086d435e682fd3fc8fb776bb8a405d329a1de23573944f2261a5559318503d	3399	govdocs1	439/439212.doc	Data	25395	blip	1
+blip/govdocs1-439702-xls-c1d10bc9ef.blip	b1852587bbc192d9a13460fd12e27b57d49e738dc792c08fb98bd1ee0408b9cd	20714	govdocs1	439/439702.xls	Workbook#MsoDrawingGroup0	42755	blip	1
+blip/govdocs1-476107-ppt-5cb909022b.blip	febdb329fcfe058a8e89e110051c1a4227842652a6a05094a443d43a77a9d825	870	govdocs1	476/476107.ppt	Pictures	2496937	blip	1
+blip/govdocs1-490100-doc-03aa60f5bb.blip	4077e8cfd60df839aabf5207ebd74de859edc7b5a54664c43f7138a2e6f98ce4	119	govdocs1	490/490100.doc	Data	32576	blip	1
+blip/govdocs1-498395-ppt-045e438c60.blip	19c2b3277dcb9d23c0443bc90122dc3f2aa42d7e74f12c870d35dcfc97bfc706	1139	govdocs1	498/498395.ppt	PowerPoint Document#ExOleObjStg@125371::Data	182	blip	2
+blip/govdocs1-510662-ppt-331020dd16.blip	822be230bd3b3ae4ae7c78a9e4146d2be0086073724326fddc3f48b30a6509a3	93	govdocs1	510/510662.ppt	Pictures	3536	blip	2
+blip/govdocs1-511068-doc-1025f0ca6b.blip	02be1dd5a08cfe253e95104f60529e126f78e5b0cf281da7356491c6d5c253de	3307	govdocs1	511/511068.doc	Data	70404	blip	2
+blip/govdocs1-513353-ppt-ae65115230.blip	848affefef616f0109516251c60e4c1227aa14e6271427bdadb1f6d7a515b760	13154	govdocs1	513/513353.ppt	Pictures	247863	blip	4
+blip/govdocs1-516821-ppt-ba17e5751c.blip	b58fbf7fa04bbc3ee631f1ba7e235563170f6bb91598e03764d4dadfaf2ed427	138	govdocs1	516/516821.ppt	Pictures	6973871	blip	1
+blip/govdocs1-517586-doc-aaff9bc060.blip	f7572785da1be5710486b4d60376dd2dda9ee3709eb6fe1afe143ebb3c7a9cfa	612	govdocs1	517/517586.doc	Data	176605	blip	1
+blip/govdocs1-528047-ppt-493ff5e877.blip	02785a522955f7cb4a99dc2b3568dd761fcac9e3cc176e17626ae8e57376ca18	3556	govdocs1	528/528047.ppt	Pictures	98024	blip	1
+blip/govdocs1-528047-ppt-509f2fa662.blip	fa4ca5379e63ae147fe3106150cf77af9ee4ee43a8e3fe0c455a1bfde4af1373	3177	govdocs1	528/528047.ppt	Pictures	101580	blip	1
+blip/govdocs1-528047-ppt-8c23940dd9.blip	81612f5f6f2e0edfd1ea494831efbfce08759b5b5fe5a68e880c291b32d8751e	3069	govdocs1	528/528047.ppt	Pictures	219634	blip	1
+blip/govdocs1-528047-ppt-d493f4f819.blip	e0818a38419414589c63340acaaf0ecb64a104eaef094ef131583e95ce0d295d	3426	govdocs1	528/528047.ppt	Pictures	91085	blip	1
+blip/govdocs1-528047-ppt-dc06a514ed.blip	4bad54e8325b3d0d686497024577f9e7dba33ed09b8878df5f24a5b589070a2a	3513	govdocs1	528/528047.ppt	Pictures	94511	blip	1
+blip/govdocs1-533291-doc-c55644f0aa.blip	42d6652c9381dd622644c87bd2e069331bd9887621f672691d49c16a1774bda1	15905	govdocs1	533/533291.doc	Data	487	blip	1
+blip/govdocs1-536308-ppt-3bb38ee5c3.blip	3cdaf1467b094169e5cf7719e7d1d8762592e577e9f2fe8725976cc6466574fd	513	govdocs1	536/536308.ppt	Pictures	398528	blip	1
+blip/govdocs1-572696-doc-53c1bd73a5.blip	63feffa7678118099be462878c93c6ded3109d19b7fed81b5d6ba7bbe96ceb08	334	govdocs1	572/572696.doc	Data	87772	blip	1
+blip/govdocs1-594204-xls-6f923cd0e3.blip	6ac09d4b02d52c6c3284eed82bd7d0f3d0ab3c4fcfde08cc2e30b4a91deb7bfa	938	govdocs1	594/594204.xls	Workbook#MsoDrawingGroup0	45660	blip	1
+blip/govdocs1-595539-xls-19e7400a47.blip	59ef0c5195b5bf359330e436aa8d11d0f2db43fc279d338da37f707dea5735f3	767	govdocs1	595/595539.xls	Workbook#MsoDrawingGroup0	794	blip	1
+blip/govdocs1-600473-unk-7ba067f0c3.blip	715f30335b5d619d899ccac1b9d14c6ebe64383cb30b42189d73a2c51322f391	252	govdocs1	600/600473.unk	Data	1922327	blip	1
+blip/govdocs1-609273-xls-5261b47f1a.blip	32c8cf0bad236612ed6d68c0b3d0ce3940a2009f6213e3627903436888923d9d	1607	govdocs1	609/609273.xls	Workbook#MsoDrawingGroup0	43168	blip	1
+blip/govdocs1-636695-xls-014370f527.blip	828f79a734339be47f42a0f9e2c63ef69bbfa9f5a7436637a25784a3fd7a6f31	1116	govdocs1	636/636695.xls	Workbook#MsoDrawingGroup0	8190	blip	1
+blip/govdocs1-641629-ppt-dde42bef9b.blip	9da7eab5ea985db3dd4240b9873cb35c838710ea9def72df7355af2637377057	162	govdocs1	641/641629.ppt	Pictures	54316	blip	1
+blip/govdocs1-654944-ppt-d6c100a68b.blip	37385f9b69b286b6ab1a9b6fd2b4170c09c8eb87b4da2c97195a01d377dd646e	211	govdocs1	654/654944.ppt	Pictures	2181839	blip	1
+blip/govdocs1-655694-xls-25ab0ac148.blip	67c53049e977771cc1cbd512cc1c018ad36b5cbb77fdbcdaa947aba0a5dc2cbd	1655	govdocs1	655/655694.xls	Workbook#MsoDrawingGroup0	136	blip	1
+blip/govdocs1-664223-ppt-2279fb5e7c.blip	9dbf8de60326b1e3b992e00cd804d78b0f870fa98a196e0b4c5aadc33842303b	160	govdocs1	664/664223.ppt	PowerPoint Document#ExOleObjStg@52362::Data	168	blip	1
+blip/govdocs1-665091-ppt-3ff7559cb2.blip	28267ffb83bac5925a9852a67b77f1438c2bfa7c3931992a0e136dc624f5fff8	1889	govdocs1	665/665091.ppt	Pictures	558004	blip	1
+blip/govdocs1-665278-ppt-059645c04e.blip	4696a98c79717e9eed9cf78138876cb97b8b885cdf87445fa479b40edab78418	118	govdocs1	665/665278.ppt	Pictures	192944	blip	2
+blip/govdocs1-676978-ppt-5baeb934b3.blip	ca92e611f764cb2892c996f840bb0d46528876684285180022aa31fe1e4f58bb	390	govdocs1	676/676978.ppt	Pictures	12267	blip	1
+blip/govdocs1-680132-ppt-3c7ee80645.blip	9ee17cc973b2ec3bea0a4121df9e8eda040e370cf9ef5eca6b0fba487bc62241	434	govdocs1	680/680132.ppt	Pictures	34157	blip	1
+blip/govdocs1-683952-ppt-d330cd0aee.blip	2fb02d32f8102dec95e2b793b03b6b5b0ea53e0f644d307fbac5c432afa4ff67	228	govdocs1	683/683952.ppt	Pictures	1780157	blip	1
+blip/govdocs1-685699-xls-b956298bad.blip	5706a79f900f5d0f553c765f421bc5eebe1f7d8ecdaa044c088d73f9e998814c	321	govdocs1	685/685699.xls	Workbook#MsoDrawingGroup0	160	blip	1
+blip/govdocs1-693885-pps-455397ab67.blip	4861d1b0eb6e914480735c25e3961532627375b23f15f5cfa26b1a8172f4ed62	1527	govdocs1	693/693885.pps	Pictures	350542	blip	1
+blip/govdocs1-715505-ppt-8936496be8.blip	5c9636d0c2c719b615110b3215276f887480566aaa713a3431e1016a86402dfd	131	govdocs1	715/715505.ppt	Pictures	0	blip	7
+blip/govdocs1-720821-doc-5ed2202a84.blip	34312f0c760874c00899052fd0024428cdac76710ba012ffc22025ee4f76d8d6	135	govdocs1	720/720821.doc	WordDocument	134546	blip	7
+blip/govdocs1-731493-pps-561e8468ed.blip	9de4b0cabee312aeca9ec01174cb1d50a6e59a86d21f69f0974efd522336dfb4	633	govdocs1	731/731493.pps	Pictures	114576	blip	1
+blip/govdocs1-736833-doc-2fb06cf02c.blip	35e455a72333946c162970c6545a887216206240b23b4ad53e350279f109d0ac	180	govdocs1	736/736833.doc	Data	36936	blip	1
+blip/govdocs1-751418-ppt-dadd261069.blip	a1de1a17f013fd3d27f2b8819e83fe50ef6e66370f4aa9ec535d46dfbf04d981	17437	govdocs1	751/751418.ppt	Pictures	0	blip	6
+blip/govdocs1-752521-doc-b1731f1dda.blip	e4fdf31fdbf14ca6ff01db3464e95136eccfff583bfe623f40d1856d199a3c50	151	govdocs1	752/752521.doc	Data	329	blip	1
+blip/govdocs1-757777-ppt-9377fe831c.blip	185ddc5e6b950b6c7b76a18b7bef5a12621abfbef96507e0a1b2bebf7d25c2eb	211	govdocs1	757/757777.ppt	Pictures	174910	blip	1
+blip/govdocs1-766695-ppt-caac3ee4a5.blip	ab292a652da2ea6b7166eff0ada7b57f65c50500b8daf45758dee67688955990	575	govdocs1	766/766695.ppt	Pictures	424195	blip	2
+blip/govdocs1-778031-doc-1eaadff488.blip	85a3bbd9295e6c682a1c0d68571d86c249d8e640f5468d1cb7e1f2da5461df1e	97	govdocs1	778/778031.doc	Data	18849	blip	1
+blip/govdocs1-782098-ppt-f63490c3a7.blip	abcb156922a49cc1cf7336ee0f47f9cd9cede8df893c971baa3b6498ac62628f	2299	govdocs1	782/782098.ppt	Pictures	520114	blip	1
+blip/govdocs1-870057-ppt-b7ba59c04b.blip	c44bd04ee4f0e26db186578e46fcbc1222cae95780da4b99576122f257fc3cf0	216	govdocs1	870/870057.ppt	Pictures	0	blip	1
+blip/govdocs1-897801-ppt-86d797088e.blip	f8de0468994ffd488c117f57d9d2403d72dfb5b730c178685c3d541814bbb1ef	629	govdocs1	897/897801.ppt	Pictures	281879	blip	2
+blip/govdocs1-905619-ppt-36f14c9583.blip	1610146e1cc6ae3881552d9008dfda518ffee82e431b46b0800f433ec22e7701	257	govdocs1	905/905619.ppt	Pictures	1332035	blip	1
+blip/govdocs1-905793-doc-c0c8722689.blip	2691af52143ad75fa4db5bcd43801607840cebb4a2bfe43f0d6a573866e243cb	1047	govdocs1	905/905793.doc	Data	5588	blip	4
+blip/govdocs1-915557-ppt-1558ff1290.blip	8565d436dc840de0a62f94ffa29907ca931162d2c84475bf91ae479fe6d07443	173	govdocs1	915/915557.ppt	Pictures	18960	blip	1
+blip/govdocs1-920799-ppt-b81c615ce9.blip	e3d91b2ed83ef3461b9ef83123f1e9168e101a8d727036f3bf2e0a3cb7482cdc	447	govdocs1	920/920799.ppt	Pictures	4038494	blip	1
+blip/govdocs1-925352-pps-f2877d79a9.blip	26d0e746d49eacd51d7dfacbb758afe60fd38b19e0635c37335aec5a3af3437b	2237	govdocs1	925/925352.pps	Pictures	130864	blip	1
+blip/govdocs1-949193-doc-26a6ceb2fc.blip	075f5b1eefd04c30f8aa9c5c3a05af2a6f181e99844dcd1bfb5538505c7cb868	441	govdocs1	949/949193.doc	Data	77763	blip	1
+blip/govdocs1-970397-doc-8be4f2a388.blip	ba45679055a5873db585fae0530af12ea9fd25ad0e02de60f4f9eff293f84b54	15915	govdocs1	970/970397.doc	Data	188	blip	3
+blip/govdocs1-971334-doc-78a1a14eaf.blip	8255c7458d7241ed4af598f8c812af5fb1a2db606d5e5ae1271f972af434e689	2704	govdocs1	971/971334.doc	Data	31690	blip	2
+blip/govdocs1-974509-doc-0a9f2e3eac.blip	350544e9458b4b2aea942bcae5eb1324fcae3fec42d85a4d4665bc6c90a75dd4	139	govdocs1	974/974509.doc	ObjectPool/_1026309005/WordDocument	4510	blip	1
+blip/govdocs1-974509-doc-55fe42f826.blip	0849acf2a0eb28c3df1a5fd7f543f4f239b3157471b16a8e96ae8a7af4e4a8a0	138	govdocs1	974/974509.doc	ObjectPool/_1026309005/WordDocument	3251	blip	1
+blip/govdocs1-974509-doc-775bd45284.blip	9c7b1e34d932273fe94bc4fc57fe6cba17a210cebd6d617b6edfbab028169272	139	govdocs1	974/974509.doc	ObjectPool/_1026309005/WordDocument	3770	blip	1
+blip/govdocs1-974986-ppt-8fb48537a5.blip	c2db455535fa6a6f3f734667dc6127cad92124b66e1ff5a948cea4c5a1a207d5	215	govdocs1	974/974986.ppt	Pictures	9453835	blip	1
+blip/govdocs1-978420-ppt-08d1d32b85.blip	c26e28365f5328a771203f57034c0be745f17fa9c08237ea1bc10759c78ca413	141	govdocs1	978/978420.ppt	Pictures	2252187	blip	1
+blip/govdocs1-981447-doc-0922bc2637.blip	39a1ae9228cf41e50ed14a2215ca5adcf59a93a3c2bb5b0f22a05203b7b48f73	215	govdocs1	981/981447.doc	Data	192	blip	1
+emf/3gpp-25212-940-26094a0eff.emf	6ba3f7af0372234c039dc353d07e6feb5ada4f4f655d9835d49473da337ba068	2160	3gpp	25_series/25.212/25212-940.zip!25212-940.doc	ObjectPool/_1224489725/Data	168	blip-emf	47
+emf/govdocs1-005187-ppt-9a13b59183.emf	196cbde72b3a6328a6471584b313a6366a6cf1de9e807ff04baf8326dd60fe6b	2968	govdocs1	005/005187.ppt	\x05SummaryInformation	398	raw-emf	1
+emf/govdocs1-005930-ppt-15d0e89541.emf	7c8a839a07508a13fed7736e32311b05b191bf732d0d2fa7c4f469119c6cd15b	22588	govdocs1	005/005930.ppt	\x05SummaryInformation	598	raw-emf	1
+emf/govdocs1-006561-xls-41f8073574.emf	a5a14282a05b7f17cbbfcc0ac0c35a001aea24a29fba28ca953400b60a73293e	3128	govdocs1	006/006561.xls	Workbook#MsoDrawingGroup0	136	blip-emf	1
+emf/govdocs1-008877-pps-b34d8b9954.emf	9c5a57af078b3c598441460ae465bb7ca04bc461b2d85b72fbc3637c8363ffea	21100	govdocs1	008/008877.pps	PowerPoint Document#ExOleObjStg@75259::\x05SummaryInformation	312	raw-emf	1
+emf/govdocs1-009265-ppt-a32ca3decb.emf	b2ef572d4d05a6e646b538d5202596e23da9dcab82fd33332465fd748c12d0f1	16908	govdocs1	009/009265.ppt	Pictures	162543	blip-emf	1
+emf/govdocs1-014984-xls-0641e8dc5f.emf	57d00217daa69f6876d860d2ada809024e36b000406ca77909ac03564e972bbd	2636	govdocs1	014/014984.xls	Workbook#MsoDrawingGroup0	175628	blip-emf	1
+emf/govdocs1-018436-ppt-61fc5f6fa8.emf	05345429852b0c94d433c4ea2e633d307056baa13d9de8e800711b05906c1ff4	856	govdocs1	018/018436.ppt	Pictures	591709	blip-emf	1
+emf/govdocs1-046727-doc-7e5026198f.emf	7fd09db52b10ac7c2df70ebe08ae5527aad1d676828f9f2e5db3a9301c97d2a1	23788	govdocs1	046/046727.doc	ObjectPool/_1197192126/\x03EPRINT	0	raw-emf	1
+emf/govdocs1-047246-ppt-69e38a4180.emf	3be2d22e1884f10018a55542e69268030396934f4eae98561bc0d52b3216abd7	3408	govdocs1	047/047246.ppt	Pictures	23233	blip-emf	1
+emf/govdocs1-051926-ppt-098747ee4a.emf	ff04c3bd2e60e05ea0570936fea3b9a460708e5228ccd029645d95ffc2405e9a	736	govdocs1	051/051926.ppt	PowerPoint Document#ExOleObjStg@2756306::\x05SummaryInformation	312	raw-emf	1
+emf/govdocs1-057096-ppt-9a8919dce6.emf	7d88d0f793388a60f1cbf969d787dd90850cabc4edf298a0b8ce1b267c80757a	16960	govdocs1	057/057096.ppt	Pictures	1219246	blip-emf	1
+emf/govdocs1-072722-ppt-9487ce0260.emf	362302193b952f56ac6714ea9d2f3a20bc8f02d3cc50bc71bb02f851d073a644	2036	govdocs1	072/072722.ppt	PowerPoint Document#ExOleObjStg@194810::\x05SummaryInformation	220	raw-emf	1
+emf/govdocs1-075704-ppt-a539e1b4a3.emf	a2765d89b7d8dd29e3ca5be605c8e3e000979e9f889c79d21817b6f441dffc07	10388	govdocs1	075/075704.ppt	Pictures	15241	blip-emf	1
+emf/govdocs1-079127-ppt-e705f4bed7.emf	bddffc58132cb2458d6fbe2d26c47f93f24bebfed5e25d2b0751bc512901692c	5780	govdocs1	079/079127.ppt	PowerPoint Document#ExOleObjStg@607873::Workbook#MsoDrawingGroup0	19140	blip-emf	1
+emf/govdocs1-081844-xls-71796c4e46.emf	81e34d298f68d00dab30ca403a892d00e2e9b147bccbcd017e12ed6315fd77b2	11592	govdocs1	081/081844.xls	\x05SummaryInformation	334	raw-emf	1
+emf/govdocs1-093647-ppt-a7586d78b5.emf	f5972f113e5328f55cac12d9749c1cc3725274f607e22a0f2638b50692b03b7b	138568	govdocs1	093/093647.ppt	Pictures	53811	blip-emf	1
+emf/govdocs1-095072-doc-6f8ce8f275.emf	49c6dd8600aeccfb54a6d69fb6bead3276a6c1f88266dae750037fb554c43ddf	236	govdocs1	095/095072.doc	ObjectPool/_1068011866/WordDocument	4650	blip-emf	2
+emf/govdocs1-098541-xls-b14c8e167a.emf	8a7f195af496338a2cd4dd9a0bd5bfcd7ee1438964e72bf58859d3096bb14a97	24544	govdocs1	098/098541.xls	\x05SummaryInformation	282	raw-emf	1
+emf/govdocs1-102561-ppt-b60f2394f4.emf	b234eace4e995caf03265c18a0e9db8a9dbef203f0548fabec96cba331e97924	3740	govdocs1	102/102561.ppt	PowerPoint Document#ExOleObjStg@151678::CONTENTS	4	raw-emf	2
+emf/govdocs1-115418-xls-eafb2c7ece.emf	9e4fec291f9d6c93c6d1ca46d986834082e0f101caa5bfd4096cac4027986915	10116	govdocs1	115/115418.xls	\x05SummaryInformation	314	raw-emf	1
+emf/govdocs1-139900-ppt-791ff2a766.emf	3743b9594a46d2fb4232722ff2b9dd82c7db69c21a9427cd7123b9576230fc47	16436	govdocs1	139/139900.ppt	Pictures	19201	blip-emf	1
+emf/govdocs1-146234-doc-fabc1ab47d.emf	da14c58a4a3f3ab7f081bf1895881a8f99797ef596d4d821d0043aacdbcc84ab	7600	govdocs1	146/146234.doc	ObjectPool/_1215407967/\x03EPRINT	0	raw-emf	2
+emf/govdocs1-157134-ppt-786b7c9b4b.emf	6b4423cce099e7fab91b353f82980b1318fdd99bd40577b73e61713bd1dd6c0e	14868	govdocs1	157/157134.ppt	Pictures	57048	blip-emf	1
+emf/govdocs1-159119-doc-a94211c85b.emf	23b3670873c181a6eb0a332f4098e0c9f690dc6613b7f6ee2f0905aa122e1c71	11024	govdocs1	159/159119.doc	ObjectPool/_1140504242/\x03EPRINT	0	raw-emf	1
+emf/govdocs1-166066-doc-6ac320f6ca.emf	2a47d944220b705a34fd454c0f2be5eeaf20f532f7acede2f30a44a9d51aa5d1	15716	govdocs1	166/166066.doc	Data	17339	blip-emf	1
+emf/govdocs1-172027-doc-27b2d052e3.emf	69cb6d971c895c5592e64c96865bd407737a3752df14d2b376ddb2bc94a99d71	1600	govdocs1	172/172027.doc	Data	191439	blip-emf	1
+emf/govdocs1-172042-doc-e5a6d74f85.emf	b0721d9fad58488ebbf55e270898e807823196bcb8eb7b21fff3186614b2fe02	9456	govdocs1	172/172042.doc	Data	5125	blip-emf	1
+emf/govdocs1-182769-ppt-44e4b446e7.emf	4a03a54b5dc5dae5c3b6ce338981364232ed023aec11427800da781544bd9635	34040	govdocs1	182/182769.ppt	Pictures	104320	blip-emf	1
+emf/govdocs1-186980-ppt-1379f4837d.emf	98fc2ac2f536615ddd62ff00f13ed1817aa3bd7daa9f8a0d17538902d4cf17e5	6100	govdocs1	186/186980.ppt	Pictures	197916	blip-emf	1
+emf/govdocs1-187406-ppt-67edc6e3a1.emf	9622098d7c4ccced618aac7adf11c087882ecd243c0832899e9a50ecfe33a0e2	10888	govdocs1	187/187406.ppt	Pictures	11994	blip-emf	1
+emf/govdocs1-199645-ppt-23e9929a98.emf	dee0fcadac9536fbd0f50d60769b46451ac33948596338a181107ce44b468e6e	1128	govdocs1	199/199645.ppt	PowerPoint Document#ExOleObjStg@682878::\x05SummaryInformation	328	raw-emf	1
+emf/govdocs1-199645-ppt-4bcbf3b9cd.emf	d714d405039739ca11a36e75f175bba331d19d8edc0b1a3b045c94a9cb393ac2	2392	govdocs1	199/199645.ppt	Pictures	243691	blip-emf	1
+emf/govdocs1-208112-ppt-f78c89823c.emf	c49297ec8580f9feb1363b0b40d2f4369386d45f0a5c20cc2dee991af8de539e	22588	govdocs1	208/208112.ppt	\x05SummaryInformation	374	raw-emf	1
+emf/govdocs1-216419-ppt-056267cdc2.emf	5f36e32712ee2faee33b3c2f3058a2db1eb988eaccc4af0786cd81aeb7d36530	10768	govdocs1	216/216419.ppt	Pictures	2019	blip-emf	1
+emf/govdocs1-223624-docx-0c745aa282.emf	b3e64968201e0896e8fae90ae939cc12905dd9ec28b2766b6f01743023610436	3820	govdocs1	223/223624.docx	!word/media/image12.emf	0	package-emf	1
+emf/govdocs1-223624-docx-6e3be45175.emf	8345c41c92a62c5f2db58692ed813250308a2e95c04b13fbdf60559e35040745	3844	govdocs1	223/223624.docx	!word/media/image5.emf	0	package-emf	1
+emf/govdocs1-223624-docx-7ef0e88c13.emf	e6c505a0241c42bf9c56d3ca7573f1b2c5e94fa3c2412656ca2c9cad4d9ad228	3748	govdocs1	223/223624.docx	!word/media/image7.emf	0	package-emf	1
+emf/govdocs1-223624-docx-c6237057ac.emf	475a85e0fc424abe99788d4cd66bbd4081e2d558b3ff000937afd59038687986	3704	govdocs1	223/223624.docx	!word/media/image10.emf	0	package-emf	1
+emf/govdocs1-223624-docx-f134d3e8ce.emf	518d23f0124cc6da7d16c1deb6983cb30dfd90304704e683d42fe13c99e151af	3740	govdocs1	223/223624.docx	!word/media/image13.emf	0	package-emf	1
+emf/govdocs1-223624-docx-fdfd56d962.emf	961798a410612a7e38d586360115390574589cf637615b1af43354aae311f05c	3704	govdocs1	223/223624.docx	!word/media/image11.emf	0	package-emf	1
+emf/govdocs1-225670-xls-2cee31a36a.emf	67a92a4696f62935f52dd943c067f0bae9d92137670c59120854acf1689928de	5128	govdocs1	225/225670.xls	Workbook#MsoDrawingGroup0	25703	blip-emf	1
+emf/govdocs1-236094-ppt-8edcfe334b.emf	4db41b9946c2e493570159f90928ad7dfe3d84d00cdec8d24758e040ea2ffa15	10060	govdocs1	236/236094.ppt	Pictures	40201	blip-emf	1
+emf/govdocs1-236268-pps-622597ee3b.emf	ea958c1ed377d22d0a62c1802215bcfc37f36d04a875f3e281af5512a697e7ac	17784	govdocs1	236/236268.pps	Pictures	10591	blip-emf	1
+emf/govdocs1-243174-pptx-0913e7ec72.emf	b508af9cac90de6097174ec50fee7bd5efb1cf1da283c31308cf571adfa5e883	21108	govdocs1	243/243174.pptx	!ppt/embeddings/oleObject1.bin::\x05SummaryInformation	304	raw-emf	10
+emf/govdocs1-243174-pptx-2fc67a45bf.emf	f824ac9d8e7c5307b7d380f7f00df12d9e837a55a0a7aa56bb9dd889549accab	8480	govdocs1	243/243174.pptx	!ppt/media/image9.emf	0	package-emf	9
+emf/govdocs1-243174-pptx-e1d2dbdb2c.emf	bef0d5094ef2e672dcb7a7059af875c3261a0e85193957242f1322e2a1ce9d44	20796	govdocs1	243/243174.pptx	!ppt/embeddings/oleObject2.bin::\x05SummaryInformation	304	raw-emf	9
+emf/govdocs1-246190-pps-df86110db5.emf	9c9254805e32f0bcf29f0e8edbec5230655f7d0689f23f7548be90cd7f2ba7b2	6572	govdocs1	246/246190.pps	Pictures	173593	blip-emf	1
+emf/govdocs1-246872-pps-cd60d65e3b.emf	0c2ec97934bf2f590675e097491af388101f67389e94cd39c1a2f989b3d9f04e	17708	govdocs1	246/246872.pps	PowerPoint Document#ExOleObjStg@101437::\x05SummaryInformation	220	raw-emf	1
+emf/govdocs1-257764-ppt-1123593b4a.emf	b4435c8c99b0640e44011a7d7dcc36965f50083a3ccfc3cd846548c62bf3f530	45888	govdocs1	257/257764.ppt	Pictures	189709	blip-emf	1
+emf/govdocs1-257981-pps-2c59c7a707.emf	5b177ba60ab9b900081cd074353ae02d984548b4fe5bb0a53866c7ed5d4535e8	10372	govdocs1	257/257981.pps	Pictures	3302319	blip-emf	1
+emf/govdocs1-264469-doc-8ecf305d98.emf	27929752f2ee121d391cb9df744fae11c20d66ee8b7fd027f76a91b29decb591	5232	govdocs1	264/264469.doc	ObjectPool/_1031630973/\x05SummaryInformation	2838	raw-emf	1
+emf/govdocs1-264546-xls-a971e4fa21.emf	ca2301acac8b0fd1d0e2e02305ec742b3837069521d02bf3fd7db13da334d2e9	2524	govdocs1	264/264546.xls	Workbook#MsoDrawingGroup0	88147	blip-emf	1
+emf/govdocs1-264675-pps-8582f6e07b.emf	8b2f7482be2db815873e9246154b0ce84c3c6bcaddc62b89619f70eb1019fe74	22588	govdocs1	264/264675.pps	\x05SummaryInformation	422	raw-emf	1
+emf/govdocs1-265649-xls-317a586a56.emf	2e5d7b47474850581174207b116da47a477a59b6c2dc90bd58d6fa2d836dc69b	3760	govdocs1	265/265649.xls	Workbook#MsoDrawingGroup0	34522	blip-emf	1
+emf/govdocs1-269391-doc-4e6cda94a5.emf	b5222d92ca660a63410ea60a43d6f46bdecb5621a295c220a0c5efc184b7ffa7	27052	govdocs1	269/269391.doc	\x05SummaryInformation	522	raw-emf	1
+emf/govdocs1-272674-ppt-f4615e7a60.emf	6bacac6d876a5c5f59fbe49e60f07732003a6f6381011e2b3514cce1ed312aa1	6440	govdocs1	272/272674.ppt	Pictures	281779	blip-emf	1
+emf/govdocs1-276686-ppt-8abc189e17.emf	8639030a084e8e24eb65a685eaa72a96b827844409fe785cc0b8ae62d742b9ea	424	govdocs1	276/276686.ppt	PowerPoint Document#ExOleObjStg@2641147::\x05SummaryInformation	322	raw-emf	1
+emf/govdocs1-288956-xls-91f5ea4c67.emf	cffbda641b475f1a48c84705dd0707518e135cd9e9c6cb5171903a8e9fc18b84	10560	govdocs1	288/288956.xls	Workbook#MsoDrawingGroup0	15240	blip-emf	2
+emf/govdocs1-294059-xls-8fa51f330e.emf	90a6cd9f7672c17f32bee08a8ece72b4f2dc7bb4ca0b2070ed25d4f7b11c0a69	2736	govdocs1	294/294059.xls	Workbook#MsoDrawingGroup0	34422	blip-emf	1
+emf/govdocs1-301763-pps-964035e2da.emf	c49cb12c643986534db3a080e27fac102b3702735fad20d5f210926d91fcf503	5948	govdocs1	301/301763.pps	Pictures	52223	blip-emf	1
+emf/govdocs1-302829-doc-a17423ca23.emf	af3374a45016d4882e0a5cc0c712eec193e9d83776c2b993ac5c0e5210a2beb9	5188	govdocs1	302/302829.doc	Data	2343121	blip-emf	3
+emf/govdocs1-328359-xls-ebe2b3f851.emf	5341f5344b0f07dd49d546a1af2cbfce08fb379b5902dcc7460eccfbcc45ed11	19192	govdocs1	328/328359.xls	\x05SummaryInformation	306	raw-emf	1
+emf/govdocs1-331899-xls-19fd32d4ed.emf	38899d91a9349f4ea5585818ded15f7cf336b3a58a796506e362605276cb38ea	1840	govdocs1	331/331899.xls	Workbook#MsoDrawingGroup0	3095	blip-emf	1
+emf/govdocs1-343997-doc-469fc1a603.emf	10ea4d0ab6fe732f3b08843982bc0cc9def3af9f32ef0737e882733eaab62443	23304	govdocs1	343/343997.doc	Data	2074	blip-emf	1
+emf/govdocs1-347040-doc-e774bcca49.emf	8d387a661152b9ee1604c7fb061e939467cb08a7474b1abb4638857699af910c	19880	govdocs1	347/347040.doc	Data	385682	blip-emf	1
+emf/govdocs1-349885-ppt-d79bf5369c.emf	168c17dfe537129e2eeea77178c06b80b01cbeb7709b0499b6357810bcb151a2	1136	govdocs1	349/349885.ppt	Pictures	1898044	blip-emf	1
+emf/govdocs1-354112-ppt-d2adebd879.emf	a8139f5abd3f648cddcaa469ad8ea2a0bcf3cf8ee8bffa4bcfdc7c8995dc6779	3636	govdocs1	354/354112.ppt	Pictures	240214	blip-emf	3
+emf/govdocs1-354979-ppt-fe71767a58.emf	537390d37b24af0644fd2f0529af2bbb08a215a4a3fdd8105736bd94c2c17dc1	3060	govdocs1	354/354979.ppt	PowerPoint Document#ExOleObjStg@289490::Package!word/media/image1.emf	0	package-emf	1
+emf/govdocs1-367803-ppt-d10e285e8d.emf	8cd4406f331752abc50f0a54134a0e7c0651bf97693a6277ad4944809b5a926a	33456	govdocs1	367/367803.ppt	Pictures	430700	blip-emf	1
+emf/govdocs1-379836-doc-e067a67050.emf	6b57d2b08eeb07e4c686bffb4de1f668b8707ed682d38184b84dc2c847f53ca7	30160	govdocs1	379/379836.doc	\x05SummaryInformation	538	raw-emf	1
+emf/govdocs1-385364-doc-001b49e10c.emf	4b7b791d846677554ff089716c194f017295a671eaaeddccab1584ab0d4d9bad	5992	govdocs1	385/385364.doc	ObjectPool/_1050325839/CONTENTS	4	raw-emf	1
+emf/govdocs1-387670-doc-4e9b893bab.emf	9e0c876e5d49af5f9ac5bf66c2a266a7c5a77539fc8e8fe647013fa9b7c93258	5500	govdocs1	387/387670.doc	Data	4415993	blip-emf	1
+emf/govdocs1-388484-rtf-2c00e78ccb.emf	bb6b5d950f91e833f1c590ceb28113f08ba96ad5ab6a3eefd4e857af1264b2af	3312	govdocs1	388/388484.rtf	#rtf@43520#objdata	201	raw-emf	1
+emf/govdocs1-398644-ppt-8b4345d25c.emf	54750c588b9e5c37997c0b22e42e1aaca2fec0fe5ba51b7671d532ed87290fb0	8644	govdocs1	398/398644.ppt	Pictures	293765	blip-emf	12
+emf/govdocs1-405374-zip-a398b2188d.emf	c81765dd714d8ee16be1960bb50c727b011b286e4878a6251458c22c54c69f7c	13448	govdocs1	405/405374.zip	!ppt/media/image41.emf	0	package-emf	1
+emf/govdocs1-406071-rtf-da3db825a1.emf	50a020e7523e839f8311c0c7c21441ab47746c86e7224c78c062501ed8fd7137	17612	govdocs1	406/406071.rtf	#rtf@147382#objdata::\x05SummaryInformation	286	raw-emf	1
+emf/govdocs1-406730-pptx-9e55f2a753.emf	b079c9e5d5d29f5c40b059d23f469e24f5cd9ef63eea68591dc322004158b124	1096	govdocs1	406/406730.pptx	!ppt/media/image141.emf	0	package-emf	1
+emf/govdocs1-406730-pptx-b76bbdf501.emf	432885e6174978ff8e3abecc5f4188f5509dc9ced3039bd2e1dd816f986618aa	1096	govdocs1	406/406730.pptx	!ppt/media/image112.emf	0	package-emf	1
+emf/govdocs1-406730-pptx-ba71223cb2.emf	e8ef30dba1c0464bb698934d735601b345632a908167dd8e670c99f6ef5e52e2	1348	govdocs1	406/406730.pptx	!ppt/media/image424.emf	0	package-emf	1
+emf/govdocs1-406730-pptx-d299299cef.emf	e86e16858549a8dce944dd0cbf4398f779c07f20c8131c7c140ca406bd72e01c	1348	govdocs1	406/406730.pptx	!ppt/media/image656.emf	0	package-emf	1
+emf/govdocs1-406730-pptx-df4a2f966e.emf	54eeaf19ea5f3409baa2d0b5aa803825152888051f4918ef2a46e6d59efb6f54	1360	govdocs1	406/406730.pptx	!ppt/media/image322.emf	0	package-emf	1
+emf/govdocs1-426098-doc-a64003cbc7.emf	b9930dad7f6cd080686b3b0c6e49d6216e8be5b62216f7d189dde5278ce12f8a	14260	govdocs1	426/426098.doc	WordDocument	25830	blip-emf	1
+emf/govdocs1-429075-xls-51e5c5dc80.emf	2ea5c08a1678e17a2bb4a4ecda713a25bd74a29e448b7a8bb5f77263b0627051	5192	govdocs1	429/429075.xls	Workbook#MsoDrawingGroup0	136	blip-emf	1
+emf/govdocs1-456974-doc-2616195166.emf	bb4d109d920cbd221bd91435d3c772b091fa91e899673f971d2a03e312d21753	8588	govdocs1	456/456974.doc	ObjectPool/_1027162770/\x03PRINT	1184	raw-emf	1
+emf/govdocs1-465115-ppt-d311a27270.emf	bf875f814335e256ad40f5289a3ebda2f4462fd1090c0e54125479e5441f6473	14360	govdocs1	465/465115.ppt	Pictures	2848581	blip-emf	1
+emf/govdocs1-478399-doc-e22eed9117.emf	18b7872156312fd432b6ed5e4b0497717668dcea15681204baa8d30483007380	23640	govdocs1	478/478399.doc	\x05SummaryInformation	574	raw-emf	1
+emf/govdocs1-488887-ppt-099698b401.emf	4842ff06f3789a6b397eed81864478e00cc6b0a0f45ae80e01792832bbdd6914	244	govdocs1	488/488887.ppt	Pictures	26038	blip-emf	1
+emf/govdocs1-489572-xls-4261253a24.emf	db1cefb03d5c3c3b65cd4193c266cf8d75f2e54287b88a29ecda7746196e4168	18520	govdocs1	489/489572.xls	\x05SummaryInformation	318	raw-emf	1
+emf/govdocs1-493095-doc-000be41a1c.emf	211473b7b4c52fec7cfb998050eccb2c1520e9e27f2f1bebeb78dc1724386170	36092	govdocs1	493/493095.doc	\x05SummaryInformation	514	raw-emf	1
+emf/govdocs1-495967-ppt-379453f35f.emf	d836ad5ad8e8dd189a7154aed425ff03df33757c0cbd33d12579b1654684a992	7720	govdocs1	495/495967.ppt	Pictures	3695	blip-emf	1
+emf/govdocs1-496329-doc-8a168a56f0.emf	00d128699d1912cbd0730a492a7411586a70d4c38269d98bf3f3843a7ff3f80b	948	govdocs1	496/496329.doc	ObjectPool/_1136995699/PowerPoint Document#ExOleObjStg@41930::\x05SummaryInformation	220	raw-emf	1
+emf/govdocs1-498395-ppt-5f59b9dff9.emf	32d259c0ae2f630bac08acde8adf1a28756f56186d0df593aa646974f59f264b	3088	govdocs1	498/498395.ppt	PowerPoint Document#ExOleObjStg@125371::Data	182	blip-emf	2
+emf/govdocs1-511717-doc-4dc5c97f5c.emf	a1498a4aa8ce866c346fea1dd6a63e2d6ee6f544d0607567d8d7c3676c9e7bf2	10160	govdocs1	511/511717.doc	ObjectPool/_1215950582/\x03EPRINT	0	raw-emf	1
+emf/govdocs1-515820-ppt-c28038fef4.emf	c9cadce4673da9dff32a5f8a746a6e2c2da82fea22ca91ea04696a729800276d	4448	govdocs1	515/515820.ppt	\x05SummaryInformation	362	raw-emf	1
+emf/govdocs1-530796-ppt-2f29d03450.emf	d8de71268cfb051abb5d26d9f5a95a1efcdd59f9cb84ac455f320bd78bcb6756	67444	govdocs1	530/530796.ppt	Pictures	383318	blip-emf	2
+emf/govdocs1-541021-ppt-927cc18b24.emf	27ac30c337c7edf63a65a81fba9028d56571dd6884cbc131c2159c28af2d75a6	17028	govdocs1	541/541021.ppt	Pictures	201843	blip-emf	1
+emf/govdocs1-541050-doc-91ce8396d5.emf	7bab0db0d772d6edc96facb2e7af5eda0c0962ae83e2d9130ac131254dcb8f63	32308	govdocs1	541/541050.doc	\x05SummaryInformation	542	raw-emf	1
+emf/govdocs1-545162-pptx-4c50eda743.emf	5157f2dd6b5f24673897f7f028d1043f39b7e5987b8d5e6475a0e54ab9985001	716	govdocs1	545/545162.pptx	!ppt/media/image27.emf	0	package-emf	1
+emf/govdocs1-547344-ppt-0af97b63b6.emf	c147e3fb3951d8fc60ed769b1e0ee4b8096786933cb12d12dee5d209e1de6a26	22588	govdocs1	547/547344.ppt	\x05SummaryInformation	426	raw-emf	1
+emf/govdocs1-553215-doc-0a18d57d28.emf	e9a6c76dc4ccffc9d344a93ea3191c33365fdb10934596c9f557a0b983c758ba	9440	govdocs1	553/553215.doc	ObjectPool/_1209462166/Pictures	0	blip-emf	1
+emf/govdocs1-576292-doc-9207d51715.emf	30ab701f8fa81cdf774c62489e323c14c1532de944f2023eb2c4d78eff9aeb06	31840	govdocs1	576/576292.doc	ObjectPool/_1092555256/\x03PRINT	70	raw-emf	7
+emf/govdocs1-581928-doc-046920e4d2.emf	a1fd0863fac3d0eac144c6d6ee1fc18a0c7141a0b7cdb2ae0f3f022e86ddcc32	15104	govdocs1	581/581928.doc	Data	863185	blip-emf	1
+emf/govdocs1-595539-xls-80f510331f.emf	dfa87484e483a2454ef546510cdc420121fc0a1f6ed9a31be9434f6da4a2f06a	4292	govdocs1	595/595539.xls	Workbook#MsoDrawingGroup0	794	blip-emf	1
+emf/govdocs1-600590-xls-cf48187f0d.emf	af64be0efad0cb5a40b487b471d36ca2c7e1f1ed4453617dbe8e33feff4a2250	15548	govdocs1	600/600590.xls	\x05SummaryInformation	306	raw-emf	1
+emf/govdocs1-606799-pps-d3109c5b9b.emf	975a50e28f34398d5aae50ab359daaf4c001d55d670e013373c8363fade3fa13	20180	govdocs1	606/606799.pps	PowerPoint Document#ExOleObjStg@295956::\x05SummaryInformation	304	raw-emf	1
+emf/govdocs1-612690-pptx-07db858061.emf	4720106539e6a66ca8a91efcc21f25145b8b622b700670c3dbeabd9a173532ec	20724	govdocs1	612/612690.pptx	!ppt/embeddings/oleObject1.bin::\x05SummaryInformation	288	raw-emf	1
+emf/govdocs1-613375-unk-6e3293eac0.emf	f6c4a161e97c6a655bab9157abc16a4480c807c9bf80939cd888b5518e94df03	10904	govdocs1	613/613375.unk	ObjectPool/_1265803817/\x05SummaryInformation	304	raw-emf	1
+emf/govdocs1-613375-unk-b8970d7e23.emf	ef66437d6dd8c317341996cda9eafa9ca4b7cb09866fd7f8d9d61f4ac71fef5a	11800	govdocs1	613/613375.unk	ObjectPool/_1265802887/\x05SummaryInformation	304	raw-emf	1
+emf/govdocs1-613477-doc-e7c0c9aec8.emf	04530c1c155b3f64c7d8376ed6cd1730e09b01e5f8264a0e0525ac5e84ad236c	1852	govdocs1	613/613477.doc	WordDocument	39651	blip-emf	1
+emf/govdocs1-623119-xls-ea8bf3beae.emf	c7537f628d82f43fd0a5433e739b403fcf90167751214ecb3c3896e9ca61ac8b	1608	govdocs1	623/623119.xls	Workbook#MsoDrawingGroup0	3600	blip-emf	2
+emf/govdocs1-626446-ppt-488b149a74.emf	9a5e8a9c90f3f0503872369cf83f2dd79b1ba5eef1459cc86c188066608f0374	59172	govdocs1	626/626446.ppt	Pictures	162756	blip-emf	1
+emf/govdocs1-628688-rtf-2853ba3b9a.emf	5013839638541f43c3fbaffc417766fc13b3aa8c734c63fc13d62b71392f0edf	1548	govdocs1	628/628688.rtf	#rtf@218292	218292	rtf-emfblip	1
+emf/govdocs1-628688-rtf-ca1e773097.emf	725375d95120ed2546e73d2d4091a406a098634cc1b5e9dda48bef2c5d636a11	3336	govdocs1	628/628688.rtf	#rtf@209047	209047	rtf-emfblip	1
+emf/govdocs1-638025-xls-25c38c37cd.emf	02bd784a565f9c90d8a6a8d3cfd2b2e59b748d811356e7eeb786a75d8757ffe1	2640	govdocs1	638/638025.xls	Workbook#MsoDrawingGroup0	16229	blip-emf	1
+emf/govdocs1-640266-xls-f59ca9b3c8.emf	c9abd5326b8c1d19d60d6b7b8d7b9d2e67fca528b489cdced9dd8628c2bb5263	16900	govdocs1	640/640266.xls	\x05SummaryInformation	278	raw-emf	1
+emf/govdocs1-664223-ppt-ae7ff4da1e.emf	36ad54696ccdaba3218655775da7dda9861cf17495985cdab87281ef08dc645e	252	govdocs1	664/664223.ppt	PowerPoint Document#ExOleObjStg@52362::Data	168	blip-emf	1
+emf/govdocs1-665091-ppt-530ee32783.emf	423053882a51b195269b18da1ae38c11c4af6022bfbf7f7719fce52079eced94	5068	govdocs1	665/665091.ppt	Pictures	559893	blip-emf	1
+emf/govdocs1-668960-ppt-076e0018f8.emf	f2e3156f54f693c348d7feb5675b3d168bd0b0cd1a88080090ffa29b5d28c714	660	govdocs1	668/668960.ppt	Pictures	38257	blip-emf	2
+emf/govdocs1-686933-ppt-9f2750aa57.emf	88ae310cfbcd245d5b2be9217f6139c4d14854e79759d2f635e8d50a1bf8e84e	4912	govdocs1	686/686933.ppt	Pictures	0	blip-emf	1
+emf/govdocs1-699613-doc-663887daef.emf	5904b887d8914c919d67bc43f8cdd448b6309db20fae0a10f880f83025047e74	30224	govdocs1	699/699613.doc	Data	430575	blip-emf	1
+emf/govdocs1-703217-ppt-bc56bba24c.emf	3d09dcda6ec7300d1b301aba519b403093ac5789eab3accef4936464a0fbe2fa	22588	govdocs1	703/703217.ppt	\x05SummaryInformation	514	raw-emf	1
+emf/govdocs1-717251-xls-85f48af3b0.emf	ca065503e7411d882a60e076924ab1be49ffd494771860e19ed2d31fb345e03b	13588	govdocs1	717/717251.xls	\x05SummaryInformation	318	raw-emf	1
+emf/govdocs1-726423-ppt-e3e3193a94.emf	90540ea054d7c594f09b74abc171cb2c82b10ff0d3015a388629e8de07a19583	26637	govdocs1	726/726423.ppt	Pictures	3401510	blip-emf	1
+emf/govdocs1-734646-xls-7afd9345d8.emf	6e4873e8b96c31ac8fa1a011bd5fc8b1fdf493ed87355db13a31cc3ce56c4577	19348	govdocs1	734/734646.xls	\x05SummaryInformation	314	raw-emf	1
+emf/govdocs1-746648-pps-acc19dbdc8.emf	ccc466f9f711a07223bd4398828f973cd08c15a7d987cf110ae7548d75e91eec	5972	govdocs1	746/746648.pps	Pictures	1358170	blip-emf	1
+emf/govdocs1-759463-xls-e21f51f0b8.emf	b3ab9e542e8051aa03c6822c1fea2ceb3172ee67d38ac48af185c38e76716c3e	2348	govdocs1	759/759463.xls	Workbook#MsoDrawingGroup0	23424	blip-emf	1
+emf/govdocs1-804331-xls-d986edba15.emf	37b0c16a6e30dbddd282cd77dd59eebbce3c4614d71b6bbc6da884db337569b4	18804	govdocs1	804/804331.xls	\x05SummaryInformation	346	raw-emf	1
+emf/govdocs1-805390-pps-b5d24bb1d5.emf	b084bcb5705a52f68e0fcc5885e803e0435f671356ca2c9b65be342c16f5c45b	6292	govdocs1	805/805390.pps	Pictures	67103	blip-emf	1
+emf/govdocs1-805495-xls-e25caa37b1.emf	3372f13065e166f46e108675a1455c725a6776a735ad94000f4e53398231be85	9544	govdocs1	805/805495.xls	\x05SummaryInformation	378	raw-emf	1
+emf/govdocs1-815899-pps-cba412ff9e.emf	2d938e78360e34fd17666efe83c6a0d853decf63c167f05e9059c37f27af5db9	20700	govdocs1	815/815899.pps	Pictures	243648	blip-emf	1
+emf/govdocs1-817635-ppt-003e2be060.emf	98ee462e0f96b76545aa66e1d06b13bc26f9e877c974512047507d92f869b3fc	27740	govdocs1	817/817635.ppt	Pictures	1643955	blip-emf	1
+emf/govdocs1-831639-ppt-987314ed24.emf	cebe9f6892075bd06cb1354d56ac96efccd1c629e0f499e11a8be7ae404d9ea9	8284	govdocs1	831/831639.ppt	\x05SummaryInformation	434	raw-emf	1
+emf/govdocs1-841922-doc-210a71f5dc.emf	9bf8e21f8c700ce9b004057e9d1b621b96d920e1eb212d306972bf380bf28616	20584	govdocs1	841/841922.doc	\x05SummaryInformation	602	raw-emf	1
+emf/govdocs1-842857-rtf-7abfe60e7d.emf	b2ac3ad1b2b0eb089b6e3ac44d0b99f27b0613048b9e0391eafd559bc77cc847	20356	govdocs1	842/842857.rtf	#rtf@686285	686285	rtf-emfblip	1
+emf/govdocs1-842857-rtf-a990300cbf.emf	8e925184c41ad4d18c83585cddc9cd2ea760b7b426feaf12dd784da1597f211f	14920	govdocs1	842/842857.rtf	#rtf@561856	561856	rtf-emfblip	1
+emf/govdocs1-842857-rtf-d2e59a6721.emf	528885d9c23205f4afa18a918e498d4980aa54186376c3a94c0cbced118f0b2f	7600	govdocs1	842/842857.rtf	#rtf@667805	667805	rtf-emfblip	1
+emf/govdocs1-846628-ppt-f9ea4e9952.emf	1e3c0e3adf9e2cea82987d40483beb7d6e517c57974f72f43768889ed5cbf1b4	22588	govdocs1	846/846628.ppt	\x05SummaryInformation	402	raw-emf	1
+emf/govdocs1-853485-ppt-f3ddb15272.emf	61f0161b34e3ab62006e5e4d13cf56f0a177d163e06045ce9014c4696b8fc0bd	11876	govdocs1	853/853485.ppt	PP97_DUALSTORAGE/Pictures	1422	blip-emf	1
+emf/govdocs1-853487-ppt-36f73b7e42.emf	1085ed22843ef892804358dc8f3a803d94d0d4521a719e8dfd271f239f427bcc	9016	govdocs1	853/853487.ppt	Pictures	2067900	blip-emf	1
+emf/govdocs1-853866-ppt-c1c3c3ee17.emf	f13942063ecf8e780a8f4f9889569326d9a3a0f5e10e4aba04e9c05991e76be2	5096	govdocs1	853/853866.ppt	Pictures	489768	blip-emf	1
+emf/govdocs1-859984-ppt-cd198047b9.emf	34c3a7f1cf1e09afb44ccf4e4d29f5d54b4f65f3e3f4d2af9e054f010e154074	8988	govdocs1	859/859984.ppt	Pictures	3157043	blip-emf	1
+emf/govdocs1-866939-ppt-c2f459d2af.emf	bb8396d85e4b6f70a1b2cf7223fea27fcac7964e185a6c6dc09b524e71b5e40e	1984	govdocs1	866/866939.ppt	Pictures	2116165	blip-emf	1
+emf/govdocs1-868808-doc-f01b1059f8.emf	647a0dc413ef262734fca3723b6a80c362ee3462f78b7f3bb4471c7bf85eb568	6180	govdocs1	868/868808.doc	Data	7139	blip-emf	1
+emf/govdocs1-870864-ppt-8120160f40.emf	14e6492d303ffa895ec7e5355bf7e575c558814088fa22fced9a6b95a615f101	5928	govdocs1	870/870864.ppt	Pictures	143967	blip-emf	1
+emf/govdocs1-897801-ppt-17be485c9b.emf	78f91cbcd6fd989931bb3dd66f67d10755d508f49263bd24d07da483c5fbaeb2	2056	govdocs1	897/897801.ppt	Pictures	281879	blip-emf	2
+emf/govdocs1-905619-ppt-3be28e38ab.emf	eb351f60a18d49047497a668853b1c2ac67250432a22b96e3730e19170b159db	660	govdocs1	905/905619.ppt	Pictures	1332035	blip-emf	1
+emf/govdocs1-923101-pps-e31560d078.emf	fb072d342ecf7985fc1e73c15b0c64946f55db8a7ce0439b79491a77b44d6310	19840	govdocs1	923/923101.pps	Pictures	817120	blip-emf	1
+emf/govdocs1-925021-ppt-e6f35fce09.emf	184113a3b972eacf6fcf9f61d671dbf655f01be203f10024e96527ed7bf59dcf	128828	govdocs1	925/925021.ppt	Pictures	67510	blip-emf	1
+emf/govdocs1-925888-ppt-8abb3d7f95.emf	f5f270245b9db96f0d5e799316047f569890b3e80be8063528d004d4de51c6b8	6952	govdocs1	925/925888.ppt	PowerPoint Document#ExOleObjStg@234890::\x05DocumentSummaryInformation	110476	raw-emf	1
+emf/govdocs1-934460-doc-9de9ac20e6.emf	2f607523c6d15301da3c56eb27121cbd81102f9a7b0e78e07de3ff20e6c32b6a	17708	govdocs1	934/934460.doc	ObjectPool/_1184747369/\x05SummaryInformation	220	raw-emf	1
+emf/govdocs1-937746-ppt-ed26def84c.emf	77bee08afa67db4964929473933c3f3e0c4fe28b2e031f34219500fb043cf786	6928	govdocs1	937/937746.ppt	Pictures	5373899	blip-emf	1
+emf/govdocs1-947671-zip-4493f143e8.emf	d6981ffd1085c05995547c92406d79dedfd5cfc6d44688533a3830b4de5a9926	11132	govdocs1	947/947671.zip	!ppt/media/image8.emf	0	package-emf	1
+emf/govdocs1-948685-ppt-6a03d7d7b3.emf	06d3337118db9f18bc0742908bc52eb21b99415f92744f68e1179c668d2263c5	21216	govdocs1	948/948685.ppt	PowerPoint Document#ExOleObjStg@580058::\x05SummaryInformation	312	raw-emf	1
+emf/govdocs1-952379-xls-8e04c3dc9f.emf	b01c32423d3945b846b9893c6a8438c36b56ef8e5ad497b20213a2235be35d1c	26300	govdocs1	952/952379.xls	\x05SummaryInformation	454	raw-emf	1
+emf/govdocs1-956355-ppt-e514592802.emf	bfd5f8ba6379579acc5bc9353aff6144a8ffffaa86c0f2e903f7745685a48709	9016	govdocs1	956/956355.ppt	Pictures	2805448	blip-emf	1
+emf/govdocs1-960526-ppt-3c57f4e65e.emf	d452a609ca8a4e8822f060cc83eb59e9f9af4067a94baa6a978c445d6d4eb477	22588	govdocs1	960/960526.ppt	\x05SummaryInformation	422	raw-emf	1
+emf/govdocs1-964777-rtf-b72310b28e.emf	e5d810f23bc7501e275a1f03e346ec33bbc504fadaddb7727d2b0930875b9224	8288	govdocs1	964/964777.rtf	#rtf@69301	69301	rtf-emfblip	1
+emf/govdocs1-974407-xls-f4efb3a80a.emf	e9c07ac2198f915527d449d2eb247fe270c4cc1a297145ffa7b514a1cc9c4fde	4844	govdocs1	974/974407.xls	Workbook#MsoDrawingGroup0	15814	blip-emf	1
+emf/govdocs1-979109-doc-3c78039ecf.emf	2d1817975894628d8fbcdad624089771d8c953841d610ebfbcd80d5bd97483e9	28336	govdocs1	979/979109.doc	\x05SummaryInformation	526	raw-emf	1
+emf/govdocs1-989239-ppt-463ecb344c.emf	e09773a75d15fb570a0d436105d7815b5d3b5d7eb186784ee21003563b4ab77a	13760	govdocs1	989/989239.ppt	Pictures	60279	blip-emf	1
+emf/govdocs1-994273-rtf-5679217009.emf	821ecd5376b7aa7e13be3468770aaa57111345b275e0b7a10060ed6e8554bb4d	18636	govdocs1	994/994273.rtf	#rtf@561066	561066	rtf-emfblip	1
+emf/govdocs1-999661-ppt-a29157fb6a.emf	0aff816411e8338bda875290b0e7092ad97e945295b88fd5b015d3d4c37934e5	840	govdocs1	999/999661.ppt	PowerPoint Document#ExOleObjStg@75068::Workbook#MsoDrawingGroup0	92	blip-emf	2
+pict/govdocs1-002680-doc-b2e139a62a.pict	6908e2f4edf5e65b54936204f7df7830e08717d1aae4afb746a1d5192241c56c	8996	govdocs1	002/002680.doc	WordDocument	5122175	blip-pict	2
+pict/govdocs1-016082-ppt-e7b38912ae.pict	e393721c867064e9822ddfd1bd9e5af7f167ddb816f8480071b640da3b6aeff9	10310	govdocs1	016/016082.ppt	\x05SummaryInformation	336	raw-pict2	1
+pict/govdocs1-020358-ppt-8710495859.pict	f05d2507e58dc8d86de014e9cf379c80be56f7ad80af392e1a47bde547a2d7d8	2112	govdocs1	020/020358.ppt	Pictures	54084	blip-pict	1
+pict/govdocs1-037089-ppt-10c88748f8.pict	4a99d190854e34915c3a94ae9c4bc5b52b1adfda23ea618819b3b96590ed27f3	272	govdocs1	037/037089.ppt	Pictures	9002	blip-pict	1
+pict/govdocs1-054650-ppt-eb84e19b78.pict	3cd4fd495285aad9dd406ea4ed6aecbbceaa522435c1c69995f857f8921f05eb	16002	govdocs1	054/054650.ppt	Pictures	0	blip-pict	1
+pict/govdocs1-061412-ppt-285f8c9762.pict	3f966ccb176e8387ff7e2f69028bc1843f452ad4e8b726aeabff419884400421	528	govdocs1	061/061412.ppt	Pictures	277805	blip-pict	1
+pict/govdocs1-074251-ppt-2ba9a1d494.pict	f17b89d6bf4536b6970eaa9b6b9f96f121103818828054996548929cd39bcb8d	1746	govdocs1	074/074251.ppt	Pictures	919123	blip-pict	1
+pict/govdocs1-091390-ppt-8e035786c2.pict	339668d0bc6f6f4f1056ddadf8f5121435dfb66131920a000d07241ff66d9ef0	1694	govdocs1	091/091390.ppt	Pictures	7439056	blip-pict	1
+pict/govdocs1-092092-ppt-0812685046.pict	9b6af3b74bf3672a15edfc0955ab47cedb6340202ee8d27d0874d598ff3c18bc	1121	govdocs1	092/092092.ppt	PowerPoint Document#ExOleObjStg@66739::Data	168	blip-pict	1
+pict/govdocs1-106763-ppt-08f4468e26.pict	9d82a0aeedaf3d3a31e58b6bcdb03b49275d217ab1844913dd50b75c696b424d	14014	govdocs1	106/106763.ppt	Pictures	0	blip-pict	1
+pict/govdocs1-108192-doc-cc8ec7b029.pict	aad2dcfb363f2e6835bab0b21f91b9e19993d3f10bdcf21807298e8f4f227890	632	govdocs1	108/108192.doc	WordDocument	103174	blip-pict	2
+pict/govdocs1-112779-doc-04b5e0d449.pict	46ce2d909eb200fa32ac0fdbb2a002460f6af13010eb8b4057c7d4cc219e865e	13130	govdocs1	112/112779.doc	Data	66071	blip-pict	1
+pict/govdocs1-125601-ppt-615e022cd3.pict	6779873b24ea34184c95dbe18b26fef42d0138f340a45c80ff4cc33df9692a6d	12962	govdocs1	125/125601.ppt	Pictures	6432935	blip-pict	1
+pict/govdocs1-141727-ppt-e12b050dea.pict	27009ebf673ae393ab7250cc1da8a8528e2874ac4683cc732a049237f4cbd368	170	govdocs1	141/141727.ppt	Pictures	13027436	blip-pict	1
+pict/govdocs1-143001-ppt-8d1fa88c7b.pict	a22bcae2bf72ae315fb67a3a9e746fdbc5faba9a15c24e693970f16d715fe9e5	56716	govdocs1	143/143001.ppt	Pictures	10692763	blip-pict	1
+pict/govdocs1-144686-ppt-c0c93a5046.pict	ff33e68048815d547bb52b3b9f1662bc09ee34f75ed68da18e6178120770ef10	7620	govdocs1	144/144686.ppt	Pictures	299153	blip-pict	1
+pict/govdocs1-170373-ppt-575ca6965c.pict	61df81936ae2342c371730e07a955e8d6e1250664580119dfc3c82cdcc1bb038	6540	govdocs1	170/170373.ppt	Pictures	1055431	blip-pict	1
+pict/govdocs1-175318-doc-9e6f924e08.pict	a7efaa8c4102426364b5335f7c8ac627ce741989ff26dbe85eb4e957a1e0989c	4685	govdocs1	175/175318.doc	-	187106	raw-pict2	1
+pict/govdocs1-176728-doc-0ff3eb9959.pict	56415f225bd370f2a0bc7481caf2d9494261bb4a1e185db90bfe1d97915e0bc5	234	govdocs1	176/176728.doc	Data	65472	blip-pict	1
+pict/govdocs1-197973-doc-7a89b56dbf.pict	748c0d645ed0211a99711bce1daac579b02b0451f2283088dfbf953957a7131d	3598	govdocs1	197/197973.doc	ObjectPool/_1081346101/\x05SummaryInformation	236	raw-pict2	1
+pict/govdocs1-202939-ppt-d47efa187e.pict	9d63db82536bd2cdf3c55f25d8c5bd34b167ad1f2bc97e23555c6dd6fa3be0b4	534	govdocs1	202/202939.ppt	Pictures	3364731	blip-pict	1
+pict/govdocs1-210008-ppt-0c66b7eddf.pict	c0427c11668a24c32ff1ebee2f88a8312c1f1dddbc46fd6a6e86c40355eceb8a	27016	govdocs1	210/210008.ppt	Pictures	1070073	blip-pict	1
+pict/govdocs1-217637-pps-5f48f116bf.pict	5001469a6314ca56f2fc9bf2b7f7f32db4d6a1a95d38502e231b4bff70899222	5604	govdocs1	217/217637.pps	Pictures	1805184	blip-pict	1
+pict/govdocs1-218822-doc-6e730f7527.pict	5813e55bbd38c45e186814a9a0c5e56caf21531ec1e99c6d28a54ba9a688fbfa	20035	govdocs1	218/218822.doc	-	348726	raw-pict2	1
+pict/govdocs1-219963-ppt-e7fdcbba7a.pict	ae2c65c06475530f8d4fd2fea4b62d8bfeafde0136c231228749fae3d093f285	614	govdocs1	219/219963.ppt	Pictures	28655	blip-pict	2
+pict/govdocs1-238180-ppt-38029a7d5b.pict	ea309432970bc44cdfc906789006b0f39c42b939bcc66a61f71e08e6532ef707	3802	govdocs1	238/238180.ppt	Pictures	574328	blip-pict	1
+pict/govdocs1-244573-ppt-124d9b1dd7.pict	2ccd82fc42de267b48cf4ab5e95da89611f17301918fed9c8b8128a7c7258642	9914	govdocs1	244/244573.ppt	PowerPoint Document#ExOleObjStg@100665::\x02OlePres000	40	raw-pict2	1
+pict/govdocs1-248139-pptx-76d2ee2749.pict	3c53ca149b2bcc09878733d8f032aa20024e43a6d24e7129ead5ffab60f39461	4468	govdocs1	248/248139.pptx	!ppt/media/image3.pict	0	package-pict	1
+pict/govdocs1-264101-doc-87187ca89f.pict	eb992bf6163b6664d6b6f065edf66884122d664d0bb3eaff93834aeb5105b7b8	8224	govdocs1	264/264101.doc	WordDocument	289264	raw-pict2	1
+pict/govdocs1-266548-ppt-97321f6c2f.pict	77893f6b9278ce881b29bfc20f9fb62446efd68d7f9343f3f4d8c8f2377aff6d	6220	govdocs1	266/266548.ppt	Pictures	2736057	blip-pict	1
+pict/govdocs1-296784-ppt-55e0afd160.pict	2da00802f0ef1421303cf98f00776ac6c0ba3e33505a3f1958c5d390ae7c09fa	1118	govdocs1	296/296784.ppt	Pictures	2522415	blip-pict	1
+pict/govdocs1-298837-pptx-77cacca243.pict	f4386211f72d7c015ee65f78996de8a8e9493ff914215a31fc24e7fc08feaef2	3926	govdocs1	298/298837.pptx	!ppt/media/image29.pict	0	package-pict	1
+pict/govdocs1-298837-pptx-fdf3cfeac9.pict	c358bf5c1c1d65dc70d3acb873d88a484e7d75782a625e62dbfada33566867cb	4640	govdocs1	298/298837.pptx	!ppt/media/image16.pict	0	package-pict	1
+pict/govdocs1-304415-ppt-3944505969.pict	96757918ba2c931f5c11be83594ca2280b1bbd4482f616321ff855e0eeb1f385	4112	govdocs1	304/304415.ppt	PP40	152546	raw-pict2	1
+pict/govdocs1-305222-ppt-30e057bc35.pict	af399d160e97e0bc0e772dc2e1ad29665bb7a5e9e7b33228b1d59d22284d7ac1	4798	govdocs1	305/305222.ppt	Pictures	4423125	blip-pict	1
+pict/govdocs1-314278-ppt-43bbd580ad.pict	cac9553fc0a4c8780674e8d3e6a9877dfc71b549ba275b282f02e4f90cc30049	3162	govdocs1	314/314278.ppt	Pictures	41089	blip-pict	1
+pict/govdocs1-320163-pptx-c6947a190f.pict	e1a7a96451bb487c2463bc5cf769703c1c3c1004cf973481d8c5823cf30f7c68	3450	govdocs1	320/320163.pptx	!ppt/media/image18.pict	0	package-pict	1
+pict/govdocs1-320439-pps-8e60379789.pict	a01f3f0e9e35cd34ccc2c5ad1d35c82af712b4be9b0dba98e448ed2bce7991ec	8224	govdocs1	320/320439.pps	PowerPoint Document#ExOleObjStg@196546::\x02OlePres000	40	raw-pict2	1
+pict/govdocs1-325680-xlsx-2c61b62571.pict	cc180dd02fde973c6313c2f1afcf90b517fa39a8ecacdabc0de97ed2bb550b8f	11416	govdocs1	325/325680.xlsx	!xl/media/image2.pict	0	package-pict	1
+pict/govdocs1-336180-ppt-7b5bf0f7b6.pict	a276cad0cabdbc15cda969a4454e69e13f7104607a14020ae01c03045208db45	5654	govdocs1	336/336180.ppt	Pictures	1583783	blip-pict	1
+pict/govdocs1-352595-ppt-0a1c7f6af0.pict	262d16a192314646eceab8cea3d27da61703d4869c4fa3b855b35f112c5c94ec	4818	govdocs1	352/352595.ppt	Pictures	6779324	blip-pict	1
+pict/govdocs1-354356-pps-6e736bcc1a.pict	97ec877a88946db3af2107b54d887c261e6d6c1b6df42eabaf58c2a9100434ca	220	govdocs1	354/354356.pps	Pictures	4786888	blip-pict	2
+pict/govdocs1-354965-doc-1ddf76f1f7.pict	ad309b914b43ef40aeae532046f2c47cb8215ddb23bae5bfde4093f25bdc52d5	6730	govdocs1	354/354965.doc	WordDocument	274038	blip-pict	1
+pict/govdocs1-369422-ppt-7ddf5e1544.pict	64be90aacfd3a0218cd44111cb6b37eba5277b1cd14172a6be8f0292848e21b8	10	govdocs1	369/369422.ppt	Pictures	417100	blip-pict	16
+pict/govdocs1-370208-pps-0929003b99.pict	dfbd4dde8005eff3c3bfa2fd3ae804211ba139590a2cfd5ae7ccfecb9e6d6577	1962	govdocs1	370/370208.pps	Pictures	1177884	blip-pict	1
+pict/govdocs1-372555-ppt-bab67c41b2.pict	3d029900a6ea93213ac34f26b25f7b7b8a9466c1b5df0c629a6efedfc41a5fb3	18504	govdocs1	372/372555.ppt	\x05SummaryInformation	336	raw-pict2	1
+pict/govdocs1-390319-ppt-147a44addb.pict	3f09ac13d1cd637b75d36abece3a94615f7152cbd4adf9bd237134d6aa228cf6	12080	govdocs1	390/390319.ppt	Pictures	5707010	blip-pict	1
+pict/govdocs1-391197-ppt-712399f612.pict	0f619db3b52f91fe545e981ef9718bd312c479af24e14540bc06780fd92d506a	572	govdocs1	391/391197.ppt	Pictures	248200	blip-pict	1
+pict/govdocs1-394450-ppt-3197b660bb.pict	18660a8263919c5eebaec8acc029203d282c8653838de70b6989805b5881d3e2	17114	govdocs1	394/394450.ppt	Pictures	314660	blip-pict	1
+pict/govdocs1-421711-pps-b96828ea61.pict	25e643aa7586660e8b5285bdc8bda54df96a37fcee9c5a7a0e892624440040fa	226	govdocs1	421/421711.pps	Pictures	461436	blip-pict	1
+pict/govdocs1-421711-pps-c4407eb1ed.pict	245391b21cc8a924e7a77c1a761bc4089a230122ba9548c9c1eec13f79576dfc	638	govdocs1	421/421711.pps	Pictures	760474	blip-pict	1
+pict/govdocs1-428166-pps-7c072cae02.pict	1c658488ba10e9c82723faf1b573894e41eca22c58b065caec8baa1205480932	4240	govdocs1	428/428166.pps	Pictures	2679566	blip-pict	1
+pict/govdocs1-428166-pps-dafd13ef44.pict	55d16ce24edc0256fa44013a9ee8101873affee1b87024b31e0437d7aeb7966f	8360	govdocs1	428/428166.pps	Pictures	4070123	blip-pict	1
+pict/govdocs1-509596-ppt-5aa80a6d3b.pict	a62711dce169c83e3931f4858195d50ce998d505a3903c7ddc0b35cb9eeacf40	21900	govdocs1	509/509596.ppt	Pictures	9635162	blip-pict	1
+pict/govdocs1-512322-ppt-e7069b6df0.pict	d06f2a3d218cc7ca5d866f492fad432420fb663f639b819e2fdd321040a81c3f	9826	govdocs1	512/512322.ppt	Pictures	77318	blip-pict	1
+pict/govdocs1-515318-ppt-e2b516f7f1.pict	d3bb7c4abc10c68929fdea67351980050b689d288f4f3780465a8dfbe7d5957b	8238	govdocs1	515/515318.ppt	\x05SummaryInformation	320	raw-pict2	1
+pict/govdocs1-548840-ppt-3363bfceeb.pict	cd3a4789d5e7db3f6655d694ee962dd20272813e2708b883f40a0c330307f630	11308	govdocs1	548/548840.ppt	\x05SummaryInformation	336	raw-pict2	1
+pict/govdocs1-559748-ppt-fa11d51d1e.pict	f13c2a00edfcc6635fdefa97ae6c5f1385d49b11bd2dd627472e5ff0d3ce7a6b	1000	govdocs1	559/559748.ppt	Pictures	4308899	blip-pict	1
+pict/govdocs1-582280-ppt-701462a066.pict	92a26dcf7a79a1744f964037fc3349623af2fc7e2ab0e6dd125d7490e24d695b	195372	govdocs1	582/582280.ppt	Pictures	13337	blip-pict	1
+pict/govdocs1-582689-pptx-2d39cb49b1.pict	824b722f3e635795ce7abb297ce433e7a8ddd9b493f3768d12e32a0f2ad0a3f0	3342	govdocs1	582/582689.pptx	!ppt/media/image74.pict	0	package-pict	1
+pict/govdocs1-582689-pptx-3e3e2fd462.pict	8fd57b9ad3b934b855eec082a8b0eb00fd7260ae5a106d3ddb2df5bf04c8e58d	1108	govdocs1	582/582689.pptx	!ppt/media/image33.pict	0	package-pict	1
+pict/govdocs1-582689-pptx-7c010bee93.pict	e9cccb969970db3cf70210a76b3f417eb4990ccff6f01e332fa999d8eb553ed8	3816	govdocs1	582/582689.pptx	!ppt/media/image62.pict	0	package-pict	1
+pict/govdocs1-582689-pptx-e8f2141616.pict	9e742664a0d8657895b17421fcc489635ab725ea3e1f419ada616e8a461cd8bd	4480	govdocs1	582/582689.pptx	!ppt/media/image84.pict	0	package-pict	1
+pict/govdocs1-582689-pptx-ff7f3d78b4.pict	d2cbe85ebd1676976a71934dbe6495dce9c27336407feb31a7b801cce82ace9e	2074	govdocs1	582/582689.pptx	!ppt/media/image65.pict	0	package-pict	1
+pict/govdocs1-602479-xls-16716c27cf.pict	8ac4f4006ce76530781a46960773751dbfd65b1dea252d057fe2ef6ddc0febed	54	govdocs1	602/602479.xls	Book#IMDATA@163	0	imdata-pict	1
+pict/govdocs1-602979-xls-803e1623dc.pict	4a07270fa6071374131b9ffb92c7800b2e8629c9ee94f1d0c592e0bb2bfc4bf4	1190	govdocs1	602/602979.xls	Workbook#MsoDrawingGroup0	6741	blip-pict	2
+pict/govdocs1-602979-xls-8c6a138049.pict	1040f8ac000bca7c0b856027fd591e8a1331c961e25e3a6b2498dfeca2ddf1f1	1186	govdocs1	602/602979.xls	Workbook#MsoDrawingGroup0	44639	blip-pict	2
+pict/govdocs1-602979-xls-9d2ad45270.pict	cbc2395b91b961a80cb0cac7670a3e72df29bde2fc4b09bda51e16575ce22dec	4112	govdocs1	602/602979.xls	Workbook#MsoDrawingGroup0	7450	blip-pict	2
+pict/govdocs1-602979-xls-d2ee39925b.pict	caf9a930fe02d8c8a893be050e152378b726881a2434a470532cbfc917a48a08	1192	govdocs1	602/602979.xls	Workbook#MsoDrawingGroup0	1710	blip-pict	2
+pict/govdocs1-606638-xls-38956af0a7.pict	60517e24c47026a6cb5fdda13fbf22bd471cbbd12f1c89a3e915f45084e47039	3084	govdocs1	606/606638.xls	\x05SummaryInformation	544	raw-pict2	1
+pict/govdocs1-619749-xls-eec6fdc59b.pict	8c67310def4dba2c2a284148831a676627d7170db3d6a73e5736cdc240766dc4	3010	govdocs1	619/619749.xls	Workbook#MsoDrawingGroup0	2270	blip-pict	1
+pict/govdocs1-623796-ppt-5c3d4e98af.pict	cd03324f330a3a55f1d229708ad0a60315e52ea33585dc4109dd114dda338bc5	51408	govdocs1	623/623796.ppt	Pictures	100187	blip-pict	1
+pict/govdocs1-626232-ppt-ad819e2684.pict	9490a10d27e1e3b66f265a0b9a4ad40ea6438ff6d83dfac15be4dfaed6e3e078	3924	govdocs1	626/626232.ppt	Pictures	2895883	blip-pict	1
+pict/govdocs1-669699-ppt-48c38310f3.pict	3dc71efe3a5a1d68821c4808c827ed8e127f535bb96cdbb3a0acd6bd9d60d9c1	2048	govdocs1	669/669699.ppt	Pictures	4916232	blip-pict	1
+pict/govdocs1-673701-ppt-a9db8cf328.pict	b224bacdf6ba9aed1e7aeeb5aa48edf9c6c6198d95ca9d5b9b0ee88ecd890673	537	govdocs1	673/673701.ppt	Pictures	281104	blip-pict	1
+pict/govdocs1-674566-ppt-5c20deff3d.pict	becb3aabe1307a5d59bd5f0c013bd9087209861d62a38c9dd793b44bd4c31542	12590	govdocs1	674/674566.ppt	Pictures	17003546	blip-pict	1
+pict/govdocs1-695190-ppt-e1fa2fd07f.pict	42b76d46b6f3b7791dcc78c6c56e944935392c1dc36202b9e5cdcdcfe2b85a0f	28646	govdocs1	695/695190.ppt	Pictures	183599	blip-pict	1
+pict/govdocs1-696605-doc-3e1b73e790.pict	efc2b3736f77fcd8633f19c7a0ef2bd868f06268ff0e0ee7bbdb86fde4693090	460	govdocs1	696/696605.doc	Data	1865852	blip-pict	1
+pict/govdocs1-696605-doc-6ab4fc0345.pict	8485f3189a25f2464bbd8504ade9931c6b88ba845244457739c790ded1cd8493	1394	govdocs1	696/696605.doc	Data	643004	blip-pict	1
+pict/govdocs1-696605-doc-e7f9b32b73.pict	0444a7653585208c3630927900893f887836547e4bc1c76a4a541125a0c6bcff	246	govdocs1	696/696605.doc	Data	4497014	blip-pict	1
+pict/govdocs1-696605-doc-fe7837b6b3.pict	7e5455667a322a02037fa1452e17d98af89469e979fd80723b8e5ee6283945e7	1180	govdocs1	696/696605.doc	Data	1664771	blip-pict	1
+pict/govdocs1-697233-ppt-881e3d389a.pict	383d2f55398e328f142ad84ff4fc42569073a7d014f76b240ab924ccfa0a98c8	4010	govdocs1	697/697233.ppt	Pictures	354294	blip-pict	2
+pict/govdocs1-700515-ppt-6e1ac59e4e.pict	64cc69ce237cc037a4b7cb6e80e842437779b41dd0c9b16980904acb83bbdf83	522	govdocs1	700/700515.ppt	Pictures	4486638	blip-pict	1
+pict/govdocs1-708762-ppt-2feecf1f05.pict	b3896bcfad8d6e3d1446154df3de71c019587d8feacb0859787b4bcd0605f073	6546	govdocs1	708/708762.ppt	Pictures	7649463	blip-pict	1
+pict/govdocs1-766825-rtf-c0eebabbbe.pict	fb869cf3622a13d6c575d00cc9b0ecdf81611792afac24c535aabfd82a1efdbb	9046	govdocs1	766/766825.rtf	#rtf@4618	4618	rtf-macpict	2
+pict/govdocs1-775855-ppt-6474cb77c5.pict	70a7d8495ecaeaa465a4be4de9cd5b72318311eb0e9e12adce31f3a35d92d65d	918	govdocs1	775/775855.ppt	Pictures	63445	blip-pict	1
+pict/govdocs1-799924-ppt-7a2c2abf07.pict	b174733c66b792039f4d76c491a19fbd375c2dc06e9faa95d935bbcf1f32c825	208	govdocs1	799/799924.ppt	Pictures	0	blip-pict	1
+pict/govdocs1-812134-xls-dc9b8d28df.pict	dc92693d8dc3bb132509a6a0468cfa216579c31b5a4447210cdfc384ac7b9164	3084	govdocs1	812/812134.xls	\x05SummaryInformation	236	raw-pict2	1
+pict/govdocs1-816941-ppt-c679d8f743.pict	6228bcbfb6bfbe9df4b4988ba87dd1ee1df7e73878e0165f4a0cb7ddfba5936d	6360	govdocs1	816/816941.ppt	Pictures	549754	blip-pict	1
+pict/govdocs1-822775-ppt-0270b9fd97.pict	2cc60e78c37fbc455fb1cda9fe7fffa41154273c5a09ea05713b5cee076d306b	8738	govdocs1	822/822775.ppt	\x05SummaryInformation	328	raw-pict2	1
+pict/govdocs1-850704-ppt-47badcdfca.pict	d5975d2a9f4adb339c7a8b67dbd6f02b9d9ed493054fd3919352af510b5c400b	136	govdocs1	850/850704.ppt	Pictures	18351	blip-pict	1
+pict/govdocs1-863629-ppt-690dcc80ff.pict	f46b017c22ee85e41b0cbb79897b7d27c43a9e85c2365bc46c9a6cfea977d8c4	132	govdocs1	863/863629.ppt	Pictures	3047433	blip-pict	2
+pict/govdocs1-874151-xls-d3f4beddd4.pict	d0b9c465ca35d8958538c85246dc3f35f34adb0e52bed0040a49427961c18ab3	7550	govdocs1	874/874151.xls	Workbook#MsoDrawingGroup0	3811	blip-pict	1
+pict/govdocs1-881604-rtf-9c33e0fbea.pict	9f649a1c1a77ed4c6239002c81954444e6f399d157cf5757a82735340db99990	5968	govdocs1	881/881604.rtf	#rtf@905	905	rtf-macpict	3
+pict/govdocs1-890902-ppt-b2be30dcfb.pict	8ea032f2bae713dde8602316af9642eeb08226895bd6dc3e1ed65ecd6efd7964	504	govdocs1	890/890902.ppt	Pictures	2634560	blip-pict	2
+pict/govdocs1-904352-ppt-8a903a2e3b.pict	391c77ba6cc973608f517645744580b80678fb69ebc4422f996bb048ba0e0cd2	57480	govdocs1	904/904352.ppt	Pictures	12803001	blip-pict	1
+pict/govdocs1-906008-pps-27de441dda.pict	98fdd3d383188d8de8010f3680ee53ab20fc5614fccf76881de7dcd930323def	1420	govdocs1	906/906008.pps	Pictures	2801397	blip-pict	2
+pict/govdocs1-907393-xls-b2c65502bd.pict	bf0eac80d35aac2619e54828c47ca97fa6df105f8644f259f985ec378607c1d5	16294	govdocs1	907/907393.xls	Workbook#MsoDrawingGroup0	6218	blip-pict	1
+pict/govdocs1-907393-xls-cae49719d4.pict	fe6af00a83083ae7f61a066d630792c4013a66a17f4e3512e76e7f481549d09f	14898	govdocs1	907/907393.xls	Workbook#MsoDrawingGroup0	92	blip-pict	1
+pict/govdocs1-951391-ppt-81e6e10412.pict	fe06e6643ee06a56f97e14a6a7ac8a8a8d4af4110c7f19a5856331000791e0ac	3620	govdocs1	951/951391.ppt	Pictures	6649	blip-pict	1
+pict/govdocs1-955343-doc-73ecf5540c.pict	afc5bd8897f21acc257a611a3001f20bb43236c5668dd96fab10725802904dff	514	govdocs1	955/955343.doc	Data	256370	raw-pict2	2
+pict/govdocs1-958082-ppt-c5c7570148.pict	db2fa5e43ad9c6fd24174b2f2450e6451d893fdaa81edd69515b058948866844	2570	govdocs1	958/958082.ppt	PowerPoint Document#ExOleObjStg@239984::\x02OlePres000	40	raw-pict2	1
+pict/govdocs1-964892-ppt-39b0346451.pict	89ed4952c08e6325658308175ce190de4a5f389275edd11494c6bbc296fbe7dd	130	govdocs1	964/964892.ppt	Pictures	39812709	blip-pict	1
+pict/govdocs1-974509-doc-14174bdd23.pict	1696a795a432acc69489a7a0a20ab139b5feb687b96fb77286a716fc0ae7a197	522	govdocs1	974/974509.doc	ObjectPool/_1026309005/WordDocument	4510	blip-pict	1
+pict/govdocs1-974509-doc-166474ae7b.pict	03d426bac7e225677cbd22c07c4e32da8cb872b0fa98738d4734a4550965aba5	522	govdocs1	974/974509.doc	ObjectPool/_1026309005/WordDocument	3770	blip-pict	1
+wmf/3gpp-25212-940-2581aafb35.wmf	1b11c7cc846e9214451cc9310a2d35ddb0e473d19b4a5c1316db8154050add0b	272	3gpp	25_series/25.212/25212-940.zip!25212-940.doc	Data	120272	blip-wmf	85
+wmf/3gpp-25212-940-2c2b8af443.wmf	7526c2fc2495abdb9a39d35de27d60f5bdc426900861646a804d24039cbf3036	662	3gpp	25_series/25.212/25212-940.zip!25212-940.doc	Data	45142	blip-wmf	87
+wmf/3gpp-25212-940-4893a2d8b1.wmf	06f745357afe11a5a9a8742fdea18fbad4bff1884b27364f6f4bb5a73f012090	982	3gpp	25_series/25.212/25212-940.zip!25212-940.doc	Data	123171	blip-wmf	85
+wmf/3gpp-25212-940-c3cd67e1a8.wmf	8a9a0a8c87bc27fff2d05963cff85716bcd987898c65cbd47931fa91a844c180	324	3gpp	25_series/25.212/25212-940.zip!25212-940.doc	Data	78891	blip-wmf	90
+wmf/govdocs1-003621-doc-7c0db267c1.wmf	7e8bdff11d71eb34f8a3c06f1631504c111e8255f82dce9f60b492eeb9bd3564	12070	govdocs1	003/003621.doc	ObjectPool/_1039938268/Object Data	2950	raw-wmf-placeable	2
+wmf/govdocs1-011121-xls-54ffdfd4f4.wmf	d88b130408c19355265d1a31ea85099b7fedc4ecd06695b2b7c96fff8150cb7d	8060	govdocs1	011/011121.xls	Workbook#MsoDrawingGroup0	814323	blip-wmf	1
+wmf/govdocs1-012335-ppt-63c0b451cf.wmf	76196feb14e2c326899b158c6c19fd0e87296989f8f07a2e79f29a01374879b0	18102	govdocs1	012/012335.ppt	PowerPoint Document#ExOleObjStg@272157::\x05SummaryInformation	276	raw-wmf	1
+wmf/govdocs1-024272-ppt-f8eec542bc.wmf	d48dcbe0df8835d72295b70d55ec541b41799505d78c79a8e82dfccc88020f07	360	govdocs1	024/024272.ppt	Pictures	288797	blip-wmf	1
+wmf/govdocs1-024904-pps-b7fc4fcb46.wmf	199f1231f658b3745e71fbd4d7e2fe505425b67a3257c1a83b34d7b3a5ae9254	21400	govdocs1	024/024904.pps	\x05SummaryInformation	376	raw-wmf	1
+wmf/govdocs1-026706-ppt-d79b74caff.wmf	3eae98349b053d84755649f0c2784dc28dcebb06077b6efb5b168d6e766a830c	3208	govdocs1	026/026706.ppt	Pictures	1034100	blip-wmf	1
+wmf/govdocs1-036276-pptx-667fdca6de.wmf	5f9941862c91840fe9d1ff0f33e5c4d66a8f065b234f215cc6b23440bac153a5	962	govdocs1	036/036276.pptx	!ppt/embeddings/oleObject21.bin::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-037025-docx-4a9afbe9d3.wmf	3283192a2940012f41897572bfaecb7e6f163499a40a20aa5aa28d87b876b6c6	3146	govdocs1	037/037025.docx	!word/media/image1.wmf	0	package-wmf	1
+wmf/govdocs1-037025-docx-5047ed67d3.wmf	76256d276aaa55979abe6188c0a9332de11aab0cdd42535a91b3874c2cabb72d	2808	govdocs1	037/037025.docx	!word/embeddings/oleObject7.bin::\x03META	8	raw-wmf	1
+wmf/govdocs1-037025-docx-50ddb791d9.wmf	bb17301e487ba464bc4342b416c8a746c2d1890a6c8131958fd45206388b2d2d	2392	govdocs1	037/037025.docx	!word/embeddings/oleObject10.bin::\x03META	8	raw-wmf	1
+wmf/govdocs1-037025-docx-7f5d01d865.wmf	746805eb5a158abbe18b7230be904f380ff6424f375d3cc1a102d37bba830f0a	2796	govdocs1	037/037025.docx	!word/embeddings/oleObject8.bin::\x03META	8	raw-wmf	1
+wmf/govdocs1-037025-docx-8e333850da.wmf	724f89140b1859069096ef8f27406f180ff7d665ee0df23552441b6be1d3b6d1	2414	govdocs1	037/037025.docx	!word/media/image2.wmf	0	package-wmf	1
+wmf/govdocs1-037025-docx-b3a86922b1.wmf	ea2dfc1cea83fe58ee8550447b621af90600eba15f69cb3fb9d5efde900a4727	3124	govdocs1	037/037025.docx	!word/embeddings/oleObject9.bin::\x03META	8	raw-wmf	1
+wmf/govdocs1-037025-docx-e99fd88cd4.wmf	c2b65e1b9839b99b7990f56860528b2489edeb198b26cf363d7fb87298222bda	2830	govdocs1	037/037025.docx	!word/media/image3.wmf	0	package-wmf	1
+wmf/govdocs1-037828-pptx-54fb074258.wmf	99a5619617d0a5560cbb63e5aa85454aacb5e632812d14499f37066c38c04b9d	856	govdocs1	037/037828.pptx	!ppt/embeddings/oleObject1.bin::\x03META	8	raw-wmf	1
+wmf/govdocs1-045927-ppt-c38bb3fd90.wmf	d3a1173867d69378b90f23d9df09d6452aa55bda63e0717f4549617b67c5aa66	272	govdocs1	045/045927.ppt	PowerPoint Document#ExOleObjStg@199740::Data	1148	blip-wmf	1
+wmf/govdocs1-057696-xls-6daf66a1be.wmf	a4a5122daedbdaf200e18fe882fcad3e53ad74ca4189aa1d552f53c352fc4b54	2032	govdocs1	057/057696.xls	\x05SummaryInformation	332	raw-wmf	1
+wmf/govdocs1-060798-ppt-f19f775064.wmf	9115663a3eefa20b02e5f897a96a24e1278fd603c12849206f810da21c40da31	15756	govdocs1	060/060798.ppt	PowerPoint Document#ExOleObjStg@147806::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-062186-doc-6783a82e14.wmf	52516cb38dcac367f1a3609f13d94454fad00948d7957613d56644c6395ba574	8402	govdocs1	062/062186.doc	ObjectPool/_916468732/\x03META	8	raw-wmf	1
+wmf/govdocs1-063376-ppt-e8c2db4dfa.wmf	ff55761c96c0ec0ff7daf8202fb0b020ba12c907bed7adf4acbeaae3fd68030a	2138	govdocs1	063/063376.ppt	Pictures	455077	blip-wmf	1
+wmf/govdocs1-076625-doc-46c91ee685.wmf	12016c92ef1a5dbed98cf0f7d401eb83ebf57f0ce57d62f784c0394f92de8b2e	13716	govdocs1	076/076625.doc	ObjectPool/_1081063147/Pictures	0	blip-wmf	1
+wmf/govdocs1-078892-doc-69141edafe.wmf	e16f6e4b6b2726e2209c4625e22f0611e99ba0470a7ac20e8cb53668c8c1eff1	332	govdocs1	078/078892.doc	ObjectPool/_1196215786/CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-079405-ppt-611483c449.wmf	cfe97c253bf2bfdf73de134db19b2ef6a906f5015ec557a2c7ad842d0d5aa3be	4216	govdocs1	079/079405.ppt	Pictures	13294	blip-wmf	1
+wmf/govdocs1-082766-ppt-982c525be6.wmf	ac5f55a119b8894f347a6e85328d4a1e7ba350e0d4ea98ce1d3b2f95faecb5f2	162	govdocs1	082/082766.ppt	Pictures	1042210	blip-wmf	398
+wmf/govdocs1-090520-ppt-84e3b89086.wmf	fce9c988035543a0ebe345415dc153261ecd89022d64c34ede4d7641047aa8ef	5214	govdocs1	090/090520.ppt	PowerPoint Document#ExOleObjStg@150293::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-095281-ppt-c9d19df0ed.wmf	de7101e5a0d5d2b38c5add730d95b06679a6600dc07ebe8d579c0554e37d966b	41816	govdocs1	095/095281.ppt	\x05SummaryInformation	260	raw-wmf	1
+wmf/govdocs1-102912-doc-3bbac48ff4.wmf	61783887ae33b495b290ca52122f8813642ccc94d64db97dcb1a64d29ec26929	402	govdocs1	102/102912.doc	Data	26016	blip-wmf	1
+wmf/govdocs1-103207-ppt-5e0c501c2c.wmf	91c1ee5bd3e82ff80fcb6b3347da358dde9bb895cbdf98944e129dc823759047	414	govdocs1	103/103207.ppt	PowerPoint Document#ExOleObjStg@108130::CONTENTS	22035	raw-wmf	1
+wmf/govdocs1-106441-doc-e0e22bfd9e.wmf	916423ddbe99a468e3077a20ba5a183a577583c7d4e4043d97f3340d0cff6f7f	5272	govdocs1	106/106441.doc	Data	1917	blip-wmf	1
+wmf/govdocs1-112817-ppt-19196d8d4a.wmf	1dda36c4fcb605b6998c14c8e778777d989a22679d2c3b5ca09a8df8d2b274e3	1024	govdocs1	112/112817.ppt	PowerPoint Document#ExOleObjStg@24150::Data	1211	blip-wmf	3
+wmf/govdocs1-170242-ppt-0574ff829e.wmf	93a5c5499a8a46a6d71033c9cabfc7d52b433be94966bba8a8477bb4e284da1d	1710	govdocs1	170/170242.ppt	Pictures	38052	blip-wmf	1
+wmf/govdocs1-174155-xls-c7a188f677.wmf	2334c3837c264642a2177b22764915ab5a651191c033a077212e5538f84205a9	21636	govdocs1	174/174155.xls	\x02OlePres000	40	olepres-wmf	2
+wmf/govdocs1-174793-pptx-6b12185dde.wmf	d2f1c1d0e299cf82ab297bfe6f77cc015b3fe35b41644cc349762bee26f38582	754	govdocs1	174/174793.pptx	!ppt/embeddings/oleObject16.bin::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-183050-pps-088247446c.wmf	a74918b12bdfbd4c293d08272a56eedd57c2be5c8944bee0179d965959e005e9	20644	govdocs1	183/183050.pps	\x05SummaryInformation	356	raw-wmf	1
+wmf/govdocs1-183756-doc-159a2dc8db.wmf	f05138d9b1e9cb521b7d6e5113725a0223437ea832a52bfbbfb24f94024453d5	1720	govdocs1	183/183756.doc	ObjectPool/_1027172909/\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-183783-ppt-097b2f0362.wmf	842368459d32842c2da818667b0de671877097f19c7e71f1d20ad2f72e3761d2	522	govdocs1	183/183783.ppt	PowerPoint Document#ExOleObjStg@159743::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-186698-wp-e366d3d700.wmf	d83c0bcbe5ac61796a60fa6a12445ba64808a406765321a000da77cc9011f944	6306	govdocs1	186/186698.wp	-	103323	raw-wmf-placeable	1
+wmf/govdocs1-200136-ppt-99d9e13bcb.wmf	0edc17ee86be2eb723f724a71f292cac89e62ef554cf46b94f9182b1c2f6eb73	1888	govdocs1	200/200136.ppt	PowerPoint Document#ExOleObjStg@1980817::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-206619-doc-9d07f1b7c6.wmf	725e5991c6bdbe39097b2a3eda63662fe69b192dc6ce009f339819159be832c2	104	govdocs1	206/206619.doc	Data	3059	blip-wmf	1
+wmf/govdocs1-207022-ppt-17c93aca48.wmf	060b4333fd27d6c234d93dbb8f5f30452dccba91997a6c6d46c1ace696219481	3234	govdocs1	207/207022.ppt	PowerPoint Document#ExOleObjStg@45713::CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-223624-docx-de21f0f645.wmf	92b9dacde3848c1bd63438e56c5202cb14dea0bdd104eb0854220753254ddeab	7964	govdocs1	223/223624.docx	!word/embeddings/Microsoft_Office_Word_97_-_2003_Document8.doc::WordDocument	166576	blip-wmf	1
+wmf/govdocs1-223629-pptx-ff625a1019.wmf	6e20b5a7de4e3b08212158c1657e12e324e7f3ea455d86c35de53abda2213147	21400	govdocs1	223/223629.pptx	!docProps/thumbnail.wmf	0	package-wmf	1
+wmf/govdocs1-224041-docx-68da92f95e.wmf	1913bd339971e1c253864aff8fd77c142e50d3c2c0370618d93db5d57e14ed84	20396	govdocs1	224/224041.docx	!word/media/image3.wmf	0	package-wmf	1
+wmf/govdocs1-224041-docx-dfe4c72e91.wmf	e70209c1af560b1ba9431dff41a7ad74f01241f9fa41c64126467c7e3844d7f4	21220	govdocs1	224/224041.docx	!word/media/image2.wmf	0	package-wmf	1
+wmf/govdocs1-224320-pps-a4856efe13.wmf	c4c5b4ce07b9badafb95fe7345f380c601ea7a0be773f5a09094e85081f3c7f9	894	govdocs1	224/224320.pps	Pictures	2247	blip-wmf	1
+wmf/govdocs1-224939-docx-4a15a97d99.wmf	70965b922c6bb93e689640624c90c15237c35345e03db5fef312b3adf2269940	13416	govdocs1	224/224939.docx	!word/embeddings/oleObject1.bin::\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-230579-pps-469198dc37.wmf	981a04c8f152e1be032bdb44fedc35a2d3394f0b79bebe4bc08488e887e0a7a2	8516	govdocs1	230/230579.pps	Pictures	3460611	blip-wmf	1
+wmf/govdocs1-232380-doc-9e5b005b3c.wmf	51864806cc5b21c58808a07acfd255bcfa9d689599b13d73e7cff4738ca092ff	496	govdocs1	232/232380.doc	ObjectPool/_1231679306/\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-234526-doc-8281142a5c.wmf	989a29ae2969f1a22e1ea83728cd508014de636250f6df3e8c4fc51ae001852e	23114	govdocs1	234/234526.doc	Data	60233	blip-wmf	2
+wmf/govdocs1-237657-xls-2b1a7c0d41.wmf	705c011bf16e411c161576be802efd12f3247442b4b168ee001289e1d953b9bd	3826	govdocs1	237/237657.xls	\x05SummaryInformation	244	raw-wmf	1
+wmf/govdocs1-244629-xls-42b95edd6e.wmf	251a04218e47aebfc2f74efebec7300646acc6eadd2c83c901c8cfc73c38295a	942	govdocs1	244/244629.xls	MBD0013CBD0/Data	42316	blip-wmf	1
+wmf/govdocs1-258642-ppt-ce7887f825.wmf	a18149a7bf4298f5cca0cd09ebe94f8c8a2ac7f536dc2e33eaa35b861d05d992	224	govdocs1	258/258642.ppt	Pictures	194	blip-wmf	1
+wmf/govdocs1-258975-pps-c77931ef8b.wmf	16ee3fd6dfb36fca291be2c0160bc58dafc1df1a76867238d8db2b5814600dbb	232	govdocs1	258/258975.pps	Pictures	3151236	blip-wmf	1
+wmf/govdocs1-261645-pps-8d4f2b878d.wmf	ad4a388a55c0f8c2332d28795f79146bb5b0e80428988735e7f5804764077fd8	2228	govdocs1	261/261645.pps	PowerPoint Document#ExOleObjStg@116935::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-262754-pps-7bc77b9556.wmf	63e09524bbc395791557c16ffa9721813880a2deb6506497659bbe491bedf59d	6884	govdocs1	262/262754.pps	PowerPoint Document#ExOleObjStg@199345::\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-265011-pptx-8eb3bfacf5.wmf	ba7673b45d4b9a9e68bd8a06dcdb7be41cad5ce8227274e8e4b03c98f19d9fec	1554	govdocs1	265/265011.pptx	!ppt/embeddings/oleObject3.bin::\x02OlePres000	40	olepres-wmf	2
+wmf/govdocs1-265011-pptx-eb0f03cb08.wmf	288033830c0473320affe9598b7ab69bae402006feb02f54b6520be5b76d9f3f	1554	govdocs1	265/265011.pptx	!ppt/media/image16.wmf	0	package-wmf	2
+wmf/govdocs1-266193-ppt-ab37a64645.wmf	69402fce4e594d9513b3251e02487719cafb78d6f5d29939b90f9d8f8c86b56a	23490	govdocs1	266/266193.ppt	Pictures	69572	blip-wmf	1
+wmf/govdocs1-273263-pptx-d10b7d9d68.wmf	455b7989446e0e0050f6149f84b678de9cf97c26e3276c5285e8b032f8fcdcfc	1098	govdocs1	273/273263.pptx	!ppt/embeddings/oleObject5.bin::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-273330-ppt-9e131969d6.wmf	4d6e239adce1636c40f1a81a4bcef1f50af7e20807df829694e8cbbfaa5fd982	21400	govdocs1	273/273330.ppt	\x05SummaryInformation	460	raw-wmf	1
+wmf/govdocs1-274495-pptx-49ab5173e0.wmf	e3b717536567d749558f9b96c11a1ffaaca6ac74edf890e45d775dc791bf85e1	4050	govdocs1	274/274495.pptx	!ppt/media/image67.wmf	0	package-wmf	1
+wmf/govdocs1-274495-pptx-98a165c24c.wmf	0b88a958a110cb2a8b783d28c7f89cedc7d333abf8d3045aee225e340c0092f8	4514	govdocs1	274/274495.pptx	!ppt/embeddings/oleObject11.bin::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-277287-ppt-a1599c0de2.wmf	efe5d45e47b72b0285d99d20066e71cd52c3acf6ea5690be54cc65a96eb29120	34	govdocs1	277/277287.ppt	Pictures	3634	blip-wmf	11
+wmf/govdocs1-279023-pps-9fb2e40a93.wmf	e354be59ba77f36ae691279fec0a7c764d3fbf8b587d6d379dd08cdfc4ec99b7	1274	govdocs1	279/279023.pps	Pictures	1441083	blip-wmf	1
+wmf/govdocs1-281233-rtf-f0dd5ab524.wmf	189a24f42943670e9dcb837efcfd02f7d73347fb12307f4c4717a61212ddeaf7	496	govdocs1	281/281233.rtf	#rtf@151173	151173	rtf-wmetafile	1
+wmf/govdocs1-285195-doc-66bbbc2222.wmf	0a5452a4bf2fb16f03f40aa67b1199918ca63b3ace2b9640a21908a01b84dd49	522	govdocs1	285/285195.doc	Data	16611	blip-wmf	1
+wmf/govdocs1-285946-ppt-2f087f3d47.wmf	78b81d5ca37ded6f9de5d47c10aaff4c8fa5f2884a995e3a326bf219f67250ab	314	govdocs1	285/285946.ppt	Pictures	2689309	blip-wmf	2
+wmf/govdocs1-299763-pptx-4f1e25202f.wmf	8a99e7e9cc5bbafc9ccd58e98b921c3f3ebccd0422d228366387d2a3f0ffba30	6834	govdocs1	299/299763.pptx	!ppt/embeddings/Microsoft_PowerPoint_97_-_2003_Presentation1.bin::PowerPoint Document#ExOleObjStg@80415::\x05SummaryInformation	424	raw-wmf	1
+wmf/govdocs1-299763-pptx-d1f1cf4801.wmf	915603178665591f1ed316b3d06b4b9c122805f6e77b4b7b6c0f0853072d6145	6836	govdocs1	299/299763.pptx	!ppt/embeddings/Microsoft_PowerPoint_97_-_2003_Presentation1.bin::PowerPoint Document#ExOleObjStg@74245::\x05SummaryInformation	424	raw-wmf	1
+wmf/govdocs1-300335-pps-975ac10794.wmf	b2b79c0fbb31e8dcf00ab8efc0038c97e7c56c52a620cd943c3f6fcca928b5cc	3788	govdocs1	300/300335.pps	PowerPoint Document#ExOleObjStg@268022::Pictures	0	blip-wmf	1
+wmf/govdocs1-304135-ppt-33c45cbaa0.wmf	3094874a9150047344744ddc1826c919c4e5abe79b674032f9e993a8a2cd0d9b	5384	govdocs1	304/304135.ppt	PowerPoint Document#ExOleObjStg@296801::\x03WP61	12597	raw-wmf-placeable	1
+wmf/govdocs1-304135-ppt-95addc13ad.wmf	829f635ec0a94eb645f068b3d992dcb7cfc64a7e45a21648b8e003dad9cbf19b	5750	govdocs1	304/304135.ppt	PowerPoint Document#ExOleObjStg@280960::\x03WP61	13415	raw-wmf-placeable	1
+wmf/govdocs1-304135-ppt-b5204ed1c5.wmf	75443403f77ac03835e4c871f0fa3672dd988d9cd303f89635935e69759a47c6	5784	govdocs1	304/304135.ppt	PowerPoint Document#ExOleObjStg@308456::\x03WP61	13597	raw-wmf-placeable	1
+wmf/govdocs1-311779-xls-c7c5e6d631.wmf	102c811880685b7dd81c144bac04bd132908ac86a69fd6017bf0ca01bb13a79a	7464	govdocs1	311/311779.xls	\x05SummaryInformation	272	raw-wmf	1
+wmf/govdocs1-316655-doc-0b505ef528.wmf	d4d63a8f0b0027be7f9e5123b8deb9dbd9267dce090ec16bd4b7d912212244c3	7104	govdocs1	316/316655.doc	Data	209876	blip-wmf	1
+wmf/govdocs1-316748-doc-f8de4c903d.wmf	6373e5a6abc51093c29e5bca4b93e1af224a85fe4e1fc1fecf9ae3fda434b5e4	1574	govdocs1	316/316748.doc	Data	368381	blip-wmf	1
+wmf/govdocs1-317590-doc-cbf361ea0a.wmf	a4f065ae8b959f460a860f828428421d89659fbe9ed4682ed79992b1f9b99b74	2808	govdocs1	317/317590.doc	WordDocument	169014	raw-wmf	1
+wmf/govdocs1-318133-pptx-0ff8d5eb85.wmf	a4d90d6d79334c9ab09b99c0021fa146586967cd4869b5ccf72f6c5b10844654	808	govdocs1	318/318133.pptx	!ppt/media/image74.wmf	0	package-wmf	2
+wmf/govdocs1-319979-rtf-1dd2a227dd.wmf	a99b3c22b6b03cea567ea95ddcdb7466fa88079a04dc34dae38410b570d7c11a	416	govdocs1	319/319979.rtf	#rtf@606917	606917	rtf-wmetafile	1
+wmf/govdocs1-319979-rtf-2a9b47ec25.wmf	1b6c11e98b73c52c68b3523c78e6e0f32af3e0b07685e9ee71ec28d2f85537eb	230	govdocs1	319/319979.rtf	#rtf@107124	107124	rtf-wmetafile	1
+wmf/govdocs1-325933-pps-9da5523876.wmf	5670ed6099ec6321ac4eec3fac89a7be7c474934243e5d5f6d01b8a8e581a922	358	govdocs1	325/325933.pps	Pictures	1107361	blip-wmf	1
+wmf/govdocs1-337824-pps-c0c315f3d5.wmf	8c6881ebd1360b2fc3b0a152067e1bb5afade67401ebaebd4e892f6dbe0a6de9	5796	govdocs1	337/337824.pps	PowerPoint Document#ExOleObjStg@43167::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-337907-ppt-676a4f119b.wmf	a13c290d0965e69e524df7885926ef338088a6e0056eb3a4e7d4e3c9c9c402ca	878	govdocs1	337/337907.ppt	PowerPoint Document#ExOleObjStg@490096::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-338945-xls-de16fad89d.wmf	67e5fa91697e2a8be5f81b2d7af6f04b5f7b74e8981d1b63b02b71c90649ae69	22502	govdocs1	338/338945.xls	\x05SummaryInformation	248	raw-wmf	1
+wmf/govdocs1-346596-pptx-6b86880b2d.wmf	c1e9109e4c832769a5b400c69a84ea11822cad0f9183380d00bd7ffac25e2ed1	924	govdocs1	346/346596.pptx	!ppt/media/image7.wmf	0	package-wmf	4
+wmf/govdocs1-348743-doc-511b97c466.wmf	c7ed51c0e99c968e181c2da1506c689bac898ef43823e659ce4d2a98806ded96	186	govdocs1	348/348743.doc	Data	25778	blip-wmf	1
+wmf/govdocs1-366558-ppt-83fe5fd6d5.wmf	776af87d4dc7c54ab859221d248d12e90cef37e8bd61243b4d42d2cb2840d019	7584	govdocs1	366/366558.ppt	PowerPoint Document#ExOleObjStg@44253::CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-369956-pptx-09e59deb69.wmf	a51caa07e78d91c0a34ca1a23e380cbf99fb32c137e1c227c4b768a2aaddf97b	900	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	1591	blip-wmf	1
+wmf/govdocs1-369956-pptx-1e4b9d3760.wmf	ee1c91d5e8ba114d10c24007064888904bc5852e361de9a9c61af2469998de37	554	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	3770	blip-wmf	1
+wmf/govdocs1-369956-pptx-5a276e3791.wmf	b2bbd17b237c481fdb47f41b90bc17f890adff86b7abab747be1b1e6770afb15	792	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	864	blip-wmf	1
+wmf/govdocs1-369956-pptx-c276bc8c41.wmf	906408cdd4781a8dcdc185e6a6268272a177a6a973aa06c64696e32612f5dde8	678	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	182	blip-wmf	1
+wmf/govdocs1-369956-pptx-dc8db6c3f8.wmf	465feb015304c40a4a0e54d8fc786a495e9697cd7e3cb3c7deb1709535d6a009	784	govdocs1	369/369956.pptx	!ppt/embeddings/oleObject1.bin::Data	3049	blip-wmf	1
+wmf/govdocs1-369988-ppt-e81951cdbc.wmf	e2266b12f439cb04ceffca9dc488da0233ddfd99553ba13ad9ad32ec5b913d0f	282	govdocs1	369/369988.ppt	PowerPoint Document#ExOleObjStg@3881193::Data	826	blip-wmf	1
+wmf/govdocs1-376962-ppt-904f61b8dc.wmf	9b21394e11a3f9bca9d7846729e3fb8f1f73aa25c243fa6e358fcd783b415c23	42	govdocs1	376/376962.ppt	Pictures	213640	blip-wmf	3
+wmf/govdocs1-378429-ppt-12ce099113.wmf	7928fcd95c23d847a647788febb42da644276b3515d823b4161a823588c3fce9	230	govdocs1	378/378429.ppt	PowerPoint Document	70322	blip-wmf	1
+wmf/govdocs1-381948-ppt-098805693e.wmf	f97e20e8cf35ede8bfda9c715fb8c74a6e816375b74bbfa4b0e202502e991c64	482	govdocs1	381/381948.ppt	PowerPoint Document#ExOleObjStg@244530::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-385578-ppt-efed66b24e.wmf	14042c712b900d62131cebae704f792a62d2100bbd4a6027ea74f299467ff79e	40	govdocs1	385/385578.ppt	Pictures	31822	blip-wmf	1
+wmf/govdocs1-391644-rtf-55c54d3ecb.wmf	e233c0ff650ee4dbe88f354b7f818921e8a4a2f5d4470bf83a3a8cee39d8f0f8	408	govdocs1	391/391644.rtf	#rtf@442438	442438	rtf-wmetafile	1
+wmf/govdocs1-391644-rtf-b09ff4e749.wmf	e95be26405ff7815d7ac6d4b00e8f9fce61eb5221bd787850325c2179a081059	496	govdocs1	391/391644.rtf	#rtf@1574853	1574853	rtf-wmetafile	1
+wmf/govdocs1-391644-rtf-c051178069.wmf	e3cfc7f17f2e09894baf303d3fefb11b7706409ee7451232de8748fd0285126e	9640	govdocs1	391/391644.rtf	#rtf@292396#objdata	9676	raw-wmf	1
+wmf/govdocs1-391644-rtf-cf48f6a96a.wmf	cdec87ef11f8fd964f4dfb47831d28bc51c54868412435503c842f152476664b	644	govdocs1	391/391644.rtf	#rtf@3864727	3864727	rtf-wmetafile	1
+wmf/govdocs1-401640-ppt-48fa1048e0.wmf	f13bb48b0eaa92bcb4fc69787be85ac25db3e8ea1718a41c7aea14ddb35a1b0b	416	govdocs1	401/401640.ppt	Pictures	553156	blip-wmf	1
+wmf/govdocs1-406071-rtf-1abddaa196.wmf	64db9f14e9f88aaa46fd636d47f02bdb7c474c83ab769bb7ff5bfe6b640a492d	10612	govdocs1	406/406071.rtf	#rtf@9878#objdata::\x05SummaryInformation	296	raw-wmf	1
+wmf/govdocs1-409633-doc-d7dc77b708.wmf	4b7a17dee70952c361a27cf4e52f660d6452515778d07de62a3fdcc637500d3d	780	govdocs1	409/409633.doc	WordDocument	144944	blip-wmf	1
+wmf/govdocs1-421731-rtf-2da66067eb.wmf	3cf66e5334b6ee9065b498c28e40a4b8db721b37047b167edfec3aab255a16f2	9928	govdocs1	421/421731.rtf	#rtf@48973#objdata::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-425243-doc-94e0074571.wmf	5adcef2e74451794f9d5b616b79707a4ac41f65b1750f106f3667e79bee3b74c	646	govdocs1	425/425243.doc	ObjectPool/_1001163608/\x05SummaryInformation	336	raw-wmf	2
+wmf/govdocs1-444227-doc-3bd7dcbc87.wmf	77b3b9eb8d19539e03a125d174b89ee4169d2fcec14074e287e43a8d2abb5d36	794	govdocs1	444/444227.doc	Data	81607	blip-wmf	1
+wmf/govdocs1-448024-docx-1323e4f678.wmf	1ddc3b5f42cd62a3b0c12032960d54492f8ffd45f73d59a4e1cc7ae71d289d56	336	govdocs1	448/448024.docx	!word/media/image4.wmf	0	package-wmf	1
+wmf/govdocs1-454419-ppt-21080f8e6f.wmf	dbf44aaabaa92d6387151fa950b89c16d6829e3513e326d9e3df0565cf0cabfe	340	govdocs1	454/454419.ppt	Pictures	933594	blip-wmf	1
+wmf/govdocs1-458959-rtf-239ec2653b.wmf	7e5dcffc7ffff516a10f06edf86cd6297482efea0f9aee05485cd508ff80d33e	838	govdocs1	458/458959.rtf	#rtf@5504545#objdata	68689	raw-wmf	1
+wmf/govdocs1-458959-rtf-d6d530a2b4.wmf	a65f1d65236307b0d604835948645dd83c40f4e6e8bbfb3f0dba919531f8a938	838	govdocs1	458/458959.rtf	#rtf@5363920#objdata::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-472071-zip-4283ea97cc.wmf	39280ef752fb2f03b8bd79841ea996e35125163869f2b49fc9379411036060bb	10772	govdocs1	472/472071.zip	!docProps/thumbnail.wmf	0	package-wmf	1
+wmf/govdocs1-472776-doc-838b99fcbb.wmf	4892956b1f808c664659df5afc523631707d79e5968ca9b6010008ee52cf9e8c	8390	govdocs1	472/472776.doc	ObjectPool/_988540389/PowerPoint Document#ExOleObjStg@7826::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-473188-ppt-a2901adaa1.wmf	166659993abb802561cb07b4b05bdc54c4a4273ca2b80da59d2ae1fade97c4a5	18434	govdocs1	473/473188.ppt	PowerPoint Document#ExOleObjStg@3515892::Package!word/media/image1.wmf	0	package-wmf	1
+wmf/govdocs1-473757-ppt-b334f0f71d.wmf	b9367b3b029de23d5d144dacba2cbf907dd8b85a32b2c3d499b70bb530c9fbf1	24428	govdocs1	473/473757.ppt	Pictures	4166930	blip-wmf	1
+wmf/govdocs1-486756-rtf-575e647dfa.wmf	28afdd391585fd7f1bf028f21cdcdf3107be8b40069ec664bcb94d974aa3b37c	3218	govdocs1	486/486756.rtf	#rtf@314193#objdata	5966	raw-wmf	1
+wmf/govdocs1-498317-ppt-5f219105c6.wmf	51556c8913697876789810d4059ed67b3cab02bf246cb0edb963c7a1ef4c3e10	480	govdocs1	498/498317.ppt	\x05SummaryInformation	424	raw-wmf	1
+wmf/govdocs1-501073-ppt-b92d0fd99d.wmf	bc1b4c225053ba69be8e1f0e664bda543f7a8131afe2cc6ef5aaef6cc69457a8	23016	govdocs1	501/501073.ppt	PowerPoint Document#ExOleObjStg@167970::CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-503480-doc-03abeeee85.wmf	ac45fb4b6e1c8be5b3861b37653f2d0657ec0e4ab2b6074ef3a483d514f85717	380	govdocs1	503/503480.doc	ObjectPool/_1154436626/\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-510763-ppt-aeaaf51580.wmf	80e8cbf68650e1c3cc910a9d2a7d2f2fcdb64a23a55c437480d4eee9b10f0e6c	6428	govdocs1	510/510763.ppt	PowerPoint Document#ExOleObjStg@348484::Data	180	blip-wmf	1
+wmf/govdocs1-511044-ppt-56fa63479c.wmf	5c7eb1db3f752b8d35a382883653da7cbd3db184b42c65f491dab6103d48461f	5542	govdocs1	511/511044.ppt	Pictures	679340	blip-wmf	1
+wmf/govdocs1-513370-rtf-247e3155f5.wmf	9d5b9d4f5ef31d0e101dbaea2f88b151f28a30a836d705a9688017cfb3097d72	712	govdocs1	513/513370.rtf	#rtf@174770#objdata	3156	raw-wmf	1
+wmf/govdocs1-513762-doc-1e28cc3ab5.wmf	3ac20db35ee551f3f597715916c0097080ec5168f9622aae02cb26338995e3e1	2588	govdocs1	513/513762.doc	ObjectPool/_901885363/\x01Ole10Native	6	raw-wmf	1
+wmf/govdocs1-514178-ppt-be93a62014.wmf	392af2c3f82fe4da5159696bf7e6ed1efd6d16d3e77f81e05aa9fc12eb87b18f	5146	govdocs1	514/514178.ppt	PowerPoint Document#ExOleObjStg@373004::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-515542-doc-13e63a14dd.wmf	2f5f13471f3a8a768927506a506c2648e8feb386937a1979e286556c24b17c12	150	govdocs1	515/515542.doc	ObjectPool/_1110197418/\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-517926-ppt-b63c54b8a2.wmf	9d1884bfde4d1260d7b9bb2a4ec0938f3c618607fbf06c8a3eede94c25590a96	38014	govdocs1	517/517926.ppt	Pictures	1537472	blip-wmf	1
+wmf/govdocs1-518370-ppt-6cf628f8fe.wmf	10eaaaa46dc817c08fbd74b40b6f67e98f4ddc627cd09ca4f63554125973f337	21400	govdocs1	518/518370.ppt	\x05SummaryInformation	324	raw-wmf	1
+wmf/govdocs1-519564-doc-28f2a97ea5.wmf	507a5d0f12cab09fc5349c27b0f6e80335e99a701087214511189eef9978c3a2	9056	govdocs1	519/519564.doc	ObjectPool/_1212891242/\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-523745-ppt-f26bfc4167.wmf	c1738b561e2c4276e8f45ad24ee7161253ccb22e14bf9d988dbe0b5adffedc5b	662	govdocs1	523/523745.ppt	PowerPoint Document#ExOleObjStg@308878::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-525201-pptx-2a07bfa33b.wmf	947601f7c6dc864a4ced356dd4a903e70410662e9f71e9293d4fdb2ecf0b2ac4	626	govdocs1	525/525201.pptx	!ppt/embeddings/oleObject5.bin::\x02OlePres000	40	olepres-wmf	2
+wmf/govdocs1-525201-pptx-e39d4315e9.wmf	70a30bde98457da17722cb4692e93bc3fccc34e2cf26dccf60e1b7a5827a8c78	6464	govdocs1	525/525201.pptx	!ppt/embeddings/Microsoft_Office_Excel_97-2003_Worksheet1.xls::\x05SummaryInformation	224	raw-wmf	3
+wmf/govdocs1-525822-doc-3f7e443a49.wmf	b1fc2c65769c41e603f45bf79f04af71831fbc0c7e74a6088cd4350bdffb81d3	7444	govdocs1	525/525822.doc	ObjectPool/_1159612137/CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-525822-doc-50b7432f82.wmf	5cb5cfc0653276c545c19e0b36111289798d8384db9c4ad921524794011ad40f	5576	govdocs1	525/525822.doc	ObjectPool/_1159612139/CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-536920-ppt-798f63a36d.wmf	58ca4a24bbd879a3eb889328ab8382f7b17212b6c14da3effdb949c444f0e527	164	govdocs1	536/536920.ppt	PowerPoint Document#ExOleObjStg@27638::CONTENTS	4057	raw-wmf-placeable	1
+wmf/govdocs1-548873-doc-69257617f8.wmf	a0c0b8784950bd9cb42ad3b7347f2a50004b91851eaf9fca6983510c76fba23f	7862	govdocs1	548/548873.doc	Data	5446	blip-wmf	1
+wmf/govdocs1-549291-ppt-b1ea1f5b0d.wmf	cb3437794fd47944b32c275d13708f6411098b6d8ae193f63fbfab3945c2bae5	7804	govdocs1	549/549291.ppt	PowerPoint Document#ExOleObjStg@71320::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-551479-pptx-4bc24ce597.wmf	6921d4c8f565d2ebec4ac0c4a96dacc12563a80461d7873bb658fea3b43c4313	1354	govdocs1	551/551479.pptx	!ppt/media/image17.wmf	0	package-wmf	1
+wmf/govdocs1-555972-ppt-f0d3fd2a15.wmf	354e08a42b91cd4141037fbdcc854d1af40c840a2008073c4298a247d3d94f04	730	govdocs1	555/555972.ppt	Pictures	6349184	blip-wmf	2
+wmf/govdocs1-556202-ppt-0216e7b474.wmf	a6845e150b0f91f8541646170e4a920ebff6f6287f2fcd5bdf3711a61d05d5a0	1086	govdocs1	556/556202.ppt	Pictures	39813	blip-wmf	1
+wmf/govdocs1-559484-ppt-7c8613566d.wmf	db524c03782a34e1d99fc252d19308a67acf298fac28bfce5b1f0cc05125df9f	2582	govdocs1	559/559484.ppt	Pictures	79509	blip-wmf	1
+wmf/govdocs1-564309-ppt-d66d760f4f.wmf	5667e0401a0a8a4d736cb783c5bda9402377a91532c6c899e94506a0052a3250	8950	govdocs1	564/564309.ppt	Pictures	2102739	blip-wmf	1
+wmf/govdocs1-579969-doc-633037e621.wmf	58f9d3efb057ff445a09158b53fd143480048b82f63fc4243bdb492851022427	214308	govdocs1	579/579969.doc	Data	385052	blip-wmf	1
+wmf/govdocs1-584931-rtf-4ed3ede3b3.wmf	30eaccc0e05870570c0b6be61cec37da9dc94d8b56fd2b1e76c5273300490084	698	govdocs1	584/584931.rtf	#rtf@1155606	1155606	rtf-wmetafile	1
+wmf/govdocs1-587492-xls-d3bca7e9ab.wmf	73b706c44d90e1679509c4ccc44f318ef25e9e20e652ef46f3b61b7edb5b8d12	506	govdocs1	587/587492.xls	Workbook#MsoDrawingGroup0	1674	blip-wmf	1
+wmf/govdocs1-591653-pps-8f7f160b98.wmf	f5703d585c2c8aab943ff89dff4ff1efa86a9b0be7dac9817bcc60937581c5e7	618	govdocs1	591/591653.pps	Pictures	1912961	blip-wmf	1
+wmf/govdocs1-595176-doc-b63382fcbc.wmf	9359160d12a927a1ee07b42352155dcc653a85d56bc731157363f8a9c26a1b31	18464	govdocs1	595/595176.doc	ObjectPool/_1194075947/CONTENTS	0	raw-wmf-placeable	1
+wmf/govdocs1-596299-xls-283ebaf96d.wmf	b061f4ad8b086282f516dc8a74e49277e5e1acd4cda889cca64ff95a344bf1f0	14922	govdocs1	596/596299.xls	MBD0013747E/Data	28911	blip-wmf	1
+wmf/govdocs1-598948-xlsx-6d1107b8c7.wmf	48585709c646d43b677174f52538b72477ad20131d3c9384b3cce43a2723b31c	5742	govdocs1	598/598948.xlsx	!docProps/thumbnail.wmf	0	package-wmf	1
+wmf/govdocs1-601273-xls-9ea88e1f6c.wmf	74b9353ff91dfa8a91696fb100f39a7b349ded2c4ac12b39e1d881aeb94d8c85	382	govdocs1	601/601273.xls	\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-603948-xls-a627a3fadd.wmf	b994fee814100a784973c1d7da8d5320806a90d984cd0342400ac6d0e881d51b	3712	govdocs1	603/603948.xls	MBD001F524D/\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-606386-xls-1b0cfa0a7a.wmf	30298c27819784f3cadea19a51e8af49febe0353eaafa406c41716686aa0b2b1	26	govdocs1	606/606386.xls	_SX_DB_CUR/0001	922593	raw-wmf	1
+wmf/govdocs1-608715-unk-949e1b7737.wmf	1aa073aa3fff401c8efe20e02cc48ab0d808655e572601ee83275d31c6a58861	16680	govdocs1	608/608715.unk	Pictures	1463382	blip-wmf	1
+wmf/govdocs1-608776-xls-9baaf4c936.wmf	aae78540cc5559de21bfbee9288cc6fd7eaed90da8f8264f4a16a330741b2a9c	3650	govdocs1	608/608776.xls	\x05SummaryInformation	244	raw-wmf	1
+wmf/govdocs1-620517-unk-3c2f639112.wmf	a6e483b03db469f3d61be5a7e4652a5c782b50004f427f2ae1b46126995ece6b	896	govdocs1	620/620517.unk	\x05SummaryInformation	364	raw-wmf	1
+wmf/govdocs1-623963-xls-c3d4cb28f4.wmf	371e08f785e079323ccc3ddaa5031dd6ecc1efb0d99563ca4fb4fd3b7f782dc5	12256	govdocs1	623/623963.xls	MBD00024FC9/\x02OlePres000	40	olepres-wmf	2
+wmf/govdocs1-632976-ppt-1a7ca8959e.wmf	9990467fd49f9e431b7a51365add8ceae7f36de47bf5ffbfcadbed4ed4878a96	1810	govdocs1	632/632976.ppt	Pictures	463689	blip-wmf	4
+wmf/govdocs1-641281-rtf-fe1c234863.wmf	aa37219a1d50c8e76aa84fecc70d3cafc77c6a8ff7949cc7b6a577bbb2c738fd	9836	govdocs1	641/641281.rtf	#rtf@64554#objdata::\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-647195-unk-ff2802a726.wmf	84f502e45807cb58bac49798cafed9308282f458d87b08d505b8c902538fb171	10924	govdocs1	647/647195.unk	-	18762	raw-wmf-placeable	1
+wmf/govdocs1-647892-xls-9b57e53d4b.wmf	1e38a6d0122a7dea2950be5413413509e07277afa5509f5496a4ec5af0d7a38d	3820	govdocs1	647/647892.xls	Workbook#MsoDrawingGroup0	92	blip-wmf	1
+wmf/govdocs1-657298-ppt-03f42ae48a.wmf	b4c6e093cddbfbfa2eb9b68b305ae73e0923c7b4608e45cb7a58cf1e47f5669b	7526	govdocs1	657/657298.ppt	PowerPoint Document#ExOleObjStg@1803415::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-662563-pps-e1c0f9c6e0.wmf	e75fdda178f2e43e573937c7895169c3bd63edcff95bd11055520c5102acf2c4	21400	govdocs1	662/662563.pps	\x05SummaryInformation	328	raw-wmf	1
+wmf/govdocs1-665080-ppt-fe73f0a79b.wmf	fdae715c84e1cc0c6ac9d45531c8267659f4d8463f35e1586b8f1a4a4d261db1	11666	govdocs1	665/665080.ppt	Pictures	9878	blip-wmf	1
+wmf/govdocs1-666816-xls-01b83e5ddf.wmf	f01331bd6d4c2439c1e3c4f154964de5ef807270dda091a8953f3dbac2ed5a6d	4944	govdocs1	666/666816.xls	MBD0005F92F/\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-668643-ppt-14d686e738.wmf	8edd67558150d43284572f5bff119c70912e3286a43b2cf9860f111409841e19	340	govdocs1	668/668643.ppt	PowerPoint Document	1391881	raw-wmf	1
+wmf/govdocs1-670017-doc-a279e106d2.wmf	d60e0479e387d9940f8d63776cc709730b2f1aeeb2ad93591394982786447ab3	5836	govdocs1	670/670017.doc	ObjectPool/_1044461930/\x03PRINT	8	raw-wmf	1
+wmf/govdocs1-678207-pps-0c6850f0c0.wmf	096dd76e31164d7bbe647828abdc924dc4a1fcfe386a6fc85db139c49e837cdd	21728	govdocs1	678/678207.pps	PowerPoint Document#ExOleObjStg@64179::\x02OlePres000	40	olepres-wmf	5
+wmf/govdocs1-678785-ppt-55afe7d01e.wmf	425f71ef1bdf76cd6974d563d5d31f5d6fcec834b23baa31532bfa5383071c77	1608	govdocs1	678/678785.ppt	Pictures	533211	blip-wmf	1
+wmf/govdocs1-686031-doc-0b94e65e53.wmf	31710d9b705e0731a6bb6ef88c51f447e1cb845c8587023fe4558a6ee385c69d	266	govdocs1	686/686031.doc	-	14675	raw-wmf	1
+wmf/govdocs1-689728-ppt-76955a92d1.wmf	48f0d0d00e5edd43f040b0acbab5b78817be538fa456433af414a3af061d7592	1102	govdocs1	689/689728.ppt	Pictures	4286778	blip-wmf	1
+wmf/govdocs1-695340-ppt-4374e497d4.wmf	eb1657cf17c787d693e4fe8ed1f08ad26a9cf6ae91f2d231ae6af85f75ba1699	3184	govdocs1	695/695340.ppt	Pictures	47940	blip-wmf	1
+wmf/govdocs1-696990-doc-59dd904763.wmf	df62a4bd7a9bc1c62ef5f228c2d566b1b4b93260c67e817cb359d3c05447f28b	272	govdocs1	696/696990.doc	Data	727	blip-wmf	1
+wmf/govdocs1-698758-ppt-8c558f12d5.wmf	08c5cb12556433078d6f021402c4d5859aa267acd409509e5d18fdf0d918514d	314	govdocs1	698/698758.ppt	Pictures	4955629	blip-wmf	1
+wmf/govdocs1-700888-ppt-0e6fc6020d.wmf	af4ca0ede3ea9a356b1e17c1613066575e09fdec775b562d0b4b1f4715b63e3e	258	govdocs1	700/700888.ppt	Pictures	843286	blip-wmf	1
+wmf/govdocs1-703842-ppt-30bf2f0080.wmf	c0cb8196b97be7b24a9b68199bd9adebb9b887535a08e76c25c85e07c3b5628f	33518	govdocs1	703/703842.ppt	PowerPoint Document#ExOleObjStg@128869::Pictures	306927	blip-wmf	1
+wmf/govdocs1-704920-doc-a23ce81673.wmf	83073600b784bb11cc4153486800b11c646d1ede86490599cbf4c209b3546fe8	5614	govdocs1	704/704920.doc	Data	11743	blip-wmf	1
+wmf/govdocs1-705249-ppt-10fcf38c13.wmf	3c56820f104a9b3e132b68b6f9600781efbaf8e67efcad7fceaba68b15d0ab63	28744	govdocs1	705/705249.ppt	Pictures	0	blip-wmf	1
+wmf/govdocs1-706792-rtf-5671566e7a.wmf	73fe6571c83b6c4a6837cdecfd602286c70b22cc31088b36856fd4e554bdf7ad	1014	govdocs1	706/706792.rtf	#rtf@177572#objdata::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-706792-rtf-8c0751f5f0.wmf	7376c1f4a6c3fa14dd3cb63a07ad67eaaf24a193dd82462c3540a5d42d4e01fa	1014	govdocs1	706/706792.rtf	#rtf@144573#objdata::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-706949-rtf-2f5f72f788.wmf	af534afb311eb491e2fb96c52fc870c390c739c69ef480094b8594896a5ded83	1014	govdocs1	706/706949.rtf	#rtf@176904#objdata	3026	raw-wmf	1
+wmf/govdocs1-706949-rtf-dbf1b33379.wmf	5efd48c9faa2691bcf04947b24435a1b75f6275a819bea21711567470ffe7e75	1014	govdocs1	706/706949.rtf	#rtf@160416#objdata::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-708954-eps-409a78aa16.wmf	98163127d7163be3464ab139648f27c7a5f79a767e07dd2abd897f25526985db	21850	govdocs1	708/708954.eps	#eps-preview	67836	eps-wmf	1
+wmf/govdocs1-714398-pps-43f17ac96d.wmf	ea6ede46b04e663b7584eda4bc6c048aabe9c8435754be49ec13ca548e393b10	6008	govdocs1	714/714398.pps	PowerPoint Document#ExOleObjStg@87281::\x03PRINT	8	raw-wmf	2
+wmf/govdocs1-715208-ppt-faa25c0a6d.wmf	df58a12298eb587a8e80b8280f5e2f5363c1c4bc11eef2c90198b0b0f3720380	1542	govdocs1	715/715208.ppt	Pictures	276471	blip-wmf	1
+wmf/govdocs1-722813-doc-067f743249.wmf	258d437db6da3bc467daef3e11fec52404243ad1fc078168bade5a080ee2c235	2698	govdocs1	722/722813.doc	ObjectPool/_1227427624/PowerPoint Document#ExOleObjStg@4797::\x02OlePres000	40	olepres-wmf	2
+wmf/govdocs1-723277-ppt-1102de9d9a.wmf	b965185ec8702dc9d84d5f9bf304004399eecd53d115a2f2e255a6458cb64409	3032	govdocs1	723/723277.ppt	Pictures	72528	blip-wmf	1
+wmf/govdocs1-724720-pps-3455206f93.wmf	17c1ef5d6fd0900ee0970755d2e0c076ffc7db5e52600a7e0dc4d9ecbeeab184	14540	govdocs1	724/724720.pps	Pictures	3427650	blip-wmf	1
+wmf/govdocs1-726997-ppt-1d55bbbc74.wmf	7f5467a08b4fbdf80a0b29448d0e5550fdc8bccc08f982c42bac707a0b3059ff	24	govdocs1	726/726997.ppt	Pictures	800312	blip-wmf	3
+wmf/govdocs1-727527-pps-1a83eca2ac.wmf	7dc7b71e88cf41b0ba92f5d9d83ed8c2f0739e38f5ac9f8d65a5eaa92ded0b55	5838	govdocs1	727/727527.pps	PowerPoint Document#ExOleObjStg@53680::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-731493-pps-030e4747bc.wmf	88e805300fb3a0be992a64a30661055552374944a3b1d34c3d9120c5475ef988	356	govdocs1	731/731493.pps	PowerPoint Document#ExOleObjStg@360582::\x03WPG20	59445	raw-wmf	2
+wmf/govdocs1-731805-doc-0277d6f6d1.wmf	de8cd8ddf699cff14c0c2b65c2d5c6f4cb9a3ad0172b04561ecf2131b164f21d	4160	govdocs1	731/731805.doc	ObjectPool/_851493957/\x03META	8	raw-wmf	1
+wmf/govdocs1-738044-doc-8f365f1a59.wmf	529aa528768142fcc8e49815a6e2d517ede5a17064910605168f46c4f0fcb661	2148	govdocs1	738/738044.doc	Data	6825	blip-wmf	1
+wmf/govdocs1-758754-ppt-879df318cf.wmf	1b028e2b77d6155d07e9250f3a0e8004e24bbbd0e09bfd087d09863aa9f6d744	3176	govdocs1	758/758754.ppt	PowerPoint Document#ExOleObjStg@139860::CONTENTS	270321	raw-wmf	1
+wmf/govdocs1-776653-xls-56a80b1dd5.wmf	40a80f353e9319a5b240f5b429f8564686e855d45f931b422037227308e0c6a8	8920	govdocs1	776/776653.xls	\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-778031-doc-5f8e90ddff.wmf	dbc4f2234379d73193a5a33ea4fb7239d88007a3439ab59cf799ea9b3f718957	55	govdocs1	778/778031.doc	Data	18849	blip-wmf	1
+wmf/govdocs1-784133-ppt-bdd1c87d12.wmf	a51f0f90130a902e3c7b15a4a6160fd6b09fb828158310f0beb8e6683b6168d5	20640	govdocs1	784/784133.ppt	\x05SummaryInformation	340	raw-wmf	1
+wmf/govdocs1-786949-xls-f1aa1b79fd.wmf	9daeb08d3e0a0722c46c3ce1beba596a48ebc6c1a282d86dde7569205029040b	6448	govdocs1	786/786949.xls	Workbook#MsoDrawingGroup0	108	blip-wmf	4
+wmf/govdocs1-788349-pps-e5b3275299.wmf	8a34df560d266c37be15b4ae02aa80e3be7d0282e042a5fcabbb7aaa40c7be5c	11112	govdocs1	788/788349.pps	PowerPoint Document#ExOleObjStg@75780::PowerPoint Document#ExOleObjStg@36129::\x02OlePres000	40	olepres-wmf	2
+wmf/govdocs1-801442-doc-762821d310.wmf	e6523a8375389ae18d5d8d696330bcf6ace82c6fffa625e601846c40b7223b3d	340	govdocs1	801/801442.doc	ObjectPool/_1123491858/ObjectPool/_947500609/\x03META	8	raw-wmf	1
+wmf/govdocs1-812918-ppt-68e4b71b9f.wmf	1b4d12e2d1470d339cece60b9656c8fa32443748730688765e120a44387f331b	44	govdocs1	812/812918.ppt	Pictures	592687	blip-wmf	1
+wmf/govdocs1-812918-ppt-6cc09c412d.wmf	9c3772600115f7d285550efd8cdfeab1caebd2babc19c1220227db304ac08ddf	44	govdocs1	812/812918.ppt	Pictures	4757485	blip-wmf	1
+wmf/govdocs1-823677-doc-0276e5f2a3.wmf	21a16b77aed95cde01f92c0735419aa0724f25cd0ec31203e02a02a0d3c7f1c3	244	govdocs1	823/823677.doc	ObjectPool/_964355159/\x03META	8	raw-wmf	1
+wmf/govdocs1-825248-ppt-b21421af0b.wmf	6b1c37e20c71ad0a1babe3b004267104500d48374eec69bd9f0f4fe16d2ed1a7	20644	govdocs1	825/825248.ppt	\x05SummaryInformation	548	raw-wmf	1
+wmf/govdocs1-854039-doc-c3d96dc89b.wmf	a41d716517287276e764bc12030c9ed25413c67510f86a6681a8960b882ebe06	402	govdocs1	854/854039.doc	Data	164191	blip-wmf	1
+wmf/govdocs1-857857-doc-95e40c4fa3.wmf	5dbdf9c015361502e4559e064b35b43c663de527d57936cd2ebfc5fec9a58080	4576	govdocs1	857/857857.doc	ObjectPool/_940339916/\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-867402-rtf-d7d49d5d41.wmf	a85dadf03ade787e1c887a07198ec0a86683905970821561547c28b1eecd63e5	15000	govdocs1	867/867402.rtf	#rtf@17339#objdata::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-870470-doc-22717d81b6.wmf	a8c5891c87b8249030009980e29c3dad1f45589f6adcda75dd76e0393ee2e65b	444	govdocs1	870/870470.doc	Data	35352	blip-wmf	1
+wmf/govdocs1-881023-ppt-88e3a13716.wmf	0d9b6285d8c9e8a9fa72c0118783e14d211e31ffdb499d1909d8fabfa40563d2	4544	govdocs1	881/881023.ppt	Pictures	0	blip-wmf	1
+wmf/govdocs1-946494-wp-66afa99562.wmf	9ed7bbe82e9442733c8f5685c3fd56c864274b7e2dd33ecf77d59734fcc954fe	7678	govdocs1	946/946494.wp	-	466515	raw-wmf-placeable	1
+wmf/govdocs1-946494-wp-85d5fdfdf5.wmf	4a5c500b481396d0fd06b2803ff51a5717caff920045a0f9c2ec0698fe6cff43	7300	govdocs1	946/946494.wp	-	583756	raw-wmf-placeable	1
+wmf/govdocs1-946494-wp-e451fb24cf.wmf	c05f6066422fb89f05bf4d0bbfa30a5b17983321f02bd0b4aa4cdfb0299d12b1	2362	govdocs1	946/946494.wp	-	192507	raw-wmf-placeable	1
+wmf/govdocs1-946494-wp-ec511ac42c.wmf	c48d18c4a8ee4d75af84e0718b45e58a7f1cbc4b52858217dd25f8028423cb51	7848	govdocs1	946/946494.wp	-	545965	raw-wmf-placeable	1
+wmf/govdocs1-948345-xls-def4114784.wmf	ec2916187726b156f33523d186a8c9ee3e00c12486a0acb99fdc512b07db8c4a	6640	govdocs1	948/948345.xls	MBD01E71524/\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-950204-pps-477c55a783.wmf	c4dbec2b3cb24935993af7c56fd22483667fc69dce305a891c315199c9523291	6398	govdocs1	950/950204.pps	PowerPoint Document#ExOleObjStg@217648::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-950704-ppt-b08f6cdeb0.wmf	86c65e7fb1f93c100c812acfc4d4b1af97119ce66a50f128b8e79bf7ec8df87d	1652	govdocs1	950/950704.ppt	\x05SummaryInformation	416	raw-wmf	1
+wmf/govdocs1-975540-doc-1c5c252e6e.wmf	5bde03b2b3236f2317db485990ca86502dc691206c885ad72b6e3669a882870a	6806	govdocs1	975/975540.doc	ObjectPool/_1105774001/PowerPoint Document#ExOleObjStg@16966::\x02OlePres000	40	olepres-wmf	1
+wmf/govdocs1-976033-ppt-bf5f1e7bd3.wmf	e99f4e0e2830f8f208a74ffde20aa49fa6759551ae1473b48fb8c3a1b98ef81f	658	govdocs1	976/976033.ppt	Pictures	480481	blip-wmf	1
+wmf/govdocs1-990376-doc-1b0a82052a.wmf	8fb5d8758ce5e8af692883ed747f8384b48ae9ee6d57ee077e3d189143a42a3a	738	govdocs1	990/990376.doc	ObjectPool/_1112697695/\x01Ole10Native#native::__attach_version1.0_#00000000/__substg1.0_3701000D/CONTENTS	0	raw-wmf-placeable	1

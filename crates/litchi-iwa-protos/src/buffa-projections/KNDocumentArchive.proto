@@ -1,0 +1,23 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TSPMessages.proto`: the three scalar fields of `TSP.Reference`;
+// - `KNArchives.proto`: `KN.DocumentArchive.show`, field 2.
+//
+// `KN.DocumentArchive.super`, field 3, is intentionally absent. Keynote's
+// package owner validates that required outer envelope before this projection
+// runs, but does not consume or validate its nested TSA/TSK graph. Keeping it
+// unknown prevents unrelated document metadata from being materialized.
+// Caller-owned IWA bytes remain authoritative.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message KeynoteDocumentArchive {
+  required .LitchiIwaProjection.Reference show = 2;
+}

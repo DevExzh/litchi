@@ -1,0 +1,7 @@
+target
+corpus/*
+!corpus/
+!corpus/pre_bnc_cell/
+!corpus/pre_bnc_cell/*
+artifacts
+coverage

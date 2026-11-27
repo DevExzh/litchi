@@ -1,0 +1,2 @@
+# Bare PICT v2 header with a 96x48 frame and EndOfPicture opcode.
+00 10 00 00 00 00 00 30 00 60 00 11 02 ff 00 ff

@@ -1,0 +1,825 @@
+//! Typed semantic `SpreadsheetDrawing` shape models.
+//!
+//! The model is context-first: anchors own objects, groups own direct children,
+//! and unknown markup remains inert and bounded rather than being discarded.
+
+use std::fmt;
+use std::str::FromStr;
+
+use crate::{Error, Result};
+use litchi_drawingml::geometry::Limits as GeometryLimits;
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+pub use litchi_drawingml::geom::Preset;
+use litchi_drawingml::geometry::CustomGeometry;
+pub use litchi_drawingml::text::body::{Body, Insets, Paragraph, Properties, Run};
+pub use litchi_drawingml::text::{
+    Anchor as VerticalAnchor, Autofit, Columns, Coordinate32, Direction, TextSize, Underline, Wrap,
+};
+
+/// How a legacy OLE object is rendered inside its graphic frame.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Aspect {
+    /// Render the embedded object's content.
+    Content,
+    /// Render the embedded object's icon.
+    Icon,
+}
+
+impl Aspect {
+    #[must_use = "use the selected shape-reader limits"]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Content => "DVASPECT_CONTENT",
+            Self::Icon => "DVASPECT_ICON",
+        }
+    }
+}
+
+impl FromStr for Aspect {
+    type Err = Error;
+
+    fn from_str(value: &str) -> Result<Self> {
+        match value {
+            "DVASPECT_CONTENT" => Ok(Self::Content),
+            "DVASPECT_ICON" => Ok(Self::Icon),
+            _ => Err(invalid("invalid OLE data/view aspect")),
+        }
+    }
+}
+
+impl TryFrom<&str> for Aspect {
+    type Error = Error;
+
+    fn try_from(value: &str) -> Result<Self> {
+        value.parse()
+    }
+}
+
+impl fmt::Display for Aspect {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}
+
+pub(crate) const MAX_DRAWING_PART_BYTES: usize = 32 * 1024 * 1024;
+pub(crate) const MAX_ANCHORS_PER_DRAWING: usize = 100_000;
+pub(crate) const MAX_OBJECTS_PER_DRAWING: usize = 100_000;
+pub(crate) const MAX_GROUP_DEPTH: usize = 32;
+pub(crate) const MAX_XML_DEPTH: usize = 256;
+pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_TEXT_ELEMENTS: usize = 100_000;
+
+/// Caller-selected bounds for the raw SpreadsheetDrawing shape inventory.
+///
+/// The policy is retained only for the duration of one read. The owner of a
+/// package derives it from its own retained input policy and passes it to
+/// [`super::read`]; no raw shape read silently falls back to a global policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[must_use]
+pub struct Limits {
+    /// Maximum serialized drawing bytes accepted before MCE processing.
+    pub max_drawing_part_bytes: usize,
+    /// Maximum anchors retained by the inventory.
+    pub max_anchors: usize,
+    /// Maximum objects retained, including group descendants.
+    pub max_objects: usize,
+    /// Maximum nested group depth.
+    pub max_group_depth: usize,
+    /// Maximum XML nesting depth.
+    pub max_xml_depth: usize,
+    /// Maximum retained shape text bytes.
+    pub max_text_bytes: usize,
+    /// Maximum text-body XML elements.
+    pub max_text_elements: usize,
+    /// Bounds forwarded to the shared custom-geometry reader.
+    pub geometry: GeometryLimits,
+}
+
+impl Limits {
+    /// The established finite shape-reader policy.
+    pub const DEFAULT: Self = Self {
+        max_drawing_part_bytes: MAX_DRAWING_PART_BYTES,
+        max_anchors: MAX_ANCHORS_PER_DRAWING,
+        max_objects: MAX_OBJECTS_PER_DRAWING,
+        max_group_depth: MAX_GROUP_DEPTH,
+        max_xml_depth: MAX_XML_DEPTH,
+        max_text_bytes: MAX_TEXT_BYTES,
+        max_text_elements: MAX_TEXT_ELEMENTS,
+        geometry: GeometryLimits::DEFAULT,
+    };
+
+    /// Construct an explicit shape-reader policy.
+    #[must_use = "use the limits derived from the owner's core policy"]
+    pub const fn new(
+        max_drawing_part_bytes: usize,
+        max_anchors: usize,
+        max_objects: usize,
+        max_group_depth: usize,
+        max_xml_depth: usize,
+        max_text_bytes: usize,
+        max_text_elements: usize,
+        geometry: GeometryLimits,
+    ) -> Self {
+        Self {
+            max_drawing_part_bytes,
+            max_anchors,
+            max_objects,
+            max_group_depth,
+            max_xml_depth,
+            max_text_bytes,
+            max_text_elements,
+            geometry,
+        }
+    }
+
+    /// Derive shape bounds from an XLSB owner's retained XML resource policy.
+    /// The shared hard ceilings remain in force even for a wider owner.
+    #[must_use = "use the limits derived from the owner's core policy"]
+    pub fn from_core(limits: litchi_core::Limits) -> Self {
+        fn bounded(value: u64, maximum: usize) -> usize {
+            usize::try_from(value)
+                .unwrap_or(usize::MAX)
+                .min(maximum)
+                .max(1)
+        }
+        let input = bounded(
+            limits.get(litchi_core::Resource::InputBytes),
+            MAX_DRAWING_PART_BYTES,
+        );
+        let objects = bounded(
+            limits.get(litchi_core::Resource::Objects),
+            MAX_OBJECTS_PER_DRAWING,
+        );
+        let depth = bounded(limits.get(litchi_core::Resource::Depth), MAX_XML_DEPTH);
+        let geometry = GeometryLimits::new(
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_adjust_handles,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_connection_sites,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_guides,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_paths,
+            ),
+            bounded(
+                limits.get(litchi_core::Resource::Objects),
+                GeometryLimits::DEFAULT.max_path_commands,
+            ),
+            input.min(1 << 20),
+        );
+        Self {
+            max_drawing_part_bytes: input,
+            max_anchors: objects.min(MAX_ANCHORS_PER_DRAWING),
+            max_objects: objects,
+            max_group_depth: depth.min(MAX_GROUP_DEPTH),
+            max_xml_depth: depth,
+            max_text_bytes: input.min(MAX_TEXT_BYTES),
+            max_text_elements: objects.min(MAX_TEXT_ELEMENTS),
+            geometry,
+        }
+    }
+
+    /// Derive shape bounds from an OPC owner's retained source policy.
+    ///
+    /// A worksheet drawing is one retained OPC part, so its part-byte ceiling
+    /// supplies the input and text budgets while the event ceiling bounds the
+    /// number of anchors, objects, and geometry structures admitted from it.
+    /// The shared hard ceilings remain in force even when the owner policy is
+    /// wider.
+    #[must_use = "use the limits derived from the retained source policy"]
+    pub fn from_source_limits(limits: litchi_opc::SourceLimits) -> Self {
+        fn bounded(value: u64, maximum: usize) -> usize {
+            usize::try_from(value)
+                .unwrap_or(usize::MAX)
+                .min(maximum)
+                .max(1)
+        }
+        let input = bounded(limits.max_part_bytes(), MAX_DRAWING_PART_BYTES);
+        let objects = limits.max_events().clamp(1, MAX_OBJECTS_PER_DRAWING);
+        let depth = limits.max_depth().clamp(1, MAX_XML_DEPTH);
+        let geometry = GeometryLimits::new(
+            objects.min(GeometryLimits::DEFAULT.max_adjust_handles),
+            objects.min(GeometryLimits::DEFAULT.max_connection_sites),
+            objects.min(GeometryLimits::DEFAULT.max_guides),
+            objects.min(GeometryLimits::DEFAULT.max_paths),
+            objects.min(GeometryLimits::DEFAULT.max_path_commands),
+            input.min(1 << 20),
+        );
+        Self {
+            max_drawing_part_bytes: input,
+            max_anchors: objects.min(MAX_ANCHORS_PER_DRAWING),
+            max_objects: objects,
+            max_group_depth: depth.min(MAX_GROUP_DEPTH),
+            max_xml_depth: depth,
+            max_text_bytes: input.min(MAX_TEXT_BYTES),
+            max_text_elements: objects.min(MAX_TEXT_ELEMENTS),
+            geometry,
+        }
+    }
+
+    /// Validate the policy against the shared hard safety ceilings.
+    pub fn validate(self) -> Result<Self> {
+        for (kind, value) in [
+            (crate::LimitKind::DrawingBytes, self.max_drawing_part_bytes),
+            (crate::LimitKind::Anchors, self.max_anchors),
+            (crate::LimitKind::Objects, self.max_objects),
+            (crate::LimitKind::GroupDepth, self.max_group_depth),
+            (crate::LimitKind::XmlDepth, self.max_xml_depth),
+            (crate::LimitKind::TextBytes, self.max_text_bytes),
+            (crate::LimitKind::TextElements, self.max_text_elements),
+        ] {
+            let maximum = kind.maximum();
+            if value == 0 || value > maximum {
+                return Err(Error::invalid_limit(kind, value, maximum));
+            }
+        }
+        Ok(Self {
+            geometry: self.geometry.validate().map_err(Error::Drawing)?,
+            ..self
+        })
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+/// An offset or extent in English Metric Units (EMU), the `DrawingML` length unit.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Emu(pub i64);
+
+impl Emu {
+    /// The raw EMU value.
+    #[must_use]
+    pub fn emu(self) -> i64 {
+        self.0
+    }
+}
+
+impl From<i64> for Emu {
+    fn from(value: i64) -> Self {
+        Self(value)
+    }
+}
+
+/// How a two-cell anchored object reacts to cell edits (`xdr:twoCellAnchor@editAs`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub enum EditAs {
+    /// Move and resize with both cells (`twoCell`, the ECMA-376 default).
+    #[default]
+    TwoCell,
+    /// Move with the anchor cell but keep the size (`oneCell`).
+    OneCell,
+    /// Do not move or resize with cells (`absolute`).
+    Absolute,
+}
+
+impl EditAs {
+    /// Return the exact `SpreadsheetDrawingML` token.
+    #[must_use]
+    pub const fn token(self) -> &'static str {
+        match self {
+            Self::TwoCell => "twoCell",
+            Self::OneCell => "oneCell",
+            Self::Absolute => "absolute",
+        }
+    }
+}
+
+/// An invalid `xdr:twoCellAnchor@editAs` token.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct EditAsError;
+
+impl fmt::Display for EditAsError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("invalid SpreadsheetDrawingML editAs token")
+    }
+}
+
+impl std::error::Error for EditAsError {}
+
+impl FromStr for EditAs {
+    type Err = EditAsError;
+
+    fn from_str(value: &str) -> std::result::Result<Self, Self::Err> {
+        match value {
+            "twoCell" => Ok(Self::TwoCell),
+            "oneCell" => Ok(Self::OneCell),
+            "absolute" => Ok(Self::Absolute),
+            _ => Err(EditAsError),
+        }
+    }
+}
+
+impl fmt::Display for EditAs {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(self.token())
+    }
+}
+
+/// One cell anchor point: a zero-based column/row plus an EMU offset into the cell.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct CellMarker {
+    /// Zero-based column index.
+    pub column: u32,
+    /// Offset from the column edge, in EMUs.
+    pub column_offset: Emu,
+    /// Zero-based row index.
+    pub row: u32,
+    /// Offset from the row edge, in EMUs.
+    pub row_offset: Emu,
+}
+
+/// An absolute position (`xdr:pos`), in EMUs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EmuOffset {
+    /// Horizontal offset, in EMUs.
+    pub x: Emu,
+    /// Vertical offset, in EMUs.
+    pub y: Emu,
+}
+
+/// An object extent (`xdr:ext` or `a:ext`), in EMUs.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EmuExtent {
+    /// Width, in EMUs.
+    pub width: Emu,
+    /// Height, in EMUs.
+    pub height: Emu,
+}
+
+/// How an object is anchored on the worksheet grid.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Anchor {
+    /// `xdr:twoCellAnchor` — bounded by a from and a to cell marker.
+    TwoCell {
+        /// Top-left anchor point.
+        from: CellMarker,
+        /// Bottom-right anchor point.
+        to: CellMarker,
+        /// Edit behavior recorded by `editAs`.
+        edit_as: EditAs,
+    },
+    /// `xdr:oneCellAnchor` — anchored at one cell with an explicit extent.
+    OneCell {
+        /// Top-left anchor point.
+        from: CellMarker,
+        /// Object size.
+        extent: EmuExtent,
+    },
+    /// `xdr:absoluteAnchor` — fixed position and size, independent of cells.
+    Absolute {
+        /// Top-left position.
+        position: EmuOffset,
+        /// Object size.
+        extent: EmuExtent,
+    },
+}
+
+/// Mutually exclusive `DrawingML` geometry of a worksheet shape.
+#[derive(Clone, PartialEq, Eq)]
+pub enum Geometry {
+    /// A schema-defined preset (`a:prstGeom`).
+    Preset(Preset),
+    /// A custom geometry (`a:custGeom`).
+    Custom(Box<CustomGeometry>),
+}
+
+impl Geometry {
+    /// Return the preset when this is a preset geometry.
+    #[must_use]
+    pub const fn preset(&self) -> Option<Preset> {
+        match self {
+            Self::Preset(preset) => Some(*preset),
+            Self::Custom(_) => None,
+        }
+    }
+
+    /// Borrow the custom geometry when this is custom.
+    #[must_use]
+    pub fn custom(&self) -> Option<&CustomGeometry> {
+        match self {
+            Self::Preset(_) => None,
+            Self::Custom(geometry) => Some(geometry.as_ref()),
+        }
+    }
+
+    /// Move out the custom geometry when this is custom.
+    #[must_use]
+    pub fn into_custom(self) -> Option<CustomGeometry> {
+        match self {
+            Self::Preset(_) => None,
+            Self::Custom(geometry) => Some(*geometry),
+        }
+    }
+}
+
+impl From<Preset> for Geometry {
+    fn from(preset: Preset) -> Self {
+        Self::Preset(preset)
+    }
+}
+
+impl fmt::Debug for Geometry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Preset(preset) => formatter.debug_tuple("Preset").field(preset).finish(),
+            Self::Custom(_) => formatter.write_str("CustomGeometry(..)"),
+        }
+    }
+}
+
+impl From<CustomGeometry> for Geometry {
+    fn from(geometry: CustomGeometry) -> Self {
+        Self::Custom(Box::new(geometry))
+    }
+}
+
+/// Non-visual identity shared by all drawing objects (`xdr:cNvPr` and lock flags).
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct NonVisual {
+    /// Unknown attributes and child elements retained from the source object.
+    pub opaque: Opaque,
+    /// Drawing object ID (`xdr:cNvPr@id`), when declared and well-formed.
+    pub id: Option<u32>,
+    /// Object name (`xdr:cNvPr@name`).
+    pub name: Option<String>,
+    /// Alternative text (`xdr:cNvPr@descr`).
+    pub description: Option<String>,
+    /// Whether the object is hidden (`xdr:cNvPr@hidden`).
+    pub hidden: bool,
+    /// Whether any lock flag (`a:spLocks`/`a:cxnSpLocks`/`a:grpSpLocks`) is set.
+    pub locked: bool,
+}
+
+/// A `DrawingML` shape (`xdr:sp`), typically a text box.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Shape {
+    /// Non-visual identity and flags.
+    pub non_visual: NonVisual,
+    /// Whether the shape is a text box (`xdr:cNvSpPr@txBox`).
+    pub is_text_box: bool,
+    /// Mutually exclusive preset or custom geometry, when declared.
+    pub geometry: Option<Geometry>,
+    /// Rich-text story (`xdr:txBody`), when present.
+    pub text_body: Option<Body>,
+}
+
+impl Shape {
+    /// Return the declared preset geometry, if any.
+    pub fn preset(&self) -> Option<Preset> {
+        self.geometry.as_ref().and_then(Geometry::preset)
+    }
+
+    /// Borrow the declared custom geometry, if any.
+    pub fn custom_geometry(&self) -> Option<&CustomGeometry> {
+        self.geometry.as_ref().and_then(Geometry::custom)
+    }
+}
+
+/// One end of a connection shape (`a:stCxn`/`a:endCxn`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ConnectionEnd {
+    /// Drawing object ID of the connected shape (`@id`).
+    pub shape_id: u32,
+    /// Connection site index on the connected shape (`@idx`).
+    pub site: u32,
+}
+
+/// A connection shape (`xdr:cxnSp`) linking two shapes.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ConnectionShape {
+    /// Non-visual identity and flags.
+    pub non_visual: NonVisual,
+    /// Mutually exclusive preset or custom geometry, when declared.
+    pub geometry: Option<Geometry>,
+    /// Start connection, when declared.
+    pub start: Option<ConnectionEnd>,
+    /// End connection, when declared.
+    pub end: Option<ConnectionEnd>,
+    /// Rich-text story (`xdr:txBody`), when present.
+    pub text_body: Option<Body>,
+}
+
+impl ConnectionShape {
+    /// Return the declared preset geometry, if any.
+    pub fn preset(&self) -> Option<Preset> {
+        self.geometry.as_ref().and_then(Geometry::preset)
+    }
+
+    /// Borrow the declared custom geometry, if any.
+    pub fn custom_geometry(&self) -> Option<&CustomGeometry> {
+        self.geometry.as_ref().and_then(Geometry::custom)
+    }
+}
+
+/// Group coordinate transform (`xdr:grpSpPr/a:xfrm`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct GroupTransform {
+    /// Group offset (`a:off`), when declared.
+    pub offset: Option<EmuOffset>,
+    /// Group extent (`a:ext`), when declared.
+    pub extent: Option<EmuExtent>,
+    /// Child coordinate-space offset (`a:chOff`), when declared.
+    pub child_offset: Option<EmuOffset>,
+    /// Child coordinate-space extent (`a:chExt`), when declared.
+    pub child_extent: Option<EmuExtent>,
+}
+
+/// A shape group (`xdr:grpSp`) with its nested objects.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct Group {
+    /// Non-visual identity and flags.
+    pub non_visual: NonVisual,
+    /// Group coordinate transform, when declared.
+    pub transform: Option<GroupTransform>,
+    /// Nested objects in document order; groups may nest.
+    pub children: Vec<Object>,
+}
+
+/// Inert metadata of a legacy OLE object anchored through a
+/// `xdr:graphicFrame` (`xdr:oleObject`).
+///
+/// The referenced payload and link targets are recorded as relationship IDs
+/// only; they are never resolved, fetched, or activated.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct OleObject {
+    /// Non-visual identity of the hosting graphic frame.
+    pub non_visual: NonVisual,
+    /// OLE program ID (`@progId`), when declared.
+    pub program_id: Option<String>,
+    /// Shape ID linked to the worksheet OLE object record (`@shapeId`).
+    pub shape_id: Option<u32>,
+    /// Typed data-or-view aspect (`@dvAspect`).
+    pub data_or_view_aspect: Option<Aspect>,
+    /// Whether the object loads automatically (`@autoLoad`), when declared.
+    pub auto_load: Option<bool>,
+    /// Relationship ID of the embedded object (`r:id`), when declared.
+    pub relationship_id: Option<String>,
+    /// Relationship ID of the linked object (`r:link`), when declared.
+    pub link_relationship_id: Option<String>,
+}
+
+/// One XML attribute retained because the shape owner does not interpret it.
+#[derive(Clone, PartialEq, Eq)]
+pub struct UnknownAttribute {
+    name: Box<str>,
+    value: Box<str>,
+}
+
+impl UnknownAttribute {
+    #[must_use]
+    pub fn name(&self) -> &str {
+        &self.name
+    }
+
+    #[must_use]
+    pub fn value(&self) -> &str {
+        &self.value
+    }
+
+    pub(crate) fn new(name: String, value: String) -> Result<Self> {
+        if name.is_empty() || name.len() > MAX_DRAWING_PART_BYTES {
+            return Err(invalid("unknown drawing attribute name is out of bounds"));
+        }
+        if value.len() > MAX_DRAWING_PART_BYTES {
+            return Err(invalid("unknown drawing attribute value is out of bounds"));
+        }
+        Ok(Self {
+            name: name.into_boxed_str(),
+            value: value.into_boxed_str(),
+        })
+    }
+}
+
+/// A bounded XML element retained without interpreting its semantics.
+#[derive(Clone, PartialEq, Eq)]
+pub struct UnknownElement {
+    xml: Box<[u8]>,
+}
+
+impl UnknownElement {
+    /// # Errors
+    ///
+    /// Returns an error when the XML fragment is empty or exceeds the drawing limit.
+    pub fn new(xml: impl Into<Vec<u8>>) -> Result<Self> {
+        Self::from_xml(xml.into())
+    }
+
+    #[must_use]
+    pub fn as_xml(&self) -> &[u8] {
+        &self.xml
+    }
+
+    pub(crate) fn from_xml(xml: Vec<u8>) -> Result<Self> {
+        if xml.is_empty() || xml.len() > MAX_DRAWING_PART_BYTES {
+            return Err(invalid(
+                "unknown drawing element bytes exceed the drawing limit",
+            ));
+        }
+        Ok(Self {
+            xml: xml.into_boxed_slice(),
+        })
+    }
+}
+
+/// Unknown shape-owned markup retained as inert, bounded data.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct Opaque {
+    attributes: Vec<UnknownAttribute>,
+    elements: Vec<UnknownElement>,
+}
+
+impl Opaque {
+    #[must_use]
+    pub fn attributes(&self) -> &[UnknownAttribute] {
+        &self.attributes
+    }
+
+    #[must_use]
+    pub fn elements(&self) -> &[UnknownElement] {
+        &self.elements
+    }
+
+    pub(crate) fn push_attribute(&mut self, value: UnknownAttribute) -> Result<()> {
+        if self.attributes.len() >= MAX_OBJECTS_PER_DRAWING {
+            return Err(invalid(
+                "unknown drawing attributes exceed the drawing limit",
+            ));
+        }
+        self.attributes.push(value);
+        Ok(())
+    }
+
+    pub(crate) fn push_element(&mut self, value: UnknownElement) -> Result<()> {
+        if self.elements.len() >= MAX_OBJECTS_PER_DRAWING {
+            return Err(invalid("unknown drawing elements exceed the drawing limit"));
+        }
+        self.elements.push(value);
+        Ok(())
+    }
+}
+
+/// An unknown drawing object preserved as its bounded XML fragment.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Unknown {
+    element: UnknownElement,
+}
+
+impl Unknown {
+    #[must_use]
+    pub fn as_xml(&self) -> &[u8] {
+        self.element.as_xml()
+    }
+
+    #[must_use]
+    pub fn element(&self) -> &UnknownElement {
+        &self.element
+    }
+
+    pub(crate) fn from_element(element: UnknownElement) -> Self {
+        Self { element }
+    }
+}
+
+/// One drawing object carried by an anchor or nested in a group.
+///
+/// Pictures and chart graphic frames are deliberately not represented: they
+/// are covered by the image and chart support.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Object {
+    /// A `DrawingML` shape or text box.
+    Shape(Shape),
+    /// A connection shape.
+    ConnectionShape(ConnectionShape),
+    /// A shape group.
+    Group(Group),
+    /// A legacy OLE object hosted by a graphic frame.
+    OleObject(OleObject),
+    /// An object not modeled by this owner, retained as bounded XML.
+    Unknown(Unknown),
+}
+
+/// Sheet-interaction flags of one anchor (`xdr:clientData`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct ClientData {
+    /// Whether the object locks with the sheet (`fLocksWithSheet`), when declared.
+    pub locks_with_sheet: Option<bool>,
+    /// Whether the object prints with the sheet (`fPrintsWithSheet`), when declared.
+    pub prints_with_sheet: Option<bool>,
+}
+
+/// One anchored drawing object on a worksheet.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct AnchoredObject {
+    /// How the object is anchored to the grid.
+    pub anchor: Anchor,
+    /// The anchored object.
+    pub object: Object,
+    /// Sheet-interaction flags from the anchor's `xdr:clientData`.
+    pub client_data: ClientData,
+}
+
+/// Shape inventory of one worksheet drawing part.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Shapes {
+    /// Worksheet name from the workbook.
+    pub worksheet_name: String,
+    /// Worksheet part name (for example `/xl/worksheets/sheet1.xml`).
+    pub worksheet_part_name: String,
+    /// Anchored objects in drawing order.
+    pub objects: Vec<AnchoredObject>,
+}
+
+impl fmt::Debug for NonVisual {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NonVisual")
+            .field("id", &self.id)
+            .field("name_present", &self.name.is_some())
+            .field("description_present", &self.description.is_some())
+            .field("hidden", &self.hidden)
+            .field("locked", &self.locked)
+            .field("opaque", &self.opaque)
+            .finish()
+    }
+}
+
+impl fmt::Debug for OleObject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OleObject")
+            .field("non_visual", &self.non_visual)
+            .field("program_id_present", &self.program_id.is_some())
+            .field("shape_id", &self.shape_id)
+            .field("data_or_view_aspect", &self.data_or_view_aspect)
+            .field("auto_load", &self.auto_load)
+            .field("relationship_id_present", &self.relationship_id.is_some())
+            .field(
+                "link_relationship_id_present",
+                &self.link_relationship_id.is_some(),
+            )
+            .finish()
+    }
+}
+
+impl fmt::Debug for UnknownAttribute {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("UnknownAttribute")
+            .field("name_bytes", &self.name.len())
+            .field("value_bytes", &self.value.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for UnknownElement {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("UnknownElement")
+            .field("bytes", &self.xml.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for Opaque {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Opaque")
+            .field("attribute_count", &self.attributes.len())
+            .field("element_count", &self.elements.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for Unknown {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Unknown")
+            .field("element", &self.element)
+            .finish()
+    }
+}
+
+impl fmt::Debug for Shapes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Shapes")
+            .field("worksheet_name_bytes", &self.worksheet_name.len())
+            .field("worksheet_part_name_bytes", &self.worksheet_part_name.len())
+            .field("objects", &self.objects)
+            .finish()
+    }
+}

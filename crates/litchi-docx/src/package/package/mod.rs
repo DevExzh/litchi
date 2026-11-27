@@ -1,0 +1,19 @@
+//! Semantic DOCX package facade.
+//!
+//! The public Package API is assembled from focused relationship, document,
+//! data-store, settings, merge, and part-publication layers. The sibling
+//! model and codec modules own state and archive I/O respectively.
+
+mod access;
+mod alternatives;
+mod catalogs;
+mod data_stores;
+mod document;
+mod merge;
+mod metadata;
+mod parts;
+mod settings;
+mod story_edit;
+mod task_panes;
+mod transfer;
+mod validation;

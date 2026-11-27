@@ -1,0 +1,1 @@
+[{"command":"query","selector":"p:contains(\"Total\") > r[font.bold=true]"},{"command":"get","path":"/body/tbl[1]/tr[2]/tc[1]","depth":2}]

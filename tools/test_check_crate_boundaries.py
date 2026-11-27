@@ -1,0 +1,19555 @@
+from __future__ import annotations
+
+import copy
+import inspect
+import io
+import json
+import re
+import tempfile
+import unittest
+from contextlib import ExitStack, redirect_stdout
+from dataclasses import replace
+from pathlib import Path
+from unittest import mock
+from tools import check_crate_boundaries as boundaries
+
+from tools.crate_boundary_fixtures import (
+    SYNTHETIC_HOST,
+    add_focused_chart_arrangement_owner_scaffolds,
+    add_iwa_common_formula_render_ownership_scaffold,
+    add_iwa_numbers_wire_formula_envelope_scaffold,
+    add_iwa_numbers_wire_formula_names_scaffold,
+    add_iwa_numbers_wire_formula_render_scaffold,
+    add_iwa_table_cell_read_scaffold,
+    add_keynote_audio_position_canonical_scaffold,
+    add_keynote_chart_axis_title_canonical_scaffold,
+    add_keynote_family_module,
+    add_keynote_movie_geometry_canonical_scaffold,
+    add_keynote_movie_playback_canonical_scaffold,
+    add_keynote_placeholder_visibility_canonical_scaffold,
+    add_keynote_slide_delete_canonical_scaffold,
+    add_keynote_slide_media_data_canonical_scaffold,
+    add_keynote_slide_media_lifecycle_canonical_scaffold,
+    add_keynote_slide_table_appearance_canonical_scaffold,
+    add_keynote_slide_table_dimension_canonical_scaffold,
+    add_keynote_slide_table_headers_canonical_scaffold,
+    add_keynote_slide_table_lock_state_canonical_scaffold,
+    add_keynote_slide_table_name_canonical_scaffold,
+    add_keynote_slide_table_sort_canonical_scaffold,
+    add_keynote_slide_table_title_canonical_scaffold,
+    add_keynote_slide_transition_canonical_scaffold,
+    add_keynote_soundtrack_items_canonical_scaffold,
+    add_keynote_soundtrack_settings_canonical_scaffold,
+    add_numbers_formula_canonical_scaffold,
+    add_numbers_sheet_order_canonical_scaffold,
+    add_numbers_table_appearance_canonical_scaffold,
+    add_numbers_table_cell_comment_reply_codec_rewrite_scaffold,
+    add_numbers_table_cell_comment_reply_metadata_scaffold,
+    add_numbers_table_cell_comment_reply_mutation_scaffold,
+    add_numbers_table_cell_comment_reply_scaffold,
+    add_numbers_table_cell_control_canonical_scaffold,
+    add_numbers_table_cell_custom_format_canonical_scaffold,
+    add_numbers_table_cell_pop_up_menu_canonical_scaffold,
+    add_numbers_table_cells_mutation_scaffold,
+    add_numbers_table_cells_read_scaffold,
+    add_numbers_table_dimension_canonical_scaffold,
+    add_numbers_table_header_settings_canonical_scaffold,
+    add_numbers_table_sort_canonical_scaffold,
+    add_numbers_table_title_settings_canonical_scaffold,
+    add_pages_footnote_lifecycle_canonical_scaffold,
+    add_pages_header_footer_canonical_scaffold,
+    add_pages_output_canonical_scaffold,
+    add_pages_section_background_canonical_scaffold,
+    add_pages_section_settings_canonical_scaffold,
+    add_pages_section_text_canonical_scaffold,
+    add_pages_table_appearance_canonical_scaffold,
+    add_pages_table_dimension_canonical_scaffold,
+    add_pages_table_headers_canonical_scaffold,
+    add_pages_table_lock_canonical_scaffold,
+    add_pages_table_name_owner_scaffold,
+    add_pages_table_sort_canonical_scaffold,
+    add_pages_table_title_canonical_scaffold,
+    add_pages_transaction_family_scaffold,
+    complete_numbers_table_cell_control_popup_split_scaffold,
+    copy_focused_table_merge_reader_fixture,
+    copy_numbers_table_merge_reader_fixture,
+    synthetic_host_raw_policy,
+    valid_snapshot,
+    write_cargo_manifest_fixture,
+)
+
+
+class BoundaryPolicyTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls.raw_policy = json.loads(boundaries.DEFAULT_POLICY.read_text(encoding="utf-8"))
+        cls.policy = boundaries.parse_policy(cls.raw_policy)
+        cls.host_raw_policy = synthetic_host_raw_policy(cls.raw_policy)
+        cls.host_policy = boundaries.parse_policy(cls.host_raw_policy)
+
+    def test_checked_in_policy_is_internally_consistent(self) -> None:
+        self.assertEqual(boundaries.audit_snapshot(valid_snapshot(self.policy), self.policy), [])
+
+    def test_policy_requires_hosts_for_existing_migration_debt(self) -> None:
+        raw = copy.deepcopy(self.host_raw_policy)
+        raw["migration_hosts"] = []
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "migration_hosts must be non-empty while migration_debt exists",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_policy_rejects_migration_debt_dependent_outside_hosts(self) -> None:
+        raw = copy.deepcopy(self.host_raw_policy)
+        debt = copy.deepcopy(raw["migration_debt"][0])
+        debt["order"] = 18
+        debt["dependent"] = "litchi-core"
+        debt["dependency"] = SYNTHETIC_HOST
+        raw["migration_debt"].append(debt)
+        raw["migration_debt"].sort(
+            key=lambda item: (
+                item["order"],
+                item["dependent"],
+                item["dependency"],
+            )
+        )
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            f"migration debt dependents must be migration hosts: litchi-core -> {SYNTHETIC_HOST}",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_policy_allows_debt_free_host_free_final_state(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        raw["migration_hosts"] = []
+        raw["migration_debt"] = []
+
+        policy = boundaries.parse_policy(raw)
+
+        self.assertEqual(policy.migration_hosts, frozenset())
+        self.assertEqual(policy.migration_debt, ())
+
+    def test_iwa_package_edge_is_archive_owned_and_no_migration_debt_remains(self) -> None:
+        host_edge = boundaries.Edge(SYNTHETIC_HOST, "litchi-iwa-package")
+        archive_edge = boundaries.Edge("litchi-iwa-archive", "litchi-iwa-package")
+        all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
+        # Derive the expected inventory from the reviewed JSON rather than a
+        # hard-coded count, so a registered edge does not break this test
+        # while a parser that drops,
+        # invents or merges an edge still does.
+        registered_edges = {
+            boundaries.Edge(dependent, dependency)
+            for dependent, dependencies in self.raw_policy["packages"].items()
+            for dependency in dependencies
+        }
+        registered_debt = {
+            boundaries.Edge(item["dependent"], item["dependency"])
+            for item in self.raw_policy["migration_debt"]
+        }
+
+        self.assertEqual(len(self.policy.packages), len(self.raw_policy["packages"]))
+        self.assertEqual(self.policy.canonical_edges, registered_edges)
+        self.assertEqual(self.policy.migration_edges, registered_debt)
+        self.assertEqual(
+            len(all_policy_edges), len(registered_edges) + len(registered_debt)
+        )
+        # The last migration host is deleted and its debt closed.
+        self.assertEqual(self.policy.migration_debt, ())
+        self.assertEqual(self.policy.migration_hosts, frozenset())
+        self.assertNotIn(host_edge, all_policy_edges)
+        self.assertIn(archive_edge, self.policy.canonical_edges)
+        self.assertNotIn(archive_edge, self.policy.migration_edges)
+        self.assertEqual(
+            boundaries.audit_snapshot(valid_snapshot(self.policy), self.policy), []
+        )
+
+        raw = copy.deepcopy(self.host_raw_policy)
+        raw["packages"][SYNTHETIC_HOST].append("litchi-iwa-package")
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "migration-host edges must be debt, not canonical: "
+            f"{SYNTHETIC_HOST} -> litchi-iwa-package",
+        ):
+            boundaries.parse_policy(raw)
+
+        snapshot = valid_snapshot(self.host_policy)
+        evidence = dict(snapshot.edges)
+        evidence[host_edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[host_edge.dependent] |= frozenset({host_edge.dependency})
+        normal_dependencies = dict(snapshot.normal_dependencies)
+        normal_dependencies[host_edge.dependent] |= frozenset({host_edge.dependency})
+        snapshot = replace(
+            snapshot,
+            edges=evidence,
+            dependencies=dependencies,
+            normal_dependencies=normal_dependencies,
+        )
+
+        self.assertIn(
+            f"unclassified internal edge {SYNTHETIC_HOST} -> litchi-iwa-package "
+            "(kind=normal, optional=false, target=*, rename=-)",
+            boundaries.audit_snapshot(snapshot, self.host_policy),
+        )
+
+    def test_checked_in_dev_only_edges_are_exact(self) -> None:
+        self.assertEqual(
+            self.policy.dev_only_edges,
+            frozenset(
+                {
+                    boundaries.Edge("litchi-docx", "litchi-cfb"),
+                    boundaries.Edge("litchi-docx", "soapberry-zip"),
+                    boundaries.Edge("litchi-iwa-detect", "litchi-iwa-protos"),
+                    boundaries.Edge("litchi-iwa-structured", "litchi-iwa-text"),
+                    boundaries.Edge("litchi-odc", "soapberry-zip"),
+                    boundaries.Edge("litchi-odf-formula", "soapberry-zip"),
+                    boundaries.Edge("litchi-odg", "soapberry-zip"),
+                    boundaries.Edge("litchi-ooxml-common", "soapberry-zip"),
+                    boundaries.Edge("litchi-oth", "soapberry-zip"),
+                    boundaries.Edge("litchi-ppt", "soapberry-zip"),
+                    boundaries.Edge("litchi-pptx", "soapberry-zip"),
+                    boundaries.Edge("litchi-sign", "soapberry-zip"),
+                    boundaries.Edge("litchi-xlsb", "soapberry-zip"),
+                    boundaries.Edge("litchi-xlsx", "soapberry-zip"),
+                }
+            ),
+        )
+
+    def test_xldm_is_the_shared_neutral_data_model_owner(self) -> None:
+        owner = "litchi-xldm"
+        shared_edges = {
+            boundaries.Edge("litchi-xlsb", owner),
+            boundaries.Edge("litchi-xlsx", owner),
+        }
+        canonical = self.policy.canonical_edges
+
+        self.assertIn(owner, self.policy.packages)
+        self.assertIn(owner, self.policy.runtime_neutral)
+        self.assertEqual(
+            {edge for edge in canonical if edge.dependency == owner},
+            shared_edges,
+        )
+        self.assertEqual(
+            {edge for edge in canonical if edge.dependent == owner},
+            set(),
+        )
+        self.assertTrue(shared_edges.isdisjoint(self.policy.dev_only_edges))
+
+    def test_dev_only_edge_cannot_be_promoted(self) -> None:
+        edge = min(self.policy.dev_only_edges)
+        for kind in ("build", "normal"):
+            with self.subTest(kind=kind):
+                snapshot = valid_snapshot(self.policy)
+                evidence = dict(snapshot.edges)
+                evidence[edge] = (
+                    f"kind={kind}, optional=false, target=*, rename=-",
+                )
+                dependency_kinds = dict(snapshot.dependency_kinds)
+                dependency_kinds[edge] = frozenset({kind})
+                snapshot = replace(
+                    snapshot,
+                    edges=evidence,
+                    dependency_kinds=dependency_kinds,
+                )
+
+                violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+                self.assertIn(
+                    f"dev-only internal edge used outside dev: {edge.display()} "
+                    f"(kind={kind}, optional=false, target=*, rename=-)",
+                    violations,
+                )
+
+    def test_unannotated_dev_only_edge_is_rejected(self) -> None:
+        edge = min(self.policy.dev_only_edges)
+        policy = replace(
+            self.policy,
+            dev_only_edges=self.policy.dev_only_edges - frozenset({edge}),
+        )
+
+        violations = boundaries.audit_snapshot(valid_snapshot(self.policy), policy)
+
+        self.assertIn(
+            f"dev-only internal edge lacks policy annotation: {edge.display()}",
+            violations,
+        )
+
+    def test_resolved_dev_only_edge_requires_annotation_cleanup(self) -> None:
+        edge = min(self.policy.dev_only_edges)
+        snapshot = valid_snapshot(self.policy)
+        evidence = dict(snapshot.edges)
+        del evidence[edge]
+        dependency_kinds = dict(snapshot.dependency_kinds)
+        del dependency_kinds[edge]
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] -= frozenset({edge.dependency})
+        snapshot = replace(
+            snapshot,
+            edges=evidence,
+            dependency_kinds=dependency_kinds,
+            dependencies=dependencies,
+        )
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            f"resolved dev-only edge still annotated: {edge.display()}; "
+            "remove its policy annotation",
+            violations,
+        )
+
+    def test_dev_only_annotation_must_reference_a_canonical_edge(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        annotation = raw["dev_only_edges"][0]
+        raw["packages"][annotation["dependent"]].remove(annotation["dependency"])
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "dev-only annotations must reference canonical edges",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_policy_rejects_incoming_migration_host_edge(self) -> None:
+        raw = copy.deepcopy(self.host_raw_policy)
+        raw["packages"]["litchi-codepage"].append(SYNTHETIC_HOST)
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "migration hosts cannot be workspace dependencies: "
+            f"litchi-codepage -> {SYNTHETIC_HOST}",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_snapshot_rejects_incoming_migration_host_edge(self) -> None:
+        snapshot = valid_snapshot(self.host_policy)
+        edge = boundaries.Edge("litchi-codepage", SYNTHETIC_HOST)
+        evidence = dict(snapshot.edges)
+        evidence[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependency_kinds = dict(snapshot.dependency_kinds)
+        dependency_kinds[edge] = frozenset({"normal"})
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        normal_dependencies = dict(snapshot.normal_dependencies)
+        normal_dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(
+            snapshot,
+            edges=evidence,
+            dependency_kinds=dependency_kinds,
+            dependencies=dependencies,
+            normal_dependencies=normal_dependencies,
+        )
+
+        violations = boundaries.audit_snapshot(snapshot, self.host_policy)
+
+        self.assertIn(
+            f"workspace dependency targets migration host: {edge.display()}",
+            violations,
+        )
+
+    def test_unclassified_optional_dev_edge_is_rejected(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-xlsx", "litchi-doc")
+        edges = dict(snapshot.edges)
+        edges[edge] = ("kind=dev, optional=true, target=cfg(unix), rename=legacy",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            "unclassified internal edge litchi-xlsx -> litchi-doc "
+            "(kind=dev, optional=true, target=cfg(unix), rename=legacy)",
+            violations,
+        )
+
+    def test_eval_rejects_each_normal_runtime_dependency(self) -> None:
+        for runtime in sorted(self.policy.runtime_packages):
+            with self.subTest(runtime=runtime):
+                snapshot = valid_snapshot(self.policy)
+                dependencies = dict(snapshot.dependencies)
+                dependencies["litchi-eval"] |= frozenset({runtime})
+                normal_dependencies = dict(snapshot.normal_dependencies)
+                normal_dependencies["litchi-eval"] |= frozenset({runtime})
+                snapshot = replace(
+                    snapshot,
+                    dependencies=dependencies,
+                    normal_dependencies=normal_dependencies,
+                )
+
+                violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+                self.assertIn(
+                    f"runtime-neutral crate litchi-eval depends on: {runtime}",
+                    violations,
+                )
+
+    def test_eval_allows_dev_only_runtime_dependency(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        dependencies = dict(snapshot.dependencies)
+        dependencies["litchi-eval"] |= frozenset({"tokio"})
+        snapshot = replace(snapshot, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertEqual(violations, [])
+
+    def test_metadata_classifies_only_normal_dependencies_as_runtime_edges(self) -> None:
+        snapshot = boundaries.snapshot_from_metadata(
+            {
+                "workspace_members": ["litchi-eval-id"],
+                "packages": [
+                    {
+                        "id": "litchi-eval-id",
+                        "name": "litchi-eval",
+                        "manifest_path": "/workspace/crates/litchi-eval/Cargo.toml",
+                        "features": {},
+                        "dependencies": [
+                            {"name": "tokio", "kind": "dev"},
+                            {"name": "rayon", "kind": "build"},
+                            {"name": "reqwest", "kind": None},
+                        ],
+                    }
+                ],
+            }
+        )
+
+        self.assertEqual(
+            snapshot.dependencies["litchi-eval"],
+            frozenset({"rayon", "reqwest", "tokio"}),
+        )
+        self.assertEqual(
+            snapshot.normal_dependencies["litchi-eval"],
+            frozenset({"reqwest"}),
+        )
+
+    def test_metadata_preserves_optional_normal_boundary_edges(self) -> None:
+        edge = boundaries.Edge("litchi-ops", "soapberry-zip")
+        snapshot = boundaries.snapshot_from_metadata(
+            {
+                "workspace_members": ["ops-id", "zip-id"],
+                "packages": [
+                    {
+                        "id": "ops-id",
+                        "name": "litchi-ops",
+                        "manifest_path": "/workspace/crates/litchi-ops/Cargo.toml",
+                        "features": {},
+                        "dependencies": [
+                            {"name": "soapberry-zip", "kind": None, "optional": True}
+                        ],
+                    },
+                    {
+                        "id": "zip-id",
+                        "name": "soapberry-zip",
+                        "manifest_path": "/workspace/crates/soapberry-zip/Cargo.toml",
+                        "features": {},
+                        "dependencies": [],
+                    },
+                ],
+            }
+        )
+
+        self.assertIn(edge, snapshot.edges)
+        self.assertEqual(snapshot.dependency_kinds[edge], frozenset({"normal"}))
+        self.assertEqual(
+            snapshot.normal_optional_dependencies["litchi-ops"],
+            frozenset({"soapberry-zip"}),
+        )
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.dev_only_edges)
+
+    def test_manifest_dependency_inventory_rejects_root_workspace_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "Cargo.toml",
+                "[workspace]\nmembers = []\n\n"
+                "[workspace.dependencies]\n"
+                "legacy_iwa = { package = \"litchi-legacy-host\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.host_policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "Cargo.toml [workspace.dependencies] alias=legacy_iwa, "
+                "package=litchi-legacy-host",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_underscore_host_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "tools/fixture/Cargo.toml",
+                "[package]\nname = \"fixture\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "litchi_legacy_host = \"0.1\"\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.host_policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "tools/fixture/Cargo.toml [dependencies] alias=litchi_legacy_host, "
+                "package=litchi-legacy-host",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_nested_fuzz_dependency(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-legacy-host/Cargo.toml",
+                "[package]\nname = \"litchi-legacy-host\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi/fuzz/Cargo.toml",
+                "[package]\nname = \"litchi-fuzz\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "legacy_iwa = { package = \"litchi-legacy-host\", path = \"../../litchi-legacy-host\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.host_policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "crates/litchi/fuzz/Cargo.toml [dependencies] alias=legacy_iwa, "
+                "package=litchi-legacy-host",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_workspace_excluded_manifest(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "Cargo.toml",
+                "[workspace]\nmembers = []\nexclude = [\"excluded\"]\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "excluded/tool/Cargo.toml",
+                "[package]\nname = \"excluded-tool\"\nversion = \"0.1\"\n\n"
+                "[dev-dependencies]\n"
+                "iwa_fixture = { package = \"litchi-legacy-host\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.host_policy
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "excluded/tool/Cargo.toml [dev-dependencies] alias=iwa_fixture, "
+                "package=litchi-legacy-host",
+                violations[0],
+            )
+
+    def test_manifest_dependency_inventory_rejects_target_dev_and_build_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "tools/fixture/Cargo.toml",
+                "[package]\nname = \"fixture\"\nversion = \"0.1\"\n\n"
+                "[target.'cfg(unix)'.dependencies]\n"
+                "iwa_target = { package = \"litchi-legacy-host\", version = \"0.1\" }\n\n"
+                "[target.'cfg(unix)'.dev-dependencies]\n"
+                "iwa_dev = { package = \"litchi-legacy-host\", version = \"0.1\" }\n\n"
+                "[target.'cfg(unix)'.build-dependencies]\n"
+                "iwa_build = { package = \"litchi-legacy-host\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.host_policy
+            )
+
+            self.assertEqual(len(violations), 3)
+            for table_name, alias in (
+                ("target.cfg(unix).dependencies", "iwa_target"),
+                ("target.cfg(unix).dev-dependencies", "iwa_dev"),
+                ("target.cfg(unix).build-dependencies", "iwa_build"),
+            ):
+                self.assertTrue(
+                    any(
+                        f"[{table_name}]" in item
+                        and f"alias={alias}, package=litchi-legacy-host" in item
+                        for item in violations
+                    ),
+                    (table_name, alias, violations),
+                )
+
+    def test_manifest_dependency_inventory_rejects_patch_replace_and_path_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-legacy-host/Cargo.toml",
+                "[package]\nname = \"litchi-legacy-host\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/consumer/Cargo.toml",
+                "[package]\nname = \"consumer\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "path_alias = { path = \"../litchi-legacy-host\" }\n\n"
+                "[patch.crates-io]\n"
+                "patched_iwa = { package = \"litchi-legacy-host\", path = \"../litchi-legacy-host\" }\n\n"
+                "[replace]\n"
+                "\"litchi-legacy-host:0.1.0\" = { path = \"../litchi-legacy-host\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(
+                root, self.host_policy
+            )
+
+            self.assertEqual(len(violations), 3)
+            for table_name in (
+                "dependencies",
+                "patch.crates-io",
+                "replace",
+            ):
+                self.assertTrue(
+                    any(f"[{table_name}]" in item for item in violations),
+                    (table_name, violations),
+                )
+            self.assertTrue(
+                any("alias=path_alias, package=litchi-legacy-host" in item for item in violations),
+                violations,
+            )
+
+    def test_manifest_dependency_inventory_rejects_current_host_fuzz_support(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-legacy-host/Cargo.toml",
+                "[package]\nname = \"litchi-legacy-host\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-legacy-host/fuzz/Cargo.toml",
+                "[package]\nname = \"litchi-iwa-fuzz\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "litchi-legacy-host = { path = \"..\" }\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "crates/litchi-iwa-archive/Cargo.toml",
+                "[package]\nname = \"litchi-iwa-archive\"\nversion = \"0.1\"\n",
+            )
+            write_cargo_manifest_fixture(
+                root,
+                "tools/legacy-alias/Cargo.toml",
+                "[package]\nname = \"legacy-alias\"\nversion = \"0.1\"\n\n"
+                "[dependencies]\n"
+                "litchi-legacy-host = { package = \"litchi-iwa-archive\", version = \"0.1\" }\n",
+            )
+
+            violations = boundaries.audit_manifest_dependency_inventory(root, self.host_policy)
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "crates/litchi-legacy-host/fuzz/Cargo.toml [dependencies] alias=litchi-legacy-host, "
+                "package=litchi-legacy-host",
+                violations[0],
+            )
+
+
+    def test_manifest_dependency_inventory_is_in_main_dispatch(self) -> None:
+        self.assertIn(
+            "+ audit_manifest_dependency_inventory(policy=policy)",
+            inspect.getsource(boundaries.main),
+        )
+
+    def test_xlsb_cannot_depend_on_concrete_xlsx(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-xlsb", "litchi-xlsx")
+        edges = dict(snapshot.edges)
+        edges[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            "OOXML concrete peer edge from litchi-xlsb: litchi-xlsx",
+            violations,
+        )
+
+    def test_odf_common_cannot_depend_on_format_host(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-odf-common", "litchi-odf")
+        edges = dict(snapshot.edges)
+        edges[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            "foundation crate litchi-odf-common depends upward on: litchi-odf",
+            violations,
+        )
+
+    def test_odf_common_package_dependencies_are_neutral(self) -> None:
+        self.assertEqual(
+            self.policy.canonical_edges
+            & {
+                boundaries.Edge("litchi-odf-common", dependency)
+                for dependency in self.policy.packages
+            },
+            {
+                boundaries.Edge("litchi-odf-common", "litchi-core"),
+                boundaries.Edge("litchi-odf-common", "soapberry-zip"),
+                boundaries.Edge("litchi-odf-common", "xml-minifier"),
+            },
+        )
+
+    def test_opc_owns_xml_publication_audit_edge(self) -> None:
+        edge = boundaries.Edge("litchi-opc", "xml-minifier")
+
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.dev_only_edges)
+        self.assertNotIn(edge, self.policy.migration_edges)
+
+    def test_pptx_drawingml_edge_is_canonical(self) -> None:
+        edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
+
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.migration_edges)
+
+    def test_numbers_metadata_core_edge_is_canonical(self) -> None:
+        edge = boundaries.Edge("litchi-numbers", "litchi-core")
+
+        self.assertIn(edge, self.policy.canonical_edges)
+        self.assertNotIn(edge, self.policy.migration_edges)
+        self.assertNotIn(edge, self.policy.dev_only_edges)
+
+    def test_spreadsheet_drawing_owner_and_host_edges_are_canonical(self) -> None:
+        owner = "litchi-spreadsheet-drawing"
+        dependencies = {
+            "litchi-core",
+            "litchi-drawingml",
+            "litchi-ooxml-common",
+            "litchi-opc",
+        }
+
+        self.assertEqual(
+            {
+                edge.dependency
+                for edge in self.policy.canonical_edges
+                if edge.dependent == owner
+            },
+            dependencies,
+        )
+        for host in ("litchi-xlsb", "litchi-xlsx"):
+            edge = boundaries.Edge(host, owner)
+            self.assertIn(edge, self.policy.canonical_edges)
+            self.assertNotIn(edge, self.policy.migration_edges)
+
+    def test_shared_worksheet_view_edges_are_canonical(self) -> None:
+        for dependent in ("litchi", "litchi-xlsb", "litchi-xlsx"):
+            with self.subTest(dependent=dependent):
+                edge = boundaries.Edge(dependent, "litchi-sheet")
+                self.assertIn(edge, self.policy.canonical_edges)
+                self.assertNotIn(edge, self.policy.migration_edges)
+
+    def test_resolved_migration_edge_requires_policy_cleanup(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-pptx", "litchi-drawingml")
+        migration = boundaries.Debt(
+            order=1,
+            edge=edge,
+            reason="test migration",
+            exit="test cleanup",
+        )
+        policy = replace(self.policy, migration_debt=(migration,))
+        edges = dict(snapshot.edges)
+        del edges[edge]
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] -= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, policy)
+
+        self.assertIn(
+            f"resolved migration debt still listed: {edge.display()}; remove its policy entry",
+            violations,
+        )
+
+    def test_resolved_canonical_edge_requires_policy_cleanup(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = next(iter(self.policy.canonical_edges))
+        edges = dict(snapshot.edges)
+        del edges[edge]
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] -= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn(
+            f"resolved canonical edge still listed: {edge.display()}; remove its policy entry",
+            violations,
+        )
+
+    def test_allowed_edges_cannot_hide_a_dependency_cycle(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        edge = boundaries.Edge("litchi-core", "litchi-sheet")
+        edges = dict(snapshot.edges)
+        edges[edge] = ("kind=normal, optional=false, target=*, rename=-",)
+        dependencies = dict(snapshot.dependencies)
+        dependencies[edge.dependent] |= frozenset({edge.dependency})
+        snapshot = replace(snapshot, edges=edges, dependencies=dependencies)
+        policy = replace(
+            self.policy,
+            canonical_edges=self.policy.canonical_edges | frozenset({edge}),
+        )
+
+        violations = boundaries.audit_snapshot(snapshot, policy)
+
+        self.assertIn(
+            "workspace dependency cycle: litchi-core -> litchi-sheet -> litchi-core",
+            violations,
+        )
+
+    def test_new_workspace_package_requires_an_inventory_entry(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        snapshot = replace(snapshot, packages=snapshot.packages | frozenset({"litchi-new"}))
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn("workspace packages lack topology policy: litchi-new", violations)
+
+    def test_retired_ooxml_monolith_cannot_return(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        raw["packages"]["litchi-ooxml"] = []
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "retired monoliths cannot return as workspace packages: litchi-ooxml",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_retired_monolith_cannot_return_as_a_policy_package(self) -> None:
+        raw = copy.deepcopy(self.raw_policy)
+        raw["packages"]["litchi-ole"] = []
+
+        with self.assertRaisesRegex(
+            boundaries.PolicyError,
+            "retired monoliths cannot return as workspace packages: litchi-ole",
+        ):
+            boundaries.parse_policy(raw)
+
+    def test_retired_umbrella_feature_cannot_return(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        features = dict(snapshot.features)
+        features["litchi"] |= frozenset({"full"})
+        snapshot = replace(snapshot, features=features)
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertIn("retired litchi facade features returned: full", violations)
+
+    def test_litchi_facade_rejects_non_optional_normal_dependencies(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        normal_dependencies = dict(snapshot.normal_dependencies)
+        normal_dependencies["litchi"] |= frozenset({"litchi-xlsb"})
+        optional_dependencies = dict(snapshot.normal_optional_dependencies)
+        optional_dependencies["litchi"] -= frozenset({"litchi-xlsb"})
+        snapshot = replace(
+            snapshot,
+            normal_dependencies=normal_dependencies,
+            normal_optional_dependencies=optional_dependencies,
+        )
+
+        violations = boundaries.audit_litchi_facade(snapshot)
+
+        self.assertIn(
+            "litchi facade has non-optional normal dependencies: litchi-xlsb",
+            violations,
+        )
+
+
+    def test_iwa_protos_retired_root_aliases_stay_private(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub use self::generated::{kn, knsos, tn, tsck, tswp};\n"
+                "pub(crate) use generated::{tstsos, tswpsos};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_protos_root_alias_source_topology(root),
+                [
+                    "retired litchi-iwa-protos generated root aliases returned "
+                    "(knsos, tsck): crates/litchi-iwa-protos/src/lib.rs:1"
+                ],
+            )
+
+    def test_iwa_protos_retired_root_alias_audit_rejects_glob(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text("pub use generated::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_iwa_protos_root_alias_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            for alias in boundaries.RETIRED_IWA_PROTOS_ROOT_ALIASES:
+                self.assertIn(alias, violations[0])
+
+    def test_iwa_protos_retired_root_alias_audit_rejects_public_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True)
+            facade.write_text(
+                "pub mod tstsos {}\n"
+                "pub(crate) mod tswpsos {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_iwa_protos_root_alias_source_topology(root),
+                [
+                    "retired litchi-iwa-protos generated root alias returned as a "
+                    "public module (tstsos): crates/litchi-iwa-protos/src/lib.rs:1"
+                ],
+            )
+
+    def test_iwa_protos_retired_root_alias_audit_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+
+        self.assertIn(
+            "audit_iwa_protos_root_alias_source_topology()", main_source
+        )
+
+
+    def test_litchi_semantic_facades_require_complete_checked_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            source = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            self.assertIn("Error, LimitKind, OpenOptions, PackageError", source)
+            source = source.replace(
+                "Error, LimitKind, OpenOptions, PackageError",
+                "Error, LimitKind, RemovedOptions, PackageError",
+                1,
+            )
+            facade.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_litchi_semantic_facade_source_topology(root)
+
+            self.assertTrue(
+                any(
+                    "pages semantic facade is missing exports" in violation
+                    and "OpenOptions" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
+    def test_litchi_semantic_facades_reject_package_aliases_and_globs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            source = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            source = source.replace(
+                "        pub use litchi_pages::{\n            Body, Document,",
+                "        pub use litchi_pages::{\n            Package, Body, Document,",
+                1,
+            )
+            source = source.replace(
+                "        pub use litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats};",
+                "        pub use litchi_numbers::*;\n"
+                "        pub use litchi_numbers::workbook::{Error, ReadError, ReadLimitKind, Result, Stats};",
+                1,
+            )
+            facade.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_litchi_semantic_facade_source_topology(root)
+
+            self.assertTrue(
+                any("pages semantic facade exposes forbidden `Package`" in violation
+                    for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("numbers semantic facade exposes a glob re-export" in violation
+                    for violation in violations),
+                violations,
+            )
+
+    def test_litchi_pages_semantic_facade_allows_reader_ingress_only(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            facade = root / boundaries.FACADE_SOURCE_ROOT / "lib.rs"
+            facade.parent.mkdir(parents=True)
+            original = Path("crates/litchi/src/lib.rs").read_text(encoding="utf-8")
+            # The facade's own reader is removed; the namespace now
+            # holds types only, and `litchi::open` is the Pages ingress.
+            self.assertNotIn("litchi_pages::Package::open(path)", original)
+            self.assertIn("pub mod semantic", original)
+            facade.write_text(original, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_litchi_semantic_facade_source_topology(root), []
+            )
+
+            # A package type or a retired ingress name in the semantic
+            # re-exports is rejected.
+            source = original.replace(
+                "Error, LimitKind, OpenOptions, PackageError",
+                "Error, LimitKind, OpenOptions, Package, PackageError, ReadError, PackageResult",
+                1,
+            )
+            self.assertNotEqual(source, original)
+            facade.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_litchi_semantic_facade_source_topology(root)
+
+            for expected in ("`Package`", "`ReadError`", "`PackageResult`"):
+                self.assertTrue(
+                    any(
+                        "pages semantic facade exposes forbidden " + expected
+                        in violation
+                        for violation in violations
+                    ),
+                    violations,
+                )
+            self.assertFalse(
+                any("`PackageError`" in violation for violation in violations),
+                violations,
+            )
+
+    def _write_pages_transaction_families(self, root: Path) -> None:
+        for family in boundaries.PAGES_TRANSACTION_FAMILIES:
+            add_pages_transaction_family_scaffold(root, family[0])
+
+    def test_pages_transaction_families_accept_w1_layout_and_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_transaction_families(root)
+            self.assertEqual(
+                boundaries.audit_pages_transaction_family_source_topology(root), []
+            )
+        self.assertIn(
+            "+ audit_pages_transaction_family_source_topology()",
+            inspect.getsource(boundaries.main),
+        )
+        # Every legacy spelling of every family is banned.
+        self.assertIn("BodyTableLockState", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+        self.assertIn("BodyTableSnapshot", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+        self.assertIn("SectionTextEdit", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+        self.assertIn("DocumentSourceLimits", boundaries.PAGES_TRANSACTION_RETIRED_NAMES)
+
+    def test_pages_transaction_families_reject_public_owner_and_missing_exports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_transaction_families(root)
+            package = root / boundaries.PAGES_PACKAGE_SOURCE
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                .replace("pub(crate) mod section_text;", "pub mod section_text;", 1)
+                .replace("pub(crate) mod table_lock;", "mod table_lock;", 1),
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SOURCE_ROOT / "section.rs"
+            section.write_text(
+                section.read_text(encoding="utf-8").replace(
+                    "pub use crate::package::section_name::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};",
+                    "pub use crate::package::section_name::{Commit, Diagnostics, Edit, Error, LimitKind};",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            chart = root / boundaries.PAGES_SOURCE_ROOT / "chart.rs"
+            chart.write_text(
+                chart.read_text(encoding="utf-8").replace(
+                    "pub mod data {", "pub(crate) mod data {", 1
+                ),
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_transaction_family_source_topology(root)
+
+            for fragment in (
+                "section_text transaction family owner module must be declared "
+                "`pub(crate) mod section_text;` (found `pub mod`)",
+                "table_lock transaction family owner module must be declared "
+                "`pub(crate) mod table_lock;` (found `private mod`)",
+                "public module section::name is missing canonical export Patch",
+                "transaction module chart::data must be declared `pub mod`",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_pages_transaction_families_reject_retired_names_aliases_and_globs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_transaction_families(root)
+            lock = root / boundaries.PAGES_SOURCE_ROOT / "table" / "lock.rs"
+            lock.write_text(
+                lock.read_text(encoding="utf-8")
+                + "pub type BodyTableLockState = State;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SOURCE_ROOT / "lib.rs"
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::section_text::{Edit as SectionTextEdit};\n"
+                + "pub use crate::package::table_cells::*;\n"
+                + "pub use crate::table::catalog::Snapshot as BodyTableSnapshot;\n"
+                + "pub struct DocumentSourceLimits;\n"
+                + "#[cfg(test)]\npub struct ReadError;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_SOURCE_ROOT / "package" / "body_chart_data.rs"
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                # A private alias inside another owner is implementation detail.
+                + "use super::body_chart_arrangement::Error as BodyChartArrangementError;\n"
+                + "pub fn leak(object_id: u64, source: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            metadata = root / boundaries.PAGES_SOURCE_ROOT / "package" / "metadata_edit.rs"
+            metadata.write_text(
+                metadata.read_text(encoding="utf-8")
+                + "pub use litchi_core::edit::Diagnostics as MetadataDiagnostics;\n"
+                + "pub use litchi_core::edit::{\n"
+                + "    Diagnostics as GroupedMetadataDiagnostics,\n"
+                + "};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_transaction_family_source_topology(root)
+
+            for fragment in (
+                "defines retired name BodyTableLockState: crates/litchi-pages/src/table/lock.rs",
+                "publicly re-exports retired name SectionTextEdit",
+                "owner section_text has alternate public alias SectionTextEdit for Edit",
+                "owner section_text has 2 public re-export paths",
+                "owner table_cells is glob re-exported",
+                "publicly re-exports retired name BodyTableSnapshot",
+                "defines retired name DocumentSourceLimits",
+                "body_chart_data transaction public API exposes raw identifier object_id",
+                "body_chart_data transaction public API exposes raw byte slice",
+                "Pages metadata_edit transaction family has alternate public alias "
+                "MetadataDiagnostics for shared litchi_core::edit::Diagnostics",
+                "Pages metadata_edit transaction family has alternate public alias "
+                "GroupedMetadataDiagnostics for shared litchi_core::edit::Diagnostics",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(
+                any("ReadError" in item for item in violations), violations
+            )
+            self.assertFalse(
+                any("BodyChartArrangementError" in item for item in violations),
+                violations,
+            )
+
+    def test_pages_table_lock_rejects_retired_state_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_pages_table_lock_facade_source_topology(root), []
+            )
+            semantic = root / boundaries.PAGES_TABLE_LOCK_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub type BodyTableLockState = State;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+            self.assertTrue(
+                any("defines retired name BodyTableLockState" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "alternate alias BodyTableLockState for State" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+
+    def test_iwork_examples_reject_legacy_editor_and_native_id_calls(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            example = root / boundaries.IWORK_EXAMPLE_SOURCES[0]
+            example.parent.mkdir(parents=True)
+            example.write_text(
+                "use legacy::numbers::Draft;\n"
+                "fn main() { let _ = table.id(); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_iwork_example_source_topology(root)
+
+            self.assertTrue(
+                any("legacy editor-host API" in violation for violation in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("native object identifier call" in violation for violation in violations),
+                violations,
+            )
+
+    def test_iwork_examples_allow_semantic_readers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative, source in (
+                (
+                    boundaries.IWORK_EXAMPLE_SOURCES[0],
+                    "use litchi::iwork::Document;\nfn main() {}\n",
+                ),
+            ):
+                example = root / relative
+                example.parent.mkdir(parents=True, exist_ok=True)
+                example.write_text(source, encoding="utf-8")
+
+            self.assertEqual(boundaries.audit_iwork_example_source_topology(root), [])
+
+
+    def test_litchi_facade_requires_an_empty_default_feature(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        definitions = dict(snapshot.feature_definitions)
+        definitions["litchi"] = dict(definitions["litchi"])
+        definitions["litchi"]["default"] = frozenset({"dep:litchi-xlsb"})
+        snapshot = replace(snapshot, feature_definitions=definitions)
+
+        self.assertEqual(
+            boundaries.audit_litchi_facade(snapshot),
+            ["litchi default feature must be exactly empty"],
+        )
+
+    def test_litchi_facade_rejects_stale_and_unknown_feature_contracts(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        definitions = dict(snapshot.feature_definitions)
+        definitions["litchi"] = {
+            "default": frozenset(),
+            "all": frozenset({"unknown-capability", "dep:litchi-missing"}),
+        }
+        snapshot = replace(snapshot, feature_definitions=definitions)
+
+        violations = boundaries.audit_litchi_facade(snapshot)
+
+        self.assertEqual(violations, sorted(violations))
+        self.assertIn(
+            "litchi facade feature references unknown features: "
+            "all -> unknown-capability",
+            violations,
+        )
+        self.assertIn(
+            "litchi facade has stale dep: feature references: litchi-missing",
+            violations,
+        )
+        self.assertIn("litchi all feature omits optional dependencies: ", violations[0] if violations else "")
+
+    def test_litchi_all_feature_may_cover_optional_dependencies_via_aggregates(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        optional_dependencies = snapshot.normal_optional_dependencies["litchi"]
+        definitions = dict(snapshot.feature_definitions)
+        definitions["litchi"] = {
+            "default": frozenset(),
+            "all": frozenset({"formats"}),
+            "formats": frozenset(
+                f"dep:{dependency}" for dependency in optional_dependencies
+            ),
+        }
+        snapshot = replace(snapshot, feature_definitions=definitions)
+
+        self.assertEqual(boundaries.audit_litchi_facade(snapshot), [])
+
+    def test_violations_have_deterministic_order(self) -> None:
+        snapshot = valid_snapshot(self.policy)
+        snapshot = replace(
+            snapshot,
+            packages=snapshot.packages | frozenset({"z-new", "a-new"}),
+        )
+
+        violations = boundaries.audit_snapshot(snapshot, self.policy)
+
+        self.assertEqual(violations, sorted(violations))
+        self.assertIn("workspace packages lack topology policy: a-new, z-new", violations)
+
+    def test_xlsb_host_xlsx_source_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "crates/litchi-xlsb/src/host/xlsx/mod.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text("// retired host\n", encoding="utf-8")
+
+            violations = boundaries.audit_xlsb_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSB host XLSX source returned: "
+                    "crates/litchi-xlsb/src/host/xlsx"
+                ],
+            )
+
+    def test_xlsb_package_public_xlsx_module_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "crates/litchi-xlsb/src/package/mod.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text("pub mod xlsx;\n", encoding="utf-8")
+
+            violations = boundaries.audit_xlsb_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSB package XLSX module: "
+                    "crates/litchi-xlsb/src/package/mod.rs:1"
+                ],
+            )
+
+    def test_xlsb_package_xlsx_paths_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / "crates/litchi-xlsb/src/writer.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text("use crate::package::xlsx::Chart;\n", encoding="utf-8")
+
+            violations = boundaries.audit_xlsb_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSB package::xlsx path: "
+                    "crates/litchi-xlsb/src/writer.rs:1"
+                ],
+            )
+
+    def test_retired_shallow_sheet_view_owners_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for _, retired in boundaries.RETIRED_SHEET_VIEW_OWNER_SOURCES:
+                path = root / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner\n", encoding="utf-8")
+            retired_tree = root / boundaries.RETIRED_XLSX_SHEET_VIEW_OWNER_TREE
+            retired_tree.mkdir(parents=True)
+
+            violations = boundaries.audit_spreadsheet_sheet_view_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired litchi-xlsb sheet-view owner source returned: "
+                    "crates/litchi-xlsb/src/views.rs",
+                    "retired litchi-xlsx sheet-view owner source returned: "
+                    "crates/litchi-xlsx/src/views.rs",
+                    "retired litchi-xlsx sheet-view owner tree returned: "
+                    "crates/litchi-xlsx/src/views",
+                ],
+            )
+
+
+    def test_focused_keynote_show_settings_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "pub fn show_settings(r#source_bytes: &[u8], r#object_id: u64) "
+                        "-> ShowArchive {}",
+                        "pub type Patch = buffa::ShowArchiveView;",
+                        "impl prost::Message for show::Edit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub type Commit = HostPackage;\n"
+                "pub type Diagnostics = litchi_iwa_core::RawObject;\n"
+                "pub type Error = SourceBytes;\n"
+                "pub type Settings = SourceCatalog;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use litchi_iwa_protos::show::GeneratedArchive as Patch;\n"
+                "pub type Patch = crate::show::GeneratedSettings;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub type LimitKind = "
+                "crate::show::LimitKind<prost_types::MessageInfo>;\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_keynote_show_settings_facade_source_topology(root)
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote show-settings public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type ShowArchive",
+                "protobuf type buffa",
+                "archive/IWA type ShowArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type HostPackage",
+                "archive/IWA type litchi_iwa_core",
+                "native object RawObject",
+                "raw source bytes SourceBytes",
+                "archive/IWA type SourceCatalog",
+                "archive/IWA type litchi_iwa_protos",
+                "archive/IWA type GeneratedArchive",
+                "generated type GeneratedSettings",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), len(expected_fragments))
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused show-settings leak: {fragment}",
+                    )
+
+    def test_focused_keynote_show_settings_api_ignores_nested_and_private_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub type ShowSettings = ShowArchive;",
+                        'const NOTE: &str = "pub struct ShowSettingsEdit;";',
+                        "/* pub type ShowSettingsPatch = buffa::ShowArchiveView; */",
+                        "pub struct Mode;",
+                        "pub struct Settings;",
+                        "pub struct Size;",
+                        "pub struct Show;",
+                        "pub struct Edit;",
+                        "pub struct Patch;",
+                        "pub struct Commit;",
+                        "pub struct Diagnostics;",
+                        "pub struct Error;",
+                        "pub struct LimitKind;",
+                        "pub fn show(settings: Settings, input: InputBytes, "
+                        "byte_count: usize) -> OutputBytes { todo!() }",
+                        "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted(archive: ShowArchive) {}",
+                        "struct ShowSettings;",
+                        "pub(crate) struct ShowSettingsEdit;",
+                        "pub(super) type ShowSettingsPatch = Patch;",
+                        "pub(in crate) struct ShowSettingsCommit;",
+                        "impl ShowSettingsEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "struct ShowSettingsDiagnostics;\n"
+                "pub(crate) struct ShowSettingsError;\n"
+                "pub(super) type ShowSettingsLimitKind = LimitKind;\n"
+                "impl ShowSettingsPatch {}\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            canonical_exports = (
+                "pub mod show;\n"
+                "// pub use crate::show::{Mode, Settings};\n"
+                'const SHOW_NOTE: &str = "pub use crate::show::{Show, Size};";\n'
+                "pub fn show_settings(settings: show::Settings, mode: show::Mode, "
+                "size: show::Size) -> show::Show { todo!() }\n"
+                "use crate::show::Mode;\n"
+                "pub(crate) use crate::show::Settings;\n"
+                "pub(super) type Show = crate::show::Show;\n"
+                "pub(in crate) use crate::show::Size;\n"
+                "pub(crate) use crate::show::*;\n"
+                "pub use crate::render::{Mode, Settings};\n"
+                "pub use crate::render::*;\n"
+                "pub type Show = crate::presentation::Show;\n"
+                "pub use crate::geometry::Size;\n"
+                "pub fn unrelated(object_id: u64) -> ShowArchive { todo!() }\n"
+                "pub struct ShowSetting;\n"
+                "pub struct ShowSettingsSnapshot;\n"
+            )
+            lib_export.write_text(canonical_exports, encoding="utf-8")
+            package_export.write_text(canonical_exports, encoding="utf-8")
+            other_owner = root / "crates/litchi-pages/src/show.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct ShowSettings;\n"
+                "pub type ShowSettingsPatch = litchi_iwa_core::RawObject;\n"
+                "pub use crate::show::{Mode, Settings, Show, Size};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_show_settings_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_show_settings_exports_reject_flat_semantic_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            lib_export.write_text(
+                "pub use crate::show::{Mode, Settings as Settings};\n"
+                "pub type Show = crate::show::Show;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::show_settings::Size;\n"
+                "pub use crate::show::*;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_show_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Mode: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Settings: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Show: "
+                        "crates/litchi-keynote/src/lib.rs:2",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic alias Size: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat semantic aliases via show glob: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_show_settings_public_api_rejects_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct ShowSettings;\n"
+                "pub struct ShowSettingsEdit;\n"
+                "pub type ShowSettingsPatch = Patch;\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub type ShowSettingsCommit = Commit;\n"
+                "pub type ShowSettingsDiagnostics = Diagnostics;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SHOW_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use crate::show::Error as ShowSettingsError;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::show::LimitKind as ShowSettingsLimitKind;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_show_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettings: "
+                        "crates/litchi-keynote/src/show.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsEdit: "
+                        "crates/litchi-keynote/src/show.rs:2",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsPatch: "
+                        "crates/litchi-keynote/src/show.rs:3",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsCommit: "
+                        "crates/litchi-keynote/src/package/show_settings.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsDiagnostics: "
+                        "crates/litchi-keynote/src/package/show_settings.rs:2",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsError: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote show-settings public API retains "
+                        "flat alias ShowSettingsLimitKind: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                    ]
+                ),
+            )
+
+
+    def test_focused_keynote_soundtrack_items_owner_scaffold_is_valid(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_keynote_soundtrack_items_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_items_canonical_scaffold(root)
+                    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SOUNDTRACK_ITEMS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack items public API "
+                            f"is missing canonical soundtrack item type {missing}: "
+                            "crates/litchi-keynote/src/soundtrack/items.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_soundtrack_items_requires_private_owner_and_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_OWNER_SOURCE
+            owner.unlink()
+            soundtrack = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[2]
+            soundtrack.write_text("mod items;\n", encoding="utf-8")
+            package = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_EXPORT_SOURCES[1]
+            package.write_text("pub mod soundtrack_items;\n", encoding="utf-8")
+
+            violations = boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                root
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "private package owner source: "
+                "crates/litchi-keynote/src/package/soundtrack_items.rs",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "public soundtrack::items module: "
+                "crates/litchi-keynote/src/soundtrack.rs",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API exposes "
+                "package::soundtrack_items module: "
+                "crates/litchi-keynote/src/package.rs:1",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API is missing "
+                "Package::soundtrack_items: crates/litchi-keynote/src/package.rs",
+                violations,
+            )
+
+    def test_focused_keynote_soundtrack_items_rejects_public_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_items_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SOUNDTRACK_ITEMS_SEMANTIC_SOURCE
+            with semantic.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub struct MediaAssetId;\n"
+                    "pub fn package_bytes(&self) -> &[u8] { unimplemented!() }\n"
+                )
+
+            violations = boundaries.audit_keynote_soundtrack_items_facade_source_topology(
+                root
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API exposes "
+                "soundtrack media topology MediaAssetId: "
+                "crates/litchi-keynote/src/soundtrack/items.rs:12",
+                violations,
+            )
+            self.assertIn(
+                "focused litchi-keynote soundtrack items public API exposes raw byte slice "
+                "&[u8]: crates/litchi-keynote/src/soundtrack/items.rs:13",
+                violations,
+            )
+
+
+    def test_keynote_soundtrack_items_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_soundtrack_items_facade_source_topology()",
+            main_source,
+        )
+
+    def test_focused_keynote_soundtrack_settings_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack settings public API "
+                            f"is missing canonical soundtrack type {missing}: "
+                            "crates/litchi-keynote/src/soundtrack.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_soundtrack_settings_requires_root_and_private_owner(
+        self,
+    ) -> None:
+        rejected_root = (
+            "",
+            "mod soundtrack;\n",
+            "pub(crate) mod soundtrack;\n",
+            "pub(super) mod r#soundtrack {}\n",
+            "pub(in crate) mod soundtrack;\n",
+            "// pub mod soundtrack;\n",
+            'const NOTE: &str = "pub mod soundtrack;";\n',
+        )
+        accepted_root = (
+            "pub mod soundtrack;\n",
+            "pub mod r#soundtrack;\n",
+            "pub mod soundtrack {}\n",
+            "pub\nmod\nr#soundtrack\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote soundtrack settings public API is "
+                        "missing canonical root soundtrack module: "
+                        "crates/litchi-keynote/src/lib.rs"
+                    ],
+                )
+                for declaration in rejected_root
+            ],
+            *[(declaration, []) for declaration in accepted_root],
+        ):
+            with self.subTest(scope="root", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    lib_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[0]
+                    lib_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        rejected_owner = (
+            "",
+            "// mod soundtrack_settings;\n",
+            'const NOTE: &str = "mod soundtrack_settings;";\n',
+            "mod soundtrack_setting;\n",
+        )
+        accepted_owner = (
+            "mod soundtrack_settings;\n",
+            "mod r#soundtrack_settings {}\n",
+            "pub(crate) mod soundtrack_settings;\n",
+            "pub(super) mod r#soundtrack_settings {}\n",
+            "pub(in crate)\nmod\nsoundtrack_settings\n;\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote soundtrack settings public API is "
+                        "missing private package owner module: "
+                        "crates/litchi-keynote/src/package.rs"
+                    ],
+                )
+                for declaration in rejected_owner
+            ],
+            *[(declaration, []) for declaration in accepted_owner],
+        ):
+            with self.subTest(scope="owner", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    package_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[1]
+                    package_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+            (root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                [
+                    "focused litchi-keynote soundtrack settings public API is "
+                    "missing private package owner source: crates/litchi-keynote/"
+                    "src/package/soundtrack_settings.rs"
+                ],
+            )
+
+    def test_focused_keynote_soundtrack_settings_rejects_duplicate_modules(self) -> None:
+        for declaration in (
+            "pub mod transaction;",
+            "pub mod r#transaction;",
+            "pub mod transaction {}",
+            "pub\nmod\nr#transaction\n{}",
+        ):
+            with self.subTest(scope="transaction", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+                    line = semantic.read_text(encoding="utf-8").count("\n") + 1
+                    semantic.write_text(
+                        semantic.read_text(encoding="utf-8") + declaration + "\n",
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack settings public API "
+                            "exposes duplicate soundtrack::transaction module: "
+                            f"crates/litchi-keynote/src/soundtrack.rs:{line}"
+                        ],
+                    )
+
+    def test_focused_keynote_soundtrack_settings_rejects_all_flat_aliases_and_host_setter(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(
+                sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES)
+            ):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = bool;"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-keynote soundtrack settings public API retains "
+                    f"flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            owner = sources[1]
+            declarations[owner].append("pub fn set_soundtrack_settings() {}")
+            expected.append(
+                "focused litchi-keynote soundtrack settings public API retains "
+                "host-style public member set_soundtrack_settings: "
+                f"{relative_sources[1]}:{len(declarations[owner])}"
+            )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_soundtrack_settings_rejects_root_aliases_glob_and_owner_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES)
+            midpoint = len(aliases) // 2
+            lib_aliases = aliases[:midpoint]
+            package_aliases = aliases[midpoint:]
+            lib_export.write_text(
+                "pub use crate::soundtrack::{" + ", ".join(lib_aliases) + "};\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::soundtrack_settings::{"
+                + ", ".join(package_aliases)
+                + "};\n"
+                "pub use crate::soundtrack::*;\n",
+                encoding="utf-8",
+            )
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-keynote soundtrack settings public API "
+                            f"retains root alias {name}: crates/litchi-keynote/src/lib.rs:1"
+                            for name in lib_aliases
+                        ],
+                        *[
+                            "focused litchi-keynote soundtrack settings public API "
+                            f"retains root alias {name}: crates/litchi-keynote/src/package.rs:1"
+                            for name in package_aliases
+                        ],
+                        "focused litchi-keynote soundtrack settings public API "
+                        "exposes public soundtrack owner alias: "
+                        "crates/litchi-keynote/src/lib.rs:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        "exposes public soundtrack owner alias: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        "exposes public soundtrack owner alias: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                        "focused litchi-keynote soundtrack settings public API "
+                        "retains root aliases via soundtrack glob: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_soundtrack_settings_rejects_public_owner_alias_variants(
+        self,
+    ) -> None:
+        for relative in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES:
+            for declaration in (
+                "pub use crate::soundtrack as audio;",
+                "pub use crate::r#soundtrack_settings as audio;",
+                "pub\nuse\ncrate::soundtrack as audio;",
+                "pub type soundtrack_settings = bool;",
+            ):
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_keynote_soundtrack_settings_canonical_scaffold(root)
+                        path = root / relative
+                        source = path.read_text(encoding="utf-8")
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+                        self.assertEqual(
+                            boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-keynote soundtrack settings public "
+                                "API exposes public soundtrack owner alias: "
+                                f"{relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_keynote_soundtrack_settings_rejects_physical_and_media_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn settings(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> DocumentArchive { todo!() }\n"
+                "pub type Projection = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for soundtrack::Settings {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner_lines = [
+                f"pub type Physical{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES)
+                )
+            ]
+            owner_lines.extend(
+                f"pub type WireLeak{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES)
+                )
+            )
+            owner_lines.extend(
+                (
+                    f"pub type MediaLeak{index} = {name};"
+                    if name[0].isupper()
+                    else f"pub fn {name}() {{}}"
+                )
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES)
+                )
+            )
+            owner_lines.append(
+                "pub type ProtoProjection = (kn::SoundtrackArchive, "
+                "tsp::ReferenceArchive);"
+            )
+            owner.write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_soundtrack_settings("
+                "value: litchi_iwa_protos::GeneratedSoundtrack) "
+                "-> soundtrack::Patch { todo!() }\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_soundtrack_settings(value: prost_types::MessageInfo) "
+                "-> soundtrack::Commit { todo!() }\n"
+                "pub fn soundtrack_settings() -> SourceBytes { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            violations = boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote soundtrack settings public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "protobuf type kn",
+                "protobuf type ProtoProjection",
+                "archive/IWA type SoundtrackArchive",
+                "protobuf type tsp",
+                "archive/IWA type ReferenceArchive",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedSoundtrack",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+                *tuple(
+                    f"archive/IWA type {name}"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES
+                    )
+                ),
+                *tuple(
+                    f"wire type {name}"
+                    for name in sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES)
+                ),
+                *tuple(
+                    f"soundtrack media topology {name}"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES
+                    )
+                ),
+            )
+            self.assertEqual(len(violations), 53)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused soundtrack-settings leak: {fragment}",
+                    )
+
+    def test_focused_keynote_soundtrack_settings_recursively_scans_private_helpers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+            nested_relative = (
+                boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT
+                / "future"
+                / "nested.rs"
+            )
+            nested = root / nested_relative
+            nested.parent.mkdir(parents=True, exist_ok=True)
+            nested.write_text(
+                "pub fn expose(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub type SoundtrackEdit = WireView;\n"
+                "pub fn media_items() {}\n"
+                "impl prost::Message for SoundtrackPatch<RawMessage> {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                root
+            )
+            path = str(nested_relative)
+            self.assertEqual(
+                violations,
+                sorted(
+                    [
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes raw source bytes source_bytes: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes raw byte slice &[u8]: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes raw identifier object_id: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes archive/IWA type ArchiveObject: {path}:1",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"retains flat alias SoundtrackEdit: {path}:2",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes wire type WireView: {path}:2",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes soundtrack media topology media_items: {path}:3",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes protobuf type prost: {path}:4",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes protobuf type Message: {path}:4",
+                        "focused litchi-keynote soundtrack settings public API "
+                        f"exposes archive/IWA type RawMessage: {path}:4",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_soundtrack_settings_allows_canonical_and_media_item_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "// pub type SoundtrackEdit = DocumentArchive;\n"
+                'const NOTE: &str = "pub struct SoundtrackSettingsPatch;";\n'
+                "/* pub fn media_items() -> &[u8] {} */\n"
+                "pub enum PlaybackMode { Off, PlayOnce, Loop, Unknown(i32) }\n"
+                "pub struct PlaybackSettings { pub volume: Option<f64> }\n"
+                "pub fn as_raw(mode: PlaybackMode) -> i32 { todo!() }\n"
+                "pub fn from_raw(value: i32) -> PlaybackMode { todo!() }\n"
+                "pub fn source_fingerprint() -> u64 { 0 }\n"
+                "pub fn soundtrack_item_count() -> usize { 0 }\n"
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) fn restricted(value: WireView) {}\n"
+                "mod transaction;\n"
+                "pub(crate) mod r#transaction;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            private_aliases = [
+                ("struct" if index % 2 == 0 else "pub(crate) struct")
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES)
+                )
+            ]
+            private_vocabulary = [
+                f"pub(super) type Private{index} = {name};"
+                for index, name in enumerate(
+                    sorted(
+                        boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_PHYSICAL_TYPES
+                        | boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_WIRE_TYPES
+                        | boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_MEDIA_TOPOLOGY_NAMES
+                    )
+                )
+            ]
+            owner.write_text(
+                "\n".join(
+                    [
+                        "pub fn soundtrack_settings() -> soundtrack::Settings { todo!() }",
+                        "pub fn edit_soundtrack_settings() "
+                        "-> soundtrack::Edit { todo!() }",
+                        "pub fn apply_soundtrack_settings(patch: soundtrack::Patch) "
+                        "-> soundtrack::Commit { todo!() }",
+                        *private_aliases,
+                        *private_vocabulary,
+                        "fn set_soundtrack_settings() {}",
+                        "impl SoundtrackEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::soundtrack::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_SHORT_NAMES)
+                )
+            )
+            lib_export.write_text(
+                "// pub use crate::soundtrack::{Mode, Settings};\n"
+                'const GLOB_NOTE: &str = "pub use crate::soundtrack::*;";\n'
+                + private_roots
+                + "\npub(crate) use crate::soundtrack::*;\n"
+                "pub use crate::animation::{Mode, Settings, Edit, Patch, Commit, "
+                "Diagnostics, Error, LimitKind};\n"
+                "pub struct KeynoteSoundtrackItemInfo;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "mod soundtrack_settings;\n"
+                "pub(crate) mod r#soundtrack_settings;\n"
+                "pub(super) use crate::soundtrack::{Mode, Settings};\n"
+                "pub fn soundtrack_items() -> Vec<KeynoteSoundtrackItemInfo> { todo!() }\n",
+                encoding="utf-8",
+            )
+            helper = (
+                root
+                / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_OWNER_HELPER_ROOT
+                / "private.rs"
+            )
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) type SoundtrackPatch = WireView;\n"
+                "pub(super) fn media_items() {}\n"
+                "impl SoundtrackEdit {}\n",
+                encoding="utf-8",
+            )
+            non_rust = helper.with_suffix(".txt")
+            non_rust.write_text(
+                "pub type SoundtrackEdit = ArchiveObject;\n"
+                "pub fn media_items(value: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.KEYNOTE_SOURCE_ROOT / "soundtrack_items.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_FLAT_ALIASES)
+                )
+                + "\npub struct KeynoteSoundtrackItemInfo;\n"
+                "pub fn media_items() -> Vec<DataReference> { todo!() }\n"
+                "pub fn set_soundtrack_settings() {}\n"
+                "pub fn item(object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/soundtrack.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct SoundtrackSettings;\n"
+                "pub fn set_soundtrack_settings() {}\n"
+                "pub fn media_items() -> Vec<DataReference> { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_soundtrack_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_soundtrack_settings_facade_source_topology(root),
+                [],
+            )
+
+        for declaration in (
+            "pub mod soundtrack_settings;",
+            "pub mod r#soundtrack_settings;",
+            "pub mod soundtrack_settings {}",
+            "pub\nmod\nr#soundtrack_settings\n{}",
+        ):
+            with self.subTest(scope="package", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_soundtrack_settings_canonical_scaffold(root)
+                    package_export = root / boundaries.KEYNOTE_SOUNDTRACK_SETTINGS_EXPORT_SOURCES[1]
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_soundtrack_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote soundtrack settings public API "
+                            "exposes duplicate package::soundtrack_settings module: "
+                            "crates/litchi-keynote/src/package.rs:1"
+                        ],
+                    )
+
+
+    def test_focused_keynote_slide_transition_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn transition(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> (DocumentArchive, HostPackage, SourceCatalog) {}\n"
+                "pub type Effect = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for transition::Settings {}\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Edit = Archive;",
+                        "pub type Patch = EntryEdit;",
+                        "pub type Commit = HostPackage;",
+                        "pub type Diagnostics = PhysicalSource;",
+                        "pub type Error = RawMessage;",
+                        "pub type LimitKind = SnappyStream;",
+                        "pub type TransitionPhysical = SourceCatalog;",
+                        "pub type TransitionSnapshot = TransitionSettingsSnapshot;",
+                        "pub type TransitionDescent = wire::WireDescent;",
+                        "pub type TransitionWireError = wire::WireError;",
+                        "pub type TransitionWireLimits = WireLimits;",
+                        "pub type TransitionWireResource = WireResourceLimit;",
+                        "pub type TransitionWireView = WireView;",
+                        "pub type TransitionNative = NativeObject;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_slide_transition("
+                "value: litchi_iwa_protos::GeneratedTransition) "
+                "-> transition::Patch {}\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_slide_transition(value: prost_types::MessageInfo) "
+                "-> transition::Commit {}\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            violations = (
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root)
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote slide-transition public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "archive/IWA type HostPackage",
+                "archive/IWA type SourceCatalog",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type Archive",
+                "archive/IWA type EntryEdit",
+                "archive/IWA type PhysicalSource",
+                "archive/IWA type RawMessage",
+                "archive/IWA type SnappyStream",
+                "archive/IWA type TransitionSettingsSnapshot",
+                "wire type wire",
+                "wire type WireDescent",
+                "wire type WireError",
+                "wire type WireLimits",
+                "wire type WireResourceLimit",
+                "wire type WireView",
+                "native object NativeObject",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedTransition",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), 30)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused slide-transition leak: {fragment}",
+                    )
+
+    def test_focused_keynote_slide_transition_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
+                    )
+                    semantic.parent.mkdir(parents=True)
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    lib_export = (
+                        root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text("pub mod transition;\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_slide_transition_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote slide-transition public API is "
+                            f"missing canonical transition type {missing}: "
+                            "crates/litchi-keynote/src/transition.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_slide_transition_root_module_visibility(self) -> None:
+        rejected = (
+            "",
+            "mod transition;\n",
+            "pub(crate) mod transition;\n",
+            "pub(super) mod r#transition {}\n",
+            "pub(in crate) mod transition;\n",
+            "// pub mod transition;\n",
+            'const NOTE: &str = "pub mod transition;";\n',
+            'const RAW_NOTE: &str = r#"pub mod r#transition {}"#;\n',
+        )
+        accepted = (
+            "pub mod transition;\n",
+            "pub mod r#transition;\n",
+            "pub mod transition {}\n",
+            "pub\nmod\nr#transition\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote slide-transition public API is "
+                        "missing canonical root transition module: "
+                        "crates/litchi-keynote/src/lib.rs"
+                    ],
+                )
+                for declaration in rejected
+            ],
+            *[(declaration, []) for declaration in accepted],
+        ):
+            with self.subTest(declaration=declaration, expected=expected):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES[0]
+                    )
+                    semantic.parent.mkdir(parents=True)
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+                        ),
+                        encoding="utf-8",
+                    )
+                    lib_export = (
+                        root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text(declaration, encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_slide_transition_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+    def test_focused_keynote_slide_transition_api_allows_nested_semantic_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub type SlideTransitionEdit = DocumentArchive;",
+                        'const NOTE: &str = "pub struct TransitionPatch;";',
+                        "/* pub type SlideTransitionCommit = buffa::ArchiveView; */",
+                        *[
+                            f"pub struct {name};"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_SEMANTIC_TYPES
+                        ],
+                        "pub const MAX_IDENTIFIER_BYTES: usize = 64;",
+                        "pub fn from_identifier(identifier: &str, identifiers: &[String]) "
+                        "-> Effect { todo!() }",
+                        "pub fn color_payload(&self) -> &[u8] { todo!() }",
+                        "pub fn set_color_payload(&mut self, payload: &[u8]) {}",
+                        "pub fn timing_curve_payload(&self) -> &[u8] { todo!() }",
+                        "pub fn timing_curve_payloads(&self) -> &[u8] { todo!() }",
+                        "pub fn set_timing_curve_payload(&mut self, payload: &[u8]) {}",
+                        "pub struct TransitionSnapshot;",
+                        "pub struct SlideTransitions;",
+                        "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted(archive: DocumentArchive) {}",
+                        "impl SlideTransitionEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            private_aliases = [
+                (
+                    "struct" if index % 2 == 0 else "pub(crate) struct"
+                )
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES)
+                )
+            ]
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        *[
+                            f"pub struct {name};"
+                            for name in boundaries.KEYNOTE_SLIDE_TRANSITION_CANONICAL_TYPES
+                        ],
+                        *private_aliases,
+                        "impl TransitionPatch {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::transition::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES)
+                )
+            )
+            safe_exports = (
+                "pub mod transition;\n"
+                "// pub use crate::transition::{Effect, Edit};\n"
+                'const NOTE: &str = "pub use crate::transition::*;";\n'
+                "pub fn edit_slide_transition(settings: transition::Settings, "
+                "edit: transition::Edit) -> Result<transition::Commit, "
+                "transition::Error> { todo!() }\n"
+                + private_roots
+                + "\npub(crate) use crate::transition::*;\n"
+                "pub use crate::animation::{Acceleration, AccelerationKind, "
+                "AnimationParameters, CustomParameters, Direction, Effect, MosaicType, "
+                "Settings, SettingsBuilder, TextDelivery, TextDeliveryKind, "
+                "TimingCurveSlot, Edit, Patch, Commit, Diagnostics, Error, LimitKind};\n"
+                "pub use crate::animation::*;\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(
+                safe_exports.replace("pub mod transition;\n", "")
+                + "// pub mod slide_transition;\n"
+                + 'const MODULE_NOTE: &str = "pub mod slide_transition;";\n'
+                + 'const RAW_NOTE: &str = r#"pub mod r#slide_transition {}"#;\n'
+                + "/* pub mod r#slide_transition {} */\n"
+                + "mod slide_transition;\n"
+                + "pub(crate) mod r#slide_transition;\n"
+                + "pub(super) mod slide_transition {}\n"
+                + "pub(in crate) mod slide_transition;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.KEYNOTE_SOURCE_ROOT / "slide.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES
+                    )
+                )
+                + "\npub fn transition(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/transition.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(
+                        boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES
+                    )
+                )
+                + "\npub use crate::transition::{Effect, Settings, Edit, Patch};\n"
+                "pub fn transition(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_slide_transition_rejects_all_flat_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(
+                sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_FLAT_ALIASES)
+            ):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = Edit;"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-keynote slide-transition public API retains "
+                    f"flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_slide_transition_rejects_adapter_only_validator(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub use crate::package::slide_transition::"
+                "validate_opaque_transition_settings;\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub fn validate_opaque_transition_settings(settings: &Settings) "
+                "-> Result<(), Error> { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            violations = boundaries.audit_keynote_slide_transition_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(
+                violations,
+                [
+                    "focused litchi-keynote slide-transition public API retains "
+                    "adapter-only public member validate_opaque_transition_settings: "
+                    "crates/litchi-keynote/src/package/slide_transition.rs:1",
+                    "focused litchi-keynote slide-transition public API retains "
+                    "adapter-only public member validate_opaque_transition_settings: "
+                    "crates/litchi-keynote/src/transition.rs:1",
+                ],
+            )
+
+    def test_focused_keynote_slide_transition_exports_reject_all_root_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path
+                for path in boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.KEYNOTE_SLIDE_TRANSITION_ROOT_ALIASES)
+            midpoint = len(aliases) // 2
+            lib_aliases = aliases[:midpoint]
+            package_aliases = aliases[midpoint:]
+            lib_export.write_text(
+                "pub use crate::transition::{" + ", ".join(lib_aliases) + "};\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::slide_transition::{"
+                + ", ".join(package_aliases)
+                + "};\n"
+                "pub use crate::transition::*;\n",
+                encoding="utf-8",
+            )
+            add_keynote_slide_transition_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_transition_facade_source_topology(root),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-keynote slide-transition public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-keynote/src/lib.rs:1"
+                            for name in lib_aliases
+                        ],
+                        *[
+                            "focused litchi-keynote slide-transition public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-keynote/src/package.rs:1"
+                            for name in package_aliases
+                        ],
+                        "focused litchi-keynote slide-transition public API retains "
+                        "root aliases via transition glob: "
+                        "crates/litchi-keynote/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_keynote_slide_transition_rejects_duplicate_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod slide_transition;",
+            "pub mod r#slide_transition;",
+            "pub mod slide_transition {}",
+            "pub\nmod\nr#slide_transition\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    package_export = (
+                        root / boundaries.KEYNOTE_SLIDE_TRANSITION_EXPORT_SOURCES[1]
+                    )
+                    package_export.parent.mkdir(parents=True)
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+                    add_keynote_slide_transition_canonical_scaffold(root)
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_slide_transition_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote slide-transition public API exposes "
+                            "duplicate package::slide_transition module: "
+                            "crates/litchi-keynote/src/package.rs:1"
+                        ],
+                    )
+
+
+    def test_focused_keynote_slide_background_requires_package_owner_and_is_prost_free(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source_root = root / boundaries.KEYNOTE_SOURCE_ROOT
+            source_root.mkdir(parents=True)
+            package = root / boundaries.KEYNOTE_SLIDE_BACKGROUND_EXPORT_SOURCES[1]
+            package.write_text("mod slide_background;\n", encoding="utf-8")
+            owner = root / boundaries.KEYNOTE_SLIDE_BACKGROUND_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn slide_background(&self) {}\n"
+                "    pub fn slide_background_override(&self) {}\n"
+                "    pub fn edit_slide_background(&self) {}\n"
+                "    pub fn apply_slide_background(&self) {}\n"
+                "}\n"
+                "impl Edit<'_> {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn oracle() { let _ = prost::Message::decode(&[]); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_background_facade_source_topology(root),
+                [],
+            )
+
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn slide_background(&self) {}\n"
+                "    pub fn slide_background_override(&self) {}\n"
+                "    pub fn edit_slide_background(&self) {}\n"
+                "    pub fn apply_slide_background(&self) {}\n"
+                "}\n"
+                "impl Edit<'_> {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "}\n"
+                "fn production() { let _ = prost::Message::decode(&[]); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_background_facade_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("prost::Message", violations[0])
+            self.assertIn(
+                "crates/litchi-keynote/src/package/slide_background.rs:11",
+                violations[0],
+            )
+
+    def test_keynote_slide_background_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_slide_background_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_keynote_slide_delete_requires_exact_topology(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_delete_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root), []
+            )
+
+            (root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE).unlink()
+            violations = (
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root)
+            )
+            for name in boundaries.KEYNOTE_SLIDE_DELETE_CANONICAL_TYPES:
+                self.assertTrue(
+                    any(
+                        f"canonical slide::delete type {name}" in item
+                        for item in violations
+                    )
+                )
+            self.assertTrue(any("Edit::remove_slide" in item for item in violations))
+
+    def test_focused_keynote_slide_delete_rejects_ids_bytes_proto_and_raw_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_delete_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub fn by_object_id(object_id: u64) -> RawMessage { todo!() }\n"
+                + "pub fn from_source_bytes(source_bytes: &[u8]) "
+                "-> kn::SlideArchive { todo!() }\n"
+                + "pub fn protobuf(value: prost_types::MessageInfo) "
+                "-> wire::WireView { todo!() }\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root)
+            )
+            for fragment in (
+                "raw identifier object_id",
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "archive/IWA type RawMessage",
+                "protobuf type kn",
+                "archive/IWA type SlideArchive",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "wire type wire",
+                "wire type WireView",
+            ):
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in item for item in violations),
+                        msg=f"missing focused slide-delete leak: {fragment}",
+                    )
+
+    def test_focused_keynote_slide_delete_rejects_all_flat_and_root_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_slide_delete_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_DELETE_SEMANTIC_SOURCE
+            aliases = sorted(boundaries.KEYNOTE_SLIDE_DELETE_FLAT_ALIASES)
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "".join(f"pub type {alias} = Edit;\n" for alias in aliases),
+                encoding="utf-8",
+            )
+            lib = root / boundaries.KEYNOTE_SLIDE_DELETE_EXPORT_SOURCES[0]
+            root_aliases = sorted(boundaries.KEYNOTE_SLIDE_DELETE_SHORT_NAMES)
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::slide::delete::{"
+                + ", ".join(root_aliases)
+                + "};\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_keynote_slide_delete_facade_source_topology(root)
+            )
+            for alias in aliases:
+                self.assertTrue(
+                    any(f"flat alias {alias}" in item for item in violations)
+                )
+            for alias in root_aliases:
+                self.assertTrue(
+                    any(f"root alias {alias}" in item for item in violations)
+                )
+            self.assertTrue(
+                any("public slide-delete owner alias" in item for item in violations)
+            )
+
+    def test_focused_keynote_slide_delete_rejects_public_package_module(self) -> None:
+        for declaration in (
+            "pub mod slide_delete;",
+            "pub mod r#slide_delete;",
+            "pub mod slide_delete {}",
+            "pub\nmod\nr#slide_delete\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_slide_delete_canonical_scaffold(root)
+                    package = root / boundaries.KEYNOTE_SLIDE_DELETE_EXPORT_SOURCES[1]
+                    package.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertIn(
+                        "focused litchi-keynote slide-delete public API exposes "
+                        "duplicate package::slide_delete module: "
+                        "crates/litchi-keynote/src/package.rs:1",
+                        boundaries.audit_keynote_slide_delete_facade_source_topology(
+                            root
+                        ),
+                    )
+
+
+    def test_focused_keynote_placeholder_visibility_requires_each_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
+                    )
+                    semantic.write_text(
+                        (
+                            "pub enum Kind { Title, Body, SlideNumber }\n"
+                            if missing != "Kind"
+                            else ""
+                        )
+                        + "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
+                            if name not in {"Kind", missing}
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    expected = [
+                        "focused litchi-keynote placeholder visibility public "
+                        "API is missing canonical slide::placeholder type "
+                        f"{missing}: crates/litchi-keynote/src/slide/placeholder.rs"
+                    ]
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        sorted(expected),
+                    )
+
+    def test_focused_keynote_placeholder_visibility_requires_each_canonical_kind(
+        self,
+    ) -> None:
+        for missing in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    semantic = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
+                    )
+                    retained = [
+                        kind
+                        for kind in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_KINDS
+                        if kind != missing
+                    ]
+                    semantic.write_text(
+                        f"// {missing},\n"
+                        f'const NOTE: &str = "{missing}";\n'
+                        "pub enum Kind { "
+                        + ", ".join(retained)
+                        + " }\n"
+                        + "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_CANONICAL_TYPES
+                            if name != "Kind"
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote placeholder visibility public "
+                            "API is missing canonical placeholder kind "
+                            f"{missing}: crates/litchi-keynote/src/slide/placeholder.rs"
+                        ],
+                    )
+
+    def test_focused_keynote_placeholder_visibility_requires_nested_modules_and_private_owner(
+        self,
+    ) -> None:
+        missing_root = (
+            "",
+            "mod slide;\n",
+            "pub(crate) mod slide;\n",
+            "pub(super) mod r#slide {}\n",
+            "pub(in crate) mod slide;\n",
+            "// pub mod slide;\n",
+            'const NOTE: &str = "pub mod slide;";\n',
+        )
+        accepted_root = (
+            "pub mod slide;\n",
+            "pub mod r#slide;\n",
+            "pub mod slide {}\n",
+            "pub\nmod\nr#slide\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote placeholder visibility public API "
+                        "is missing canonical root slide module: "
+                        "crates/litchi-keynote/src/lib.rs"
+                    ],
+                )
+                for declaration in missing_root
+            ],
+            *[(declaration, []) for declaration in accepted_root],
+        ):
+            with self.subTest(scope="root", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    lib_export = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        missing_placeholder = (
+            "",
+            "mod placeholder;\n",
+            "pub(crate) mod placeholder;\n",
+            "pub(super) mod r#placeholder {}\n",
+            "pub(in crate) mod placeholder;\n",
+            "// pub mod placeholder;\n",
+            'const NOTE: &str = "pub mod placeholder;";\n',
+        )
+        accepted_placeholder = (
+            "pub mod placeholder;\n",
+            "pub mod r#placeholder;\n",
+            "pub mod placeholder {}\n",
+            "pub\nmod\nr#placeholder\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote placeholder visibility public API "
+                        "is missing canonical slide::placeholder module: "
+                        "crates/litchi-keynote/src/slide.rs"
+                    ],
+                )
+                for declaration in missing_placeholder
+            ],
+            *[(declaration, []) for declaration in accepted_placeholder],
+        ):
+            with self.subTest(scope="placeholder", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    slide_export = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES[2]
+                    )
+                    slide_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        missing_owner_module = (
+            "",
+            "// mod slide_placeholder_visibility;\n",
+            'const NOTE: &str = "mod slide_placeholder_visibility;";\n',
+            "mod slide_placeholder_visibilities;\n",
+        )
+        accepted_owner_module = (
+            "mod slide_placeholder_visibility;\n",
+            "mod r#slide_placeholder_visibility {}\n",
+            "pub(crate) mod slide_placeholder_visibility;\n",
+            "pub(super) mod r#slide_placeholder_visibility {}\n",
+            "pub(in crate)\nmod\nslide_placeholder_visibility\n;\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-keynote placeholder visibility public API "
+                        "is missing private package owner module: "
+                        "crates/litchi-keynote/src/package.rs"
+                    ],
+                )
+                for declaration in missing_owner_module
+            ],
+            *[(declaration, []) for declaration in accepted_owner_module],
+        ):
+            with self.subTest(scope="owner", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    package_export = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES[1]
+                    )
+                    package_export.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        expected,
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+            (root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-keynote placeholder visibility public API is "
+                    "missing private package owner source: crates/litchi-keynote/"
+                    "src/package/slide_placeholder_visibility.rs"
+                ],
+            )
+
+    def test_focused_keynote_placeholder_visibility_rejects_number_specific_aliases_and_members(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            semantic_aliases = sorted(
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES
+            )
+            members = sorted(
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS
+            )
+            for index, name in enumerate(semantic_aliases):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                declarations[path].append(f"pub struct {name};")
+                expected.append(
+                    "focused litchi-keynote placeholder visibility public API "
+                    f"retains flat semantic alias {name}: "
+                    f"{relative_sources[source_index]}:{len(declarations[path])}"
+                )
+            for index, name in enumerate(members):
+                source_index = (index + len(semantic_aliases)) % len(sources)
+                path = sources[source_index]
+                declarations[path].append(f"pub fn {name}() {{}}")
+                expected.append(
+                    "focused litchi-keynote placeholder visibility public API "
+                    f"retains slide-number-specific public member {name}: "
+                    f"{relative_sources[source_index]}:{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_placeholder_visibility_rejects_public_number_helper_modules(
+        self,
+    ) -> None:
+        module_sources = (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE,
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE,
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE,
+            *boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES,
+        )
+        declarations = (
+            "pub mod slide_number;",
+            "pub mod r#slide_number;",
+            "pub mod slide_number {}",
+            "pub\nmod\nr#slide_number\n{}",
+        )
+        for relative in module_sources:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_keynote_placeholder_visibility_canonical_scaffold(root)
+                        path = root / relative
+                        path.parent.mkdir(parents=True, exist_ok=True)
+                        source = path.read_text(encoding="utf-8") if path.is_file() else ""
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-keynote placeholder visibility public "
+                                "API exposes public slide-number helper module: "
+                                f"{relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_keynote_placeholder_visibility_rejects_public_number_owner_aliases(
+        self,
+    ) -> None:
+        alias_sources = (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE,
+            *boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES,
+        )
+        declarations = (
+            "pub use crate::slide_number as legacy;",
+            "pub use crate::r#slide_number as legacy;",
+            "pub\nuse\ncrate::slide_number as legacy;",
+            "pub type slide_number = bool;",
+        )
+        for relative in alias_sources:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_keynote_placeholder_visibility_canonical_scaffold(root)
+                        path = root / relative
+                        source = path.read_text(encoding="utf-8")
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-keynote placeholder visibility public "
+                                "API exposes public slide-number owner alias: "
+                                f"{relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_keynote_placeholder_visibility_rejects_all_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_IMPLEMENTATION_SOURCES
+                + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(
+                sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES)
+            ):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = bool;"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-keynote placeholder visibility public API "
+                    f"retains flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_placeholder_visibility_exports_reject_root_aliases_and_glob(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            exports = tuple(
+                root / path
+                for path in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            )
+            relative = boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            aliases = sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SHORT_NAMES)
+            grouped = [aliases[0:3], aliases[3:6], aliases[6:]]
+            expected: list[str] = []
+            for index, (path, names) in enumerate(zip(exports, grouped)):
+                path.parent.mkdir(parents=True, exist_ok=True)
+                owner = "placeholder" if index == 2 else "slide::placeholder"
+                path.write_text(
+                    f"pub use crate::{owner}::{{{', '.join(names)}}};\n"
+                    f"pub use crate::{owner}::*;\n",
+                    encoding="utf-8",
+                )
+                expected.extend(
+                    "focused litchi-keynote placeholder visibility public API "
+                    f"retains root alias {name}: {relative[index]}:1"
+                    for name in names
+                )
+                expected.append(
+                    "focused litchi-keynote placeholder visibility public API "
+                    "retains root aliases via slide::placeholder glob: "
+                    f"{relative[index]}:2"
+                )
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                sorted(expected),
+            )
+
+    def test_focused_keynote_placeholder_visibility_rejects_duplicate_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod slide_placeholder_visibility;",
+            "pub mod r#slide_placeholder_visibility;",
+            "pub mod slide_placeholder_visibility {}",
+            "pub\nmod\nr#slide_placeholder_visibility\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    package_export = (
+                        root
+                        / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES[1]
+                    )
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote placeholder visibility public "
+                            "API exposes duplicate package::slide_placeholder_visibility "
+                            "module: crates/litchi-keynote/src/package.rs:1"
+                        ],
+                    )
+
+    def test_focused_keynote_placeholder_visibility_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = (
+                root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn visibility(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> (DocumentArchive, HostPackage, SourceCatalog) { todo!() }\n"
+                "pub type EffectPayload = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for placeholder::State {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner_lines = [
+                f"pub type Physical{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES)
+                )
+            ]
+            owner_lines.extend(
+                f"pub type WireLeak{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_WIRE_TYPES)
+                )
+            )
+            owner_lines.append(
+                "pub type Projected = (kn::SlideArchive, tsp::StorageArchive);"
+            )
+            owner.write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
+            lib_export, package_export, slide_export = (
+                root / path
+                for path in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_slide_placeholder_visibility("
+                "value: litchi_iwa_protos::GeneratedPlaceholder) "
+                "-> placeholder::Patch { todo!() }\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_slide_placeholder_visibility("
+                "value: prost_types::MessageInfo) "
+                "-> slide::placeholder::Commit { todo!() }\n",
+                encoding="utf-8",
+            )
+            slide_export.write_text(
+                "pub fn slide_placeholder_visibility() -> SourceBytes { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+
+            violations = (
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-keynote placeholder visibility public API "
+                        "exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedPlaceholder",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+                "protobuf type kn",
+                "archive/IWA type SlideArchive",
+                "protobuf type tsp",
+                "archive/IWA type StorageArchive",
+                *tuple(
+                    f"archive/IWA type {name}"
+                    for name in sorted(
+                        boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES
+                    )
+                ),
+                *tuple(
+                    f"wire type {name}"
+                    for name in sorted(
+                        boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_WIRE_TYPES
+                    )
+                ),
+            )
+            self.assertEqual(len(violations), 48)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused placeholder-visibility leak: {fragment}",
+                    )
+
+    def test_focused_keynote_placeholder_visibility_scans_every_private_helper(
+        self,
+    ) -> None:
+        helpers = (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES
+            + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES
+        )
+        for relative in helpers:
+            with self.subTest(relative=relative):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    helper = root / relative
+                    helper.parent.mkdir(parents=True, exist_ok=True)
+                    helper.write_text(
+                        "pub fn expose(r#source_bytes: &[u8], r#object_id: u64) "
+                        "-> ArchiveObject { todo!() }\n"
+                        "pub type PlaceholderEdit = WireView;\n"
+                        "impl prost::Message for PlaceholderPatch<RawMessage> {}\n",
+                        encoding="utf-8",
+                    )
+                    path = str(relative)
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        sorted(
+                            [
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes raw source bytes source_bytes: {path}:1",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes raw byte slice &[u8]: {path}:1",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes raw identifier object_id: {path}:1",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes archive/IWA type ArchiveObject: {path}:1",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API retains flat alias PlaceholderEdit: {path}:2",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes wire type WireView: {path}:2",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes protobuf type prost: {path}:3",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes protobuf type Message: {path}:3",
+                                "focused litchi-keynote placeholder visibility public "
+                                f"API exposes archive/IWA type RawMessage: {path}:3",
+                            ]
+                        ),
+                    )
+
+    def test_focused_keynote_placeholder_visibility_recursively_scans_future_helpers(
+        self,
+    ) -> None:
+        for helper_root in (
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT,
+            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT,
+        ):
+            with self.subTest(helper_root=helper_root):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_keynote_placeholder_visibility_canonical_scaffold(root)
+                    nested_relative = helper_root / "future" / "nested.rs"
+                    nested = root / nested_relative
+                    nested.parent.mkdir(parents=True, exist_ok=True)
+                    nested.write_text(
+                        "pub type FutureVisibilitySnapshot = ArchiveObject;\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-keynote placeholder visibility public "
+                            "API exposes archive/IWA type ArchiveObject: "
+                            f"{nested_relative}:1"
+                        ],
+                    )
+
+    def test_focused_keynote_placeholder_visibility_allows_private_helper_vocabulary(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+            helpers = (
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_SOURCES
+                + boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_SOURCES
+            )
+            for index, relative in enumerate(helpers):
+                helper = root / relative
+                helper.parent.mkdir(parents=True, exist_ok=True)
+                helper.write_text(
+                    "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                    "-> ArchiveObject { todo!() }\n"
+                    "pub(crate) fn restricted(value: WireView) {}\n"
+                    "pub(super) type PlaceholderEdit = RawMessage;\n"
+                    "pub(in crate) struct SlideTextPlaceholderPatch;\n"
+                    "impl PlaceholderPatch {}\n"
+                    "// pub type PlaceholderCommit = ArchiveObject;\n"
+                    'const NOTE: &str = "pub fn source_bytes(value: &[u8]) {}";\n'
+                    "/* pub type PlaceholderError = WireError; */\n"
+                    f"struct Helper{index};\n",
+                    encoding="utf-8",
+                )
+            for helper_root in (
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_HELPER_ROOT,
+                boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PREVIEW_HELPER_ROOT,
+            ):
+                non_rust = root / helper_root / "future.txt"
+                non_rust.write_text(
+                    "pub type PlaceholderEdit = ArchiveObject;\n"
+                    "pub fn source_bytes(value: &[u8]) {}\n",
+                    encoding="utf-8",
+                )
+
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_keynote_placeholder_visibility_allows_nested_semantic_surface(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = (
+                root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SEMANTIC_SOURCE
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "// pub type PlaceholderEdit = DocumentArchive;\n"
+                'const NOTE: &str = "pub struct SlidePlaceholderPatch;";\n'
+                "/* pub type SlideTextPlaceholderCommit = buffa::ArchiveView; */\n"
+                "pub struct AggregateVisibility;\n"
+                "pub struct LayoutVisibility;\n"
+                "pub struct SlideNumberVisibilityPolicy;\n"
+                "pub fn title_visible(state: &State) -> bool { todo!() }\n"
+                "pub fn body_visible(state: &State) -> bool { todo!() }\n"
+                "mod slide_number;\n"
+                "pub(crate) mod r#slide_number;\n"
+                "// pub mod slide_number;\n"
+                'const MODULE_NOTE: &str = "pub mod r#slide_number {};";\n'
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> DocumentArchive { todo!() }\n"
+                "pub(crate) fn restricted(value: ArchiveObject) {}\n"
+                "impl PlaceholderEdit {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            private_aliases = [
+                ("struct" if index % 2 == 0 else "pub(crate) struct")
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES)
+                )
+            ]
+            private_physical = [
+                f"pub(super) type Private{index} = {name};"
+                for index, name in enumerate(
+                    sorted(
+                        boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_PHYSICAL_TYPES
+                        | boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_WIRE_TYPES
+                    )
+                )
+            ]
+            private_number_surface = [
+                *[
+                    ("struct" if index % 2 == 0 else "pub(crate) struct")
+                    + f" {name};"
+                    for index, name in enumerate(
+                        sorted(
+                            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_SEMANTIC_ALIASES
+                        )
+                    )
+                ],
+                *[
+                    ("fn" if index % 2 == 0 else "pub(super) fn")
+                    + f" {name}() {{}}"
+                    for index, name in enumerate(
+                        sorted(
+                            boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_NUMBER_PUBLIC_MEMBERS
+                        )
+                    )
+                ],
+            ]
+            owner.write_text(
+                "\n".join(
+                    [
+                        "pub fn slide_placeholder_visibility() "
+                        "-> slide::placeholder::State { todo!() }",
+                        "pub fn edit_slide_placeholder_visibility("
+                        "edit: slide::placeholder::Edit) "
+                        "-> slide::placeholder::Diagnostics { todo!() }",
+                        "pub fn apply_slide_placeholder_visibility("
+                        "patch: slide::placeholder::Patch) "
+                        "-> Result<slide::placeholder::Commit, "
+                        "slide::placeholder::Error> { todo!() }",
+                        *private_aliases,
+                        *private_physical,
+                        *private_number_surface,
+                        "mod slide_number;",
+                        "pub(crate) mod r#slide_number;",
+                        "// pub mod slide_number;",
+                        'const MODULE_NOTE: &str = "pub mod slide_number {};";',
+                        "impl SlidePlaceholderVisibilityEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export, slide_export = (
+                root / path
+                for path in boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::slide::placeholder::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SHORT_NAMES)
+                )
+            )
+            lib_export.write_text(
+                "// pub use crate::slide::placeholder::{Kind, State};\n"
+                'const GLOB_NOTE: &str = "pub use crate::slide::placeholder::*;";\n'
+                + private_roots
+                + "\npub(crate) use crate::slide::placeholder::*;\n"
+                "use crate::slide_number as private_number_owner;\n"
+                "pub(crate) use crate::r#slide_number as restricted_number_owner;\n"
+                "pub(crate) mod slide_number;\n"
+                "pub use crate::layout::{Kind, State, Edit, Patch, Commit, "
+                "Diagnostics, Error, LimitKind};\n"
+                "pub use crate::slide::{SlideInfo, SlideLayout, "
+                "SlideNumberVisibilityPolicy};\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "mod slide_placeholder_visibility;\n"
+                "pub(crate) mod r#slide_placeholder_visibility;\n"
+                "pub(super) mod slide_number;\n"
+                "pub(in crate) use crate::slide_number as private_number_owner;\n"
+                "pub(super) use crate::slide::placeholder::{Kind, State};\n"
+                "pub fn package_layout(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            slide_export.write_text(
+                "pub mod placeholder;\n"
+                "mod slide_number;\n"
+                "pub(crate) use crate::slide_number as private_number_owner;\n"
+                "pub use crate::layout::{Kind, State};\n"
+                "pub struct SlideAggregate;\n"
+                "pub struct SlideNumberSettings;\n",
+                encoding="utf-8",
+            )
+            preview_parent = (
+                root / boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_SLIDE_PREVIEW_SOURCE
+            )
+            preview_parent.write_text(
+                "mod slide_number;\n"
+                "pub(crate) mod r#slide_number;\n"
+                "// pub mod slide_number;\n"
+                'const NOTE: &str = "pub mod slide_number {};";\n',
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.KEYNOTE_SOURCE_ROOT / "render.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(
+                        boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES
+                    )
+                )
+                + "\npub struct SlideNumberVisibility;\n"
+                "pub fn show_slide_number() {}\n"
+                "pub mod slide_number;\n"
+                "pub fn render(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/placeholder.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(
+                        boundaries.KEYNOTE_PLACEHOLDER_VISIBILITY_FLAT_ALIASES
+                    )
+                )
+                + "\npub use crate::slide::placeholder::*;\n"
+                "pub struct SlideNumberVisibility;\n"
+                "pub fn hide_slide_number() {}\n"
+                "pub mod slide_number;\n"
+                "pub fn placeholder(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_keynote_placeholder_visibility_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_keynote_placeholder_visibility_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+
+    def test_focused_numbers_table_sort_requires_each_contract_part(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8").replace("Order", "MissingOrder"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(
+                any("canonical table::sort type Order" in violation for violation in violations)
+            )
+
+            owner = root / boundaries.NUMBERS_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn edit_table_sort_order", "pub fn missing_table_sort_order"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(
+                any("Package method edit_table_sort_order" in violation for violation in violations)
+            )
+
+            codec = root / boundaries.NUMBERS_TABLE_SORT_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "prepare_table_sort_order_rewrite",
+                    "missing_table_sort_order_rewrite",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(
+                any(
+                    "strict API prepare_table_sort_order_rewrite" in violation
+                    for violation in violations
+                )
+            )
+
+            fuzz = root / boundaries.NUMBERS_TABLE_SORT_FUZZ_SOURCE
+            fuzz.unlink()
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in violation for violation in violations))
+
+    def test_focused_numbers_table_sort_rejects_aliases_leaks_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub struct SortEdit;\n"
+                + "pub fn raw(source_bytes: &[u8], object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_TABLE_SORT_EXPORT_SOURCES[1]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use crate::table_sort::*;\n"
+                + "pub type SortPatch = bool;\n"
+                + "pub mod table_sort;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn physical(source_bytes: &[u8], object_id: u64) -> TableModelArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(any("flat alias SortEdit" in violation for violation in violations))
+            self.assertTrue(any("raw source bytes source_bytes" in violation for violation in violations))
+            self.assertTrue(any("raw identifier object_id" in violation for violation in violations))
+            self.assertTrue(any("root aliases via table::sort glob" in violation for violation in violations))
+            self.assertTrue(any("public package::table_sort module" in violation for violation in violations))
+            self.assertTrue(any("archive/IWA type TableModelArchive" in violation for violation in violations))
+
+
+    def test_focused_numbers_table_sort_dispatch_is_wired(self) -> None:
+        main_source = Path(boundaries.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            "+ audit_numbers_table_sort_facade_source_topology()", main_source
+        )
+
+
+    def test_numbers_table_sort_fuzz_contract_is_required(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_sort_canonical_scaffold(root)
+            fuzz = root / boundaries.NUMBERS_TABLE_SORT_CODEC_FUZZ_SOURCE
+            fuzz.write_text("fn main() {}\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_sort_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz_target! harness" in violation for violation in violations))
+
+
+    def test_focused_numbers_table_move_dispatch_is_wired(self) -> None:
+        main_source = Path(boundaries.__file__).read_text(encoding="utf-8")
+        self.assertIn(
+            "+ audit_numbers_table_move_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_numbers_sheet_order_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.NUMBERS_SHEET_ORDER_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_SHEET_ORDER_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers sheet-order public API is missing "
+                            f"canonical sheet::order type {missing}: "
+                            "crates/litchi-numbers/src/sheet/order.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_sheet_order_requires_nested_modules_and_private_owner(
+        self,
+    ) -> None:
+        missing_root = (
+            "",
+            "mod sheet;\n",
+            "pub(crate) mod sheet;\n",
+            "pub(super) mod r#sheet {}\n",
+            "pub(in crate) mod sheet;\n",
+            "// pub mod sheet;\n",
+            'const NOTE: &str = "pub mod sheet;";\n',
+        )
+        accepted_root = (
+            "pub mod sheet;\n",
+            "pub mod r#sheet;\n",
+            "pub mod sheet {}\n",
+            "pub\nmod\nr#sheet\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-numbers sheet-order public API is missing "
+                        "canonical root sheet module: crates/litchi-numbers/src/lib.rs"
+                    ],
+                )
+                for declaration in missing_root
+            ],
+            *[(declaration, []) for declaration in accepted_root],
+        ):
+            with self.subTest(scope="root", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    path = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[0]
+                    path.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        expected,
+                    )
+
+        missing_nested = (
+            "",
+            "mod order;\n",
+            "pub(crate) mod order;\n",
+            "pub(super) mod r#order {}\n",
+            "pub(in crate) mod order;\n",
+            "// pub mod order;\n",
+            'const NOTE: &str = "pub mod order;";\n',
+        )
+        accepted_nested = (
+            "pub mod order;\n",
+            "pub mod r#order;\n",
+            "pub mod order {}\n",
+            "pub\nmod\nr#order\n{}\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-numbers sheet-order public API is missing "
+                        "canonical sheet::order module: crates/litchi-numbers/src/sheet.rs"
+                    ],
+                )
+                for declaration in missing_nested
+            ],
+            *[(declaration, []) for declaration in accepted_nested],
+        ):
+            with self.subTest(scope="nested", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    path = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[2]
+                    path.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        expected,
+                    )
+
+        missing_owner = (
+            "",
+            "// mod sheet_order;\n",
+            'const NOTE: &str = "mod sheet_order;";\n',
+            "mod sheet_orders;\n",
+        )
+        accepted_owner = (
+            "mod sheet_order;\n",
+            "mod r#sheet_order {}\n",
+            "pub(crate) mod sheet_order;\n",
+            "pub(super) mod r#sheet_order {}\n",
+            "pub(in crate)\nmod\nsheet_order\n;\n",
+        )
+        for declaration, expected in (
+            *[
+                (
+                    declaration,
+                    [
+                        "focused litchi-numbers sheet-order public API is missing "
+                        "private package owner module: "
+                        "crates/litchi-numbers/src/package.rs"
+                    ],
+                )
+                for declaration in missing_owner
+            ],
+            *[(declaration, []) for declaration in accepted_owner],
+        ):
+            with self.subTest(scope="owner", declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    path = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[1]
+                    path.write_text(declaration, encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        expected,
+                    )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_sheet_order_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                [
+                    "focused litchi-numbers sheet-order public API is missing "
+                    "private package owner source: "
+                    "crates/litchi-numbers/src/package/sheet_order.rs"
+                ],
+            )
+
+    def test_focused_numbers_sheet_order_rejects_duplicate_package_module(self) -> None:
+        for declaration in (
+            "pub mod sheet_order;",
+            "pub mod r#sheet_order;",
+            "pub mod sheet_order {}",
+            "pub\nmod\nr#sheet_order\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_sheet_order_canonical_scaffold(root)
+                    package = root / boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES[1]
+                    package.write_text(declaration + "\n", encoding="utf-8")
+                    self.assertEqual(
+                        boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers sheet-order public API exposes "
+                            "duplicate package::sheet_order module: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                        ],
+                    )
+
+    def test_focused_numbers_sheet_order_rejects_all_flat_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.NUMBERS_SHEET_ORDER_IMPLEMENTATION_SOURCES
+                + boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            for index, name in enumerate(sorted(boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES)):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                declaration = (
+                    f"pub struct {name};"
+                    if source_index < 2
+                    else f"pub use crate::legacy::Legacy as {name};"
+                )
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-numbers sheet-order public API retains flat alias "
+                    f"{name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_numbers_sheet_order_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_sheet_order_rejects_root_aliases_glob_and_owner_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib, package, sheet = (
+                root / path for path in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            lib.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.NUMBERS_SHEET_ORDER_SHORT_NAMES)
+            lib_names, package_names, sheet_names = aliases[:2], aliases[2:4], aliases[4:]
+            lib.write_text(
+                "pub use crate::sheet::order::{" + ", ".join(lib_names) + "};\n",
+                encoding="utf-8",
+            )
+            package.write_text(
+                "pub use crate::sheet_order::{" + ", ".join(package_names) + "};\n"
+                "pub use crate::sheet::order::*;\n",
+                encoding="utf-8",
+            )
+            sheet.write_text(
+                "pub use crate::sheet::order::{" + ", ".join(sheet_names) + "};\n",
+                encoding="utf-8",
+            )
+            add_numbers_sheet_order_canonical_scaffold(root)
+            expected = [
+                *[
+                    "focused litchi-numbers sheet-order public API retains root alias "
+                    f"{name}: crates/litchi-numbers/src/lib.rs:1"
+                    for name in lib_names
+                ],
+                *[
+                    "focused litchi-numbers sheet-order public API retains root alias "
+                    f"{name}: crates/litchi-numbers/src/package.rs:1"
+                    for name in package_names
+                ],
+                *[
+                    "focused litchi-numbers sheet-order public API retains root alias "
+                    f"{name}: crates/litchi-numbers/src/sheet.rs:1"
+                    for name in sheet_names
+                ],
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/lib.rs:1",
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/package.rs:1",
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/package.rs:2",
+                "focused litchi-numbers sheet-order public API exposes public "
+                "sheet-order owner alias: crates/litchi-numbers/src/sheet.rs:1",
+                "focused litchi-numbers sheet-order public API retains root aliases "
+                "via sheet::order glob: crates/litchi-numbers/src/package.rs:2",
+            ]
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_sheet_order_rejects_public_owner_alias_variants(
+        self,
+    ) -> None:
+        for relative in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES:
+            for declaration in (
+                "pub use crate::sheet::order as ordering;",
+                "pub use crate::r#sheet_order as ordering;",
+                "pub\nuse\ncrate::sheet::order as ordering;",
+                "pub type sheet_order = bool;",
+            ):
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_numbers_sheet_order_canonical_scaffold(root)
+                        path = root / relative
+                        source = path.read_text(encoding="utf-8")
+                        line = source.count("\n") + 1
+                        path.write_text(source + declaration + "\n", encoding="utf-8")
+                        self.assertEqual(
+                            boundaries.audit_numbers_sheet_order_facade_source_topology(
+                                root
+                            ),
+                            [
+                                "focused litchi-numbers sheet-order public API exposes "
+                                f"public sheet-order owner alias: {relative}:{line}"
+                            ],
+                        )
+
+    def test_focused_numbers_sheet_order_rejects_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn order(r#source_bytes: &[u8], r#object_id: u64) "
+                "-> DocumentArchive { todo!() }\n"
+                "pub type Projection = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for order::Edit {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner_lines = [
+                f"pub type Physical{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES)
+                )
+            ]
+            owner_lines.extend(
+                f"pub type WireLeak{index} = {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES)
+                )
+            )
+            owner_lines.extend(
+                [
+                    "pub type ProtoProjection = (tn::DocumentArchive, "
+                    "tsp::ReferenceArchive);",
+                    "pub fn physical_names(component_name: &str, "
+                    "member_name: &str, entry_name: &str) {}",
+                ]
+            )
+            owner.write_text("\n".join(owner_lines) + "\n", encoding="utf-8")
+            lib, package, sheet = (
+                root / path for path in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            lib.write_text(
+                "pub fn edit_sheet_order(value: litchi_iwa_protos::GeneratedSheetOrder) "
+                "-> order::Edit { todo!() }\n",
+                encoding="utf-8",
+            )
+            package.write_text(
+                "pub fn apply_sheet_order(value: prost_types::MessageInfo) "
+                "-> order::Commit { todo!() }\n",
+                encoding="utf-8",
+            )
+            sheet.write_text(
+                "pub fn edit_sheet_order() -> SourceBytes { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_numbers_sheet_order_canonical_scaffold(root)
+
+            violations = boundaries.audit_numbers_sheet_order_facade_source_topology(root)
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-numbers sheet-order public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "protobuf type tn",
+                "protobuf type tsp",
+                "protobuf type ProtoProjection",
+                "physical package name component_name",
+                "physical package name member_name",
+                "physical package name entry_name",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedSheetOrder",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+                *tuple(
+                    f"archive/IWA type {name}"
+                    for name in sorted(boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES)
+                ),
+                *tuple(
+                    f"wire type {name}"
+                    for name in sorted(boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES)
+                ),
+            )
+            self.assertEqual(len(violations), 43)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused sheet-order leak: {fragment}",
+                    )
+
+    def test_focused_numbers_sheet_order_recursively_scans_private_helpers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_sheet_order_canonical_scaffold(root)
+            nested_relative = (
+                boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT
+                / "future"
+                / "nested.rs"
+            )
+            nested = root / nested_relative
+            nested.parent.mkdir(parents=True, exist_ok=True)
+            nested.write_text(
+                "pub fn expose(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub type SheetOrderEdit = WireView;\n"
+                "impl prost::Message for SheetOrderPatch<RawMessage> {}\n",
+                encoding="utf-8",
+            )
+            path = str(nested_relative)
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"raw source bytes source_bytes: {path}:1",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"raw byte slice &[u8]: {path}:1",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"raw identifier object_id: {path}:1",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"archive/IWA type ArchiveObject: {path}:1",
+                        "focused litchi-numbers sheet-order public API retains flat "
+                        f"alias SheetOrderEdit: {path}:2",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"wire type WireView: {path}:2",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"protobuf type prost: {path}:3",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"protobuf type Message: {path}:3",
+                        "focused litchi-numbers sheet-order public API exposes "
+                        f"archive/IWA type RawMessage: {path}:3",
+                    ]
+                ),
+            )
+
+    def test_focused_numbers_sheet_order_allows_canonical_and_retained_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_SHEET_ORDER_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "// pub type SheetOrderEdit = DocumentArchive;\n"
+                'const NOTE: &str = "pub struct SheetOrderPatch;";\n'
+                "pub struct Sheet;\n"
+                "pub struct SheetSelector;\n"
+                "pub fn move_sheet(selector: SheetSelector, destination: usize) {}\n"
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) fn restricted(value: WireView) {}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            private_aliases = [
+                ("struct" if index % 2 == 0 else "pub(crate) struct")
+                + f" {name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES)
+                )
+            ]
+            private_physical = [
+                f"pub(super) type Private{index} = {name};"
+                for index, name in enumerate(
+                    sorted(
+                        boundaries.NUMBERS_SHEET_ORDER_PHYSICAL_TYPES
+                        | boundaries.NUMBERS_SHEET_ORDER_WIRE_TYPES
+                    )
+                )
+            ]
+            owner.write_text(
+                "\n".join(
+                    [
+                        "pub fn edit_sheet_order() -> sheet::order::Edit { todo!() }",
+                        "pub fn apply_sheet_order(patch: sheet::order::Patch) "
+                        "-> sheet::order::Commit { todo!() }",
+                        "pub fn move_sheet(selector: SheetSelector, destination: usize) {}",
+                        *private_aliases,
+                        *private_physical,
+                        "impl SheetOrderEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib, package, sheet = (
+                root / path for path in boundaries.NUMBERS_SHEET_ORDER_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::sheet::order::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_SHEET_ORDER_SHORT_NAMES)
+                )
+            )
+            lib.write_text(
+                "// pub use crate::sheet::order::{Edit, Patch};\n"
+                'const NOTE: &str = "pub use crate::sheet::order::*;";\n'
+                + private_roots
+                + "\npub(crate) use crate::sheet::order::*;\n"
+                "pub use crate::table::{Edit, Patch, Commit, Diagnostics, Error, LimitKind};\n"
+                "pub struct Sheet;\n"
+                "pub struct SheetSelector;\n",
+                encoding="utf-8",
+            )
+            package.write_text(
+                "mod sheet_order;\n"
+                "pub(crate) mod r#sheet_order;\n"
+                "pub(super) use crate::sheet::order::{Edit, Patch};\n"
+                "pub fn move_table() {}\n"
+                "pub fn add_empty_sheet() {}\n"
+                "pub fn duplicate_sheet() {}\n"
+                "pub fn remove_sheet() {}\n",
+                encoding="utf-8",
+            )
+            sheet.write_text(
+                "pub mod order;\n"
+                "pub struct Sheet;\n"
+                "pub struct SheetSelector;\n",
+                encoding="utf-8",
+            )
+            helper = root / boundaries.NUMBERS_SHEET_ORDER_OWNER_HELPER_ROOT / "private.rs"
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> ArchiveObject { todo!() }\n"
+                "pub(crate) type SheetOrderPatch = WireView;\n"
+                "impl SheetOrderEdit {}\n",
+                encoding="utf-8",
+            )
+            helper.with_suffix(".txt").write_text(
+                "pub type SheetOrderEdit = ArchiveObject;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.NUMBERS_SOURCE_ROOT / "names.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.NUMBERS_SHEET_ORDER_FLAT_ALIASES)
+                )
+                + "\npub fn move_sheet(object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/sheet/order.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct SheetOrderEdit;\n"
+                "pub fn move_sheet(object_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_numbers_sheet_order_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_sheet_order_facade_source_topology(root),
+                [],
+            )
+
+
+    def test_focused_numbers_names_public_api_rejects_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path for path in boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "pub fn names(r#source_bytes: &[u8], r#object_id: u64, "
+                        "archive_name: &str, component_name: &str, member_name: &str, "
+                        "entry_name: &str) -> "
+                        "(DocumentArchive, HostPackage, SourceCatalog) {}",
+                        "pub type Edit = buffa::DocumentArchiveView;",
+                        "impl prost::Message for names::Patch {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Edit = Archive;",
+                        "pub type Patch = ComponentCatalog;",
+                        "pub type Commit = EntryEdit;",
+                        "pub type Diagnostics = litchi_iwa_core::RawMessage;",
+                        "pub type Error = Resolved;",
+                        "pub type LimitKind = SnappyStream;",
+                        "pub type Path = wire::WireDescent;",
+                        "pub type InvalidReason = wire::WireError;",
+                        "pub type NamesWireLimits = WireLimits;",
+                        "pub type NamesWireResource = WireResourceLimit;",
+                        "pub type NamesWireView = WireView;",
+                        "pub type NamesNative = NativeObject;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_names(value: litchi_iwa_protos::GeneratedName) "
+                "-> names::Patch {}\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_names(value: prost_types::MessageInfo) "
+                "-> names::Commit {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_names_facade_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-numbers names public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "physical package name archive_name",
+                "physical package name component_name",
+                "physical package name member_name",
+                "physical package name entry_name",
+                "archive/IWA type DocumentArchive",
+                "archive/IWA type HostPackage",
+                "archive/IWA type SourceCatalog",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type Archive",
+                "archive/IWA type ComponentCatalog",
+                "archive/IWA type EntryEdit",
+                "archive/IWA type litchi_iwa_core",
+                "archive/IWA type RawMessage",
+                "archive/IWA type Resolved",
+                "archive/IWA type SnappyStream",
+                "wire type wire",
+                "wire type WireDescent",
+                "wire type WireError",
+                "wire type WireLimits",
+                "wire type WireResourceLimit",
+                "wire type WireView",
+                "native object NativeObject",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedName",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), 33)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused Numbers names leak: {fragment}",
+                    )
+
+    def test_focused_numbers_names_api_ignores_nested_private_and_other_owners(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path for path in boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            private_aliases = [
+                (
+                    "struct" if index % 2 == 0 else "pub(crate) struct"
+                )
+                + f" {name};"
+                for index, name in enumerate(sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES))
+            ]
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub type NameEdit = DocumentArchive;",
+                        'const NOTE: &str = "pub struct NamesPatch;";',
+                        "/* pub type SheetNameCommit = buffa::DocumentArchiveView; */",
+                        *[f"pub struct {name};" for name in boundaries.NUMBERS_NAMES_CANONICAL_TYPES],
+                        *[f"pub struct {name};" for name in boundaries.NUMBERS_NAMES_OPTIONAL_TYPES],
+                        "pub struct NamesSnapshot;",
+                        "pub struct NameEditor;",
+                        "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted(archive: DocumentArchive) {}",
+                        *private_aliases,
+                        "impl NameEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub fn edit_names(edit: Edit) -> Result<Commit, Error> { todo!() }\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            restricted_roots = "\n".join(
+                (
+                    "use" if index % 2 == 0 else "pub(crate) use"
+                )
+                + f" crate::names::{name};"
+                for index, name in enumerate(sorted(boundaries.NUMBERS_NAMES_SHORT_NAMES))
+            )
+            safe_exports = (
+                "pub mod names;\n"
+                "// pub use crate::names::{Edit, Patch};\n"
+                'const NOTE: &str = "pub use crate::names::*;";\n'
+                "pub fn edit_names(edit: names::Edit) "
+                "-> Result<names::Commit, names::Error> { todo!() }\n"
+                + restricted_roots
+                + "\npub(crate) use crate::names::*;\n"
+                "pub use crate::render::{Edit, Patch, Commit, Diagnostics, Error, "
+                "LimitKind, Path, InvalidReason};\n"
+                "pub use crate::render::*;\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(
+                safe_exports.replace("pub mod names;\n", "")
+                + "// pub mod names;\n"
+                + 'const MODULE_NOTE: &str = "pub mod names;";\n'
+                + 'const RAW_MODULE_NOTE: &str = r#"pub mod r#names {}"#;\n'
+                + "/* pub mod r#names {} */\n"
+                + "mod names;\n"
+                + "pub(crate) mod r#names;\n"
+                + "pub(super) mod names {}\n"
+                + "pub(in crate) mod names;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.NUMBERS_SOURCE_ROOT / "table.rs"
+            nonfocused.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES)
+                )
+                + "\npub fn names(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/names.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(
+                    f"pub struct {name};"
+                    for name in sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES)
+                )
+                + "\npub use crate::names::{Edit, Patch, Commit, Diagnostics, Error, "
+                "LimitKind, Path, InvalidReason};\n"
+                "pub fn names(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_facade_source_topology(root), []
+            )
+
+    def test_focused_numbers_names_public_api_rejects_all_flat_aliases(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            sources = tuple(
+                root / path
+                for path in (
+                    boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+                    + boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+                )
+            )
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            relative_sources = (
+                boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES
+                + boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            for index, name in enumerate(sorted(boundaries.NUMBERS_NAMES_FLAT_ALIASES)):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = Edit;"
+                elif source_index == 2:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-numbers names public API retains flat alias "
+                    f"{name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_facade_source_topology(root),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_names_exports_reject_root_aliases_and_globs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export = (
+                root / path for path in boundaries.NUMBERS_NAMES_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            lib_export.write_text(
+                "pub use crate::names::{Edit, Patch as Patch, Path, InvalidReason};\n"
+                "pub type Commit = crate::names::Commit;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::names::{Diagnostics, Error, LimitKind};\n"
+                "pub use crate::names::*;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_facade_source_topology(root),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-numbers names public API retains root "
+                            f"alias {name}: crates/litchi-numbers/src/lib.rs:1"
+                            for name in ("Edit", "Patch", "Path", "InvalidReason")
+                        ],
+                        "focused litchi-numbers names public API retains root alias "
+                        "Commit: crates/litchi-numbers/src/lib.rs:2",
+                        *[
+                            "focused litchi-numbers names public API retains root "
+                            f"alias {name}: crates/litchi-numbers/src/package.rs:1"
+                            for name in ("Diagnostics", "Error", "LimitKind")
+                        ],
+                        "focused litchi-numbers names public API retains root aliases "
+                        "via names glob: crates/litchi-numbers/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_numbers_names_rejects_duplicate_public_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod names;",
+            "pub mod r#names;",
+            "pub mod names {}",
+            "pub\nmod\nr#names\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    package_export = (
+                        root / boundaries.NUMBERS_NAMES_EXPORT_SOURCES[1]
+                    )
+                    package_export.parent.mkdir(parents=True)
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_names_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers names public API exposes "
+                            "duplicate package::names module: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                        ],
+                    )
+
+
+    def test_focused_numbers_table_header_settings_requires_canonical_types(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    semantic = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+                    )
+                    semantic.parent.mkdir(parents=True)
+                    semantic.write_text("pub mod transaction;\n", encoding="utf-8")
+                    transaction = (
+                        root
+                        / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
+                    )
+                    transaction.parent.mkdir(parents=True, exist_ok=True)
+                    transaction.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+                    table_export = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2]
+                    )
+                    table_export.write_text("pub mod headers;\n", encoding="utf-8")
+                    lib_export = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0]
+                    )
+                    lib_export.write_text("pub mod table;\n", encoding="utf-8")
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-header settings public API "
+                            f"is missing canonical transaction type {missing}: "
+                            "crates/litchi-numbers/src/table/headers.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_header_settings_module_visibility(self) -> None:
+        missing_cases = (
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE,
+                (
+                    "",
+                    "mod transaction;\n",
+                    "pub(crate) mod transaction;\n",
+                    "pub(super) mod r#transaction {}\n",
+                    "// pub mod transaction;\n",
+                    'const NOTE: &str = "pub mod transaction;";\n',
+                ),
+                "focused litchi-numbers table-header settings public API is missing "
+                "canonical headers::transaction module: "
+                "crates/litchi-numbers/src/table/headers.rs",
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2],
+                (
+                    "",
+                    "mod headers;\n",
+                    "pub(crate) mod headers;\n",
+                    "pub(in crate) mod r#headers {}\n",
+                    "/* pub mod headers; */\n",
+                ),
+                "focused litchi-numbers table-header settings public API is missing "
+                "canonical table::headers module: crates/litchi-numbers/src/table.rs",
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0],
+                (
+                    "",
+                    "mod table;\n",
+                    "pub(crate) mod table;\n",
+                    "pub(super) mod r#table {}\n",
+                    'const RAW_NOTE: &str = r#"pub mod table;"#;\n',
+                ),
+                "focused litchi-numbers table-header settings public API is missing "
+                "canonical root table module: crates/litchi-numbers/src/lib.rs",
+            ),
+        )
+        for relative, declarations, diagnostic in missing_cases:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_numbers_table_header_settings_canonical_scaffold(root)
+                        path = root / relative
+                        path.write_text(declaration, encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                                root
+                            ),
+                            [diagnostic],
+                        )
+
+        accepted_cases = (
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE,
+                (
+                    "pub mod transaction;\n",
+                    "pub mod r#transaction;\n",
+                    "pub\nmod\nr#transaction\n;\n",
+                ),
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2],
+                (
+                    "pub mod headers;\n",
+                    "pub mod r#headers;\n",
+                    "pub mod headers {}\n",
+                    "pub\nmod\nr#headers\n{}\n",
+                ),
+            ),
+            (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0],
+                (
+                    "pub mod table;\n",
+                    "pub mod r#table;\n",
+                    "pub mod table {}\n",
+                    "pub\nmod\nr#table\n{}\n",
+                ),
+            ),
+        )
+        for relative, declarations in accepted_cases:
+            for declaration in declarations:
+                with self.subTest(relative=relative, declaration=declaration):
+                    with tempfile.TemporaryDirectory() as directory:
+                        root = Path(directory)
+                        add_numbers_table_header_settings_canonical_scaffold(root)
+                        path = root / relative
+                        path.write_text(declaration, encoding="utf-8")
+
+                        self.assertEqual(
+                            boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                                root
+                            ),
+                            [],
+                        )
+
+    def test_focused_numbers_table_header_settings_accepts_inline_transaction(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub mod transaction {\n"
+                + "".join(
+                    f"    pub struct {name};\n"
+                    for name in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_CANONICAL_TYPES
+                )
+                + "}\n",
+                encoding="utf-8",
+            )
+            table_export = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[2]
+            )
+            table_export.write_text("pub mod headers;\n", encoding="utf-8")
+            lib_export = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[0]
+            )
+            lib_export.write_text("pub mod table;\n", encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_table_header_settings_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+            transaction = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
+            )
+            owner = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn headers(r#source_bytes: &[u8], r#object_id: u64, "
+                "archive_name: &str, component_name: &str, member_name: &str, "
+                "entry_name: &str) -> "
+                "(DocumentArchive, HostPackage, SourceCatalog) {}\n"
+                "pub type Count = buffa::DocumentArchiveView;\n"
+                "impl prost::Message for headers::Settings {}\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Edit = Archive;",
+                        "pub type Patch = ComponentCatalog;",
+                        "pub type Commit = EntryEdit;",
+                        "pub type Diagnostics = ExactArtifacts;",
+                        "pub type Error = HostPackage;",
+                        "pub type LimitKind = PhysicalSource;",
+                        "pub type Path = RawMessage;",
+                        "pub type InvalidReason = Resolved;",
+                        "pub type HeaderSnappy = SnappyStream;",
+                        "pub type HeaderCatalog = SourceCatalog;",
+                        "pub type HeaderSnapshot = TableHeaderSettingsSnapshot;",
+                        "pub type HeaderInfo = TableInfoSnapshot;",
+                        "pub type HeaderDecode = DecodeOptions;",
+                        "pub type HeaderFieldEdit = NestedFieldEdit;",
+                        "pub type HeaderReplacement = NestedFieldReplacement;",
+                        "pub type HeaderDescent = wire::WireDescent;",
+                        "pub type HeaderWireError = wire::WireError;",
+                        "pub type HeaderWireLimits = WireLimits;",
+                        "pub type HeaderWireResource = WireResourceLimit;",
+                        "pub type HeaderWireView = WireView;",
+                        "pub type HeaderNative = NativeObject;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub type HeaderOwner = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export, table_export = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub fn edit_table_headers("
+                "value: litchi_iwa_protos::GeneratedHeaderSettings) "
+                "-> table::headers::transaction::Edit {}\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub fn apply_table_headers(value: prost_types::MessageInfo) "
+                "-> table::headers::transaction::Commit {}\n",
+                encoding="utf-8",
+            )
+            table_export.write_text(
+                "pub fn table_header_settings(value: SourceBytes) "
+                "-> headers::Settings {}\n",
+                encoding="utf-8",
+            )
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            violations = (
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-numbers table-header settings public API "
+                        "exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "physical package name archive_name",
+                "physical package name component_name",
+                "physical package name member_name",
+                "physical package name entry_name",
+                "archive/IWA type DocumentArchive",
+                "archive/IWA type HostPackage",
+                "archive/IWA type SourceCatalog",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type Archive",
+                "archive/IWA type ComponentCatalog",
+                "archive/IWA type EntryEdit",
+                "archive/IWA type ExactArtifacts",
+                "archive/IWA type PhysicalSource",
+                "archive/IWA type RawMessage",
+                "archive/IWA type Resolved",
+                "archive/IWA type SnappyStream",
+                "archive/IWA type TableHeaderSettingsSnapshot",
+                "archive/IWA type TableInfoSnapshot",
+                "wire type DecodeOptions",
+                "wire type NestedFieldEdit",
+                "wire type NestedFieldReplacement",
+                "wire type wire",
+                "wire type WireDescent",
+                "wire type WireError",
+                "wire type WireLimits",
+                "wire type WireResourceLimit",
+                "wire type WireView",
+                "native object NativeObject",
+                "archive/IWA type litchi_iwa_core",
+                "native object RawObject",
+                "archive/IWA type litchi_iwa_protos",
+                "generated type GeneratedHeaderSettings",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+                "raw source bytes SourceBytes",
+            )
+            self.assertEqual(len(violations), 44)
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused table-header leak: {fragment}",
+                    )
+
+    def test_focused_numbers_table_header_settings_scans_split_owner_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_header_settings_canonical_scaffold(root)
+            split_owner = root / Path(
+                "crates/litchi-numbers/src/package/table_headers/api.rs"
+            )
+            split_owner.parent.mkdir(parents=True, exist_ok=True)
+            split_owner.write_text(
+                "impl Package {\n"
+                "    pub fn table_header_settings(&self, object_id: u64) "
+                "-> Archive { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "raw identifier object_id" in violation
+                    and "package/table_headers/api.rs" in violation
+                    for violation in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "archive/IWA type Archive" in violation
+                    and "package/table_headers/api.rs" in violation
+                    for violation in violations
+                )
+            )
+
+    def test_focused_numbers_table_header_settings_allows_nested_private_surfaces(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_SEMANTIC_SOURCE
+            transaction = (
+                root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_TRANSACTION_SOURCE
+            )
+            owner = root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_OWNER_SOURCE
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct Count;\n"
+                "pub struct Settings;\n"
+                "pub enum Error {}\n"
+                "// pub struct HeaderSettings;\n"
+                'const NOTE: &str = "pub type TableHeaderSettingsEdit = Archive";\n'
+                "/* pub struct TableHeaderCount; */\n"
+                "fn source_bytes(source_bytes: &[u8], object_id: u64) "
+                "-> SourceBytes { todo!() }\n"
+                "pub(crate) fn restricted(archive: DocumentArchive) {}\n",
+                encoding="utf-8",
+            )
+            all_flat_aliases = sorted(
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES
+                | boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    (
+                        "struct" if index % 2 == 0 else "pub(crate) struct"
+                    )
+                    + f" {name};"
+                    for index, name in enumerate(all_flat_aliases)
+                )
+                + "\nimpl TableHeaderSettingsEdit {}\n",
+                encoding="utf-8",
+            )
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub fn table_header_settings() -> table::headers::Settings { todo!() }\n"
+                "pub fn edit_table_headers() -> table::headers::transaction::Edit "
+                "{ todo!() }\n"
+                "pub fn apply_table_headers() -> table::headers::transaction::Commit "
+                "{ todo!() }\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export, table_export = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            private_roots = "\n".join(
+                ("use" if index % 2 == 0 else "pub(crate) use")
+                + f" crate::table::headers::{name};"
+                for index, name in enumerate(
+                    sorted(boundaries.NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES)
+                )
+            )
+            safe_exports = (
+                "// pub use crate::table::headers::{Settings, Edit};\n"
+                'const NOTE: &str = "pub use crate::table::headers::*;";\n'
+                "pub fn table_header_settings() -> table::headers::Settings { todo!() }\n"
+                + private_roots
+                + "\npub(crate) use crate::table::headers::*;\n"
+                "pub use crate::layout::{Count, Settings, Edit, Patch, Commit, "
+                "Diagnostics, Error, LimitKind, Path, InvalidReason};\n"
+                "pub use crate::layout::*;\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            table_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(
+                safe_exports
+                + "// pub mod table_headers;\n"
+                + 'const MODULE_NOTE: &str = "pub mod table_headers;";\n'
+                + 'const RAW_NOTE: &str = r#"pub mod r#table_headers {}"#;\n'
+                + "/* pub mod r#table_headers {} */\n"
+                + "mod table_headers;\n"
+                + "pub(crate) mod r#table_headers;\n"
+                + "pub(super) mod table_headers {}\n"
+                + "pub(in crate) mod table_headers;\n",
+                encoding="utf-8",
+            )
+            nonfocused = root / boundaries.NUMBERS_SOURCE_ROOT / "cell.rs"
+            nonfocused.write_text(
+                "\n".join(f"pub struct {name};" for name in all_flat_aliases)
+                + "\npub fn table_headers(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            other_owner = root / "crates/litchi-pages/src/table_headers.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "\n".join(f"pub struct {name};" for name in all_flat_aliases)
+                + "\npub use crate::table::headers::{Count, Settings, Edit, Patch};\n"
+                "pub fn table_headers(object_id: u64) -> DocumentArchive { todo!() }\n",
+                encoding="utf-8",
+            )
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_table_header_settings_rejects_all_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            relative_sources = (
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_IMPLEMENTATION_SOURCES
+                + boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            sources = tuple(root / path for path in relative_sources)
+            declarations: dict[Path, list[str]] = {path: [] for path in sources}
+            expected: list[str] = []
+            aliases = sorted(
+                boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_ALIASES
+                | boundaries.NUMBERS_TABLE_HEADER_SETTINGS_FLAT_SEMANTIC_ALIASES
+            )
+            for index, name in enumerate(aliases):
+                source_index = index % len(sources)
+                path = sources[source_index]
+                if source_index == 0:
+                    declaration = f"pub struct {name};"
+                elif source_index == 1:
+                    declaration = f"pub type {name} = Edit;"
+                elif source_index == 2:
+                    declaration = f"pub enum {name} {{ Legacy }}"
+                else:
+                    declaration = f"pub use crate::legacy::Legacy as {name};"
+                declarations[path].append(declaration)
+                expected.append(
+                    "focused litchi-numbers table-header settings public API retains "
+                    f"flat alias {name}: {relative_sources[source_index]}:"
+                    f"{len(declarations[path])}"
+                )
+            for path, lines in declarations.items():
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                sorted(expected),
+            )
+
+    def test_focused_numbers_table_header_settings_exports_reject_root_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            lib_export, package_export, table_export = (
+                root / path
+                for path in boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.parent.mkdir(parents=True)
+            aliases = sorted(boundaries.NUMBERS_TABLE_HEADER_SETTINGS_ROOT_ALIASES)
+            first = aliases[:3]
+            second = aliases[3:6]
+            third = aliases[6:]
+            lib_export.write_text(
+                "pub use crate::table::headers::{" + ", ".join(first) + "};\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use crate::table_headers::{" + ", ".join(second) + "};\n"
+                "pub use crate::table_headers::*;\n",
+                encoding="utf-8",
+            )
+            table_export.write_text(
+                "pub use self::headers::{" + ", ".join(third) + "};\n",
+                encoding="utf-8",
+            )
+            add_numbers_table_header_settings_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                    root
+                ),
+                sorted(
+                    [
+                        *[
+                            "focused litchi-numbers table-header settings public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-numbers/src/lib.rs:1"
+                            for name in first
+                        ],
+                        *[
+                            "focused litchi-numbers table-header settings public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                            for name in second
+                        ],
+                        *[
+                            "focused litchi-numbers table-header settings public API "
+                            f"retains root alias {name}: "
+                            "crates/litchi-numbers/src/table.rs:1"
+                            for name in third
+                        ],
+                        "focused litchi-numbers table-header settings public API "
+                        "retains root aliases via table-header glob: "
+                        "crates/litchi-numbers/src/package.rs:2",
+                    ]
+                ),
+            )
+
+    def test_focused_numbers_table_header_settings_rejects_public_package_module(
+        self,
+    ) -> None:
+        for declaration in (
+            "pub mod table_headers;",
+            "pub mod r#table_headers;",
+            "pub mod table_headers {}",
+            "pub\nmod\nr#table_headers\n{}",
+        ):
+            with self.subTest(declaration=declaration):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    package_export = (
+                        root / boundaries.NUMBERS_TABLE_HEADER_SETTINGS_EXPORT_SOURCES[1]
+                    )
+                    package_export.parent.mkdir(parents=True)
+                    package_export.write_text(declaration + "\n", encoding="utf-8")
+                    add_numbers_table_header_settings_canonical_scaffold(root)
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_header_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-header settings public API "
+                            "exposes duplicate package::table_headers module: "
+                            "crates/litchi-numbers/src/package.rs:1"
+                        ],
+                    )
+
+
+    def test_focused_numbers_document_reader_public_api_rejects_native_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / boundaries.NUMBERS_DOCUMENT_PUBLIC_API_SOURCES[0]
+            document.parent.mkdir(parents=True)
+            document.write_text(
+                "/// Returns a `NativeObjectIdentifier`.\n"
+                "pub struct Document { pub object_id: u64 }\n"
+                "pub fn raw_source_bytes() -> &[u8] { todo!() }\n"
+                "pub type Native = litchi_iwa_common::ObjectArchive;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_document_public_api(root)
+            joined = "\n".join(violations)
+            self.assertIn("raw identifier object_id", joined)
+            self.assertIn("raw source bytes raw_source_bytes", joined)
+            self.assertIn("archive/IWA type litchi_iwa_common", joined)
+            self.assertIn("native object ObjectArchive", joined)
+            self.assertIn("rustdoc exposes raw identifier NativeObjectIdentifier", joined)
+
+    def test_focused_numbers_document_reader_public_api_allows_checked_limits(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            document = root / boundaries.NUMBERS_DOCUMENT_PUBLIC_API_SOURCES[0]
+            document.parent.mkdir(parents=True)
+            document.write_text(
+                "/// Immutable semantic spreadsheet.\n"
+                "pub struct Document;\n"
+                "pub struct DocumentReadOptions;\n"
+                "pub struct DocumentSourceLimits;\n"
+                "pub enum DocumentSourceLimitKind { InputBytes }\n"
+                "pub enum ReadLimitKind { Sheets, Tables, Cells, TextBytes }\n"
+                "pub struct Stats { pub sheet_count: usize }\n"
+                "pub fn from_shared_bytes(_: std::sync::Arc<[u8]>) -> Document "
+                "{ Document }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(boundaries.audit_numbers_document_public_api(root), [])
+
+
+    def test_focused_pages_document_reader_public_api_rejects_native_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "/// Returns `NativeObjectId` and `DocumentArchive`.\n"
+                "pub fn inspect(object_id: u64) -> DocumentArchive { todo!() }\n"
+                "pub type SourceBytes = Vec<u8>;\n",
+                encoding="utf-8",
+            )
+            export = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[1]
+            export.write_text(
+                "pub type OpenOptions = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_document_public_api(root)
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                any("raw identifier object_id" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("archive/IWA type DocumentArchive" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("raw source bytes SourceBytes" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("archive/IWA type litchi_iwa_core" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("native object RawObject" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("rustdoc exposes raw identifier NativeObjectId" in violation for violation in violations)
+            )
+
+    def test_focused_pages_document_reader_public_api_allows_checked_limits(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "/// Checked, content-free source limits.\n"
+                "pub struct DocumentSourceLimits { max_input_bytes: u64 }\n"
+                "pub struct DocumentReadOptions;\n"
+                "pub enum ReadError { InvalidSource }\n"
+                "pub struct Document;\n",
+                encoding="utf-8",
+            )
+            export = root / boundaries.PAGES_DOCUMENT_PUBLIC_API_SOURCES[1]
+            export.write_text(
+                "pub use document::{Document, DocumentReadOptions, "
+                "DocumentSourceLimits, ReadError};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_pages_document_public_api(root), [])
+
+    def test_focused_keynote_document_reader_public_api_rejects_native_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "/// Returns `NativeObjectId` and `DocumentArchive`.\n"
+                "pub fn inspect(object_id: u64, wire: WireView) -> DocumentArchive { todo!() }\n"
+                "pub struct SourceBytes { value: Vec<u8> }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_document_public_api(root)
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                any("raw identifier object_id" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("archive/IWA type DocumentArchive" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("wire type wire" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("wire type WireView" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("raw source bytes SourceBytes" in violation for violation in violations)
+            )
+            self.assertTrue(
+                any("rustdoc exposes raw identifier NativeObjectId" in violation for violation in violations)
+            )
+
+    def test_focused_keynote_document_reader_public_api_allows_byte_ingress(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct Document { state: Arc<State> }\n"
+                "pub struct DocumentReadOptions;\n"
+                "impl Document {\n"
+                "pub fn from_bytes(bytes: &[u8]) -> Result<Self, ReadError> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_keynote_document_public_api(root), [])
+
+    def test_focused_keynote_document_reader_public_api_allows_semantic_limits(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct DocumentSemanticLimits;\n"
+                "impl DocumentSemanticLimits {\n"
+                "pub const fn new(\n"
+                "max_objects: usize,\n"
+                "max_slides: usize,\n"
+                "max_references: usize,\n"
+                "max_text_storages: usize,\n"
+                "max_text_fragments: usize,\n"
+                "max_text_bytes: usize,\n"
+                ") -> Result<Self, DocumentSemanticLimitsError> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_keynote_document_public_api(root), [])
+
+    def test_focused_keynote_document_reader_public_api_keeps_physical_object_detection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.KEYNOTE_DOCUMENT_PUBLIC_API_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn inspect(max_object_count: usize) {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_document_public_api(root)
+            self.assertTrue(
+                any(
+                    "native object max_object_count" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
+    def test_focused_keynote_package_no_eager_prost_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::kn::SlideArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = SlideArchive::decode(bytes);\n"
+                "        let _ = M::decode(bytes);\n"
+                "        let _ = decode_message::<SlideArchive>(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            test_only = (
+                root
+                / boundaries.KEYNOTE_SOURCE_ROOT
+                / "package"
+                / "perf_tests.rs"
+            )
+            test_only.parent.mkdir(parents=True)
+            test_only.write_text(
+                "use litchi_iwa_protos::tsp::ArchiveInfo;\n"
+                "use prost::Message;\n"
+                "fn decode(bytes: &[u8]) { let _ = ArchiveInfo::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            verification_only = (
+                root
+                / boundaries.KEYNOTE_SOURCE_ROOT
+                / "package"
+                / "slide_chart_title"
+                / "verification_tests.rs"
+            )
+            verification_only.parent.mkdir(parents=True)
+            verification_only.write_text(
+                "use litchi_iwa_protos::kn::SlideArchive;\n"
+                "use prost::Message as _;\n"
+                "fn decode(bytes: &[u8]) { let _ = SlideArchive::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "thiserror = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_production_after_test_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = prost::Message::decode(bytes);\n"
+                "    }\n"
+                "}\n"
+                "fn production_after_tests(bytes: &[u8]) {\n"
+                "    let _ = prost::Message::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn(
+                "focused litchi-keynote production source uses prost::Message: "
+                "crates/litchi-keynote/src/package.rs:9",
+                violations,
+            )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_production_after_nested_test_module(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "mod production {\n"
+                "    #[cfg(test)]\n"
+                "    mod tests {\n"
+                "        use prost::Message;\n"
+                "        fn decode(bytes: &[u8]) {\n"
+                "            let _ = prost::Message::decode(bytes);\n"
+                "        }\n"
+                "    }\n"
+                "\n"
+                "    fn production_after_tests(bytes: &[u8]) {\n"
+                "        let _ = prost::Message::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn(
+                "focused litchi-keynote production source uses prost::Message: "
+                "crates/litchi-keynote/src/package.rs:11",
+                violations,
+            )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "prost::Message": "use prost::Message;\n",
+            "generated-message decode": (
+                "let _ = kn::SlideArchive::decode(bytes);\n"
+            ),
+            "generated-message generic decode": "let _ = M::decode(bytes);\n",
+            "generated-message decode helper": (
+                "let _ = decode_message::<kn::SlideArchive>(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+                    manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        "[dependencies]\n"
+                        "thiserror = { workspace = true }\n"
+                        "[dev-dependencies]\n"
+                        "prost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    expected_label = (
+                        "generated-message decode"
+                        if label == "generated-message generic decode"
+                        else label
+                    )
+                    self.assertTrue(
+                        any(f"uses {expected_label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_keynote_package_no_eager_prost_rejects_normal_manifest_dependency(
+        self,
+    ) -> None:
+        for section in (
+            "[dependencies]",
+            "[target.'cfg(unix)'.dependencies]",
+            "[build-dependencies]",
+            "[target.'cfg(unix)'.build-dependencies]",
+        ):
+            with self.subTest(section=section):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        f"{section}\nprost = {{ workspace = true }}\n\n"
+                        "[target.'cfg(unix)'.dev-dependencies]\n"
+                        "prost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_keynote_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-keynote Cargo manifest retains normal prost "
+                        "dependency: crates/litchi-keynote/Cargo.toml:2",
+                        violations,
+                    )
+
+    def test_focused_keynote_package_no_eager_prost_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                'const NOTE: &str = "kn::SlideArchive::decode";\n'
+                "/* decode_message::<kn::SlideArchive> */\n"
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.KEYNOTE_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_keynote_chart_title_rejects_legacy_calls_and_ignores_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package/chart_title.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// editor.set_slide_chart_title(0, id, title);\n"
+                'const NOTE: &str = "editor.remove_slide_chart_title(0, id)";\n'
+                "fn set_slide_chart_title_by_selector() {}\n"
+                "fn remove_slide_chart_title_for_test() {}\n"
+                "fn set_slide_chart_title() {}\n"
+                "fn remove_slide_chart_title() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_chart_title_legacy_calls(root),
+                [
+                    "focused litchi-keynote chart-title source retains legacy call "
+                    "remove_slide_chart_title: "
+                    "crates/litchi-keynote/src/package/chart_title.rs:6",
+                    "focused litchi-keynote chart-title source retains legacy call "
+                    "set_slide_chart_title: "
+                    "crates/litchi-keynote/src/package/chart_title.rs:5",
+                ],
+            )
+
+    def test_focused_keynote_chart_title_allows_semantic_transaction_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package/chart_title.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "impl Package {\n"
+                "    pub fn slide_chart_title() {}\n"
+                "    pub fn edit_slide_chart_title() {}\n"
+                "    pub fn apply_slide_chart_title() {}\n"
+                "    pub fn set_slide_chart_title_by_selector() {}\n"
+                "    pub fn remove_slide_chart_title_by_selector() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(boundaries.audit_keynote_chart_title_legacy_calls(root), [])
+
+
+    def test_focused_keynote_chart_caption_rejects_legacy_calls_and_ignores_near_names(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.KEYNOTE_SOURCE_ROOT / "package/chart_caption.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// editor.set_slide_chart_caption(0, id, caption);\n"
+                'const NOTE: &str = "editor.remove_slide_chart_caption(0, id)";\n'
+                "fn set_slide_chart_caption_by_selector() {}\n"
+                "fn remove_slide_chart_caption_for_test() {}\n"
+                "fn set_slide_chart_caption() {}\n"
+                "fn remove_slide_chart_caption() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_legacy_calls(root),
+                [
+                    "focused litchi-keynote chart-caption source retains legacy call "
+                    "remove_slide_chart_caption: "
+                    "crates/litchi-keynote/src/package/chart_caption.rs:6",
+                    "focused litchi-keynote chart-caption source retains legacy call "
+                    "set_slide_chart_caption: "
+                    "crates/litchi-keynote/src/package/chart_caption.rs:5",
+                ],
+            )
+
+
+    def test_focused_keynote_chart_caption_facade_requires_semantic_owner_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
+            library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            add_keynote_family_module(root, "CHART_CAPTION")
+            owner.parent.mkdir(parents=True)
+            canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nimpl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl Edit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        rewrite_chart_caption_operation(true, false, &mut budget);\n"
+                "    }\n"
+                "}\n"
+                "struct ChartCaptionPackageBudget;\n"
+                "impl ChartCaptionPackageBudget {\n"
+                "    fn new() -> Self { Self }\n"
+                "    fn charge_codec_report(&mut self, _report: ()) {}\n"
+                "    fn charge_archive_work(&mut self) {}\n"
+                "    fn charge_snappy_work(&mut self) {}\n"
+                "    fn charge_zip_work(&mut self) {}\n"
+                "    fn charge_reopen_work(&mut self) {}\n"
+                "    fn charge_artifact_work(&mut self) {}\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    if !creating && !removing {\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        rewrite_package_metadata_save_tokens();\n"
+                "        return Ok(());\n"
+                "    }\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
+                "    validate_canonical_object_framing();\n"
+                "}\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    validate_selected_message_metadata();\n"
+                "    let payload = object.messages[0].data.clone();\n"
+                "    budget.charge_codec_report(());\n"
+                "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header(payload);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            exports = ", ".join(canonical)
+            package.write_text(
+                "mod slide_chart_caption;\n"
+                f"pub use slide_chart_caption::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            library.write_text(
+                f"pub use package::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_caption(bytes: &[u8]) -> ChartCaptionSnapshot<'_> { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("public API exposes" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nimpl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
+                "}\n"
+                "impl Edit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {}\n"
+                "}\n"
+                "fn private_codec(bytes: &[u8]) { let _ = prost::Message::decode(bytes); }\n"
+                "pub struct Leaked {\n"
+                "    pub storage_id: u64,\n"
+                "    pub wire: WireView<'static>,\n"
+                "    pub archive: ArchiveObject,\n"
+                "}\n"
+                "pub use litchi_iwa_protos::WireView;\n"
+                "pub type LeakedCaption = Edit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("raw identifier" in item for item in violations), violations
+            )
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("protobuf type" in item for item in violations), violations)
+            self.assertTrue(any("alternate alias" in item for item in violations), violations)
+
+    def test_focused_keynote_chart_caption_owner_guards_mask_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
+            library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            add_keynote_family_module(root, "CHART_CAPTION")
+            owner.parent.mkdir(parents=True)
+            canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+            helper = (
+                "struct ChartCaptionPackageBudget;\n"
+                "impl ChartCaptionPackageBudget {\n"
+                "    fn new() -> Self { Self }\n"
+                "    fn charge_codec_report(&mut self, _report: ()) {}\n"
+                "    fn charge_archive_work(&mut self) {}\n"
+                "    fn charge_snappy_work(&mut self) {}\n"
+                "    fn charge_zip_work(&mut self) {}\n"
+                "    fn charge_reopen_work(&mut self) {}\n"
+                "    fn charge_artifact_work(&mut self) {}\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    if !creating && !removing {\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        rewrite_package_metadata_save_tokens();\n"
+                "        return Ok(());\n"
+                "    }\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
+                "    validate_canonical_object_framing();\n"
+                "}\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    validate_selected_message_metadata();\n"
+                "    let payload = object.messages[0].data.clone();\n"
+                "    budget.charge_codec_report(());\n"
+                "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header(payload);\n"
+                "}\n"
+            )
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nimpl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
+                "}\n"
+                "impl Edit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        rewrite_chart_caption_operation(true, false, &mut budget);\n"
+                "    }\n"
+                "}\n"
+                + helper,
+                encoding="utf-8",
+            )
+            exports = ", ".join(canonical)
+            package.write_text(
+                "mod slide_chart_caption;\n"
+                f"pub use slide_chart_caption::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            library.write_text(
+                f"pub use package::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "rewrite_package_metadata_save_tokens();", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("advance Metadata save tokens" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "validate_canonical_object_framing();", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("canonical object framing" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn cross_component_caption() { cross_component(); }\n"
+                + "#[cfg(test)]\n"
+                + "fn test_only_bad_transition() {\n"
+                + "    info.object_references.push(7);\n"
+                + "    object.replace_message_preserving_header(message);\n"
+                + "}\n"
+                + "fn bad_transition() {\n"
+                + "    info.object_references.push(7);\n"
+                + "    object.replace_message_preserving_header(message);\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("external-reference attribution" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("MessageInfo reference mutation" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "fn bad_transition() {\n"
+                    "    info.object_references.push(7);\n"
+                    "    object.replace_message_preserving_header(message);\n"
+                    "}\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertFalse(
+                any("MessageInfo reference mutation" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_chart_caption_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_chart_caption_legacy_calls()", main_source
+        )
+        self.assertIn(
+            "+ audit_keynote_chart_caption_facade_source_topology()", main_source
+        )
+
+    def _write_movie_caption_facade_fixture(self, root: Path) -> tuple[Path, Path, Path, Path]:
+        owner = root / boundaries.KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE
+        selector = root / boundaries.KEYNOTE_MOVIE_CAPTION_SELECTOR_SOURCE
+        package = root / boundaries.KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[0]
+        library = root / boundaries.KEYNOTE_MOVIE_CAPTION_EXPORT_SOURCES[1]
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        selector.parent.mkdir(parents=True, exist_ok=True)
+        canonical = sorted(boundaries.KEYNOTE_MOVIE_CAPTION_CANONICAL_TYPES)
+        owner.write_text(
+            "\n".join(f"pub struct {name};" for name in canonical)
+            + "\nimpl Package {\n"
+            "    pub fn slide_movie_caption(&self, selector: MovieSelector) -> Option<String> { let _ = selector; None }\n"
+            "    pub fn edit_slide_movie_caption(&self, selector: MovieSelector) -> Edit { let _ = selector; Edit }\n"
+            "    pub fn apply_slide_movie_caption(&self, patch: Patch) -> Commit { let _ = patch; Commit }\n"
+            "}\n"
+            "impl Edit {\n"
+            "    pub fn set(self, caption: &str) -> Self { let _ = caption; self }\n"
+            "    pub fn clear(self) -> Self { self }\n"
+            "    pub fn commit(self) -> Commit { let _ = self; Commit }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        selector.write_text(
+            "pub enum MovieSelector { Index(usize) }\n",
+            encoding="utf-8",
+        )
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            "mod slide_movie_caption;\n"
+            + "pub use slide_movie_caption::{"
+            + ", ".join(canonical)
+            + "};\n",
+            encoding="utf-8",
+        )
+        library.write_text(
+            "pub use package::{"
+            + ", ".join(canonical)
+            + "};\n"
+            "pub use slide::movie::MovieSelector;\n",
+            encoding="utf-8",
+        )
+        add_keynote_family_module(root, "MOVIE_CAPTION")
+        return owner, selector, package, library
+
+    def test_focused_keynote_movie_caption_facade_requires_selector_owner_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_caption_facade_source_topology(root),
+                [
+                    "focused litchi-keynote movie-caption owner source is missing: "
+                    f"{boundaries.KEYNOTE_MOVIE_CAPTION_OWNER_SOURCE}"
+                ],
+            )
+            owner, selector, package, library = self._write_movie_caption_facade_fixture(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_caption_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_movie_caption(bytes: &[u8]) -> MovieCaptionSnapshot<'_> { todo!() }\n"
+                + "pub use litchi_iwa_protos::WireView;\n"
+                + "pub type MovieCaptionEdit = Edit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "selector: MovieSelector", "movie_id: u64"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_movie_caption;", "pub mod slide_movie_caption;"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+            selector.write_text("pub struct WrongSelector;\n", encoding="utf-8")
+            library.write_text(
+                library.read_text(encoding="utf-8").replace(
+                    "pub use slide::movie::MovieSelector;", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("missing canonical MovieSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical MovieSelector re-export" in item for item in violations), violations)
+
+    def test_focused_keynote_movie_caption_owner_masks_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_caption_facade_fixture(root)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "pub fn cfg_only_bad(bytes: &[u8], movie_id: u64) -> MovieCaptionSnapshot<'static> { todo!() }\n"
+                + owner.read_text(encoding="utf-8")
+                + "pub fn production_bad(bytes: &[u8], movie_id: u64) -> MovieCaptionSnapshot<'static> { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier parameter" in item for item in violations), violations)
+            self.assertEqual(sum("raw byte slice" in item for item in violations), 1)
+            self.assertEqual(sum("raw identifier parameter" in item for item in violations), 1)
+
+
+    def test_keynote_movie_caption_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_movie_caption_facade_source_topology()", main_source
+        )
+        self.assertIn(
+            "+ audit_keynote_movie_caption_lifecycle_source_topology()", main_source
+        )
+
+    def test_focused_keynote_movie_caption_lifecycle_requires_graph_metadata_and_budget(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_caption_facade_fixture(root)
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("private aggregate package budget" in item for item in violations), violations)
+            self.assertTrue(any("graph operation helper is missing" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                + "struct MovieCaptionBudget;\n"
+                + "#[cfg(test)]\n"
+                + "fn rewrite_movie_caption_operation(creating: bool, removing: bool) { let _ = (creating, removing); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("private aggregate package budget" in item for item in violations), violations)
+            self.assertTrue(any("graph operation helper is missing" in item for item in violations), violations)
+
+            source = owner.read_text(encoding="utf-8")
+            source = source.replace(
+                "pub fn apply_slide_movie_caption(&self, patch: Patch) -> Commit { let _ = patch; Commit }",
+                "pub fn apply_slide_movie_caption(&self, patch: Patch) -> Commit { let budget = MovieCaptionBudget; let _ = (patch, budget); Commit }",
+            ).replace(
+                "pub fn commit(self) -> Commit { let _ = self; Commit }",
+                "pub fn commit(self) -> Commit { let budget = MovieCaptionBudget; let _ = (self, budget); Commit }",
+            )
+            source += """
+struct MovieCaptionBudget;
+fn rewrite_movie_caption_operation(
+    budget: &MovieCaptionBudget,
+    creating: bool,
+    removing: bool,
+) {
+    let _ = (budget, creating, removing);
+    validate_canonical_object_framing();
+    patch_movie_caption_edge(expected_identifier, replacement_identifier);
+    rewrite_movie_caption_with_report();
+    prepare_package_metadata_additions_and_save_tokens();
+    add_component_object_uuids();
+    budget.charge_movie_codec_report(report);
+    budget.charge_archive_work();
+    budget.charge_snappy_work();
+    budget.charge_zip_work();
+    budget.charge_reopen_work();
+    budget.charge_artifact_work();
+}
+"""
+            owner.write_text(source, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root), []
+            )
+
+            owner.write_text(
+                source.replace("add_component_object_uuids();", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("Metadata/UUID registry" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("creating: bool,", "creating: bool,").replace(
+                    "    let _ = (budget, creating, removing);",
+                    "    let _ = (budget, creating, removing);\n    if storage_identifier.is_none() { return Err(UnsupportedDependency); }",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_caption_lifecycle_source_topology(root)
+            self.assertTrue(any("blanket" in item for item in violations), violations)
+
+    def _write_movie_title_facade_fixture(
+        self, root: Path
+    ) -> tuple[Path, Path, Path, Path]:
+        owner = root / boundaries.KEYNOTE_MOVIE_TITLE_OWNER_SOURCE
+        selector = root / boundaries.KEYNOTE_MOVIE_TITLE_SELECTOR_SOURCE
+        package = root / boundaries.KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[0]
+        library = root / boundaries.KEYNOTE_MOVIE_TITLE_EXPORT_SOURCES[1]
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        selector.parent.mkdir(parents=True, exist_ok=True)
+        canonical = sorted(boundaries.KEYNOTE_MOVIE_TITLE_CANONICAL_TYPES)
+        owner.write_text(
+            "\n".join(f"pub struct {name};" for name in canonical)
+            + "\nimpl Package {\n"
+            "    pub fn slide_movie_title(&self, selector: MovieSelector) -> Option<String> { let _ = selector; None }\n"
+            "    pub fn edit_slide_movie_title(&self, selector: MovieSelector) -> Edit { let _ = selector; Edit }\n"
+            "    pub fn apply_slide_movie_title(&self, patch: Patch) -> Commit { let _ = patch; Commit }\n"
+            "}\n"
+            "impl Edit {\n"
+            "    pub fn set(self, title: &str) -> Self { let _ = title; self }\n"
+            "    pub fn clear(self) -> Self { self }\n"
+            "    pub fn commit(self) -> Commit { let _ = self; Commit }\n"
+            "}\n",
+            encoding="utf-8",
+        )
+        selector.write_text("pub enum MovieSelector { Index(usize) }\n", encoding="utf-8")
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            "mod slide_movie_title;\n"
+            + "pub use slide_movie_title::{"
+            + ", ".join(canonical)
+            + "};\n",
+            encoding="utf-8",
+        )
+        library.write_text(
+            "pub use package::{"
+            + ", ".join(canonical)
+            + "};\n"
+            "pub use slide::movie::MovieSelector;\n",
+            encoding="utf-8",
+        )
+        add_keynote_family_module(root, "MOVIE_TITLE")
+        return owner, selector, package, library
+
+    def test_focused_keynote_movie_title_facade_requires_selector_and_hides_physical_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, selector, package, library = self._write_movie_title_facade_fixture(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_title_facade_source_topology(root), []
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_movie_title(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n"
+                + "pub use litchi_iwa_protos::WireView;\n"
+                + "pub type MovieTitleEdit = Edit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "selector: MovieSelector", "movie_id: u64"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_movie_title;", "pub mod slide_movie_title;"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+            selector.write_text("pub struct WrongSelector;\n", encoding="utf-8")
+            library.write_text(
+                library.read_text(encoding="utf-8").replace(
+                    "pub use slide::movie::MovieSelector;", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("missing canonical MovieSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical MovieSelector re-export" in item for item in violations), violations)
+
+    def test_focused_keynote_movie_title_facade_masks_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_title_facade_fixture(root)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "pub fn cfg_only_bad(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n"
+                + owner.read_text(encoding="utf-8")
+                + "pub fn production_bad(bytes: &[u8], movie_id: u64) -> MovieTitleSnapshot<'static> { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertEqual(sum("raw byte slice" in item for item in violations), 1)
+            self.assertEqual(sum("raw identifier" in item for item in violations), 2)
+
+
+    def test_keynote_movie_title_codec_and_lifecycle_require_dual_edge_and_budget(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner, _selector, _package, _library = self._write_movie_title_facade_fixture(root)
+            violations = boundaries.audit_keynote_movie_title_codec_source_topology(root)
+            self.assertTrue(any("missing strict dual-edge codec" in item for item in violations), violations)
+            violations = boundaries.audit_keynote_movie_title_lifecycle_source_topology(root)
+            self.assertTrue(any("graph operation helper is missing" in item for item in violations), violations)
+
+            codec = root / boundaries.KEYNOTE_MOVIE_TITLE_CODEC_SOURCE
+            graph_codec = root / boundaries.KEYNOTE_MOVIE_TITLE_GRAPH_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            graph_codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "fn decode_movie_caption() {}\nfn decode_movie_caption_with_report() {}\n"
+                "fn rewrite_movie_caption_with_report() {}\n"
+                "struct MovieCaptionWrite; struct MovieCaptionSnapshot;\n"
+                "fn title_edge() { MovieCaptionWrite::title; MovieCaptionSlot::Title; }\n",
+                encoding="utf-8",
+            )
+            graph_codec.write_text(
+                "fn encode_caption_graph_with_kind_with_report() {}\n"
+                "struct CaptionGraphKind; struct CaptionGraphWrite;\n"
+                "fn title_profile() { CaptionGraphKind::Title; DrawableCaptionKind::Title; }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_title_codec_source_topology(root)
+            self.assertTrue(any("hidden" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + """
+struct CaptionBudget;
+fn rewrite_movie_title_operation(
+    budget: &mut CaptionBudget,
+    creating: bool,
+    removing: bool,
+) {
+    let _ = (budget, creating, removing);
+    validate_canonical_object_framing();
+    patch_movie_title_edge(expected_identifier, replacement_identifier);
+    keynote_movie_caption_codec::rewrite_movie_caption_with_report(bytes);
+    keynote_chart_caption_graph_codec::encode_caption_graph_with_kind_with_report(bytes);
+    let _ = (MOVIE_TITLE_FIELD, CAPTION_INFO_MESSAGE_TYPE, CaptionInfoArchive);
+    let _ = DrawableCaptionKind::Title;
+    prepare_package_metadata_additions_and_save_tokens();
+    ObjectUuidAddition;
+    budget.charge_codec_report(report);
+    budget.charge_archive_work();
+    budget.charge_snappy_work();
+    budget.charge_zip_work();
+    budget.charge_reopen_work();
+    budget.charge_exact_artifacts();
+    let _ = (ExactArtifacts, inverse, locality, PatchConflict);
+}
+""",
+                encoding="utf-8",
+            )
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "fn codec_route() { keynote_movie_caption_codec; }\n",
+                encoding="utf-8",
+            )
+            graph_codec.write_text(
+                graph_codec.read_text(encoding="utf-8")
+                + "fn graph_route() { keynote_chart_caption_graph_codec; }\n",
+                encoding="utf-8",
+            )
+            # The codec and owner now contain the complete marker profile, so
+            # both audits must accept the synthetic production shape.
+            self.assertEqual(
+                boundaries.audit_keynote_movie_title_codec_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_movie_title_lifecycle_source_topology(root), []
+            )
+
+    def test_keynote_movie_title_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_movie_title_legacy_calls()",
+            "+ audit_keynote_movie_title_facade_source_topology()",
+            "+ audit_keynote_movie_title_codec_source_topology()",
+            "+ audit_keynote_movie_title_lifecycle_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_movie_playback_facade_is_dormant_until_owner_and_then_strict(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            # The current compatibility host is intentionally not audited
+            # until the owner/codec/package activation seam exists.
+            self.assertEqual(
+                boundaries.audit_keynote_movie_playback_facade_source_topology(root), []
+            )
+            add_keynote_movie_playback_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_playback_facade_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_playback(bytes: &[u8], movie_id: u64) -> MoviePlaybackSnapshot { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+    def test_keynote_movie_playback_facade_masks_cfg_test_decoys_and_rejects_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_playback_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\npub fn decoy(movie_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::Edit as PlaybackEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_movie_playback_codec_resource_and_fuzz_ratchets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_playback_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_playback_resource_source_topology(root),
+                [],
+            )
+            codec = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            for markers in boundaries.KEYNOTE_MOVIE_PLAYBACK_CODEC_MARKER_GROUPS.values():
+                for marker in markers:
+                    codec_source = codec_source.replace(marker, "")
+            codec.write_text(codec_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("resource/preflight" in item for item in violations), violations)
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "fn resource() { max_work; try_reserve; }\n",
+                encoding="utf-8",
+            )
+            fuzz = root / boundaries.KEYNOTE_MOVIE_PLAYBACK_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_movie_playback_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+
+    def test_keynote_movie_playback_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_movie_playback_facade_source_topology()",
+            "+ audit_keynote_movie_playback_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_audio_position_facade_rejects_raw_values_and_codec_regression(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_audio_position_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_position(bytes: &[u8], audio_object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_audio_position_facade_source_topology(root)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn raw_position(bytes: &[u8], audio_object_id: u64) {}\n", ""
+                ),
+                encoding="utf-8",
+            )
+            codec = root / boundaries.KEYNOTE_AUDIO_POSITION_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            codec.write_text(
+                codec_source.replace("pub fn decode_movie_position_with_report() {}\n", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_audio_position_codec_source_topology(root)
+            self.assertTrue(any("decode_movie_position_with_report" in item for item in violations), violations)
+
+            codec.write_text(codec_source, encoding="utf-8")
+            fuzz = root / boundaries.KEYNOTE_AUDIO_POSITION_FUZZ_SOURCE
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_audio_position_completion_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+    def test_keynote_audio_position_resource_guard_rejects_unbounded_or_unprepared_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_audio_position_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_AUDIO_POSITION_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("fn execute_prepared()", "fn execute_prepared()")
+                + "fn unbounded() { saturating_add; }\n"
+                + "struct SecondBudget;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_audio_position_resource_source_topology(root)
+            self.assertTrue(any("exactly one aggregate" in item for item in violations), violations)
+            self.assertTrue(any("checked resource accounting" in item for item in violations), violations)
+
+
+    def test_keynote_audio_position_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_audio_position_facade_source_topology()",
+            "+ audit_keynote_audio_position_codec_source_topology()",
+            "+ audit_keynote_audio_position_completion_source_topology()",
+            "+ audit_keynote_audio_position_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_media_properties_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_media_properties_facade_source_topology()",
+            "+ audit_keynote_media_properties_codec_source_topology()",
+            "+ audit_keynote_media_properties_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_movie_geometry_facade_is_dormant_until_owner_and_then_strict(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_facade_source_topology(root), []
+            )
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_facade_source_topology(root), []
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_geometry(bytes: &[u8], movie_id: u64) -> MovieGeometrySnapshot { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_facade_masks_cfg_test_decoys_and_rejects_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\npub fn decoy(movie_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::Edit as GeometryEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_movie_geometry_codec_resource_preview_and_fuzz_ratchets(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_resource_source_topology(root), []
+            )
+            codec = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            for markers in boundaries.KEYNOTE_MOVIE_GEOMETRY_CODEC_MARKER_GROUPS.values():
+                for marker in markers:
+                    codec_source = codec_source.replace(marker, "")
+            codec.write_text(codec_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("resource/preflight" in item for item in violations), violations)
+            codec.write_text(
+                codec.read_text(encoding="utf-8") + "fn resource() { max_work; try_reserve; }\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_MOVIE_GEOMETRY_PACKAGE_MARKER_GROUPS["preview invalidation"]:
+                owner_source = owner_source.replace(marker, "")
+            owner.write_text(owner_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_movie_geometry_resource_source_topology(root)
+            self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+            fuzz = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_movie_geometry_facade_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+
+    def test_keynote_movie_geometry_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_movie_geometry_facade_source_topology()",
+            "+ audit_keynote_movie_geometry_resource_source_topology()",
+            "+ audit_keynote_movie_geometry_completion_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_media_data_facade_rejects_physical_ids_and_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_media(bytes: &[u8], movie_id: u64, archive: Archive, wire: WireView) { let _ = (bytes, movie_id, archive, wire); }\n"
+                + "#[cfg(test)]\npub fn decoy(movie_id: u64) {}\n"
+                + "pub use self::Edit as MediaDataEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_transaction_requires_one_budget_and_prepared_closure(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_transaction_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source.replace("MediaBudget::for_package(self)?;", "budget_placeholder;", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("(slide_media_data)" in item for item in violations), violations
+            )
+
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source
+                + "fn reset_helper(budget: &mut MediaBudget) { let mut nested = MediaBudget::for_package(package)?; let _ = (budget, nested); }\n"
+                + "fn reset_decode() { DecodeOptions::for_source(payload); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("must not reset" in item for item in violations), violations)
+            self.assertTrue(any("must not reset codec limits" in item for item in violations), violations)
+
+            closure = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+            closure.write_text(
+                closure.read_text(encoding="utf-8").replace("&mut MediaBudget", "&MediaBudget"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("closure helper must thread" in item for item in violations), violations)
+
+            owner_source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                owner_source.replace("prepare_package_metadata_media_rewrite", "removed_metadata_rewrite"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("must prepare metadata rewrite" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_transaction_allows_only_borrowed_budget_visitors(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            closure = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+            closure.write_text(
+                closure.read_text(encoding="utf-8")
+                + "\n"
+                + "struct SafeVisitor<'a> { budget: &'a mut MediaBudget }\n"
+                + "impl SafeVisitor<'_> { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                + "fn make_safe_visitor(budget: &mut MediaBudget) { let mut visitor = SafeVisitor { budget }; visitor.validate_entry(); }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_transaction_source_topology(root),
+                [],
+            )
+
+            invalid_visitors = {
+                "copied ledger": (
+                    "struct CopiedVisitor<'a> { budget: &'a mut MediaBudget }\n"
+                    "impl CopiedVisitor<'_> { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                    "fn make_copied(budget: &mut MediaBudget) { let copied = CopiedVisitor { budget: *budget }; copied.validate_entry(); }\n"
+                ),
+                "owned ledger": (
+                    "struct OwnedVisitor { budget: MediaBudget }\n"
+                    "impl OwnedVisitor { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                    "fn make_owned(budget: &mut MediaBudget) { let owned = OwnedVisitor { budget: MediaBudget }; owned.validate_entry(); }\n"
+                ),
+                "non-budget ledger": (
+                    "struct NonBudgetVisitor<'a> { budget: &'a mut OtherBudget }\n"
+                    "impl NonBudgetVisitor<'_> { fn validate_entry(&mut self) { self.budget.wire_work(1); } }\n"
+                    "fn make_non_budget(budget: &mut MediaBudget) { let visitor = NonBudgetVisitor { budget }; visitor.validate_entry(); }\n"
+                ),
+            }
+            for label, visitor in invalid_visitors.items():
+                with self.subTest(label=label):
+                    invalid_root = Path(temporary) / label.replace(" ", "_")
+                    invalid_root.mkdir()
+                    add_keynote_slide_media_data_canonical_scaffold(invalid_root)
+                    invalid_closure = (
+                        invalid_root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CLOSURE_SOURCE
+                    )
+                    invalid_closure.write_text(
+                        invalid_closure.read_text(encoding="utf-8") + "\n" + visitor,
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_keynote_slide_media_data_transaction_source_topology(
+                        invalid_root
+                    )
+                    self.assertTrue(
+                        any("validate_entry" in item and "must thread" in item for item in violations),
+                        violations,
+                    )
+
+    def test_keynote_slide_media_data_codecs_and_owner_require_lazy_bounded_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_codec_source_topology(root), []
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_resource_source_topology(root),
+                [],
+            )
+
+            metadata = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+            metadata_source = metadata.read_text(encoding="utf-8")
+            for marker in ("max_message_bytes", "max_fields", "max_work_bytes", "try_reserve"):
+                metadata_source = metadata_source.replace(marker, "")
+            metadata.write_text(metadata_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_data_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("finite media resource accounting" in item for item in violations),
+                violations,
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_SOURCE
+            owner_source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_MEDIA_DATA_OWNER_MARKER_GROUPS[
+                "preview invalidation"
+            ]:
+                owner_source = owner_source.replace(marker, "")
+            owner.write_text(owner_source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_data_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_core_clone_boundary_keeps_core_ownership(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            core = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CORE_SOURCE_ROOT / "archive.rs"
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(root),
+                [],
+            )
+
+            package = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use crate::clone_with_identity_remap;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("public API exposes" in item for item in violations), violations)
+
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "pub use crate::clone_with_identity_remap;\n", ""
+                ),
+                encoding="utf-8",
+            )
+            core.write_text(
+                core.read_text(encoding="utf-8").replace(
+                    "let _ = (archive_info, messages, original_header, original_canonical_header, remap);",
+                    "buffa::Message; let _ = (archive_info, messages, original_header, original_canonical_header, remap);",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_core_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("must not depend" in item for item in violations), violations)
+
+    def test_keynote_slide_media_data_metadata_boundary_requires_borrowed_witness(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_data_canonical_scaffold(root)
+            metadata = root / boundaries.KEYNOTE_SLIDE_MEDIA_DATA_CODEC_SOURCES[1]
+            metadata_source = metadata.read_text(encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            metadata.write_text(
+                metadata_source.replace(
+                    "let map_source = batch.data_metadata_map_source; count_data_owners(source, removal.identifier); owner_removals;",
+                    "count_data_owners(source, removal.identifier); owner_removals;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("bounded map witness" in item for item in violations), violations)
+
+            metadata.write_text(
+                metadata_source + "pub struct DataMetadataMap;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_data_metadata_boundary_source_topology(
+                root
+            )
+            self.assertTrue(any("unbounded/public map" in item for item in violations), violations)
+
+
+    def test_keynote_slide_media_data_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_media_data_facade_source_topology()",
+            "+ audit_keynote_slide_media_data_codec_source_topology()",
+            "+ audit_keynote_slide_media_data_core_boundary_source_topology()",
+            "+ audit_keynote_slide_media_data_metadata_boundary_source_topology()",
+            "+ audit_keynote_slide_media_data_resource_source_topology()",
+            "+ audit_keynote_slide_media_data_transaction_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_media_lifecycle_audits_are_dormant_until_owner_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            audits = (
+                boundaries.audit_keynote_slide_media_lifecycle_facade_source_topology,
+                boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology,
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology,
+            )
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            for audit in audits:
+                self.assertEqual(audit(root), [], audit.__name__)
+
+    def test_keynote_slide_media_lifecycle_facade_rejects_raw_graph_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_lifecycle(bytes: &[u8], movie_object_id: u64, archive: Archive, wire: WireView) {}\n"
+                + "pub use self::LifecyclePatch as LifecycleAlias;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("wire type" in item for item in violations), violations)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+
+            package = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_media_lifecycle;", "pub mod slide_media_lifecycle;"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+    def test_keynote_slide_media_lifecycle_allows_only_shared_internal_children(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+
+            shared = source.replace(
+                "mod budget;\n", "pub(in crate::package) mod budget;\n", 1
+            ).replace(
+                "mod comment_graph;\n",
+                "pub(in crate::package) mod comment_graph;\n",
+                1,
+            )
+            owner.write_text(shared, encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                shared.replace(
+                    "mod graph;\n", "pub(in crate::package) mod graph;\n", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("child modules must remain private" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                shared.replace(
+                    "pub(in crate::package) mod budget;\n",
+                    "pub(crate) mod budget;\n",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("child modules must remain private" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_media_lifecycle_transaction_requires_one_budget_and_children(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            comment_graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs"
+            comment_graph_source = comment_graph.read_text(encoding="utf-8")
+            comment_graph.write_text(
+                comment_graph_source.replace(
+                    "CommentGraphPayloadPolicy::Strict",
+                    "CommentGraphPayloadPolicy::PreserveRootExtensions",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("clone wrapper strict" in item for item in violations), violations)
+            comment_graph.write_text(comment_graph_source, encoding="utf-8")
+
+            graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
+            graph_source = graph.read_text(encoding="utf-8")
+            graph.write_text(
+                graph_source.replace(
+                    "plan_comment_graph(package,",
+                    "plan_comment_graph_cross_component(package,",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must not use the package-scope cross-component" in item for item in violations),
+                violations,
+            )
+            graph.write_text(graph_source, encoding="utf-8")
+            owner.write_text(source.replace("mod comment_graph;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("comment_graph child" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            comment_graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_graph.rs"
+            comment_graph_source = comment_graph.read_text(encoding="utf-8")
+            comment_graph.write_text(
+                comment_graph_source.replace("CommentStorageVisitor", "MissingVisitor", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("strict comment-storage visitor" in item for item in violations), violations)
+            comment_graph.write_text(comment_graph_source, encoding="utf-8")
+
+            owner.write_text(source.replace("mod graph;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("graph child" in item for item in violations), violations)
+
+            owner.write_text(source.replace("mod budget;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("budget child" in item for item in violations), violations)
+
+            owner.write_text(source.replace("mod node_cache;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("node_cache child" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(source.replace("mod identifier_watermark;\n", "", 1), encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("identifier_watermark child" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            identifier_watermark = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "identifier_watermark.rs"
+            identifier_watermark_source = identifier_watermark.read_text(encoding="utf-8")
+            identifier_watermark.write_text(
+                identifier_watermark_source.replace("fn plan_release", "fn missing_plan_release", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("missing strict API plan_release" in item for item in violations), violations)
+            identifier_watermark.write_text(identifier_watermark_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "identifier_watermark::plan_release(source, &source_ids,",
+                    "identifier_watermark::plan_release(source, &selected_source_ids,",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "source_ids, the source watermark" in item
+                    or "effective removed-object set" in item
+                    for item in violations
+                ),
+                violations,
+            )
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    ".with_new_last_identifier(new_last_identifier)",
+                    ".with_missing_last_identifier(new_last_identifier)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("attach the released watermark" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            metadata = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "metadata.rs"
+            metadata_source = metadata.read_text(encoding="utf-8")
+            metadata.write_text(
+                metadata_source.replace("with_new_last_object_identifier", "with_missing_last_object_identifier", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("optional removal watermark" in item for item in violations), violations)
+            metadata.write_text(metadata_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "snapshot.last_identifier().max(snapshot.metadata_identifier_maximum())",
+                    "snapshot.last_identifier()",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("metadata and physical identifier census marker" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            metadata.write_text(
+                metadata_source.replace(
+                    "self.observe_identifier(owner.object_identifier());",
+                    "self.observe_identifier(owner.object_identifier()); self.observe_identifier(data_reference.data_identifier());",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("host object identifiers" in item for item in violations), violations)
+            metadata.write_text(metadata_source, encoding="utf-8")
+
+            node_cache = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "node_cache.rs"
+            node_cache_source = node_cache.read_text(encoding="utf-8")
+            node_cache.write_text(
+                node_cache_source.replace("index.replace(position).is_some()", "index = Some(position)", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("unique supported message" in item for item in violations), violations)
+            node_cache.write_text(node_cache_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "node_cache::prepare_slide_node_build_cache",
+                    "node_cache::prepare_missing_slide_node_build_cache",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("route its node-cache helper prepare_slide_node_build_cache" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace("mod clone_payload;\n", "pub mod clone_payload;\n", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("child modules must remain private" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("select_media(&mut budget)", "select_media()", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("route its shared budget through select_media" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace("clone_object(&mut budget)", "clone_object()", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("route its shared budget through clone_object" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace(
+                    "replace_slide_message_with_lifecycle_refs(&mut budget)",
+                    "replace_slide_message_with_lifecycle_refs()",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "route its shared budget through replace_slide_message_with_lifecycle_refs"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+            graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
+            graph_source = graph.read_text(encoding="utf-8")
+            graph.write_text(
+                graph_source.replace(
+                    "plan_comment_graph(package, component_name, root, limits, budget)",
+                    "plan_comment_graph(package, component_name, root, limits)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("shared budget through plan_comment_graph" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "archive_limits, budget);",
+                    "archive_limits, archive_limits);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("plan_comment_removal" in item and "shared budget" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "if action == LifecycleAction::Remove",
+                    "if action == LifecycleAction::Duplicate",
+                    2,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("gated by the remove action" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "let source_ids = plan.removed_object_ids;",
+                    "let source_ids = selected_source_ids;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("filter physical source IDs" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace(
+                    "let external_authors = plan.unused_external_author_ids;",
+                    "let external_authors = selected_source_ids;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("preserve author diagnostics" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            comment_removal = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "comment_removal.rs"
+            comment_removal_source = comment_removal.read_text(encoding="utf-8")
+            comment_removal.write_text(
+                comment_removal_source
+                + "fn delete_authors() { for identifier in external_author_ids { push_vec(&mut removed_object_ids, identifier, budget); } }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("never delete author objects" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget);",
+                    "reserve_core_header_inspection_work;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("known payload" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget); reserve_core_header_inspection_work(object, archive_limits, budget); strict_reference_census(object, archive_limits, budget);",
+                    "reserve_core_header_inspection_work(object, archive_limits, budget); strict_reference_census(object, archive_limits, budget); validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("before its strict census" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_movie_payload_relationship",
+                    "missing_movie_payload_relationship",
+                    3,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("movie comment payload/header relationship" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_comment_storage_payload_relationship",
+                    "missing_comment_storage_payload_relationship",
+                    2,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("comment storage payload/header relationship" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_known_payload_relationships(package, component.name(), object, comment_graph, limits, budget);",
+                    "validate_known_payload_relationships(object, comment_graph, limits, budget);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("package and owning component" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "validate_comment_storage_target(package, component_name, identifier);",
+                    "missing_comment_storage_target(package, component_name, identifier);",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("Movie validation" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "facts.author_identifier",
+                    "facts.missing_author_identifier",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("author target" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "facts.reply_identifiers",
+                    "facts.missing_reply_identifiers",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("reply target" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace(
+                    "actual_component != component_name",
+                    "actual_component == component_name",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("same-component CommentStorage" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            comment_removal.write_text(
+                comment_removal_source.replace("message.data.len()", "message.data.capacity()", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("exact singleton MessageInfo/message type and length" in item for item in violations), violations)
+            comment_removal.write_text(comment_removal_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace("UnsupportedComment", "UnsupportedCaption", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("fail-closed" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace(
+                    "rewrite_comment_payload(message, object_remap, budget)",
+                    "rewrite_comment_payload(message, object_remap, limits)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("comment cloning through its shared budget" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace(
+                    "let _ = (storage_ids, author_ids); continue;",
+                    "let _ = (storage_ids, author_ids); break;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("shared author dependency skip semantics" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            graph.write_text(
+                graph_source.replace(
+                    "remap_clone_payload_with_budget", "remap_clone_payload", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("cfg(test) clone payload wrapper" in item for item in violations),
+                violations,
+            )
+
+            graph.write_text(
+                graph_source.replace("&mut charge", "&mut budget", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("charge callback" in item for item in violations), violations
+            )
+
+            graph.write_text(
+                graph_source.replace(
+                    "replace_slide_message_with_lifecycle_refs", "legacy_slide_rewrite"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("header helper" in item for item in violations), violations)
+            graph.write_text(graph_source, encoding="utf-8")
+
+            owner.write_text(
+                source.replace("count = count.checked_add(1)", "count = count.checked_add(2)", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("skip unsupported drawable siblings" in item for item in violations), violations)
+            owner.write_text(source, encoding="utf-8")
+
+            owner.write_text(
+                source + "struct SecondLifecycleBudget;\n", encoding="utf-8"
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("exactly one private aggregate budget" in item for item in violations), violations)
+
+            owner.write_text(
+                source.replace(
+                    "select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition();",
+                    "let _nested = MediaLifecycleBudget::for_package(self); select_media(&mut budget); clone_object(&mut budget); replace_slide_message_with_lifecycle_refs(&mut budget); metadata_transition();",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("exactly one aggregate budget" in item for item in violations), violations)
+
+    def test_keynote_media_lifecycle_codec_and_projection_remain_lazy_and_bounded(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(root),
+                [],
+            )
+
+            codec = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8") + "fn eager() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("eager generated operation" in item for item in violations), violations)
+
+            codec.write_text(codec.read_text(encoding="utf-8").split("fn eager", 1)[0], encoding="utf-8")
+            codec_child = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_NODE_CACHE_SOURCE
+            codec_child.write_text(
+                codec_child.read_text(encoding="utf-8")
+                + "fn eager() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "eager generated operation" in item
+                    and str(boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CODEC_NODE_CACHE_SOURCE) in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+            projection = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_PROJECTION_SOURCE
+            codec_child.write_text(
+                codec_child.read_text(encoding="utf-8").split("fn eager", 1)[0],
+                encoding="utf-8",
+            )
+            projection.write_text(
+                projection.read_text(encoding="utf-8").replace(
+                    "message BuildArchive", "message Bad { repeated Reference values = 1; }\nmessage BuildArchive"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("repeated views" in item for item in violations), violations)
+
+            projection.write_text(
+                projection.read_text(encoding="utf-8").replace(
+                    "message SlideNodeBuildCacheArchive", "message RemovedSlideNodeBuildCacheArchive", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("SlideNodeBuildCacheArchive" in item for item in violations), violations)
+
+            build = root / "crates/litchi-iwa-protos/build.rs"
+            build.write_text(
+                build.read_text(encoding="utf-8").replace(".lazy_views(true)", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(any("lazy_views" in item for item in violations), violations)
+
+    def test_keynote_media_lifecycle_comment_codec_remains_neutral_and_prepared(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            parent = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_PARENT_SOURCE
+            parent.parent.mkdir(parents=True, exist_ok=True)
+            parent.write_text(
+                "#[doc(hidden)]\npub mod lifecycle;\n",
+                encoding="utf-8",
+            )
+            child = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE
+            child.parent.mkdir(parents=True, exist_ok=True)
+            child.write_text(
+                "pub struct CommentStorageLifecycleRewrite<'a> { remaps: &'a [(u64, u64)] }\n"
+                "pub struct PreparedCommentStorageLifecycleRewrite<'a, 'b> { source: &'a [u8], remaps: &'b [(u64, u64)] }\n"
+                "pub fn prepare_comment_storage_lifecycle_rewrite() {}\n"
+                "pub fn rewrite_comment_storage_lifecycle() {}\n"
+                "fn source_witness() { expecting_fingerprint; expecting_storage_uuid; replacing_storage_uuid; storage_uuid; }\n"
+                "fn prepared() { prepare_report; execution_requirements; RewriteExecutionRequirements; RewriteExecutionLimits; execute; }\n"
+                "fn preserve() { reply_remaps; scan_comment_storage_raw; emit_lifecycle_rewrite; replies; RawField; }\n"
+                "fn bounded() { max_message_bytes; output_bytes; scratch_bytes; retained_bytes; try_reserve_exact; }\n",
+                encoding="utf-8",
+            )
+            tests = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_TEST_SOURCE
+            tests.write_text(
+                "#[test]\nfn lifecycle_rewrite_round_trip() { prepare_comment_storage_lifecycle_rewrite(); execution_requirements; execute; replacing_storage_uuid; unknown; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(root),
+                [],
+            )
+
+            child.write_text(
+                child.read_text(encoding="utf-8")
+                + "fn eager() { prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "eager generated operation" in item
+                    and str(boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_COMMENT_CODEC_SOURCE) in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_keynote_media_lifecycle_reserves_core_header_work_and_bulk_budget_atomically(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_media_lifecycle_canonical_scaffold(root)
+            graph = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "graph.rs"
+            graph_source = graph.read_text(encoding="utf-8")
+            budget = root / boundaries.KEYNOTE_SLIDE_MEDIA_LIFECYCLE_CHILD_ROOT / "budget.rs"
+            budget_source = budget.read_text(encoding="utf-8")
+            self.assertEqual(
+                boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work_inner(source, additional_references, limits, budget, true)",
+                    "reserve_core_header_work_inner(source, additional_references, limits, other_budget, true)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("mutation wrapper must delegate" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work_inner(source, 0, limits, budget, false)",
+                    "reserve_core_header_work_inner(source, 0, limits, other_budget, false)",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("inspection wrapper must delegate" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace("charge_allocation_plan", "charge_allocation_batch", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("inner helper must charge one atomic byte/event allocation plan" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace("charge_wire_work", "charge_wire_batch", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("inner helper must charge its bounded wire work" in item for item in violations), violations)
+
+            graph.write_text(graph_source, encoding="utf-8")
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work(source, object_remap.len(), limits, budget)?;",
+                    "limits;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("clone core publication" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work(object, removed.len(), limits, budget)?;",
+                    "limits;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("prune core publication" in item for item in violations), violations)
+
+            graph.write_text(
+                graph_source.replace(
+                    "reserve_core_header_work(object, growth, limits, budget)?;",
+                    "limits;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("transition core publication" in item for item in violations), violations)
+
+            graph.write_text(graph_source, encoding="utf-8")
+            budget.write_text(
+                budget_source.replace("charge_allocation_plan", "charge_allocation_batch"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_media_lifecycle_transaction_source_topology(
+                root
+            )
+            self.assertTrue(any("atomic allocation plan" in item for item in violations), violations)
+
+    def test_keynote_slide_media_lifecycle_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_media_lifecycle_facade_source_topology()",
+            "+ audit_keynote_slide_media_lifecycle_codec_source_topology()",
+            "+ audit_keynote_slide_media_lifecycle_transaction_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_movie_geometry_completion_is_dormant_until_explicit_activation(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+            add_keynote_movie_geometry_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_movie_geometry_completion_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_MOVIE_GEOMETRY_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "const MOVIE_GEOMETRY_COMPLETE: () = ();\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_movie_geometry_completion_source_topology(root)
+            self.assertTrue(any("missing angle" in item for item in violations), violations)
+            self.assertTrue(any("missing flip" in item for item in violations), violations)
+
+
+    def test_keynote_slide_table_title_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_title_facade_source_topology(root),
+                [],
+            )
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_title_facade_source_topology(root),
+                [],
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_title(bytes: &[u8], table_id: u64) -> ArchiveObject { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_title_facade_source_topology(root)
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+
+    def test_keynote_slide_table_title_masks_cfg_test_and_rejects_flat_alias(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\npub fn decoy(table_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::Edit as TitleEdit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_title_facade_source_topology(root)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_title_resource_markers_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_title_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_title_resource_source_topology(root),
+                [],
+            )
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_TITLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_TABLE_TITLE_PACKAGE_MARKER_GROUPS[
+                "strict Buffa projections"
+            ]:
+                source = source.replace(marker, "")
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_title_resource_source_topology(root)
+            self.assertTrue(any("strict Buffa projections" in item for item in violations), violations)
+
+    def test_keynote_slide_table_title_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_title_facade_source_topology()",
+            "+ audit_keynote_slide_table_title_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_table_sort_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_facade_source_topology(root),
+                [],
+            )
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_facade_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_sort_rejects_public_physical_and_row_range_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_sort(bytes: &[u8], model_id: u64, rows: RowRange) -> ArchiveObject { todo!() }\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n"
+                + "pub use self::Edit as SortEdit;\n",
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl Package { pub fn edit_slide_table_sort_order_with_rows(&self, rows: RowRange) {} }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_sort_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("legacy RowRange" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_requires_exact_codec_and_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_CODEC_SOURCE
+            source = codec.read_text(encoding="utf-8").replace(
+                "pub fn prepare_table_model_sort_order_rewrite", "pub fn missing_prepare"
+            )
+            codec.write_text(source, encoding="utf-8")
+            lib = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_CODEC_PUBLIC_SOURCE
+            lib.write_text("pub mod numbers_table_sort_order_codec;\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_sort_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("prepare_table_model_sort_order_rewrite" in item for item in violations), violations)
+            self.assertTrue(any("hidden codec module table_sort_order_codec" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_resource_markers_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_resource_source_topology(root),
+                [],
+            )
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_TABLE_SORT_PACKAGE_MARKER_GROUPS[
+                "prepared codec requirements"
+            ]:
+                source = source.replace(marker, "")
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("prepared codec requirements" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "let deleted_previews: usize = 0", "let deleted_previews: usize = 1"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+
+    def test_keynote_slide_table_sort_shared_core_boundary_accepts_formatted_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = source.replace(
+                "use super :: slide_table_core :: { Budget,\n"
+                "    select_table, same_target, verify_locality,\n"
+                "};\n",
+                "use\n"
+                "    super\n"
+                "    :: slide_table_core\n"
+                "    :: {\n"
+                "        Budget,\n"
+                "        select_table,\n"
+                "        same_target,\n"
+                "        verify_locality,\n"
+                "    };\n",
+            )
+            source += (
+                "// SortBudget ArchiveReferenceVisitor table_info_codec .max(1)\n"
+                "#[cfg(test)]\n"
+                "fn production_decoy() {\n"
+                "    let _ = (SortBudget, ArchiveReferenceVisitor, table_info_codec);\n"
+                "}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_sort_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_sort_shared_core_boundary_requires_every_route(self) -> None:
+        for api in boundaries.KEYNOTE_SLIDE_TABLE_SORT_SHARED_CORE_APIS:
+            with self.subTest(api=api):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_keynote_slide_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+                    source = owner.read_text(encoding="utf-8").replace(api, "")
+                    owner.write_text(source, encoding="utf-8")
+
+                    violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(
+                            f"must route {api} through slide_table_core" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_keynote_slide_table_sort_shared_core_boundary_requires_calls_not_imports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = re.sub(
+                r"fn shared_graph\(\) \{.*?\}\n",
+                "fn shared_graph() { Budget; }\n",
+                source,
+                flags=re.DOTALL,
+            )
+            owner.write_text(source, encoding="utf-8")
+
+            violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                root
+            )
+            for api in boundaries.KEYNOTE_SLIDE_TABLE_SORT_SHARED_CORE_APIS:
+                with self.subTest(api=api):
+                    self.assertTrue(
+                        any(
+                            f"must route {api} through slide_table_core" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_keynote_slide_table_sort_shared_core_boundary_rejects_local_graph_copies(
+        self,
+    ) -> None:
+        forbidden = (
+            (
+                "local SortBudget",
+                "struct\nSortBudget;\n",
+            ),
+            (
+                "local ArchiveReferenceVisitor",
+                "use litchi_iwa_core::\nArchiveReferenceVisitor;\n",
+            ),
+            (
+                "residual limit grant via .max(1)",
+                "fn residual_limit() {\n"
+                "    let available = budget.saturating_sub(\n"
+                "        used,\n"
+                "    )\n"
+                "    .max(\n"
+                "        1,\n"
+                "    );\n"
+                "}\n",
+            ),
+            (
+                "saturating reference counter",
+                "fn census() {\n"
+                "    self.model_edges = self.model_edges\n"
+                "        .saturating_add(1);\n"
+                "}\n",
+            ),
+            (
+                "direct table_info_codec graph selection",
+                "fn graph() {\n"
+                "    table_info_codec\n"
+                "        ::decode_table_info(bytes);\n"
+                "}\n",
+            ),
+        )
+        for label, addition in forbidden:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_keynote_slide_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.KEYNOTE_SLIDE_TABLE_SORT_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8") + addition,
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_keynote_slide_table_sort_resource_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"must not retain {label}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_keynote_slide_table_sort_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_sort_facade_source_topology()",
+            "+ audit_keynote_slide_table_sort_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_table_physical_sort_audits_are_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_physical_sort_facade_source_topology()",
+            "+ audit_keynote_slide_table_physical_sort_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_lock_state_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_lock_state_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_keynote_slide_table_lock_state_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_lock_state_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_table_lock_state_facade_rejects_public_physical_raw_and_flat(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_lock_state_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_LOCK_STATE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_lock(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n"
+                + "pub use self::Edit as LockStateEdit;\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_lock_state_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+
+    def test_keynote_slide_table_lock_state_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_lock_state_facade_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_slide_table_dimension_facade_is_dormant_then_strict(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_keynote_slide_table_dimension_rejects_public_physical_raw_and_flat(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_dimension(bytes: &[u8], model_id: u64, wire: WireView, generated: GeneratedProjection, prost: prost_types::MessageInfo) -> ArchiveObject { todo!() }\n"
+                + "pub use self::Edit as DimensionEdit;\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "raw byte slice",
+                "raw parameter",
+                "archive/IWA type ArchiveObject",
+                "wire type WireView",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+                "flat alias DimensionEdit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_dimension_requires_semantic_and_selector_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_dimension_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text("pub struct Dimension;\n", encoding="utf-8")
+            selector = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_SELECTOR_SOURCE
+            selector.write_text("pub struct TableSelector;\n", encoding="utf-8")
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_dimension_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "semantic API is missing",
+                "transaction API is missing",
+                "selector must expose",
+                "Package method is missing",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing contract violation {fragment!r}: {violations!r}",
+                )
+
+
+    def test_keynote_slide_table_dimension_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_dimension_facade_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_table_name_facade_rejects_public_physical_raw_and_flat(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_name(model_id: u64, source_bytes: &[u8], wire: WireView, generated: GeneratedProjection, prost: prost_types::MessageInfo) -> ArchiveObject { todo!() }\n"
+                + "pub use self::Edit as NameEdit;\n"
+                + "#[cfg(test)]\npub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_name_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "raw byte slice",
+                "raw parameter",
+                "archive/IWA type ArchiveObject",
+                "wire type WireView",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+                "flat alias NameEdit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_name_facade_requires_semantics_selectors_and_methods(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SEMANTIC_SOURCE
+            semantic.write_text("pub struct Name;\n", encoding="utf-8")
+            selector = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_SELECTOR_SOURCE
+            selector.write_text("pub struct TableSelector;\n", encoding="utf-8")
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+            owner.write_text("impl Package {}\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_name_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "semantic API is missing",
+                "transaction API is missing",
+                "selector must expose",
+                "Package method is missing",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing contract violation {fragment!r}: {violations!r}",
+                )
+
+    def test_keynote_slide_table_name_requires_private_owner_and_codec_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "mod slide_table_name;", "pub mod slide_table_name;"
+                ),
+                encoding="utf-8",
+            )
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "pub fn prepare_table_model_name_rewrite", "pub fn missing_prepare"
+                ),
+                encoding="utf-8",
+            )
+            codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text("pub mod table_model_discovery_codec;\n", encoding="utf-8")
+            integration = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_TEST_SOURCES[0]
+            integration.write_text(
+                integration.read_text(encoding="utf-8").replace(
+                    "deleted_previews(), 0", "deleted_previews(), 1"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_name_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "owner module must remain private",
+                "prepare_table_model_name_rewrite",
+                "missing hidden codec module table_model_discovery_codec",
+                "exact no-op deleted_previews == 0",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing owner/codec violation {fragment!r}: {violations!r}",
+                )
+
+    def test_keynote_slide_table_name_resource_markers_and_one_shot_are_required(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_name_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_resource_source_topology(root),
+                [],
+            )
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_NAME_OWNER_SOURCE
+            baseline = owner.read_text(encoding="utf-8")
+            source = baseline.replace(
+                "root_preview_deletions", "missing_preview_deletions"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_name_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("preview invalidation" in item for item in violations), violations)
+
+            # A changed rename may remove any number of existing root previews;
+            # only the exact no-op path is required to report zero.
+            owner.write_text(
+                baseline + "fn changed_nonzero() { let deleted_previews = 3; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_name_resource_source_topology(root),
+                [],
+            )
+
+            source = baseline
+            source = source.replace(
+                boundaries.KEYNOTE_SLIDE_TABLE_NAME_PACKAGE_MARKER_GROUPS[
+                    "candidate reopen and authority"
+                ][0],
+                "missing_validation",
+            )
+            source += "fn bad() { rewrite_table_model_name(source, name); rename_table_in_package(package, id, name); }\n"
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_name_resource_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("candidate reopen and authority" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("one-shot table-model name rewrite" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("legacy Numbers name helper" in item for item in violations),
+                violations,
+            )
+
+
+    def test_keynote_slide_table_name_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_name_facade_source_topology()",
+            "+ audit_keynote_slide_table_name_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_table_headers_rejects_public_physical_raw_and_flat_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_header(bytes: &[u8], model_id: u64) -> ArchiveObject { todo!() }\n"
+                + "pub use self::Edit as HeaderEdit;\n"
+                + "#[cfg(test)]\n"
+                + "pub fn decoy(model_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_EXPORT_SOURCES[0]
+            package.write_text(
+                package.read_text(encoding="utf-8")
+                + "pub use slide_table_headers::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_headers_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+            self.assertTrue(any("raw parameter" in item for item in violations), violations)
+            self.assertTrue(any("archive/IWA type" in item for item in violations), violations)
+            self.assertTrue(any("flat alias" in item for item in violations), violations)
+            self.assertTrue(any("glob re-export" in item for item in violations), violations)
+            self.assertFalse(any("decoy" in item for item in violations), violations)
+
+    def test_keynote_slide_table_headers_masks_non_code_and_cfg_test_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "// pub fn raw_header(bytes: &[u8], model_id: u64) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub use crate::ArchiveObject; model_id: u64";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn decoy(bytes: &[u8], model_id: u64) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_headers_resource_source_topology(root),
+                [],
+            )
+
+    def test_keynote_slide_table_headers_requires_prepared_codec_and_hidden_modules(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "pub fn prepare_table_header_settings_rewrite",
+                    "pub fn missing_prepare_table_header_settings_rewrite",
+                ).replace(
+                    "pub struct RewriteExecutionRequirements;",
+                    "pub struct MissingExecutionRequirements;",
+                ),
+                encoding="utf-8",
+            )
+            codec_lib = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_PUBLIC_SOURCE
+            codec_lib.write_text(
+                "#[doc(hidden)]\n"
+                "pub mod numbers_table_header_settings_codec;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_headers_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("prepare_table_header_settings_rewrite" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("RewriteExecutionRequirements" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("hidden codec module table_header_settings_codec" in item for item in violations),
+                violations,
+            )
+
+    def test_keynote_slide_table_headers_requires_test_fuzz_and_corpus_inventory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace("#[test]", ""),
+                encoding="utf-8",
+            )
+            test_path = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_TEST_SOURCES[0]
+            test_path.unlink()
+            fuzz_path = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_SOURCES[0]
+            fuzz_path.unlink()
+            corpus = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_FUZZ_CORPORA[1]
+            corpus.rmdir()
+            violations = boundaries.audit_keynote_slide_table_headers_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing #[test] coverage" in item for item in violations), violations)
+            self.assertTrue(any("missing integration test" in item for item in violations), violations)
+            self.assertTrue(any(str(fuzz_path.relative_to(root)) in item for item in violations), violations)
+            self.assertTrue(any(str(corpus.relative_to(root)) in item for item in violations), violations)
+
+    def test_keynote_slide_table_headers_resource_markers_and_mutation_scope_are_required(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_HEADERS_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8").replace("HeaderBudget", "MissingBudget")
+            source = source.replace("deleted_previews: 0", "deleted_previews: 1")
+            source += (
+                "fn move_rows() {}\n"
+                "fn rewrite_formula() {}\n"
+                "fn metadata_update() {}\n"
+                "fn preview_delete() {}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_headers_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("aggregate transaction budget" in item for item in violations), violations)
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+            self.assertTrue(any("row movement" in item for item in violations), violations)
+            self.assertTrue(any("cell/formula mutation" in item for item in violations), violations)
+            self.assertTrue(any("metadata mutation" in item for item in violations), violations)
+            self.assertTrue(any("preview deletion" in item for item in violations), violations)
+
+
+    def test_keynote_slide_table_headers_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_headers_facade_source_topology()",
+            "+ audit_keynote_slide_table_headers_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_slide_table_appearance_boundary_accepts_complete_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_appearance_facade_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_slide_table_appearance_resource_source_topology(root),
+                [],
+            )
+
+
+    def test_keynote_slide_table_appearance_requires_selector_codec_and_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "SlideSelector<'slide>", "MissingSelector<'slide>", 1
+                ),
+                encoding="utf-8",
+            )
+            codec = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8").replace(
+                    "prepare_table_model_style_rewrite",
+                    "missing_prepare_table_model_style_rewrite",
+                ).replace(
+                    "scan_group_fields",
+                    "group_scan_disabled",
+                ),
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8").replace(
+                    "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines, RowSizing};",
+                    "pub use litchi_iwa_common::table::appearance::{Appearance, Banding, GridlineVisibility, Gridlines};",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("selector-first SlideSelector" in item for item in violations), violations)
+            self.assertTrue(any("prepare_table_model_style_rewrite" in item for item in violations), violations)
+            self.assertTrue(any("canonical unknown preservation" in item for item in violations), violations)
+            self.assertTrue(any("semantic API is missing RowSizing" in item for item in violations), violations)
+
+    def test_keynote_slide_table_appearance_rejects_public_leaks_and_masks_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableAppearanceEdit = Edit;\n"
+                + "pub fn raw_appearance(model_id: u64, source_bytes: &[u8], wire: WireView, archive: Archive, generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n"
+                + "// pub fn decoy(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub fn decoy(model_id: u64, bytes: &[u8])";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn test_only(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_table_appearance_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "flat alias TableAppearanceEdit",
+                "raw parameter model_id: u64",
+                "raw byte slice &[u8]",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), (fragment, violations))
+            self.assertFalse(any("decoy" in item or "test_only" in item for item in violations), violations)
+
+    def test_keynote_slide_table_appearance_resource_markers_and_scope_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_keynote_slide_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.KEYNOTE_SLIDE_TABLE_APPEARANCE_OWNER_MARKER_GROUPS[
+                "metadata ownership"
+            ]:
+                source = source.replace(marker, "missing_marker")
+            source = source.replace("deleted_previews = 0", "deleted_previews = 1")
+            source += (
+                "fn move_rows() {}\n"
+                "fn rewrite_formula() {}\n"
+                "fn delete_previews() {}\n"
+                "fn rewrite_table_model_style() {}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_keynote_slide_table_appearance_resource_source_topology(
+                root
+            )
+            self.assertTrue(any("metadata ownership" in item for item in violations), violations)
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+            self.assertTrue(any("row/cell movement" in item for item in violations), violations)
+            self.assertTrue(any("formula/tile mutation" in item for item in violations), violations)
+            self.assertTrue(any("preview deletion" in item for item in violations), violations)
+            self.assertTrue(any("one-shot style rewrite" in item for item in violations), violations)
+
+
+    def test_keynote_slide_table_appearance_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_slide_table_appearance_facade_source_topology()",
+            "+ audit_keynote_slide_table_appearance_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_focused_keynote_chart_caption_requires_one_aggregate_budget_and_masks_decoys(
+        self,
+    ) -> None:
+        """Keep every publication path under one bounded package transaction."""
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_CAPTION_OWNER_SOURCE
+            package = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[0]
+            library = root / boundaries.KEYNOTE_CHART_CAPTION_EXPORT_SOURCES[1]
+            add_keynote_family_module(root, "CHART_CAPTION")
+            owner.parent.mkdir(parents=True)
+            canonical = sorted(boundaries.KEYNOTE_CHART_CAPTION_CANONICAL_TYPES)
+            owner.write_text(
+                "\n".join(f"pub struct {name};" for name in canonical)
+                + "\nstruct ChartCaptionPackageBudget;\n"
+                "impl ChartCaptionPackageBudget {\n"
+                "    fn new() -> Self { Self }\n"
+                "    fn charge_codec_report(&mut self, _report: ()) {}\n"
+                "    fn charge_archive_work(&mut self) {}\n"
+                "    fn charge_snappy_work(&mut self) {}\n"
+                "    fn charge_zip_work(&mut self) {}\n"
+                "    fn charge_reopen_work(&mut self) {}\n"
+                "    fn charge_artifact_work(&mut self) {}\n"
+                "}\n"
+                "impl Package {\n"
+                "    pub fn slide_chart_caption(&self) {}\n"
+                "    pub fn edit_slide_chart_caption(&self) {}\n"
+                "    pub fn apply_slide_chart_caption(&self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        budget.charge_codec_report(());\n"
+                "        budget.charge_archive_work();\n"
+                "        budget.charge_snappy_work();\n"
+                "        budget.charge_zip_work();\n"
+                "        budget.charge_reopen_work();\n"
+                "        budget.charge_artifact_work();\n"
+                "        verify_caption_candidate(&mut budget);\n"
+                "    }\n"
+                "}\n"
+                "impl Edit {\n"
+                "    pub fn set(self) {}\n"
+                "    pub fn clear(self) {}\n"
+                "    pub fn commit(self) {\n"
+                "        let mut budget = ChartCaptionPackageBudget::new();\n"
+                "        rewrite_chart_caption_operation(true, false, &mut budget);\n"
+                "    }\n"
+                "}\n"
+                "fn verify_caption_candidate(budget: &mut ChartCaptionPackageBudget) {\n"
+                "    budget.charge_reopen_work();\n"
+                "}\n"
+                "fn rewrite_existing_caption_text_with_metadata(budget: &mut ChartCaptionPackageBudget) {\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
+                "    rewrite_package_metadata_save_tokens();\n"
+                "}\n"
+                "fn rewrite_chart_caption_operation(creating: bool, removing: bool, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    if !creating && !removing {\n"
+                "        rewrite_existing_caption_text_with_metadata(budget);\n"
+                "        return Ok(());\n"
+                "    }\n"
+                "    budget.charge_codec_report(());\n"
+                "    budget.charge_archive_work();\n"
+                "    budget.charge_snappy_work();\n"
+                "    budget.charge_zip_work();\n"
+                "    budget.charge_reopen_work();\n"
+                "    budget.charge_artifact_work();\n"
+                "    validate_canonical_object_framing();\n"
+                "    patch_chart_caption_edge(expected_identifier, replacement_identifier, budget);\n"
+                "}\n"
+                "fn patch_chart_caption_edge(expected_identifier: u64, replacement_identifier: u64, budget: &mut ChartCaptionPackageBudget) {\n"
+                "    validate_selected_message_metadata();\n"
+                "    budget.charge_codec_report(());\n"
+                "    rewrite_chart_caption_with_report(expected_identifier, replacement_identifier);\n"
+                "    object.replace_message_transitioning_object_references_preserving_header(message);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "pub fn test_only_raw(native_resource_id: Option<u64>) {\n"
+                "    budget.charge_archive_work();\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            exports = ", ".join(canonical)
+            package.write_text(
+                "mod slide_chart_caption;\n"
+                f"pub use slide_chart_caption::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            library.write_text(
+                f"pub use package::{{{exports}}};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root), []
+            )
+
+            invalid = owner.read_text(encoding="utf-8").replace(
+                "struct ChartCaptionPackageBudget;", "pub struct ChartCaptionPackageBudget;"
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertEqual(violations, [])
+            owner.write_text(invalid, encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("private aggregate package budget" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                invalid.replace("pub struct ChartCaptionPackageBudget;", "struct ChartCaptionPackageBudget;")
+                .replace("budget.charge_snappy_work();", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("prepublication snappy work" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "budget.charge_codec_report(());",
+                    "budget.charge_codec_report(());\n"
+                    "    budget.charge_snappy_work();",
+                ),
+                encoding="utf-8",
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn raw_caption(native_resource_id: Option<u64>) -> Edit { todo!() }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_caption_facade_source_topology(root)
+            self.assertTrue(
+                any("raw resource/native identifier" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn raw_caption(native_resource_id: Option<u64>) -> Edit { todo!() }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_keynote_chart_caption_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_package_no_eager_prost_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::{tn, tswp};\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tn::DocumentArchive::decode(bytes);\n"
+                "        let _ = tn::SheetArchive::decode(bytes);\n"
+                "        let _ = tn::FormBasedSheetArchive::decode(bytes);\n"
+                "        let _ = tswp::StorageArchive::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_accepts_strict_reject_all_index(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { locators: Box<[Locator]> }\n"
+                "fn build(locators: &[Locator]) {\n"
+                "    if locators.windows(2).any(|pair| {\n"
+                "        pair[0].identifier == pair[1].identifier\n"
+                "    }) {\n"
+                "        return Err(Error::InvalidFormat);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_identity_boundary_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_rejects_first_wins_deduplication(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { locators: Box<[Locator]> }\n"
+                "fn build(locators: &mut Vec<Locator>) {\n"
+                "    locators.dedup_by_key(|locator| locator.identifier);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must reject duplicate object identities" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must call same_content_ignoring_offsets" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("same-component duplicate identities" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("physical object count" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_accepts_exact_cross_component_alias_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index {\n"
+                "    physical_object_count: usize,\n"
+                "    locators: Box<[Locator]>,\n"
+                "}\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) {\n"
+                "            return Err(Error::Divergent);\n"
+                "        }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    let comparison_work = comparison_work(object_count);\n"
+                "    object_count.saturating_mul(comparison_work)\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.original_header == other.original_header\n"
+                "            && self.original_canonical_header == other.original_canonical_header\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_identity_boundary_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_rejects_decoded_only_comparison(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) { return Err(Error::Divergent); }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    let comparison_work = comparison_work(object_count);\n"
+                "    object_count.saturating_mul(comparison_work)\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("omits header_length" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("omits original_header" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("omits original_canonical_header" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_accepts_shared_source_provenance_shape(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "struct SourceProvenance;\n"
+                "impl ArchiveObject {\n"
+                "    fn source_headers(&self) -> Option<(&[u8], &[u8])> {\n"
+                "        self.source_provenance.as_deref().map(|provenance| (\n"
+                "            provenance.original_header(),\n"
+                "            provenance.original_canonical_header(),\n"
+                "        ))\n"
+                "    }\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.source_headers() == other.source_headers()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_identity_boundary_source_topology(root),
+                [],
+            )
+
+    def test_numbers_identity_boundary_rejects_same_source_provenance_endpoint(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn source_headers(&self) -> Option<(&[u8], &[u8])> {\n"
+                "        self.source_provenance.as_deref().map(|provenance| (\n"
+                "            provenance.original_header(),\n"
+                "            provenance.original_canonical_header(),\n"
+                "        ))\n"
+                "    }\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.source_headers() == self.source_headers()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "must compare self and other source_headers values" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_rejects_incomplete_shared_source_provenance(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn source_headers(&self) -> Option<&[u8]> {\n"
+                "        self.source_provenance.as_deref().map(|provenance| {\n"
+                "            provenance.original_header()\n"
+                "        })\n"
+                "    }\n"
+                "    pub fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.source_headers().is_some()\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("omits original_canonical_header" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must compare both source_headers values" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_rejects_offset_comparison_in_core_helper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) { return Err(Error::Divergent); }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    let comparison_work = comparison_work(object_count);\n"
+                "    object_count.saturating_mul(comparison_work)\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.original_header == other.original_header\n"
+                "            && self.original_canonical_header == other.original_canonical_header\n"
+                "            && self.offset == other.offset\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("compares an offset", violations[0])
+
+    def test_numbers_identity_boundary_rejects_unique_rebuild_work_term(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.component == right.component { return Err(Error::Duplicate); }\n"
+                "        if !left.same_content_ignoring_offsets(right) { return Err(Error::Divergent); }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn rebuild_work(&self) -> usize {\n"
+                "    let object_count = self.physical_object_count;\n"
+                "    object_count.saturating_mul(self.lookup_work())\n"
+                "}\n"
+                "fn aliases() { unique_count += 1; }\n",
+                encoding="utf-8",
+            )
+            core = root / boundaries.NUMBERS_CORE_ARCHIVE_SOURCE
+            core.parent.mkdir(parents=True)
+            core.write_text(
+                "impl ArchiveObject {\n"
+                "    fn same_content_ignoring_offsets(&self, other: &Self) -> bool {\n"
+                "        self.archive_info == other.archive_info\n"
+                "            && self.messages == other.messages\n"
+                "            && self.header_length == other.header_length\n"
+                "            && self.data_length == other.data_length\n"
+                "            && self.original_header == other.original_header\n"
+                "            && self.original_canonical_header == other.original_canonical_header\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("not unique lookup_work" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("explicit physical comparison-work term" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_requires_same_component_guard_and_semantics(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_INDEX_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct Index { physical_object_count: usize }\n"
+                "fn build(components: &Components, max_objects: usize) {\n"
+                "    let physical_object_count = components.iter_objects().count();\n"
+                "    if physical_object_count > max_objects { return Err(Error::Limit); }\n"
+                "    if left.identifier == right.identifier {\n"
+                "        if left.archive_info != right.archive_info ||\n"
+                "            left.messages != right.messages { continue; }\n"
+                "    }\n"
+                "}\n"
+                "fn object_count(&self) -> usize { self.physical_object_count }\n"
+                "fn aliases() { locators.dedup_by_key(|locator| locator.identifier); }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must call same_content_ignoring_offsets" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("same-component duplicate identities" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_identity_boundary_rejects_public_raw_id_api_but_masks_cfg_test(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "pub fn object_id(&self) -> u64 { 1 }\n"
+                "pub fn object_id(&self) -> u64 { 2 }\n"
+                "pub fn semantic_sheet(&self) {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("raw object identity", violations[0])
+            self.assertIn(":3", violations[0])
+
+    def test_numbers_identity_boundary_scans_nested_package_owner_files(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_SOURCE_ROOT / "package" / "nested.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "pub fn object_identifier(&self) -> u64 { 1 }\n"
+                "pub fn resolve_ref_id(&self, identifier: u64) -> u64 { identifier }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_identity_boundary_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("resolve_ref_id", violations[0])
+            self.assertIn("package/nested.rs", violations[0])
+
+    def test_numbers_package_test_import_cannot_hide_production_marker(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use litchi_iwa_protos::tn;\n"
+                "fn production(bytes: &[u8]) {\n"
+                "    let _ = tn::DocumentArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_package_no_eager_prost_source_topology(
+                root
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("DocumentArchive::decode", violations[0])
+            self.assertIn(":4", violations[0])
+
+    def test_numbers_names_save_token_route_accepts_canonical_reachable_helper(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                "fn rewrite_metadata() {\n"
+                "    metadata_codec::rewrite_package_metadata_save_tokens(\n"
+                "        source, batch, options\n"
+                "    );\n"
+                "}\n"
+                "fn rewrite_names() { rewrite_metadata(); }\n"
+                "fn unreachable_legacy() {\n"
+                "    crate::package_metadata::advance_package_save_token_for_components(\n"
+                "        source\n"
+                "    );\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn generated_oracle() {\n"
+                "    let _ = PackageMetadata::decode(source);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_save_token_publication_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_names_save_token_route_requires_reachable_codec_call(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                "fn unreachable() {\n"
+                "    metadata_codec::rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                "}\n"
+                "fn rewrite_names() { rewrite_native(source); }\n"
+                "fn rewrite_native() {}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_names_save_token_publication_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("does not call rewrite_package_metadata_save_tokens", violations[0])
+
+    def test_numbers_names_save_token_route_rejects_reachable_legacy_paths(
+        self,
+    ) -> None:
+        markers = {
+            "crate::package_metadata": (
+                "crate::package_metadata::rewrite_legacy(source);\n"
+            ),
+            "advance_package_save_token_for_components": (
+                "advance_package_save_token_for_components(source);\n"
+            ),
+            "set_package_last_object_identifier": (
+                "set_package_last_object_identifier(source, 1);\n"
+            ),
+            "PackageMetadata::decode": (
+                "let _ = tsp::PackageMetadata::decode(source);\n"
+            ),
+            "ComponentInfo::decode": (
+                "let _ = tsp::ComponentInfo::decode(source);\n"
+            ),
+            "Message::decode": "let _ = Message::decode(source);\n",
+            "prost": "let _ = prost_types::MessageInfo::default();\n",
+        }
+        for label, marker in markers.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                        "fn rewrite_metadata() {\n"
+                        + marker
+                        + "    metadata_codec::rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                        "}\n"
+                        "fn rewrite_names() { rewrite_metadata(); }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_names_save_token_publication_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(label in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_numbers_names_save_token_route_scans_split_helpers_and_masks_cfg_items(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            owner.parent.mkdir(parents=True)
+            owner.write_text(
+                "fn rewrite_names() { rewrite_metadata_tokens(); }\n",
+                encoding="utf-8",
+            )
+            helper = (
+                root
+                / boundaries.NUMBERS_NAMES_PUBLICATION_HELPER_ROOT
+                / "metadata.rs"
+            )
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "use litchi_iwa_protos::package_metadata_codec::{\n"
+                "    rewrite_package_metadata_save_tokens,\n"
+                "};\n"
+                "fn rewrite_metadata_tokens() {\n"
+                "    rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn hidden_legacy() {\n"
+                "    advance_package_save_token_for_components(source);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_save_token_publication_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_names_save_token_manifest_requires_focused_normal_edge(self) -> None:
+        manifests = {
+            "prost-types": "prost-types = { workspace = true }\n",
+            "missing codec": "thiserror = { workspace = true }\n",
+        }
+        for label, dependency in manifests.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True)
+                    manifest.write_text(
+                        "[dependencies]\n"
+                        + dependency
+                        + ("litchi-iwa-protos = { workspace = true }\n" if label != "missing codec" else "")
+                        + "\n[dev-dependencies]\nprost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+                    source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True, exist_ok=True)
+                    source.write_text(
+                        "use litchi_iwa_protos::package_metadata_codec as metadata_codec;\n"
+                        "fn rewrite_names() {\n"
+                        "    metadata_codec::rewrite_package_metadata_save_tokens(source, batch, options);\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_names_save_token_manifest_topology(
+                        root
+                    )
+                    if label == "missing codec":
+                        self.assertTrue(any("missing normal litchi-iwa-protos" in item for item in violations))
+                    else:
+                        self.assertTrue(any(dependency.strip().split(" ")[0] in item for item in violations))
+
+    def test_numbers_names_public_api_rejects_save_token_codec_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic = root / boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES[0]
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub fn save_token(value: u64) {}\n"
+                "pub fn rewrite(value: SaveTokenBatch) -> RewriteOutput { todo!() }\n"
+                "pub fn select(value: ComponentSelector) -> PackageMetadata { todo!() }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("", encoding="utf-8")
+
+            violations = boundaries.audit_numbers_names_facade_source_topology(root)
+            self.assertTrue(any("save-token state save_token" in item for item in violations))
+            self.assertTrue(any("package-metadata codec type SaveTokenBatch" in item for item in violations))
+            self.assertTrue(any("package-metadata codec type ComponentSelector" in item for item in violations))
+
+    def test_numbers_names_public_api_rejects_codec_alias_reexports_and_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in boundaries.NUMBERS_NAMES_IMPLEMENTATION_SOURCES:
+                path = root / relative
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("", encoding="utf-8")
+            lib = root / boundaries.NUMBERS_NAMES_EXPORT_SOURCES[0]
+            lib.parent.mkdir(parents=True, exist_ok=True)
+            lib.write_text(
+                "use litchi_iwa_protos::package_metadata_codec as codec;\n"
+                "pub use codec::{Batch, RemovalBatch};\n"
+                "pub type PublicRewrite = codec::PreparedPackageMetadataRewrite;\n"
+                "pub mod package_metadata_codec;\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_NAMES_EXPORT_SOURCES[1]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text(
+                "pub use litchi_iwa_protos::package_metadata_codec::RewriteLimit;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_names_facade_source_topology(root)
+            self.assertGreaterEqual(
+                sum("package-metadata codec reexport/module alias" in item for item in violations),
+                4,
+                violations,
+            )
+            for type_name in (
+                "Batch",
+                "RemovalBatch",
+                "PreparedPackageMetadataRewrite",
+                "RewriteLimit",
+            ):
+                self.assertTrue(
+                    any(f"package-metadata codec type {type_name}" in item for item in violations),
+                    violations,
+                )
+
+    def test_numbers_names_save_token_route_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_names_save_token_publication_source_topology()",
+            main_source,
+        )
+
+    def test_focused_numbers_package_no_eager_prost_allows_dev_only_manifest(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "thiserror = { workspace = true }\n"
+                "litchi-iwa-protos = { workspace = true }\n"
+                "# prost = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n"
+                "\n"
+                "[target.'cfg(unix)'.dev-dependencies]\n"
+                "prost.workspace = true\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_package_no_eager_prost_rejects_normal_manifest_dependency(
+        self,
+    ) -> None:
+        for section in ("[dependencies]", "[target.'cfg(unix)'.dependencies]"):
+            with self.subTest(section=section):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True)
+                    manifest.write_text(
+                        f"{section}\nprost = {{ workspace = true }}\n"
+                        "litchi-iwa-protos = { workspace = true }\n\n"
+                        "[dev-dependencies]\nprost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers Cargo manifest retains normal prost "
+                        "dependency: crates/litchi-numbers/Cargo.toml:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "DocumentArchive::decode": (
+                "let _ = tn::DocumentArchive::decode(bytes);\n"
+            ),
+            "SheetArchive::decode": "let _ = tn::SheetArchive::decode(bytes);\n",
+            "FormBasedSheetArchive::decode": (
+                "let _ = tn::FormBasedSheetArchive::decode(bytes);\n"
+            ),
+            "StorageArchive::decode": (
+                "let _ = tswp::StorageArchive::decode(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(f"uses {label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_package_no_eager_prost_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                "const NOTE: &str = \"tn::DocumentArchive::decode\";\n"
+                "/* tswp::StorageArchive::decode */\n"
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tn;\n"
+                "    use prost::Message;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.NUMBERS_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "# prost = { workspace = true }\n"
+                "# \"prost\" = { workspace = true }\n"
+                "litchi-iwa-protos = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_rich_text_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::TableDataList::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tst::RichTextPayloadArchive::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_rich_text_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_rich_text_rejects_production_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::RichTextPayloadArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_extractor_no_eager_rich_text_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn(
+                "focused litchi-numbers extractor production source uses "
+                "RichTextPayloadArchive::decode: "
+                "crates/litchi-numbers/src/package/extractor.rs:2",
+                violations,
+            )
+
+    def test_focused_numbers_extractor_no_eager_rich_text_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tst::RichTextPayloadArchive::decode\n"
+                'const NOTE: &str = "RichTextPayloadArchive::decode";\n'
+                "/* tst::RichTextPayloadArchive::decode */\n"
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_rich_text_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_tile_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::TableDataList::decode(bytes);\n"
+                "    let _ = tst::TileStorage::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tst;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tst::Tile::decode(bytes);\n"
+                "        let _ = tst::TileRowInfo::decode(bytes);\n"
+                "        let _ = Tile::decode(bytes);\n"
+                "        let _ = tst::Tile::default();\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_tile_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "unqualified Tile": (
+                "let _ = Tile::decode(bytes);\n",
+                "Tile::decode",
+            ),
+            "tst namespace Tile": (
+                "let _ = tst::Tile::decode(bytes);\n",
+                "Tile::decode",
+            ),
+            "fully qualified namespace Tile": (
+                "let _ = litchi_iwa_protos::tst::Tile::decode(bytes);\n",
+                "Tile::decode",
+            ),
+            "unqualified TileRowInfo": (
+                "let _ = TileRowInfo::decode(bytes);\n",
+                "TileRowInfo::decode",
+            ),
+            "tst namespace TileRowInfo": (
+                "let _ = tst::TileRowInfo::decode(bytes);\n",
+                "TileRowInfo::decode",
+            ),
+            "fully qualified namespace TileRowInfo": (
+                "let _ = litchi_iwa_protos::tst::TileRowInfo::decode(bytes);\n",
+                "TileRowInfo::decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers extractor production source uses "
+                        f"{expected_label}: "
+                        "crates/litchi-numbers/src/package/extractor.rs:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_extractor_no_eager_tile_allows_unrelated_decodes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::TableDataList::decode(bytes);\n"
+                "    let _ = tst::TileStorage::decode(bytes);\n"
+                "    let _ = decode_tile_with_visitor(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_tile_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tst::Tile::decode\n"
+                'const NOTE: &str = "Tile::decode";\n'
+                "/* litchi_iwa_protos::tst::Tile::decode */\n"
+                'const RAW: &str = r###"tst::Tile::decode"###;\n'
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_tile_source_topology(
+                    root
+                ),
+                [],
+            )
+
+
+    def test_iwa_common_formula_render_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_common_formula_render_ownership_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_common_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_common_formula_render_ownership_rejects_reader_arena_copy(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_common_formula_render_ownership_scaffold(
+                root,
+                reader_suffix="struct FormulaRenderer;\n",
+            )
+            violations = boundaries.audit_iwa_common_formula_render_ownership(root)
+            self.assertEqual(len(violations), 1)
+            self.assertTrue(
+                all(
+                    "redeclares shared arena FormulaRenderer" in item
+                    for item in violations
+                )
+            )
+
+
+    def test_iwa_common_formula_render_ownership_rejects_format_import(
+        self,
+    ) -> None:
+        for import_path in (
+            "litchi_iwa_protos::tsce::FormulaArchive",
+            "litchi_iwa_core::archive::Archive",
+            "litchi_iwa_archive::package::Catalog",
+            "raw::FormulaArchive",
+            "protobuf::FormulaArchive",
+        ):
+            with self.subTest(import_path=import_path):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_common_formula_render_ownership_scaffold(
+                        root,
+                        common_source=(
+                            "pub trait FormulaRenderBudget {}\n"
+                            "pub struct FormulaExpr;\n"
+                            "pub struct FormulaRenderer;\n"
+                            "impl FormulaRenderer { pub fn render() {} }\n"
+                            f"use {import_path};\n"
+                        ),
+                    )
+                    violations = boundaries.audit_iwa_common_formula_render_ownership(root)
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn("format/protobuf owner", violations[0])
+
+    def test_iwa_numbers_wire_formula_render_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_render_owner_requires_shared_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(
+                root,
+                wire_source="pub struct FormulaRenderCodecVisitor;\n",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_render_ownership(
+                root
+            )
+            self.assertEqual(
+                len(violations),
+                len(boundaries.IWA_NUMBERS_WIRE_FORMULA_RENDER_REQUIRED_MARKERS) + 1,
+            )
+            for marker in boundaries.IWA_NUMBERS_WIRE_FORMULA_RENDER_REQUIRED_MARKERS:
+                if marker == "FormulaRenderCodecVisitor":
+                    continue
+                self.assertTrue(any(marker in item for item in violations), marker)
+            self.assertTrue(any("common expression arena import" in item for item in violations))
+            self.assertTrue(any("sanctioned generated codec import" in item for item in violations))
+
+    def test_iwa_numbers_wire_formula_render_owner_rejects_duplicate_reader_routes(
+        self,
+    ) -> None:
+        duplicate_sources = {
+            "visitor": "struct CompatibilityFormulaVisitor;\n",
+            "codec": "type FormulaRenderCodecVisitor = ();\n",
+            "dispatch": (
+                "impl numbers_formula_codec::FormulaRenderVisitor "
+                "for CompatibilityFormulaVisitor {}\n"
+            ),
+            "scalar": "fn render_scalar_formula_nodes() {}\n",
+        }
+        for label, duplicate in duplicate_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_formula_render_scaffold(
+                        root,
+                        reader_suffix=duplicate,
+                    )
+                    violations = boundaries.audit_iwa_numbers_wire_formula_render_ownership(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertTrue(
+                        all("redeclares the Numbers wire owner" in item for item in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_formula_render_owner_masks_test_only_duplicates(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(
+                root,
+                reader_suffix=(
+                    "#[cfg(test)]\n"
+                    "struct CompatibilityFormulaVisitor;\n"
+                    "#[cfg(test)]\n"
+                    "impl numbers_formula_codec::FormulaRenderVisitor "
+                    "for CompatibilityFormulaVisitor {}\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_render_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_render_owner_requires_reader_import(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_render_scaffold(root)
+            reader = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8").replace(
+                    "use litchi_numbers_wire::formula_render::{"
+                    "CompatibilityFormulaVisitor, FormulaRenderCodecVisitor, "
+                    "FormulaEventRenderBudget, ReferenceResolver, "
+                    "render_scalar_formula_nodes};\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_render_ownership(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("missing the Numbers wire owner import", violations[0])
+
+
+    def test_iwa_numbers_wire_formula_envelope_ownership_accepts_migrated_readers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_envelope_owner_requires_schema_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(
+                root,
+                envelope_source=(
+                    "pub fn preflight_formula_envelope() {}\n"
+                ),
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                root
+            )
+            self.assertEqual(
+                len(violations),
+                len(boundaries.IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_REQUIRED_MARKERS) + 1,
+            )
+            for marker in boundaries.IWA_NUMBERS_WIRE_FORMULA_ENVELOPE_REQUIRED_MARKERS:
+                if marker == "preflight_formula_envelope":
+                    continue
+                self.assertTrue(any(marker in item for item in violations), marker)
+            self.assertTrue(any("common wire import" in item for item in violations))
+            self.assertTrue(any("generated-free codec import" in item for item in violations))
+
+    def test_iwa_numbers_wire_formula_envelope_owner_rejects_duplicate_schema_routes(
+        self,
+    ) -> None:
+        duplicate_sources = {
+            "cost": "struct FormulaEnvelopeCost;\n",
+            "field": "type FormulaEnvelopeField = ();\n",
+            "scalar": "enum FormulaScalar {}\n",
+            "preflight": "fn preflight_formula_envelope() {}\n",
+            "required": "fn require_formula_fields() {}\n",
+            "schema": "fn formula_envelope_field() {}\n",
+            "repeated": "fn formula_field_is_repeated() {}\n",
+            "scalar_validation": "fn validate_formula_scalar() {}\n",
+            "node_type": "fn required_formula_ast_node_type() {}\n",
+            "constant": "const FORMULA_REQUIRED_NODE: &[u32] = &[];\n",
+        }
+        for label, duplicate in duplicate_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_iwa_numbers_wire_formula_envelope_scaffold(
+                        root,
+                        reader_suffix=duplicate,
+                    )
+                    violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertTrue(
+                        all("redeclares the Numbers wire FormulaArchive envelope" in item
+                            for item in violations),
+                        violations,
+                    )
+
+    def test_iwa_numbers_wire_formula_envelope_owner_masks_test_only_schema_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(
+                root,
+                reader_suffix=(
+                    "#[cfg(test)]\n"
+                    "struct FormulaEnvelopeField;\n"
+                    "#[cfg(test)]\n"
+                    "fn formula_envelope_field() {}\n"
+                    "#[cfg(test)]\n"
+                    "const FORMULA_REQUIRED_TEST: &[u32] = &[];\n"
+                ),
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(root),
+                [],
+            )
+
+    def test_iwa_numbers_wire_formula_envelope_owner_does_not_mask_broad_cfg(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            reader = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8")
+                + '#[cfg(any(test, feature = "oracle"))]\n'
+                + "fn preflight_formula_envelope() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("redeclares the Numbers wire FormulaArchive envelope", violations[0])
+
+    def test_iwa_numbers_wire_formula_envelope_owner_is_mandatory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                Path(directory)
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("owner is missing", violations[0])
+
+    def test_iwa_numbers_wire_formula_envelope_owner_requires_reader_import(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_envelope_scaffold(root)
+            reader = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8").replace(
+                    "use litchi_numbers_wire::formula_envelope::"
+                    "preflight_formula_envelope;\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_envelope_ownership(
+                root
+            )
+            self.assertEqual(len(violations), 1)
+            self.assertIn("missing the Numbers wire FormulaArchive envelope import", violations[0])
+
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = decode_table_data_list_with_visitor(bytes);\n"
+                "    let _ = decode_table_data_list_segment_with_visitor(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tst::{TableDataList, TableDataListSegment};\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = TableDataList::decode(bytes);\n"
+                "        let _ = TableDataListSegment::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "unqualified TableDataList": (
+                "let _ = TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "tst namespace TableDataList": (
+                "let _ = tst::TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "fully qualified namespace TableDataList": (
+                "let _ = litchi_iwa_protos::tst::TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "arbitrary qualified TableDataList": (
+                "let _ = crate::numbers::wire::TableDataList::decode(bytes);\n",
+                "TableDataList::decode",
+            ),
+            "unqualified TableDataListSegment": (
+                "let _ = TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "tst namespace TableDataListSegment": (
+                "let _ = tst::TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "fully qualified namespace TableDataListSegment": (
+                "let _ = litchi_iwa_protos::tst::TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+            "arbitrary qualified TableDataListSegment": (
+                "let _ = crate::numbers::wire::TableDataListSegment::decode(bytes);\n",
+                "TableDataListSegment::decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers extractor production source uses "
+                        f"{expected_label}: "
+                        "crates/litchi-numbers/src/package/extractor.rs:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_allows_unrelated_decodes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = tst::Tile::decode(bytes);\n"
+                "    let _ = tst::TableDataListArchive::decode(bytes);\n"
+                "    let _ = decode_table_data_list(bytes);\n"
+                "    let _ = decode_table_data_list_segment(bytes);\n"
+                "    let _ = decode_table_data_list_with_visitor(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tst::TableDataList::decode\n"
+                'const NOTE: &str = "TableDataListSegment::decode";\n'
+                "/* litchi_iwa_protos::tst::TableDataList::decode */\n"
+                'const RAW: &str = r###"crate::wire::TableDataListSegment::decode"###;\n'
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_table_data_list_ignores_legacy_monolith_sources(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / "crates/litchi-ooxml/src/package/extractor.rs"
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn legacy_projection(bytes: &[u8]) {\n"
+                "    let _ = litchi_ooxml::tst::TableDataList::decode(bytes);\n"
+                "    let _ = litchi_ooxml::tst::TableDataListSegment::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_table_data_list_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = decode_comment_storage(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tsd::CommentStorageArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = CommentStorageArchive::decode(bytes);\n"
+                "        let _ = tsd::CommentStorageArchive\n"
+                "            ::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "unqualified CommentStorageArchive": (
+                "let _ = CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "tsd namespace CommentStorageArchive": (
+                "let _ = tsd::CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "fully qualified namespace CommentStorageArchive": (
+                "let _ = litchi_iwa_protos::tsd::CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "arbitrary qualified CommentStorageArchive": (
+                "let _ = crate::numbers::wire::CommentStorageArchive::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+            "multiline qualified CommentStorageArchive": (
+                "let _ = litchi_iwa_protos::tsd::CommentStorageArchive\n"
+                "    ::decode(bytes);\n",
+                "CommentStorageArchive::decode",
+            ),
+        }
+        for label, (marker, expected_label) in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                        root
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-numbers extractor production source uses "
+                        f"{expected_label}: "
+                        "crates/litchi-numbers/src/package/extractor.rs:2",
+                        violations,
+                    )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_allows_aliases_and_unrelated_decodes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = CommentStorageArchiveAlias::decode(bytes);\n"
+                "    let _ = CommentStorage::decode(bytes);\n"
+                "    let _ = tsd::CommentStorageArchiveBuilder::decode(bytes);\n"
+                "    let _ = decode_comment_storage(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_comment_storage_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// tsd::CommentStorageArchive::decode\n"
+                'const NOTE: &str = "CommentStorageArchive::decode";\n'
+                "/* litchi_iwa_protos::tsd::CommentStorageArchive::decode */\n"
+                'const RAW: &str = r###"CommentStorageArchive::decode"###;\n'
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_comment_storage_source_topology(
+                    root
+                ),
+                [],
+            )
+
+
+    def test_focused_numbers_names_package_no_eager_prost_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::{tn, tsce, tst};\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = tn::DocumentArchive::decode(bytes);\n"
+                "        let _ = tsce::CalculationEngineArchive::decode(bytes);\n"
+                "        let _ = tst::TableModelArchive::decode(bytes);\n"
+                "        let _ = M::decode(bytes);\n"
+                "        let _ = decode_message::<tn::DocumentArchive>(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_package_no_eager_prost_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_no_eager_formula_allows_test_only_usage(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = decode_formula_archive(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tsce::FormulaArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = FormulaArchive::decode(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_numbers_extractor_cfg_test_import_does_not_hide_production(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "#[cfg(test)]\n"
+                "use litchi_iwa_protos::tsce;\n"
+                "fn production(bytes: &[u8]) {\n"
+                "    let _ = tsce::FormulaArchive::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "fn oracle(bytes: &[u8]) {\n"
+                "    let _ = tsce::FormulaArchive::decode(bytes);\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "FormulaArchive::decode: "
+                    "crates/litchi-numbers/src/package/extractor.rs:4",
+                ],
+            )
+
+    def test_focused_numbers_extractor_no_eager_formula_rejects_production_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection(bytes: &[u8]) {\n"
+                "    let _ = litchi_iwa_protos::tsce::FormulaArchive\n"
+                "        ::decode(bytes);\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "FormulaArchive::decode: "
+                    "crates/litchi-numbers/src/package/extractor.rs:2",
+                ],
+            )
+
+    def test_focused_numbers_extractor_rejects_production_formula_type_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn retain_generated_formula(archive: tsce::FormulaArchive) {\n"
+                "    let _ = archive;\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "generated FormulaArchive type: "
+                    "crates/litchi-numbers/src/package/extractor.rs:1",
+                ],
+            )
+
+    def test_focused_numbers_extractor_rejects_bounded_formula_compatibility_fallback(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct FormulaArchiveBytes { bytes: Box<[u8]> }\n"
+                "impl FormulaArchiveBytes {\n"
+                "    fn decode(&self) -> Result<tsce::FormulaArchive> {\n"
+                "        tsce::FormulaArchive::decode(self.bytes.as_ref())\n"
+                "    }\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                ),
+                [
+                    "focused litchi-numbers extractor production source uses "
+                    "FormulaArchive::decode: "
+                    "crates/litchi-numbers/src/package/extractor.rs:4",
+                    "focused litchi-numbers extractor production source uses "
+                    "generated FormulaArchive type: "
+                    "crates/litchi-numbers/src/package/extractor.rs:3",
+                ],
+            )
+
+    def test_focused_numbers_extractor_rejects_formula_decode_with_arbitrary_bytes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_EXTRACTOR_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "struct FormulaArchiveBytes { bytes: Box<[u8]> }\n"
+                "impl FormulaArchiveBytes {\n"
+                "    fn decode(&self, bytes: &[u8]) -> Result<tsce::FormulaArchive> {\n"
+                "        tsce::FormulaArchive::decode(bytes)\n"
+                "    }\n"
+                "}\n"
+                "#[cfg(test)]\n"
+                "mod tests {}\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_extractor_no_eager_formula_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(len(violations), 2, violations)
+            self.assertIn("FormulaArchive::decode", violations[0])
+            self.assertIn("generated FormulaArchive type", violations[1])
+
+    def test_focused_numbers_names_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "prost::Message": "use prost::Message;\n",
+            "generated-message decode": (
+                "let _ = tsce::CalculationEngineArchive::decode(bytes);\n"
+            ),
+            "generated-message generic decode": "let _ = M::decode(bytes);\n",
+            "generated-message decode helper": (
+                "let _ = decode_message::<tst::TableModelArchive>(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_numbers_names_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    expected_label = (
+                        "generated-message decode"
+                        if label == "generated-message generic decode"
+                        else label
+                    )
+                    self.assertTrue(
+                        any(f"uses {expected_label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_names_package_no_eager_prost_ignores_non_code_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.NUMBERS_NAMES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                'const NOTE: &str = "tsce::CalculationEngineArchive::decode";\n'
+                "/* decode_message::<tst::TableModelArchive> */\n"
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tn;\n"
+                "    use prost::Message;\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_names_package_no_eager_prost_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_focused_pages_package_no_eager_prost_allows_test_only_usage(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.PAGES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "fn production_projection() {}\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    use litchi_iwa_protos::tswp::StorageArchive;\n"
+                "    use prost::Message;\n"
+                "    fn decode(bytes: &[u8]) {\n"
+                "        let _ = StorageArchive::decode(bytes);\n"
+                "        let _ = litchi_iwa_text_wire::from_archive(bytes);\n"
+                "    }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "thiserror = { workspace = true }\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n"
+                "\n"
+                "[dev-dependencies]\n"
+                "prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+    def test_focused_pages_package_no_eager_prost_rejects_production_markers(
+        self,
+    ) -> None:
+        marker_sources = {
+            "prost::Message": "use prost::Message;\n",
+            "direct generated tswp": (
+                "use litchi_iwa_protos::tswp::StorageArchive;\n"
+            ),
+            "StorageArchive::decode": "let _ = StorageArchive::decode(bytes);\n",
+            "litchi_iwa_text_wire::from_archive": (
+                "let _ = litchi_iwa_text_wire::from_archive(bytes);\n"
+            ),
+        }
+        for label, marker in marker_sources.items():
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    source = root / boundaries.PAGES_PACKAGE_SOURCE
+                    source.parent.mkdir(parents=True)
+                    source.write_text(
+                        "fn production_projection(bytes: &[u8]) {\n"
+                        + marker
+                        + "}\n"
+                        "#[cfg(test)]\n"
+                        "mod tests {\n"
+                        "    use prost::Message;\n"
+                        "}\n",
+                        encoding="utf-8",
+                    )
+                    manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        "[dependencies]\n"
+                        "thiserror = { workspace = true }\n"
+                        "[dev-dependencies]\n"
+                        "prost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_pages_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertTrue(
+                        any(f"uses {label}:" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_pages_package_no_eager_prost_rejects_normal_manifest_dependency(
+        self,
+    ) -> None:
+        for section in ("[dependencies]", "[target.'cfg(unix)'.dependencies]"):
+            with self.subTest(section=section):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+                    manifest.parent.mkdir(parents=True, exist_ok=True)
+                    manifest.write_text(
+                        f"{section}\nprost = {{ workspace = true }}\n\n"
+                        "[dev-dependencies]\nprost = { workspace = true }\n",
+                        encoding="utf-8",
+                    )
+
+                    violations = (
+                        boundaries.audit_pages_package_no_eager_prost_source_topology(
+                            root
+                        )
+                    )
+                    self.assertEqual(len(violations), 1)
+                    self.assertIn(
+                        "focused litchi-pages Cargo manifest retains normal prost "
+                        "dependency: crates/litchi-pages/Cargo.toml:2",
+                        violations,
+                    )
+
+    def test_focused_pages_package_no_eager_prost_ignores_non_code_near_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            source = root / boundaries.PAGES_PACKAGE_SOURCE
+            source.parent.mkdir(parents=True)
+            source.write_text(
+                "// prost::Message\n"
+                "const NOTE: &str = \"StorageArchive::decode\";\n"
+                "/* litchi_iwa_text_wire::from_archive */\n"
+                "fn production_projection() {}\n",
+                encoding="utf-8",
+            )
+            manifest = root / boundaries.PAGES_PACKAGE_MANIFEST
+            manifest.parent.mkdir(parents=True, exist_ok=True)
+            manifest.write_text(
+                "[dependencies]\n"
+                "prost-types = { workspace = true }\n"
+                "# prost = { workspace = true }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_package_no_eager_prost_source_topology(root),
+                [],
+            )
+
+
+    def test_keynote_media_creation_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_media_creation_codec_source_topology()",
+            main_source,
+        )
+
+    def test_keynote_slide_audio_creation_audit_is_dormant_without_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                boundaries.audit_keynote_slide_audio_creation_source_topology(
+                    Path(directory)
+                ),
+                [],
+            )
+
+
+    def test_keynote_slide_audio_creation_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_slide_audio_creation_source_topology()",
+            main_source,
+        )
+
+
+    def test_keynote_slide_movie_creation_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_keynote_slide_movie_creation_source_topology()",
+            main_source,
+        )
+
+
+    def test_iwa_drawable_container_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_drawable_container_codec_source_topology()",
+            main_source,
+        )
+
+    def test_pages_output_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.PAGES_PACKAGE_OUTPUT_FORBIDDEN_NAMES,
+            frozenset({"source_bytes", "from_archive_bytes"}),
+        )
+        self.assertEqual(boundaries.PAGES_PACKAGE_OUTPUT_METHOD, "write_to")
+        self.assertEqual(boundaries.PAGES_PACKAGE_OUTPUT_ERROR, "WriteError")
+        self.assertEqual(
+            boundaries.PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE,
+            Path("crates/litchi-pages/src/lib.rs"),
+        )
+
+    def test_focused_pages_output_boundary_allows_private_bytes_and_valid_writer(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_output_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_pages_package_output_api_source_topology(root), []
+            )
+
+    def test_focused_pages_output_boundary_rejects_public_bytes_and_reexports_after_cfg_test(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_output_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "output_aliases.rs"
+            extra.write_text(
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    pub fn source_bytes() {}\n"
+                "    pub fn from_archive_bytes() {}\n"
+                "}\n"
+                "pub fn source_bytes() {}\n"
+                "pub use package::from_archive_bytes;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_package_output_api_source_topology(
+                root
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                any(
+                    "public or re-exported source_bytes" in violation
+                    and "output_aliases.rs:6" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "public or re-exported from_archive_bytes" in violation
+                    and "output_aliases.rs:7" in violation
+                    for violation in violations
+                ),
+                violations,
+            )
+
+    def test_focused_pages_output_boundary_requires_production_writer_error_and_root_export(
+        self,
+    ) -> None:
+        cases = (
+            (
+                "wrong return",
+                {"write_signature": "pub fn write_to(&self) -> Result<(), OtherError>"},
+                "Package::write_to must return WriteError",
+            ),
+            (
+                "private error",
+                {"error_declaration": "struct WriteError;"},
+                "missing public WriteError",
+            ),
+            (
+                "missing root export",
+                {"root_export": "pub mod package;"},
+                "missing root WriteError export",
+            ),
+        )
+        for label, overrides, fragment in cases:
+            with self.subTest(label=label):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_output_canonical_scaffold(root, **overrides)
+                    violations = (
+                        boundaries.audit_pages_package_output_api_source_topology(root)
+                    )
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        violations,
+                    )
+
+    def test_focused_pages_output_boundary_rejects_cfg_test_only_writer_and_free_writer(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            package = root / boundaries.PAGES_PACKAGE_SOURCE
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text(
+                "pub struct WriteError;\n"
+                "pub fn write_to() -> Result<(), WriteError> { todo!() }\n"
+                "#[cfg(test)]\n"
+                "impl Package {\n"
+                "    pub fn write_to() -> Result<(), WriteError> { todo!() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            export = root / boundaries.PAGES_PACKAGE_OUTPUT_EXPORT_SOURCE
+            export.parent.mkdir(parents=True, exist_ok=True)
+            export.write_text("pub use package::WriteError;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_package_output_api_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("missing production Package::write_to" in item for item in violations),
+                violations,
+            )
+
+
+    def test_focused_pages_footnote_text_requires_production_edit_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_FOOTNOTE_TEXT_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "impl Package {\n"
+                "    pub fn edit_body_footnote_text(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_text_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("missing Package method edit_body_footnote_text", violations[0])
+
+    def test_focused_pages_footnote_text_allows_production_edit_route(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.PAGES_FOOTNOTE_TEXT_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn edit_body_footnote_text(&self) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_footnote_text_facade_source_topology(root), []
+            )
+
+
+    def test_focused_body_footnote_lifecycle_requires_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub struct Position;\n"
+                "pub enum Selector { At(Position) }\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                "pub struct BodyFootnoteEdit;\n"
+                "impl Package { pub fn insert_body_footnote() {} }\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_lifecycle_facade_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("missing semantic footnote::body type Footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing canonical package type Patch" in item for item in violations),
+                violations,
+            )
+            # ADR 0034: a reintroduced prefixed spelling is rejected.
+            self.assertTrue(
+                any("defines retired name BodyFootnoteEdit" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing Package method edit_body_footnote" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing Package method apply_body_footnote" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_body_footnote_lifecycle_rejects_public_owner_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            package = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub mod body_footnote;\n"
+                "pub use body_footnote::*;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn insert_body_footnote(object_id: u64, source_bytes: &[u8], wire: WireView, generated: GeneratedProjection, archive: Archive) {}\n"
+                "pub fn edit_body_footnote() {}\n"
+                "pub fn apply_body_footnote() {}\n"
+                "}\n"
+                "pub type FootnotePatch = BodyFootnotePatch;\n",
+                encoding="utf-8",
+            )
+            sibling = root / boundaries.PAGES_SOURCE_ROOT / "aliases.rs"
+            sibling.write_text(
+                "pub use package::BodyFootnotePatch as FootnotePatch;\n"
+                "pub type Alternate = BodyFootnoteCommit;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_lifecycle_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "public package::body_footnote module",
+                "retains root aliases via owner glob",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes generated type GeneratedProjection",
+                "exposes archive/IWA type Archive",
+                "retains flat alias FootnotePatch",
+                "alternate alias FootnotePatch",
+                "alternate alias Alternate",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_body_footnote_lifecycle_allows_canonical_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_FOOTNOTE_LIFECYCLE_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_FOOTNOTE_LIFECYCLE_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn insert_body_footnote() {}\n"
+                "pub fn edit_body_footnote() {}\n"
+                "pub fn apply_body_footnote() {}\n"
+                "}\n"
+                "fn resolve_reference(object_id: u64, source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n"
+                "#[cfg(test)]\n"
+                "pub fn test_only_raw(object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_footnote_lifecycle_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_body_footnote_lifecycle_masks_cfg_tests_item_by_item(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_footnote_lifecycle_canonical_scaffold(root)
+            sibling = root / boundaries.PAGES_SOURCE_ROOT / "fixtures.rs"
+            sibling.write_text(
+                "#[cfg(test)]\n"
+                "mod fixtures {\n"
+                "    pub type TestOnly = BodyFootnotePatch;\n"
+                "    pub fn test_only_raw(object_id: u64) {}\n"
+                "}\n"
+                "// pub use package::BodyFootnotePatch as Ignored;\n"
+                "pub type ProductionAlias = BodyFootnotePatch;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_footnote_lifecycle_facade_source_topology(
+                root
+            )
+
+            self.assertFalse(any("TestOnly" in item for item in violations), violations)
+            self.assertFalse(any("test_only_raw" in item for item in violations), violations)
+            self.assertTrue(
+                any("alternate alias ProductionAlias" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_body_footnote_lifecycle_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_footnote_lifecycle_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_pages_page_layout_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            implementation = root / boundaries.PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE
+            implementation.parent.mkdir(parents=True)
+            implementation.write_text(
+                "\n".join(
+                    [
+                        "pub async unsafe fn r#page_layout(",
+                        "    r#object_id: u64,",
+                        ") {}",
+                        "pub type PageLayoutPatch = DocumentArchive;",
+                        "pub type PageLayoutCommit = HostPackage;",
+                        "pub type PageLayoutDiagnostics = buffa::DocumentArchiveView;",
+                        "impl prost::Message for PageLayoutEdit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.PAGES_PAGE_LAYOUT_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub fn page_layout(source_bytes: &[u8]) -> SourceBytes {}\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_PAGE_LAYOUT_EXPORT_SOURCES
+            )
+            package_export.parent.mkdir(parents=True, exist_ok=True)
+            package_export.write_text(
+                "pub type PageLayoutDiagnostics = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+            lib_export.write_text(
+                "pub use litchi_iwa_protos::PageLayoutArchive as PageLayoutPatch;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_page_layout_facade_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertEqual(
+                violations,
+                sorted(
+                    [
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw identifier object_id: "
+                        "crates/litchi-pages/src/package/page_layout.rs:2",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type DocumentArchive: "
+                        "crates/litchi-pages/src/package/page_layout.rs:4",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type HostPackage: "
+                        "crates/litchi-pages/src/package/page_layout.rs:5",
+                        "focused litchi-pages page-layout public API exposes "
+                        "protobuf type buffa: "
+                        "crates/litchi-pages/src/package/page_layout.rs:6",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type DocumentArchiveView: "
+                        "crates/litchi-pages/src/package/page_layout.rs:6",
+                        "focused litchi-pages page-layout public API exposes "
+                        "protobuf type prost: "
+                        "crates/litchi-pages/src/package/page_layout.rs:7",
+                        "focused litchi-pages page-layout public API exposes "
+                        "protobuf type Message: "
+                        "crates/litchi-pages/src/package/page_layout.rs:7",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type litchi_iwa_core: "
+                        "crates/litchi-pages/src/package.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "native object RawObject: "
+                        "crates/litchi-pages/src/package.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type litchi_iwa_protos: "
+                        "crates/litchi-pages/src/lib.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "archive/IWA type PageLayoutArchive: "
+                        "crates/litchi-pages/src/lib.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw source bytes source_bytes: "
+                        "crates/litchi-pages/src/page_layout.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw byte slice &[u8]: "
+                        "crates/litchi-pages/src/page_layout.rs:1",
+                        "focused litchi-pages page-layout public API exposes "
+                        "raw source bytes SourceBytes: "
+                        "crates/litchi-pages/src/page_layout.rs:1",
+                    ]
+                ),
+            )
+
+    def test_focused_pages_page_layout_public_api_ignores_safe_and_private_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            implementation = root / boundaries.PAGES_PAGE_LAYOUT_IMPLEMENTATION_SOURCE
+            implementation.parent.mkdir(parents=True)
+            implementation.write_text(
+                "\n".join(
+                    [
+                        "// pub fn page_layout(object_id: ObjectId) {}",
+                        'const NOTE: &str = "pub type PageLayoutPatch = DocumentArchive";',
+                        "/* pub type PageLayoutCommit = HostPackage;",
+                        "   /* impl buffa::Message for PageLayoutEdit {} */",
+                        "*/",
+                        'const RAW_NOTE: &str = r###"',
+                        "pub fn page_layout(object_id: ObjectId) {}",
+                        '"###;',
+                        "pub struct PageLayoutEdit;",
+                        "pub fn page_layout(layout: Layout) "
+                        "-> Result<PageLayoutCommit, PageLayoutError> {}",
+                        "impl PageLayoutEdit {}",
+                        "impl prost::Message for Unrelated {}",
+                        "fn private_page_layout(object_id: u64) {}",
+                        "pub(crate) fn restricted_page_layout(archive: DocumentArchive) {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_PAGE_LAYOUT_EXPORT_SOURCES
+            )
+            package_export.parent.mkdir(parents=True, exist_ok=True)
+            safe_exports = (
+                "pub use crate::page_layout::Layout;\n"
+                "pub use package::page_layout::{PageLayoutCommit, PageLayoutError};\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+                "pub type PageLayoutsCommit = litchi_iwa_core::RawObject;\n"
+            )
+            package_export.write_text(safe_exports, encoding="utf-8")
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            low_level = root / boundaries.PAGES_SOURCE_ROOT / "page_layout.rs"
+            low_level.write_text(
+                "\n".join(
+                    [
+                        "pub fn page_layout(input: InputBytes, byte_count: usize) "
+                        "-> OutputBytes { todo!() }",
+                        "fn private_source_bytes(source_bytes: &[u8]) -> SourceBytes "
+                        "{ todo!() }",
+                        "pub(crate) fn restricted_source_bytes(source_bytes: &[u8]) "
+                        "-> SourceBytes { todo!() }",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            unrelated_owner = root / "crates/litchi-keynote/src/package/page_layout.rs"
+            unrelated_owner.parent.mkdir(parents=True)
+            unrelated_owner.write_text(
+                "pub type PageLayoutPatch = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_page_layout_facade_source_topology(root), []
+            )
+
+
+    def test_focused_pages_table_lock_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_lock_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_table_lock_facade_source_topology(root),
+                        [
+                            "focused litchi-pages table-lock public API is missing "
+                            f"canonical package table-lock type {missing}: "
+                            "crates/litchi-pages/src/package/table_lock.rs",
+                            "focused litchi-pages table-lock public API owner is missing "
+                            f"canonical type {missing}: "
+                            "crates/litchi-pages/src/package/table_lock.rs",
+                        ],
+                    )
+
+    def test_focused_pages_table_lock_requires_each_package_method(self) -> None:
+        for missing in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_lock_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_LOCK_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_table_lock_facade_source_topology(root),
+                        [
+                            "focused litchi-pages table-lock public API is missing "
+                            f"Package method {missing}: "
+                            "crates/litchi-pages/src/package/table_lock.rs"
+                        ],
+                    )
+
+    def test_focused_pages_table_lock_rejects_physical_leaks_and_globs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_lock(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_lock() {}\n"
+                "pub fn apply_body_table_lock() {}\n"
+                "}\n"
+                "pub type TableLockPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableLockArchive as TableLockPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+            table.write_text("pub mod lock;\npub use lock::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::lock glob",
+                "retains flat alias TableLockPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_lock_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_lock() {}\n"
+                "pub fn edit_body_table_lock() {}\n"
+                "pub fn apply_body_table_lock() {}\n"
+                "}\n"
+                "fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            helper = root / boundaries.PAGES_TABLE_LOCK_OWNER_HELPER_ROOT / "resolve.rs"
+            helper.parent.mkdir(parents=True, exist_ok=True)
+            helper.write_text(
+                "pub(crate) fn resolve_object_id(object_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod lock;\n"
+                "pub use lock::State;\n"
+                "pub struct Table;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_lock_facade_source_topology(root), []
+            )
+
+    def test_focused_pages_table_lock_rejects_flat_methods(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_LOCK_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_LOCK_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_lock() {}\n"
+                "pub fn edit_body_table_lock() {}\n"
+                "pub fn apply_body_table_lock() {}\n"
+                "pub fn table_lock() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+
+            self.assertEqual(len(violations), 1, violations)
+            self.assertIn("retains flat Package method table_lock", violations[0])
+
+    def test_focused_pages_table_lock_scans_all_facade_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomLockPatch = BodyTableLockPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyLockPatch = BodyTableLockPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableLockPatch as LockPatch;\n"
+                    "pub mod table_lock;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_LOCK_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use lock::State as LockState;\n")
+
+            violations = boundaries.audit_pages_table_lock_facade_source_topology(root)
+
+            for fragment in (
+                "alternate alias CustomLockPatch for BodyTableLockPatch",
+                "aliases via owner glob",
+                "alternate alias LockPatch for BodyTableLockPatch",
+                "alternate alias LockState for State",
+                "exposes duplicate table_lock module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(
+                any("TestOnlyLockPatch" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_lock_ignores_unrelated_package_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_lock_canonical_scaffold(root)
+            package = root / boundaries.PAGES_TABLE_LOCK_PACKAGE_EXPORT_SOURCE
+            with package.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub enum PackageError { Archive, ObjectLimit }\n"
+                    "pub struct PackageResult;\n"
+                )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_lock_facade_source_topology(root), []
+            )
+
+
+    def test_focused_pages_table_headers_requires_each_canonical_type_and_method(self) -> None:
+        for missing in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_headers_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_headers_facade_source_topology(root)
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_headers_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_HEADERS_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_headers_facade_source_topology(root)
+                        )
+                    )
+
+    def test_focused_pages_table_headers_requires_semantics_selector_and_root_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_HEADERS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::body_table_headers::{"
+                "BodyTableHeaderSettingsCommit as Commit};\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_HEADERS_SELECTOR_SOURCE
+            selector.write_text("pub enum OtherSelector { Name }\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+            lib.write_text("pub mod table;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_headers_facade_source_topology(root)
+
+            self.assertTrue(
+                any("missing semantic table::headers type Count" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing semantic table::headers type Error" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing semantic table::headers type Settings" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing canonical BodyTableSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing root BodyTableSelector re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_headers_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_header_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_header_settings() {}\n"
+                "pub fn apply_body_table_header_settings() {}\n"
+                "}\n"
+                "pub type TableHeadersPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableHeadersArchive as TableHeadersPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+            table.write_text("pub mod headers;\npub use headers::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_headers_facade_source_topology(root)
+
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::headers glob",
+                "retains flat alias TableHeadersPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_headers_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomHeadersPatch = BodyTableHeaderSettingsPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyHeadersPatch = BodyTableHeaderSettingsPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableHeaderSettingsPatch as HeadersPatch;\n"
+                    "pub mod body_table_headers;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use headers::Settings as HeadersSettings;\n")
+
+            violations = boundaries.audit_pages_table_headers_facade_source_topology(root)
+
+            for fragment in (
+                "alternate alias CustomHeadersPatch for BodyTableHeaderSettingsPatch",
+                "aliases via owner glob",
+                "alternate alias HeadersPatch for BodyTableHeaderSettingsPatch",
+                "alternate alias HeadersSettings for Settings",
+                "exposes duplicate body_table_headers module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyHeadersPatch" in item for item in violations))
+
+    def test_focused_pages_table_headers_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_headers_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_HEADERS_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_HEADERS_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_header_settings() {}\n"
+                "pub fn edit_body_table_header_settings() {}\n"
+                "pub fn apply_body_table_header_settings() {}\n"
+                "}\n"
+                "fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_HEADERS_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod headers;\n"
+                "pub use headers::{Count, Settings};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_headers_facade_source_topology(root), []
+            )
+
+    def test_focused_pages_table_headers_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_table_headers_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_pages_table_dimension_requires_canonical_types_and_methods(
+        self,
+    ) -> None:
+        for missing in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_dimension_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_dimension_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_dimension_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_DIMENSION_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_dimension_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+    def test_focused_pages_table_dimension_requires_semantics_selector_and_root_export(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::body_table_dimension::{"
+                "BodyTableDimensionCommit as Commit};\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_DIMENSION_SELECTOR_SOURCE
+            selector.write_text("pub enum OtherSelector { Name }\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            lib.write_text("pub mod table;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_dimension_facade_source_topology(root)
+
+            for name in boundaries.PAGES_TABLE_DIMENSION_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"missing semantic table::dimension type {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations))
+            self.assertTrue(any("missing root BodyTableSelector re-export" in item for item in violations))
+
+    def test_focused_pages_table_dimension_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_dimension_size(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_dimension_size() {}\n"
+                "pub fn apply_body_table_dimension_size() {}\n"
+                "}\n"
+                "pub type TableDimensionPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableDimensionArchive as TableDimensionPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+            table.write_text("pub mod dimension;\npub use dimension::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_dimension_facade_source_topology(root)
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::dimension glob",
+                "retains flat alias TableDimensionPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_dimension_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomDimensionPatch = BodyTableDimensionPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyDimensionPatch = BodyTableDimensionPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableDimensionPatch as DimensionPatch;\n"
+                    "pub mod body_table_dimension;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use dimension::Size as DimensionSize;\n")
+
+            violations = boundaries.audit_pages_table_dimension_facade_source_topology(root)
+            for fragment in (
+                "alternate alias CustomDimensionPatch for BodyTableDimensionPatch",
+                "aliases via owner glob",
+                "alternate alias DimensionPatch for BodyTableDimensionPatch",
+                "alternate alias DimensionSize for Size",
+                "exposes duplicate body_table_dimension module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyDimensionPatch" in item for item in violations))
+
+    def test_focused_pages_table_dimension_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_DIMENSION_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_dimension_size() {}\n"
+                "pub fn edit_body_table_dimension_size() {}\n"
+                "pub fn apply_body_table_dimension_size() {}\n"
+                "}\n"
+                "fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_DIMENSION_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod dimension;\n"
+                "pub use dimension::{Dimension, Points, Size};\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_table_dimension_facade_source_topology(root), []
+            )
+
+
+    def test_focused_pages_table_dimension_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_table_dimension_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_pages_table_sort_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}(selector: BodyTableSelector) {{}}\n"
+                            for method in boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS
+                        )
+                        + "}\n"
+                        + "fn budget_candidate_reopen_locality_reassembly_atomic_inverse() {}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_sort_facade_source_topology(root)
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_sort_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}(selector: BodyTableSelector) {{}}\n"
+                            for method in boundaries.PAGES_TABLE_SORT_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n"
+                        + "fn budget_candidate_reopen_locality_reassembly_atomic_inverse() {}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_sort_facade_source_topology(root)
+                        )
+                    )
+
+    def test_focused_pages_table_sort_requires_semantics_selector_and_root_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_SORT_SEMANTIC_SOURCE
+            semantic.write_text("pub mod transaction;\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_TABLE_SORT_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+            lib.write_text("pub mod other;\n", encoding="utf-8")
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            table.write_text("pub mod other;\n", encoding="utf-8")
+            violations = boundaries.audit_pages_table_sort_facade_source_topology(root)
+            for name in boundaries.PAGES_TABLE_SORT_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"missing semantic table::sort type {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations))
+            self.assertTrue(any("missing canonical root table module" in item for item in violations))
+            self.assertTrue(any("missing root BodyTableSelector re-export" in item for item in violations))
+            self.assertTrue(any("missing canonical table::sort module" in item for item in violations))
+
+    def test_focused_pages_table_sort_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_sort_order(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo, selector: BodyTableSelector) {}\n"
+                "pub fn edit_body_table_sort_order(selector: BodyTableSelector) {}\n"
+                "pub fn apply_body_table_sort_order(patch: &Patch) {}\n"
+                "}\n"
+                "pub type TableSortPatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableSortArchive as TableSortPatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            table.write_text("pub mod sort;\npub use sort::*;\n", encoding="utf-8")
+            violations = boundaries.audit_pages_table_sort_facade_source_topology(root)
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::sort glob",
+                "retains flat alias TableSortPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_sort_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomSortPatch = BodyTableSortPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlySortPatch = BodyTableSortPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableSortPatch as SortPatch;\n"
+                    "pub mod body_table_sort;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use sort::Order as SortOrder;\n")
+            violations = boundaries.audit_pages_table_sort_facade_source_topology(root)
+            for fragment in (
+                "alternate alias CustomSortPatch for BodyTableSortPatch",
+                "aliases via table::sort glob",
+                "alternate alias SortPatch for BodyTableSortPatch",
+                "alternate alias SortOrder for Order",
+                "exposes duplicate body_table_sort module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlySortPatch" in item for item in violations))
+
+    def test_focused_pages_table_sort_allows_canonical_private_api_and_shared_codec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_sort_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_SORT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_SORT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_sort_order(selector: BodyTableSelector) {}\n"
+                "pub fn edit_body_table_sort_order(selector: BodyTableSelector) {}\n"
+                "pub fn apply_body_table_sort_order(patch: &Patch) {}\n"
+                "}\n"
+                "fn resolve_native(source_bytes: &[u8], wire: WireView) {}\n"
+                "fn transaction_budget_candidate_reopen_locality_reassembly_atomic_inverse_source_bytes_unchanged() {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_SORT_EXPORT_SOURCES[2]
+            table.write_text(
+                "pub mod sort;\n"
+                "pub use sort::{ColumnIndex, Direction, Order, RowRange, Rule, Scope};\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_pages_table_sort_facade_source_topology(root), []
+            )
+
+
+    def test_focused_pages_table_sort_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn("+ audit_pages_table_sort_facade_source_topology()", main_source)
+
+
+    def test_focused_pages_table_appearance_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_TABLE_APPEARANCE_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_appearance_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(
+                            f"pub struct {missing};\n", "", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+                    self.assertTrue(
+                        any(
+                            f"missing canonical type {missing}:" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+        for missing in boundaries.PAGES_TABLE_APPEARANCE_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as temporary:
+                    root = Path(temporary)
+                    add_pages_table_appearance_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+                    source = owner.read_text(encoding="utf-8")
+                    source = re.sub(
+                        rf"\s+pub fn {re.escape(missing)}\b[^{{]*\{{[^}}]*\}}",
+                        "",
+                        source,
+                        count=1,
+                    )
+                    owner.write_text(source, encoding="utf-8")
+                    violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+                    self.assertTrue(
+                        any(
+                            f"Package method is missing {missing}:" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+    def test_focused_pages_table_appearance_requires_semantics_selector_modules_codec_and_fuzz(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_APPEARANCE_SEMANTIC_SOURCE
+            semantic.write_text("pub mod other;\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_TABLE_APPEARANCE_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            table = root / boundaries.PAGES_TABLE_APPEARANCE_EXPORT_SOURCES[2]
+            table.write_text("pub mod other;\n", encoding="utf-8")
+            codec = root / boundaries.PAGES_TABLE_APPEARANCE_CODEC_SOURCE
+            codec.unlink()
+            integration = root / boundaries.PAGES_TABLE_APPEARANCE_TEST_SOURCES[0]
+            integration.unlink()
+            fuzz = root / boundaries.PAGES_TABLE_APPEARANCE_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            (root / boundaries.PAGES_TABLE_APPEARANCE_FUZZ_CORPORA[0]).rmdir()
+            violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+            for name in boundaries.PAGES_TABLE_APPEARANCE_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(f"semantic API is missing {name}" in item for item in violations),
+                    violations,
+                )
+            self.assertTrue(any("missing table::appearance::transaction" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical BodyTableSelector" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical table::appearance module" in item for item in violations), violations)
+            self.assertTrue(any("missing strict hidden codec source" in item for item in violations), violations)
+            self.assertTrue(any("missing integration test" in item for item in violations), violations)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+            self.assertTrue(any("missing fuzz corpus" in item for item in violations), violations)
+
+    def test_focused_pages_table_appearance_rejects_leaks_aliases_and_masks_decoys(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableAppearanceEdit = Edit;\n"
+                + "pub fn raw_appearance(model_id: u64, source_bytes: &[u8], wire: WireView, archive: Archive, generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n"
+                + "// pub fn decoy(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n"
+                + 'const DOC: &str = "pub fn decoy(model_id: u64, bytes: &[u8])";\n'
+                + "#[cfg(test)]\n"
+                + "pub fn test_only(model_id: u64, bytes: &[u8]) -> ArchiveObject {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_appearance_facade_source_topology(root)
+            for fragment in (
+                "flat alias TableAppearanceEdit",
+                "raw parameter model_id: u64",
+                "raw byte slice &[u8]",
+                "wire type WireView",
+                "archive/IWA type Archive",
+                "generated type GeneratedProjection",
+                "protobuf type prost",
+                "protobuf type prost_types",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), (fragment, violations))
+            self.assertFalse(any("decoy" in item or "test_only" in item for item in violations), violations)
+
+    def test_focused_pages_table_appearance_resource_markers_and_scope_are_required(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            add_pages_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_APPEARANCE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            for marker in boundaries.PAGES_TABLE_APPEARANCE_OWNER_MARKER_GROUPS[
+                "metadata ownership"
+            ]:
+                source = source.replace(marker, "missing_marker")
+            source = source.replace("deleted_previews = 0", "deleted_previews = 1")
+            source += (
+                "fn move_rows() {}\n"
+                "fn rewrite_formula() {}\n"
+                "fn delete_previews() {}\n"
+                "fn rewrite_table_model_style() {}\n"
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_pages_table_appearance_resource_source_topology(root)
+            self.assertTrue(any("metadata ownership" in item for item in violations), violations)
+            self.assertTrue(any("deleted_previews = 0" in item for item in violations), violations)
+            self.assertTrue(any("row/cell movement" in item for item in violations), violations)
+            self.assertTrue(any("formula/tile mutation" in item for item in violations), violations)
+            self.assertTrue(any("preview deletion" in item for item in violations), violations)
+            self.assertTrue(any("one-shot style rewrite" in item for item in violations), violations)
+
+
+    def test_focused_pages_table_appearance_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_pages_table_appearance_facade_source_topology()",
+            "+ audit_pages_table_appearance_resource_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_focused_pages_table_hidden_axes_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn("+ audit_pages_table_hidden_axes_facade_source_topology()", main_source)
+
+
+    def test_focused_pages_header_footer_requires_canonical_types_and_methods(
+        self,
+    ) -> None:
+        for missing in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_header_footer_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "pub fn header_footers() {}\n"
+                        + "pub fn edit_header_footer_text() {}\n"
+                        + "pub fn apply_header_footer_text() {}\n"
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_header_footer_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+        for missing in boundaries.PAGES_HEADER_FOOTER_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_header_footer_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "\n".join(
+                            f"pub fn {method}() {{}}"
+                            for method in boundaries.PAGES_HEADER_FOOTER_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "\n}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_header_footer_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+    def test_focused_pages_header_footer_requires_semantics_selector_and_exports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+            semantic.write_text("pub enum OtherRole { Header }\n", encoding="utf-8")
+            selector = root / boundaries.PAGES_HEADER_FOOTER_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+            lib.write_text("pub mod header_footer;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_header_footer_facade_source_topology(
+                root
+            )
+            for name in boundaries.PAGES_HEADER_FOOTER_SEMANTIC_TYPES:
+                self.assertTrue(
+                    any(
+                        f"missing semantic header_footer type {name}" in item
+                        for item in violations
+                    ),
+                    violations,
+                )
+            self.assertTrue(
+                any("missing canonical HeaderFooterSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing root HeaderFooterSelector re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_header_footer_rejects_leaks_aliases_and_raw_ids(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn header_footers(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo, "
+                "storage: TextStorageId, info: PagesHeaderFooterInfo) {}\n"
+                "pub fn edit_header_footer_text() {}\n"
+                "pub fn apply_header_footer_text() {}\n"
+                "}\n"
+                "pub type HeaderFooterPatchAlias = HeaderFooterTextPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod header_footer;\n"
+                "pub use package::*;\n"
+                "pub use package::HeaderFooterTextPatch as FooterPatch;\n"
+                "pub use litchi_iwa_protos::HeaderFooterArchive as HeaderFooterTextPatch;\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.PAGES_HEADER_FOOTER_SEMANTIC_SOURCE
+            with semantic.open("a", encoding="utf-8") as stream:
+                stream.write("pub use crate::header_footer::Kind as FooterKind;\n")
+
+            violations = boundaries.audit_pages_header_footer_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type TextStorageId",
+                "exposes archive/IWA type PagesHeaderFooterInfo",
+                "retains root aliases via owner glob",
+                "alternate alias FooterPatch for HeaderFooterTextPatch",
+                "alternate alias HeaderFooterPatchAlias for HeaderFooterTextPatch",
+                "alternate alias FooterKind for Kind",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_header_footer_masks_cfg_test_and_scans_alias_routes(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomFooterPatch = HeaderFooterTextPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyFooterPatch = HeaderFooterTextPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_HEADER_FOOTER_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::HeaderFooterTextPatch as FooterPatch;\n"
+                    "pub mod header_footer;\n"
+                )
+
+            violations = boundaries.audit_pages_header_footer_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "alternate alias CustomFooterPatch for HeaderFooterTextPatch",
+                "aliases via owner glob",
+                "alternate alias FooterPatch for HeaderFooterTextPatch",
+                "exposes duplicate header_footer module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyFooterPatch" in item for item in violations))
+
+    def test_focused_pages_header_footer_allows_canonical_and_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_header_footer_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_HEADER_FOOTER_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_HEADER_FOOTER_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn header_footers() {}\n"
+                "pub fn edit_header_footer_text() {}\n"
+                "pub fn apply_header_footer_text() {}\n"
+                "}\n"
+                "fn resolve_storage(source_bytes: &[u8], wire: WireView) {}\n"
+                "pub(crate) fn private_archive(archive: Archive) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_pages_header_footer_facade_source_topology(root), []
+            )
+
+
+    def test_focused_pages_header_footer_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_header_footer_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_pages_section_text_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_text_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_section_text_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+        for missing in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_text_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_section_text_facade_source_topology(
+                                root
+                            )
+                        )
+                    )
+
+    def test_focused_pages_section_text_requires_selector_exports_and_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_text_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_SECTION_TEXT_SEMANTIC_SOURCE
+            semantic.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[0]
+            lib.write_text("pub mod selector;\n", encoding="utf-8")
+            package = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[1]
+            package.write_text("pub mod section_text;\n", encoding="utf-8")
+            duplicate = root / boundaries.PAGES_SOURCE_ROOT / "duplicate.rs"
+            duplicate.write_text("pub mod selector {}\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_section_text_facade_source_topology(root)
+            self.assertTrue(
+                any("missing semantic selector type SectionSelector" in item for item in violations)
+            )
+            self.assertTrue(
+                any("missing root SectionSelector re-export" in item for item in violations)
+            )
+            self.assertTrue(
+                any("exposes public package::section_text module" in item for item in violations)
+            )
+            self.assertTrue(
+                any("exposes duplicate selector module" in item for item in violations)
+            )
+
+    def test_focused_pages_section_text_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_text_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn section_text(object_id: u64, source_bytes: &[u8], wire: WireView, "
+                "archive: Archive, generated: GeneratedProjection, buffa: BuffaView, "
+                "prost: prost_types::MessageInfo, storage: TextStorageId) {}\n"
+                "pub fn edit_section_text() {}\n"
+                "pub fn set_section_text() {}\n"
+                "pub fn clear_section_text() {}\n"
+                "pub fn apply_section_text() {}\n"
+                "}\n"
+                "pub type CustomSectionTextPatch = SectionTextPatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SECTION_TEXT_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod selector;\n"
+                "pub use selector::SectionSelector;\n"
+                "pub use package::*;\n"
+                "pub use package::SectionTextPatch as OtherPatch;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_section_text_facade_source_topology(root)
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type TextStorageId",
+                "retains root aliases via owner glob",
+                "alternate alias OtherPatch for SectionTextPatch",
+                "alternate alias CustomSectionTextPatch for SectionTextPatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_section_text_masks_cfg_test_and_allows_private_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_text_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomSectionTextPatch = SectionTextPatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlySectionTextPatch = SectionTextPatch;\n",
+                encoding="utf-8",
+            )
+            self.assertTrue(
+                any(
+                    "CustomSectionTextPatch" in item
+                    for item in boundaries.audit_pages_section_text_facade_source_topology(
+                        root
+                    )
+                )
+            )
+            self.assertFalse(
+                any(
+                    "TestOnlySectionTextPatch" in item
+                    for item in boundaries.audit_pages_section_text_facade_source_topology(
+                        root
+                    )
+                )
+            )
+
+            owner = root / boundaries.PAGES_SECTION_TEXT_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_SECTION_TEXT_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                + "".join(
+                    f"pub fn {method}() {{}}\n"
+                    for method in boundaries.PAGES_SECTION_TEXT_PACKAGE_METHODS
+                )
+                + "}\n"
+                "fn resolve_section(selector: SectionSelector) {}\n"
+                "pub(crate) fn private_source(source_bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            extra.write_text(
+                "#[cfg(test)]\n"
+                "pub type TestOnlySectionTextPatch = SectionTextPatch;\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                boundaries.audit_pages_section_text_facade_source_topology(root)
+            )
+
+
+    def test_focused_pages_section_text_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_section_text_facade_source_topology()", main_source
+        )
+
+
+    def test_focused_pages_table_title_requires_canonical_types_and_methods(self) -> None:
+        for missing in boundaries.PAGES_TABLE_TITLE_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_title_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_TITLE_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_TITLE_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_TITLE_PACKAGE_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing canonical package type {missing}:" in item
+                            for item in boundaries.audit_pages_table_title_facade_source_topology(root)
+                        )
+                    )
+
+        for missing in boundaries.PAGES_TABLE_TITLE_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_table_title_canonical_scaffold(root)
+                    owner = root / boundaries.PAGES_TABLE_TITLE_OWNER_SOURCE
+                    owner.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_TABLE_TITLE_CANONICAL_TYPES
+                        )
+                        + "impl Package {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_TABLE_TITLE_PACKAGE_METHODS
+                            if method != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+                    self.assertTrue(
+                        any(
+                            f"missing Package method {missing}:" in item
+                            for item in boundaries.audit_pages_table_title_facade_source_topology(root)
+                        )
+                    )
+
+    def test_focused_pages_table_title_requires_settings_selector_and_root_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_title_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_TABLE_TITLE_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::body_table_title::{"
+                "BodyTableTitleCommit as Commit};\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_TITLE_SELECTOR_SOURCE
+            selector.write_text("pub enum OtherSelector { Name }\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_TITLE_EXPORT_SOURCES[0]
+            lib.write_text("pub mod table;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_title_facade_source_topology(root)
+
+            self.assertTrue(
+                any("missing semantic table::title type Settings" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing canonical BodyTableSelector" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing root BodyTableSelector re-export" in item for item in violations),
+                violations,
+            )
+
+    def test_focused_pages_table_title_rejects_leaks_aliases_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_title_canonical_scaffold(root)
+            owner = root / boundaries.PAGES_TABLE_TITLE_OWNER_SOURCE
+            owner.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.PAGES_TABLE_TITLE_CANONICAL_TYPES
+                )
+                + "impl Package {\n"
+                "pub fn body_table_title_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n"
+                "pub fn edit_body_table_title() {}\n"
+                "pub fn apply_body_table_title() {}\n"
+                "}\n"
+                "pub type TableTitlePatch = DocumentArchive;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_TITLE_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use litchi_iwa_protos::TableTitleArchive as TableTitlePatch;\n",
+                encoding="utf-8",
+            )
+            table = root / boundaries.PAGES_TABLE_TITLE_EXPORT_SOURCES[2]
+            table.write_text("pub mod title;\npub use title::*;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_title_facade_source_topology(root)
+
+            for fragment in (
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type DocumentArchive",
+                "exposes archive/IWA type litchi_iwa_protos",
+                "retains root aliases via table::title glob",
+                "retains flat alias TableTitlePatch",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_table_title_masks_cfg_test_and_scans_alias_routes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_title_canonical_scaffold(root)
+            extra = root / boundaries.PAGES_SOURCE_ROOT / "extra.rs"
+            extra.write_text(
+                "pub type CustomTitlePatch = BodyTableTitlePatch;\n"
+                "#[cfg(test)]\n"
+                "pub type TestOnlyTitlePatch = BodyTableTitlePatch;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_TABLE_TITLE_EXPORT_SOURCES[0]
+            with lib.open("a", encoding="utf-8") as stream:
+                stream.write(
+                    "pub use package::*;\n"
+                    "pub use package::BodyTableTitlePatch as TitlePatch;\n"
+                    "pub mod body_table_title;\n"
+                )
+            table = root / boundaries.PAGES_TABLE_TITLE_EXPORT_SOURCES[2]
+            with table.open("a", encoding="utf-8") as stream:
+                stream.write("pub use title::Settings as TitleSettings;\n")
+
+            violations = boundaries.audit_pages_table_title_facade_source_topology(root)
+
+            for fragment in (
+                "alternate alias CustomTitlePatch for BodyTableTitlePatch",
+                "aliases via owner glob",
+                "alternate alias TitlePatch for BodyTableTitlePatch",
+                "alternate alias TitleSettings for Settings",
+                "exposes duplicate body_table_title module",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+            self.assertFalse(any("TestOnlyTitlePatch" in item for item in violations))
+
+    def test_focused_pages_table_title_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_table_title_facade_source_topology()", main_source
+        )
+
+
+    def test_iwa_pages_table_name_dispatch_is_wired(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_pages_table_name_facade_source_topology()", main_source
+        )
+
+    def test_focused_pages_table_name_requires_selector_methods_and_root_export(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_table_name_owner_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_pages_table_name_facade_source_topology(root), []
+            )
+
+            owner = root / boundaries.PAGES_TABLE_NAME_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "    pub fn body_table_name() {}\n"
+                "    pub fn edit_body_table_name() {}\n"
+                "    pub fn rename_table() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            selector = root / boundaries.PAGES_TABLE_NAME_SELECTOR_SOURCE
+            selector.write_text("pub struct OtherSelector;\n", encoding="utf-8")
+            lib = root / boundaries.PAGES_TABLE_NAME_EXPORT_SOURCES[0]
+            lib.write_text("pub use selector::OtherSelector;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_table_name_facade_source_topology(root)
+            for fragment in (
+                "missing Package method apply_body_table_name",
+                "must accept selector-first BodyTableSelector",
+                "retains flat Package method rename_table",
+                "missing canonical BodyTableSelector",
+                "missing root BodyTableSelector re-export",
+            ):
+                self.assertTrue(any(fragment in item for item in violations), (fragment, violations))
+
+
+    def test_focused_pages_document_settings_public_api_rejects_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "pub fn document_settings(source_bytes: &[u8], object_id: u64) "
+                        "-> DocumentArchive {}",
+                        "pub type Patch = buffa::DocumentArchiveView;",
+                        "impl prost::Message for document_settings::Edit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub type Commit = HostPackage;",
+                        "pub type Diagnostics = litchi_iwa_core::RawObject;",
+                        "pub type Error = SourceBytes;",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use litchi_iwa_protos::document_settings::GeneratedArchive;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub type document_settings_limit = prost_types::MessageInfo;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_document_settings_facade_source_topology(
+                root
+            )
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertTrue(
+                all(
+                    violation.startswith(
+                        "focused litchi-pages document-settings public API exposes "
+                    )
+                    for violation in violations
+                )
+            )
+            expected_fragments = (
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "raw identifier object_id",
+                "archive/IWA type DocumentArchive",
+                "protobuf type buffa",
+                "archive/IWA type DocumentArchiveView",
+                "protobuf type prost",
+                "protobuf type Message",
+                "archive/IWA type HostPackage",
+                "archive/IWA type litchi_iwa_core",
+                "native object RawObject",
+                "raw source bytes SourceBytes",
+                "archive/IWA type litchi_iwa_protos",
+                "archive/IWA type GeneratedArchive",
+                "protobuf type prost_types",
+                "archive/IWA type MessageInfo",
+            )
+            self.assertEqual(len(violations), len(expected_fragments))
+            for fragment in expected_fragments:
+                with self.subTest(fragment=fragment):
+                    self.assertTrue(
+                        any(fragment in violation for violation in violations),
+                        msg=f"missing focused document-settings leak: {fragment}",
+                    )
+
+    def test_focused_pages_document_settings_api_ignores_semantic_and_private_code(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "\n".join(
+                    [
+                        "// pub fn document_settings(object_id: ObjectId) {}",
+                        'const NOTE: &str = "pub type DocumentSettingsPatch = DocumentArchive";',
+                        "/* impl buffa::Message for DocumentSettingsEdit {} */",
+                        "// pub struct DocumentSettings;",
+                        'const FLAT_NOTE: &str = "pub type DocumentSettings = Settings";',
+                        "pub struct Options;",
+                        "pub struct FootnoteSettings;",
+                        "pub struct Settings;",
+                        "pub struct DocumentSettingsSnapshot;",
+                        "pub fn document_settings(options: Options, footnotes: FootnoteSettings, "
+                        "input: InputBytes, byte_count: usize) -> OutputBytes { todo!() }",
+                        "fn private_source_bytes(source_bytes: &[u8], object_id: u64) "
+                        "-> SourceBytes { todo!() }",
+                        "pub(crate) fn restricted_settings(archive: DocumentArchive) {}",
+                        "struct DocumentSettings;",
+                        "pub(crate) struct DocumentSettings;",
+                        "struct DocumentSettingsEdit;",
+                        "pub(crate) struct DocumentSettingsPatch;",
+                        "impl prost::Message for Unrelated {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "\n".join(
+                    [
+                        "pub struct Edit;",
+                        "pub struct Patch;",
+                        "pub struct Commit;",
+                        "pub struct Diagnostics;",
+                        "pub struct Error;",
+                        "pub struct LimitKind;",
+                        "impl Edit {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+            )
+            safe_exports = (
+                "pub use crate::document_settings::{Options, FootnoteSettings, Settings};\n"
+                "pub use package::document_settings::{Edit, Patch, Commit, Diagnostics, "
+                "Error, LimitKind};\n"
+                "pub fn unrelated(object_id: u64) -> DocumentArchive { todo!() }\n"
+                "pub type DocumentSettingCommit = litchi_iwa_core::RawObject;\n"
+            )
+            lib_export.write_text(safe_exports, encoding="utf-8")
+            package_export.write_text(safe_exports, encoding="utf-8")
+            other_owner = root / "crates/litchi-keynote/src/document_settings.rs"
+            other_owner.parent.mkdir(parents=True)
+            other_owner.write_text(
+                "pub struct DocumentSettings;\n"
+                "pub type DocumentSettingsPatch = litchi_iwa_core::RawObject;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_document_settings_facade_source_topology(root), []
+            )
+
+    def test_focused_pages_document_settings_public_api_rejects_flat_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            semantic, transaction = (
+                root / path
+                for path in boundaries.PAGES_DOCUMENT_SETTINGS_IMPLEMENTATION_SOURCES
+            )
+            semantic.parent.mkdir(parents=True)
+            semantic.write_text(
+                "pub struct DocumentSettings;\n"
+                "pub struct DocumentSettingsEdit;\n"
+                "pub type DocumentSettingsPatch = Patch;\n",
+                encoding="utf-8",
+            )
+            transaction.parent.mkdir(parents=True, exist_ok=True)
+            transaction.write_text(
+                "pub type DocumentSettingsCommit = Commit;\n"
+                "pub type DocumentSettingsDiagnostics = Diagnostics;\n",
+                encoding="utf-8",
+            )
+            lib_export, package_export = (
+                root / path for path in boundaries.PAGES_DOCUMENT_SETTINGS_EXPORT_SOURCES
+            )
+            lib_export.write_text(
+                "pub use crate::document_settings::Error as DocumentSettingsError;\n",
+                encoding="utf-8",
+            )
+            package_export.write_text(
+                "pub use package::document_settings::LimitKind "
+                "as DocumentSettingsLimitKind;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_document_settings_facade_source_topology(root),
+                sorted(
+                    [
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettings: "
+                        "crates/litchi-pages/src/document_settings.rs:1",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsEdit: "
+                        "crates/litchi-pages/src/document_settings.rs:2",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsPatch: "
+                        "crates/litchi-pages/src/document_settings.rs:3",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsCommit: "
+                        "crates/litchi-pages/src/package/document_settings.rs:1",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsDiagnostics: "
+                        "crates/litchi-pages/src/package/document_settings.rs:2",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsError: "
+                        "crates/litchi-pages/src/lib.rs:1",
+                        "focused litchi-pages document-settings public API retains "
+                        "flat alias DocumentSettingsLimitKind: "
+                        "crates/litchi-pages/src/package.rs:1",
+                    ]
+                ),
+            )
+
+    def test_legacy_xlsb_sheet_view_names_and_methods_are_forbidden(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / boundaries.XLSB_SOURCE_ROOT / "legacy_sheet_view.rs"
+            path.parent.mkdir(parents=True)
+            path.write_text(
+                "\n".join(
+                    [
+                        *boundaries.LEGACY_XLSB_SHEET_VIEW_NAMES,
+                        "pub fn set_sheet_view() {}",
+                        "pub(crate) fn sheet_views() {}",
+                    ]
+                )
+                + "\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_spreadsheet_sheet_view_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertEqual(
+                violations,
+                [
+                    f"litchi-xlsb legacy sheet-view name {name}: "
+                    "crates/litchi-xlsb/src/legacy_sheet_view.rs:"
+                    f"{index}"
+                    for index, name in enumerate(
+                        boundaries.LEGACY_XLSB_SHEET_VIEW_NAMES, start=1
+                    )
+                ]
+                + [
+                    "litchi-xlsb legacy sheet-view public method set_sheet_view: "
+                    "crates/litchi-xlsb/src/legacy_sheet_view.rs:7",
+                    "litchi-xlsb legacy sheet-view public method sheet_views: "
+                    "crates/litchi-xlsb/src/legacy_sheet_view.rs:8",
+                ],
+            )
+
+    def test_sheet_view_hosts_cannot_define_canonical_view_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for path in (
+                boundaries.XLSB_SHEET_VIEW_ADAPTER,
+                boundaries.XLSX_SHEET_VIEW_MODEL,
+            ):
+                absolute_path = root / path
+                absolute_path.parent.mkdir(parents=True, exist_ok=True)
+                absolute_path.write_text(
+                    "\n".join(
+                        [
+                            *(f"pub struct {name};" for name in boundaries.CANONICAL_SHEET_VIEW_TYPES),
+                            "pub struct Entry;",
+                            "pub struct Collection;",
+                            "pub struct PivotSelection;",
+                            "pub struct Extension;",
+                        ]
+                    )
+                    + "\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_sheet_view_source_topology(root)
+
+            self.assertEqual(violations, sorted(violations))
+            self.assertEqual(
+                violations,
+                [
+                    f"{host} sheet-view {role} defines canonical view type {name}: "
+                    f"{path}:{index}"
+                    for host, path, role in (
+                        ("litchi-xlsb", boundaries.XLSB_SHEET_VIEW_ADAPTER, "adapter"),
+                        ("litchi-xlsx", boundaries.XLSX_SHEET_VIEW_MODEL, "model"),
+                    )
+                    for index, name in enumerate(
+                        boundaries.CANONICAL_SHEET_VIEW_TYPES, start=1
+                    )
+                ],
+            )
+
+    def test_retired_xlsx_chart_owner_sources_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for retired in boundaries.RETIRED_XLSX_CHART_FILES:
+                path = root / boundaries.XLSX_SOURCE_ROOT / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSX chart owner source returned: "
+                    f"{boundaries.XLSX_SOURCE_ROOT / retired}"
+                    for retired in boundaries.RETIRED_XLSX_CHART_FILES
+                ],
+            )
+
+    def test_spreadsheet_chart_facades_must_remain_thin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for facades in boundaries.SPREADSHEET_CHART_FACADES.values():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "// facade\n"
+                    * (boundaries.MAX_SPREADSHEET_CHART_FACADE_LINES + 1),
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb chart facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_CHART_FACADE_LINES} lines: "
+                    "crates/litchi-xlsb/src/chart.rs",
+                    "litchi-xlsx chart facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_CHART_FACADE_LINES} lines: "
+                    "crates/litchi-xlsx/src/chart.rs",
+                ],
+            )
+
+    def test_chart_facades_cannot_define_shared_chart_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, facades in boundaries.SPREADSHEET_CHART_FACADES.items():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("pub struct Chart;\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb chart facade defines shared chart type: "
+                    "crates/litchi-xlsb/src/chart.rs:1",
+                    "litchi-xlsx chart facade defines shared chart type: "
+                    "crates/litchi-xlsx/src/chart.rs:1",
+                ],
+            )
+
+    def test_chart_facades_cannot_directly_use_drawingml_chart_codecs(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, facades in boundaries.SPREADSHEET_CHART_FACADES.items():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "litchi_drawingml::chart::read_chart();\n", encoding="utf-8"
+                )
+
+            violations = boundaries.audit_spreadsheet_chart_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb chart facade directly uses litchi_drawingml chart codec: "
+                    "crates/litchi-xlsb/src/chart.rs:1",
+                    "litchi-xlsx chart facade directly uses litchi_drawingml chart codec: "
+                    "crates/litchi-xlsx/src/chart.rs:1",
+                ],
+            )
+
+    def test_retired_xlsx_shape_owner_sources_cannot_return(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for retired in boundaries.RETIRED_XLSX_SHAPE_FILES:
+                path = root / boundaries.XLSX_SOURCE_ROOT / retired
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("// retired owner\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "retired XLSX shape owner source returned: "
+                    f"{boundaries.XLSX_SOURCE_ROOT / retired}"
+                    for retired in boundaries.RETIRED_XLSX_SHAPE_FILES
+                ],
+            )
+
+    def test_spreadsheet_shape_facades_must_remain_thin(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for facades in boundaries.SPREADSHEET_SHAPE_FACADES.values():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "// facade\n"
+                    * (boundaries.MAX_SPREADSHEET_SHAPE_FACADE_LINES + 1),
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb shape facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_SHAPE_FACADE_LINES} lines: "
+                    "crates/litchi-xlsb/src/shapes.rs",
+                    "litchi-xlsx shape facade exceeds "
+                    f"{boundaries.MAX_SPREADSHEET_SHAPE_FACADE_LINES} lines: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs",
+                ],
+            )
+
+    def test_shape_facades_cannot_define_local_types(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, facades in boundaries.SPREADSHEET_SHAPE_FACADES.items():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text("pub struct Shape;\n", encoding="utf-8")
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb shape facade defines local shape type: "
+                    "crates/litchi-xlsb/src/shapes.rs:1",
+                    "litchi-xlsx shape facade defines local shape type: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs:1",
+                ],
+            )
+
+    def test_shape_facades_cannot_directly_use_xml_implementation_details(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for facades in boundaries.SPREADSHEET_SHAPE_FACADES.values():
+                path = root / facades[0]
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "use quick_xml::Reader;\nwrite(\"<xdr:wsDr>\");\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    "litchi-xlsb shape facade directly emits xdr XML: "
+                    "crates/litchi-xlsb/src/shapes.rs:2",
+                    "litchi-xlsb shape facade directly uses quick_xml: "
+                    "crates/litchi-xlsb/src/shapes.rs:1",
+                    "litchi-xlsx shape facade directly emits xdr XML: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs:2",
+                    "litchi-xlsx shape facade directly uses quick_xml: "
+                    "crates/litchi-xlsx/src/shapes/mod.rs:1",
+                ],
+            )
+
+    def test_legacy_host_shape_names_are_forbidden(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for host, source_root in (
+                ("litchi-xlsb", boundaries.XLSB_SOURCE_ROOT),
+                ("litchi-xlsx", boundaries.XLSX_SOURCE_ROOT),
+            ):
+                path = root / source_root / "shape_host.rs"
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "\n".join(boundaries.LEGACY_HOST_SHAPE_NAMES) + "\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_spreadsheet_shape_source_topology(root)
+
+            self.assertEqual(
+                violations,
+                [
+                    f"{host} legacy shape host name {name}: "
+                    f"{source_root}/shape_host.rs:{index}"
+                    for host, source_root in (
+                        ("litchi-xlsb", boundaries.XLSB_SOURCE_ROOT),
+                        ("litchi-xlsx", boundaries.XLSX_SOURCE_ROOT),
+                    )
+                    for index, name in enumerate(boundaries.LEGACY_HOST_SHAPE_NAMES, start=1)
+                ],
+            )
+
+
+    def test_focused_numbers_table_title_requires_each_direct_canonical_type(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_TITLE_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_title_settings_canonical_scaffold(root)
+                    semantic = (
+                        root
+                        / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
+                    )
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in (
+                                boundaries.NUMBERS_TABLE_TITLE_SETTINGS_CANONICAL_TYPES
+                            )
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-title settings public API is "
+                            f"missing canonical table::title type {missing}: "
+                            "crates/litchi-numbers/src/table/title.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_title_requires_modules_and_private_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES[1]
+            package.write_text("pub mod table_title;\n", encoding="utf-8")
+            table = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES[2]
+            table.write_text("mod title;\n", encoding="utf-8")
+
+            violations = (
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertTrue(
+                any(
+                    "missing canonical table::title module" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::table_title module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_SOURCE).unlink()
+            violations = (
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                )
+            )
+            self.assertEqual(
+                violations,
+                [
+                    "focused litchi-numbers table-title settings public API is "
+                    "missing private package owner source: "
+                    "crates/litchi-numbers/src/package/table_title.rs"
+                ],
+            )
+
+    def test_focused_numbers_table_title_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            helper = (
+                root
+                / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_OWNER_HELPER_ROOT
+                / "api.rs"
+            )
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "pub type TableTitleEdit = Edit;\n"
+                "pub fn table_title_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use crate::table::title::{Settings, Edit};\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                )
+            )
+
+            for fragment in (
+                "retains flat alias TableTitleEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public table-title owner alias",
+                "retains root alias Settings",
+                "retains root alias Edit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_title_allows_canonical_common_settings_reexport(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_title_settings_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_TITLE_SETTINGS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::table_title::{Commit, Diagnostics, "
+                "Edit, Error, "
+                "LimitKind, Patch, Path};\n"
+                "pub use litchi_iwa_common::table::title::Settings;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_title_settings_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+
+    def test_focused_numbers_table_appearance_requires_each_contract_part(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+
+            semantic = root / boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_SOURCE
+            semantic.write_text(
+                "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.NUMBERS_TABLE_APPEARANCE_SEMANTIC_TYPES[:-1]
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical table::appearance type RowSizing" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_appearance_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_APPEARANCE_CODEC_SOURCE
+            codec.write_text("", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("hidden codec is missing strict API" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "SheetSelector<'sheet>", "MissingSheetSelector<'sheet>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first SheetSelector" in item for item in violations),
+                violations,
+            )
+
+            marker_lines = {
+                "copy-on-write": "fn copy_on_write_style_variation() {}\n",
+                "metadata": "fn metadata_save_token_watermark() {}\n",
+                "budget": "fn transaction_budget_preflight() {}\n",
+                "locality": "fn verify_locality_candidate_reopen() {}\n",
+            }
+            for label, marker_line in marker_lines.items():
+                with self.subTest(marker=label):
+                    add_numbers_table_appearance_canonical_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(marker_line, ""),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_appearance_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type TableAppearanceEdit = Edit;\n"
+                + "pub fn raw_table_appearance(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n"
+                + "pub fn __table_appearance_from_source_built_variant(model_style_identifier: u64, source_bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_APPEARANCE_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::table_appearance::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_appearance_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias TableAppearanceEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_appearance_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_appearance_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_APPEARANCE_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn test_only_raw_table_appearance(object_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_appearance_facade_source_topology(root),
+                [],
+            )
+
+
+    def test_focused_numbers_table_cell_pop_up_menu_requires_each_contract_part(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub mod transaction;\n"
+                + "".join(
+                    f"pub struct {name};\n"
+                    for name in boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_SEMANTIC_TYPES
+                    if name != "Item"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical cell::data_format::pop_up_menu type Item" in item
+                    for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "At<'cell>", "MissingPosition<'cell>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first At" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_CODEC_SOURCE
+            codec.write_text("", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("hidden codec is missing strict API" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_FUZZ_SOURCE).unlink()
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+            marker_lines = {
+                "control-cell": "fn control_cell_data_list_refcount() {}\n",
+                "table-data-list": "fn control_cell_data_list_refcount() {}\n",
+                "refcount": "fn control_cell_data_list_refcount() {}\n",
+                "copy-on-write": "fn copy_on_write_shared_model_cull() {}\n",
+                "metadata": "fn metadata_save_token_object_uuid_external_reference_watermark() {}\n",
+                "budget": "fn transaction_budget_preflight_charge() {}\n",
+                "locality": "fn verify_locality_candidate_reopen_string_table() {}\n",
+                "string-table": "fn verify_locality_candidate_reopen_string_table() {}\n",
+            }
+            for label, marker_line in marker_lines.items():
+                with self.subTest(marker=label):
+                    add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(marker_line, ""),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_cell_pop_up_menu_rejects_aliases_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type PopUpMenuEdit = Edit;\n"
+                + "pub fn raw_popup(table_id: u64, row: usize, column: usize, "
+                "source_bytes: &[u8], wire: WireView, archive: Archive, "
+                "model: PopUpMenuModel, value: CellValueArchive, "
+                "generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::table_cell_pop_up_menu::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias PopUpMenuEdit",
+                "exposes raw identifier parameter table_id: u64",
+                "exposes raw identifier parameter row: usize",
+                "exposes raw identifier parameter column: usize",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes archive/IWA type PopUpMenuModel",
+                "exposes archive/IWA type CellValueArchive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cell_pop_up_menu_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_pop_up_menu_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_POP_UP_MENU_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn test_only_raw_popup(table_id: u64, bytes: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_pop_up_menu_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+
+    def test_focused_numbers_table_cell_pop_up_menu_audits_are_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_pop_up_menu_facade_source_topology()",
+            main_source,
+        )
+
+
+    def test_focused_numbers_table_dimension_requires_canonical_contract(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_dimension_canonical_scaffold(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_dimension_facade_source_topology(root),
+                [],
+            )
+
+            transaction = root / boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE
+            transaction.write_text("pub struct Edit;\n", encoding="utf-8")
+            owner = root / boundaries.NUMBERS_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                "impl Package { pub fn table_dimension_size(&self) {} }\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub struct Dimension;\npub struct Points;\npub struct Size;\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_table_dimension_facade_source_topology(
+                root
+            )
+            for missing in boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_TYPES[1:]:
+                self.assertTrue(
+                    any(f"transaction type {missing}:" in item for item in violations),
+                    msg=f"missing canonical type gate {missing!r}: {violations!r}",
+                )
+            for missing in boundaries.NUMBERS_TABLE_DIMENSION_PACKAGE_METHODS[1:]:
+                self.assertTrue(
+                    any(f"Package method {missing}:" in item for item in violations),
+                    msg=f"missing Package method gate {missing!r}: {violations!r}",
+                )
+            self.assertTrue(
+                any("missing canonical table::dimension::transaction module" in item for item in violations)
+            )
+
+    def test_focused_numbers_table_dimension_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_dimension_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_DIMENSION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn edit_table_dimension_size_raw(\n"
+                "object_id: u64, native_object: NativeObjectIdentifier,\n"
+                "source_bytes: &[u8], archive: Archive, wire: WireView,\n"
+                "generated: GeneratedProjection, prost: prost_types::MessageInfo\n"
+                ") {}\n",
+                encoding="utf-8",
+            )
+            transaction = root / boundaries.NUMBERS_TABLE_DIMENSION_TRANSACTION_SOURCE
+            transaction.write_text(
+                transaction.read_text(encoding="utf-8")
+                + "pub type DimensionSizeEdit = Edit;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_DIMENSION_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use table::dimension::transaction::{Edit, Error};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_table_dimension_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias DimensionSizeEdit",
+                "transaction alias outside table::dimension::transaction Edit",
+                "transaction alias outside table::dimension::transaction Error",
+                "exposes raw identifier object_id",
+                "exposes raw identifier NativeObjectIdentifier",
+                "exposes native object native_object",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes archive/IWA type Archive",
+                "exposes wire type WireView",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_dimension_allows_exact_common_compatibility_reexport(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_dimension_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_DIMENSION_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use litchi_iwa_common::table::dimension::{"
+                "Dimension, Error, Points, Size};\n"
+                "pub mod transaction;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_dimension_facade_source_topology(root),
+                [],
+            )
+
+            semantic.write_text(
+                "pub use litchi_iwa_common::table::dimension::{"
+                "Dimension as Axis, Error, Points, Size};\n"
+                "pub mod transaction;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_dimension_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("public dimension owner alias" in item for item in violations),
+                violations,
+            )
+
+
+    def test_focused_pages_section_settings_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.PAGES_SECTION_SETTINGS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_settings_canonical_scaffold(root)
+                    semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_SETTINGS_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_section_settings_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-pages section-settings public API is "
+                            f"missing canonical section::settings type {missing}: "
+                            "crates/litchi-pages/src/section/settings.rs"
+                        ],
+                    )
+
+    def test_focused_pages_section_settings_requires_nested_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            package = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[1]
+            package.write_text("pub mod section_settings;\n", encoding="utf-8")
+            section = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+            section.write_text("mod settings;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_section_settings_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "missing canonical section::settings module" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::section_settings module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            (root / boundaries.PAGES_SECTION_SETTINGS_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_pages_section_settings_facade_source_topology(root),
+                [
+                    "focused litchi-pages section-settings public API is missing "
+                    "Package method apply_section_settings: "
+                    "crates/litchi-pages/src/package/section_settings.rs",
+                    "focused litchi-pages section-settings public API is missing "
+                    "Package method edit_section_settings: "
+                    "crates/litchi-pages/src/package/section_settings.rs",
+                    "focused litchi-pages section-settings public API is missing "
+                    "Package method section_settings: "
+                    "crates/litchi-pages/src/package/section_settings.rs",
+                    "focused litchi-pages section-settings public API is missing "
+                    "private package owner source: "
+                    "crates/litchi-pages/src/package/section_settings.rs"
+                ],
+            )
+
+    def test_focused_pages_section_settings_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            helper = root / boundaries.PAGES_SECTION_SETTINGS_OWNER_HELPER_ROOT / "api.rs"
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "pub type SectionSettingsEdit = Edit;\n"
+                "pub fn section_settings(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod section;\n"
+                "pub use crate::section::settings::{Settings, Edit};\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod settings;\n"
+                "pub struct Settings;\n"
+                "pub use settings::{Patch, Commit};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_section_settings_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias SectionSettingsEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public section-settings owner alias",
+                "retains root alias Settings",
+                "retains root alias Edit",
+                "retains root alias Patch",
+                "retains root alias Commit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_section_settings_allows_canonical_and_adjacent_api(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_settings_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_SECTION_SETTINGS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::section_settings::{Commit, Diagnostics, "
+                "Edit, Error, LimitKind, Patch, Path, DependencyKind};\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_SECTION_SETTINGS_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn section_settings() {}\n"
+                "pub fn edit_section_settings() {}\n"
+                "pub fn apply_section_settings() {}\n"
+                "}\n"
+                "pub(crate) fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_SETTINGS_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod pagination;\n"
+                "pub mod settings;\n"
+                "pub use pagination::{PageNumber, PageNumbering, Pagination, Start};\n"
+                "pub struct Settings;\n"
+                "pub enum Error { BackgroundPayloadTooLarge }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_section_settings_facade_source_topology(root), []
+            )
+
+
+    def test_focused_pages_section_background_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.PAGES_SECTION_BACKGROUND_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_pages_section_background_canonical_scaffold(root)
+                    semantic = root / boundaries.PAGES_SECTION_BACKGROUND_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.PAGES_SECTION_BACKGROUND_CANONICAL_TYPES
+                            if name != missing
+                        )
+                        + "impl Edit {\n"
+                        + "".join(
+                            f"pub fn {method}() {{}}\n"
+                            for method in boundaries.PAGES_SECTION_BACKGROUND_EDIT_METHODS
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_pages_section_background_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-pages section-background public API is "
+                            f"missing canonical section::background type {missing}: "
+                            "crates/litchi-pages/src/section/background.rs"
+                        ],
+                    )
+
+    def test_focused_pages_section_background_requires_nested_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            package = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[1]
+            package.write_text("pub mod section_background;\n", encoding="utf-8")
+            section = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[2]
+            section.write_text("mod background;\n", encoding="utf-8")
+
+            violations = boundaries.audit_pages_section_background_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any(
+                    "missing canonical section::background module" in item
+                    for item in violations
+                )
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::section_background module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            (root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_SOURCE).unlink()
+            self.assertEqual(
+                boundaries.audit_pages_section_background_facade_source_topology(root),
+                [
+                    "focused litchi-pages section-background public API is missing "
+                    "Package method apply_section_background: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                    "focused litchi-pages section-background public API is missing "
+                    "Package method edit_section_background: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                    "focused litchi-pages section-background public API is missing "
+                    "Package method section_background: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                    "focused litchi-pages section-background public API is missing "
+                    "private package owner source: "
+                    "crates/litchi-pages/src/package/section_background.rs",
+                ],
+            )
+
+    def test_focused_pages_section_background_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            helper = (
+                root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_HELPER_ROOT / "api.rs"
+            )
+            helper.parent.mkdir(parents=True)
+            helper.write_text(
+                "pub type SectionBackgroundEdit = Edit;\n"
+                "pub fn section_background(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, archive: Archive, generated: GeneratedProjection, "
+                "buffa: BuffaView, prost: prost_types::MessageInfo, opaque: Opaque) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod section;\n"
+                "pub use crate::section::background::{Edit, Patch};\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod background;\npub struct Background;\n"
+                "pub use background::{Edit, Patch, Commit};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_pages_section_background_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias SectionBackgroundEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type BuffaView",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes archive/IWA type Opaque",
+                "exposes public section-background owner alias",
+                "retains root alias Edit",
+                "retains root alias Patch",
+                "retains root alias Commit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_pages_section_background_allows_canonical_and_adjacent_api(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_pages_section_background_canonical_scaffold(root)
+            semantic = root / boundaries.PAGES_SECTION_BACKGROUND_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::package::section_background::{Commit, Diagnostics, "
+                "Edit, Error, LimitKind, Patch, Path};\n"
+                "impl Edit {\n"
+                "pub fn background() {}\n"
+                "pub fn set_solid() {}\n"
+                "pub fn clear() {}\n"
+                "pub fn commit() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.PAGES_SECTION_BACKGROUND_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn section_background() {}\n"
+                "pub fn edit_section_background() {}\n"
+                "pub fn apply_section_background() {}\n"
+                "}\n"
+                "pub(crate) fn resolve_object_id(source_bytes: &[u8], wire: WireView) {}\n",
+                encoding="utf-8",
+            )
+            section = root / boundaries.PAGES_SECTION_BACKGROUND_EXPORT_SOURCES[2]
+            section.write_text(
+                "pub mod background;\npub struct Background;\n"
+                "pub mod settings;\npub struct Settings;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_pages_section_background_facade_source_topology(root),
+                [],
+            )
+
+
+    def test_numbers_formula_boundary_inventory_is_exact(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/formula.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_CANONICAL_TYPES,
+            (
+                "Expression",
+                "CachedValue",
+                "CellReference",
+                "AxisReference",
+                "BinaryOperator",
+                "Table",
+                "Error",
+                "LimitKind",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cells.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS,
+            ("WireBytes", "AllocationEvents"),
+        )
+        self.assertEqual(
+            boundaries.RETIRED_NUMBERS_FORMULA_FACADE_TYPES,
+            frozenset(
+                {
+                    "FormulaExpression",
+                    "FormulaCachedValue",
+                    "FormulaCellReference",
+                    "FormulaAxisReference",
+                    "FormulaBinaryOperator",
+                    "FormulaPivotCategoryReference",
+                    "FormulaUuid",
+                }
+            ),
+        )
+
+    def test_focused_numbers_formula_requires_each_canonical_type(self) -> None:
+        for missing in boundaries.NUMBERS_FORMULA_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_formula_canonical_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_FORMULA_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    violations = boundaries.audit_numbers_formula_facade_source_topology(root)
+                    self.assertIn(
+                        "focused litchi-numbers formula API is missing canonical "
+                        f"formula type {missing}: "
+                        "crates/litchi-numbers/src/formula.rs",
+                        violations,
+                    )
+
+    def test_focused_numbers_formula_requires_typed_transaction_limit_kinds(self) -> None:
+        for missing in boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_formula_canonical_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+                    transaction_limit = (
+                        root / boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_SOURCE
+                    )
+                    transaction_limit.write_text(
+                        "pub enum LimitKind { "
+                        + ", ".join(
+                            variant
+                            for variant in boundaries.NUMBERS_FORMULA_TRANSACTION_LIMIT_VARIANTS
+                            if variant != missing
+                        )
+                        + " }\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_formula_facade_source_topology(root),
+                        [
+                            "focused litchi-numbers formula transaction API is missing typed "
+                            f"LimitKind::{missing}: "
+                            "crates/litchi-numbers/src/package/table_cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_formula_rejects_legacy_and_native_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_formula_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_FORMULA_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub use litchi_iwa_common::formula::FormulaExpression;\n"
+                + "pub type LegacyFormula = FormulaUuid;\n"
+                + "pub fn decode(table_id: u64, source_bytes: &[u8], "
+                "wire: WireView, codec: FormulaCodec) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_SOURCE_ROOT / "lib.rs"
+            lib.write_text(
+                "pub mod formula;\n"
+                "pub use formula::{Expression, CachedValue};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_formula_facade_source_topology(root)
+
+            for fragment in (
+                "shared iWork formula facade litchi_iwa_common",
+                "retired formula facade type FormulaExpression",
+                "retired formula facade type FormulaUuid",
+                "raw identifier table_id",
+                "raw source bytes source_bytes",
+                "raw byte slice &[u8]",
+                "wire/BNC type WireView",
+                "protobuf type FormulaCodec",
+                "retains root formula alias",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_formula_allows_contextual_formula_cell_api(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_formula_canonical_scaffold(root)
+            cells = root / Path("crates/litchi-numbers/src/table/cells.rs")
+            cells.parent.mkdir(parents=True)
+            cells.write_text(
+                "use crate::formula::{CachedValue, Expression, Table};\n"
+                "pub struct Edit;\n"
+                "impl Edit {\n"
+                "    pub fn formula(&mut self, expression: Expression, cached: CachedValue) {}\n"
+                "    pub fn formula_table(&mut self, table: Table) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_formula_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_formula_audits_package_public_declarations(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_formula_canonical_scaffold(root)
+            for relative_path in (
+                Path("crates/litchi-numbers/src/package.rs"),
+                Path("crates/litchi-numbers/src/package/table_cells.rs"),
+            ):
+                path = root / relative_path
+                path.parent.mkdir(parents=True, exist_ok=True)
+                path.write_text(
+                    "pub fn edit_formula(table_id: u64, source_bytes: &[u8], "
+                    "wire: WireView, generated: FormulaArchive) {}\n",
+                    encoding="utf-8",
+                )
+
+            violations = boundaries.audit_numbers_formula_facade_source_topology(root)
+
+            for path in (
+                "crates/litchi-numbers/src/package.rs",
+                "crates/litchi-numbers/src/package/table_cells.rs",
+            ):
+                self.assertTrue(
+                    any(path in item and "raw identifier table_id" in item for item in violations),
+                    msg=violations,
+                )
+                self.assertTrue(
+                    any(path in item and "raw source bytes source_bytes" in item for item in violations),
+                    msg=violations,
+                )
+                self.assertTrue(
+                    any(path in item and "wire/BNC type WireView" in item for item in violations),
+                    msg=violations,
+                )
+
+    def test_numbers_table_cells_read_boundary_inventories_are_exact(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE,
+            Path("crates/litchi-numbers/src/table/cells.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE,
+            Path("crates/litchi-numbers/src/package/table_cells.rs"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES,
+            ("State", "Storage", "Error", "LimitKind", "Path"),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS,
+            ("table_cell", "table_cells"),
+        )
+        for deferred in (
+            "Input",
+            "Change",
+            "Edit",
+            "Patch",
+            "Commit",
+            "Diagnostics",
+            "DependencyKind",
+        ):
+            self.assertNotIn(deferred, boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES)
+        for deferred in ("edit_table_cells", "apply_table_cells"):
+            self.assertNotIn(deferred, boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS)
+
+    def test_focused_numbers_table_cells_read_requires_each_type(self) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_read_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+                    retained = [
+                        name
+                        for name in boundaries.NUMBERS_TABLE_CELLS_CANONICAL_TYPES
+                        if name != missing
+                    ]
+                    semantic.write_text(
+                        "".join(f"pub struct {name};\n" for name in retained),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells read API is missing "
+                            f"canonical table::cells type {missing}: "
+                            "crates/litchi-numbers/src/table/cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_read_requires_each_package_method(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_read_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE
+                    owner.write_text(
+                        "impl Package {\n"
+                        + "".join(
+                            f"pub fn {name}() {{}}\n"
+                            for name in boundaries.NUMBERS_TABLE_CELLS_PACKAGE_METHODS
+                            if name != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells read API is missing "
+                            f"canonical Package::{missing} method: "
+                            "crates/litchi-numbers/src/package/table_cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_read_requires_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[1]
+            package.write_text("pub mod table_cells;\n", encoding="utf-8")
+            table = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[2]
+            table.write_text("mod cells;\n", encoding="utf-8")
+
+            violations = boundaries.audit_numbers_table_cells_facade_source_topology(
+                root
+            )
+
+            self.assertTrue(
+                any("missing canonical table::cells module" in item for item in violations)
+            )
+            self.assertTrue(
+                any(
+                    "exposes duplicate package::table_cells module" in item
+                    for item in violations
+                )
+            )
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE).unlink()
+            violations = boundaries.audit_numbers_table_cells_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing private package owner source" in item for item in violations)
+            )
+            self.assertEqual(
+                sum("canonical Package::" in item for item in violations),
+                2,
+            )
+
+    def test_focused_numbers_table_cells_read_rejects_aliases_and_physical_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub type TableCellState = State;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_TABLE_CELLS_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn table_cell(object_id: u64, source_bytes: &[u8], "
+                "bnc: BncCell, codec: NumbersTableCellStorageCodec, "
+                "buffa: BuffaCellView, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n"
+                "pub fn table_cells() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use crate::table::cells::{State, Storage};\n",
+                encoding="utf-8",
+            )
+
+            violations = boundaries.audit_numbers_table_cells_facade_source_topology(
+                root
+            )
+
+            for fragment in (
+                "retains flat alias TableCellState",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire/BNC type BncCell",
+                "exposes protobuf type NumbersTableCellStorageCodec",
+                "exposes protobuf type BuffaCellView",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public table-cells owner alias",
+                "retains root alias State",
+                "retains root alias Storage",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cells_read_allows_semantic_variants_and_types(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_read_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub use crate::cell::{FiniteF64, Value};\n"
+                "pub use crate::cell::data_format::DataFormat;\n"
+                "pub use crate::table::{At, Area, Dimensions};\n"
+                "pub struct State;\n"
+                "pub enum Storage { Empty, Stored }\n"
+                "pub struct Error;\n"
+                "pub struct LimitKind;\n"
+                "pub struct Path;\n"
+                "pub enum SemanticDependency { CellStorage, FormulaCache }\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_cells_facade_source_topology(root),
+                [],
+            )
+
+
+    def test_focused_numbers_table_cells_mutation_requires_each_type(self) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_MUTATION_TYPES:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_mutation_scaffold(root)
+                    semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+                    semantic.write_text(
+                        "".join(
+                            f"pub struct {name};\n"
+                            for name in boundaries.NUMBERS_TABLE_CELLS_FULL_CANONICAL_TYPES
+                            if name != missing
+                        ),
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells mutation API is missing "
+                            f"canonical table::cells type {missing}: "
+                            "crates/litchi-numbers/src/table/cells.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_mutation_requires_each_package_method(
+        self,
+    ) -> None:
+        for missing in boundaries.NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS:
+            with self.subTest(missing=missing):
+                with tempfile.TemporaryDirectory() as directory:
+                    root = Path(directory)
+                    add_numbers_table_cells_mutation_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE
+                    owner.write_text(
+                        "impl Package {\n"
+                        + "".join(
+                            f"pub fn {name}() {{}}\n"
+                            for name in (
+                                boundaries.NUMBERS_TABLE_CELLS_MUTATION_PACKAGE_METHODS
+                            )
+                            if name != missing
+                        )
+                        + "}\n",
+                        encoding="utf-8",
+                    )
+
+                    self.assertEqual(
+                        boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                            root
+                        ),
+                        [
+                            "focused litchi-numbers table-cells mutation API is missing "
+                            f"canonical Package::{missing} method: "
+                            "crates/litchi-numbers/src/package/table_cell_edit.rs"
+                        ],
+                    )
+
+    def test_focused_numbers_table_cells_mutation_requires_private_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            package = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[1]
+            package.write_text(
+                "pub(crate) mod table_cells;\npub mod table_cell_edit;\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                )
+            )
+
+            self.assertEqual(len(violations), 1)
+            self.assertIn("exposes package::table_cell_edit module", violations[0])
+
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE).unlink()
+            violations = (
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("missing private package owner source" in item for item in violations)
+            )
+            self.assertEqual(
+                sum("canonical Package::" in item for item in violations),
+                2,
+            )
+
+    def test_focused_numbers_table_cells_mutation_rejects_public_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8")
+                + "pub type TableCellEdit = Edit;\n",
+                encoding="utf-8",
+            )
+            owner = root / boundaries.NUMBERS_TABLE_CELLS_MUTATION_OWNER_SOURCE
+            owner.write_text(
+                "impl Package {\n"
+                "pub fn edit_table_cells(object_id: u64, source_bytes: &[u8], "
+                "wire: WireView, bnc: BncCell, codec: NumbersTableCellStorageCodec, "
+                "buffa: BuffaCellView, generated: GeneratedProjection, "
+                "prost: prost_types::MessageInfo) {}\n"
+                "pub fn apply_table_cells() {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELLS_EXPORT_SOURCES[0]
+            lib.write_text(
+                "pub mod table;\n"
+                "pub use crate::table::cells::{Edit, Patch, Commit};\n",
+                encoding="utf-8",
+            )
+
+            violations = (
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                )
+            )
+
+            for fragment in (
+                "retains flat alias TableCellEdit",
+                "exposes raw identifier object_id",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire/BNC type WireView",
+                "exposes wire/BNC type BncCell",
+                "exposes protobuf type NumbersTableCellStorageCodec",
+                "exposes protobuf type BuffaCellView",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "exposes protobuf type prost_types",
+                "exposes public mutation-owner alias",
+                "retains root alias Edit",
+                "retains root alias Patch",
+                "retains root alias Commit",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cells_mutation_allows_private_plan_and_variants(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cells_mutation_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELLS_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub struct Input;\npub struct Change;\n"
+                "pub struct State;\npub struct Storage;\n"
+                "pub struct Edit;\npub struct Patch;\npub struct Commit;\n"
+                "pub struct Diagnostics;\npub struct Error;\n"
+                "pub struct LimitKind;\npub struct Path;\n"
+                "pub enum DependencyKind { CellStorage, FormulaCache }\n"
+                "pub(crate) struct Plan;\n",
+                encoding="utf-8",
+            )
+
+            self.assertEqual(
+                boundaries.audit_numbers_table_cells_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+
+    def _write_comment_clear_metadata_prerequisite_fixture(
+        self, root: Path, *, clear_body: str | None = None, commit_body: str | None = None
+    ) -> None:
+        codec = root / boundaries.PACKAGE_METADATA_CODEC_SOURCE
+        codec.parent.mkdir(parents=True, exist_ok=True)
+        codec.write_text(
+            "pub struct ComponentSelector<'a> { value: &'a str }\n"
+            "pub struct RemovalBatch<'a> { selector: ComponentSelector<'a> }\n"
+            "pub struct SaveTokenBatch<'a> { selector: ComponentSelector<'a> }\n"
+            "pub struct RemovalSaveTokenBatch<'a> {\n"
+            "    removals: RemovalBatch<'a>, save_tokens: SaveTokenBatch<'a>\n"
+            "}\n"
+            "pub struct RewriteOptions;\n"
+            "pub struct RewriteOutput;\n"
+            "pub struct RewriteError;\n"
+            "pub fn remove_package_metadata(\n"
+            "    source: &[u8], batch: RemovalBatch<'_>, options: RewriteOptions,\n"
+            ") -> Result<RewriteOutput, RewriteError> { todo!() }\n"
+            "pub fn rewrite_package_metadata_save_tokens(\n"
+            "    source: &[u8], batch: SaveTokenBatch<'_>, options: RewriteOptions,\n"
+            ") -> Result<RewriteOutput, RewriteError> { todo!() }\n"
+            "pub fn rewrite_package_metadata_removals_and_save_tokens(\n"
+            "    source: &[u8], batch: RemovalSaveTokenBatch<'_>, options: RewriteOptions,\n"
+            ") -> Result<RewriteOutput, RewriteError> { todo!() }\n",
+            encoding="utf-8",
+        )
+        comments = root / boundaries.NUMBERS_COMMENT_SOURCE
+        comments.parent.mkdir(parents=True, exist_ok=True)
+        comments.write_text(
+            "impl Package {\n"
+            "    pub fn clear_table_cell_comment(&self) -> Result<Commit, Error> {\n"
+            + (clear_body or "        self.edit_table_cell_comment().clear().commit()\n")
+            + "    }\n"
+            "}\n"
+            "fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {\n"
+            + (
+                commit_body
+                or "        if edit.before.is_some() && edit.after.is_none() {\n"
+                "            return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+                "        }\n"
+                "        rewrite_existing(edit)\n"
+            )
+            + "}\n",
+            encoding="utf-8",
+        )
+
+    def test_numbers_comment_clear_metadata_prerequisite_accepts_bounded_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(root)
+            self.assertEqual(
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_accepts_combined_route(
+        self,
+    ) -> None:
+        """A future clear may pass only with the complete narrow guard set."""
+
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !global_comment_ownership_is_safe(edit.source, &located) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            prove_archive_reference_ownership(edit.source, &located)?;\n"
+            "            inspect_references_with_policy_and_limits(visitor, ArchiveReferencePolicy::RejectUnknownMetadata, limits)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=combined_clear
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_partial_combined_guards(
+        self,
+    ) -> None:
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !global_comment_ownership_is_safe(edit.source, &located) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=combined_clear
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("unsupported entry owner guard" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_unpublished_preparation(
+        self,
+    ) -> None:
+        prepared_only = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) || entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 || located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            prove_archive_reference_ownership(edit.source, &located)?;\n"
+            "            inspect_references_with_policy_and_limits(visitor, ArchiveReferencePolicy::RejectUnknownMetadata, limits)?;\n"
+            "            prepare_root_clear(edit.source, &located)?;\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=prepared_only
+            )
+            violations = boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(root)
+            self.assertTrue(
+                any("must rewrite and publish" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_requires_archive_census(
+        self,
+    ) -> None:
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) || entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 || located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root, commit_body=combined_clear
+            )
+            violations = boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("archive reference census" in item for item in violations), violations
+            )
+            self.assertTrue(
+                any("opaque archive-owner rejection" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_public_wire_boundary(
+        self,
+    ) -> None:
+        combined_clear = (
+            "        if edit.before.is_some() && edit.after.is_none() {\n"
+            "            if !matches!(entry.owner, EntryOwner::Root) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if entry.entry.refcount != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.storage_occurrences != 1 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if located.replies != 0 {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !entry.owner.supports_text_rewrite() {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            if !global_comment_ownership_is_safe(edit.source, &located) {\n"
+            "                return Err(Error::UnsupportedDependency { path: Path::Package });\n"
+            "            }\n"
+            "            prove_global_comment_ownership(edit.source, &located)?;\n"
+            "            rewrite_package_metadata_removals_and_save_tokens(source, batch, options);\n"
+            "        }\n"
+            "        rewrite_existing(edit)\n"
+        )
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root,
+                commit_body=combined_clear,
+                clear_body=(
+                    "        pub fn clear_table_cell_comment(&self) -> RawMessage {\n"
+                    "            self.edit_table_cell_comment().clear().commit()\n"
+                    "        }\n"
+                ),
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("public API exposes a raw/wire/Prost type" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_rejects_generated_codec_path(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(root)
+            codec = root / boundaries.PACKAGE_METADATA_CODEC_SOURCE
+            codec.write_text(
+                codec.read_text(encoding="utf-8")
+                + "use prost::Message;\n"
+                + "fn eager() { let _ = PackageMetadata::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("prost dependency marker" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("PackageMetadata::decode" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_requires_typed_batches(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(root)
+            codec = root / boundaries.PACKAGE_METADATA_CODEC_SOURCE
+            source = codec.read_text(encoding="utf-8")
+            source = source.replace(
+                "batch: RemovalBatch<'_>", "batch: Batch<'_>"
+            ).replace("batch: SaveTokenBatch<'_>", "batch: Batch<'_>").replace(
+                "batch: RemovalSaveTokenBatch<'_>", "batch: Batch<'_>"
+            )
+            codec.write_text(source, encoding="utf-8")
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("remove_package_metadata must accept RemovalBatch" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "rewrite_package_metadata_save_tokens must accept SaveTokenBatch"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+            self.assertTrue(
+                any(
+                    "rewrite_package_metadata_removals_and_save_tokens must accept "
+                    "RemovalSaveTokenBatch"
+                    in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_keeps_clear_fail_closed(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_comment_clear_metadata_prerequisite_fixture(
+                root,
+                clear_body=(
+                    "        rewrite_package_metadata_save_tokens(source, batch, options)\n"
+                ),
+                commit_body="        rewrite_existing(edit)\n",
+            )
+            violations = (
+                boundaries.audit_numbers_comment_clear_metadata_prerequisite_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("owner reaches PackageMetadata" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("must fail with typed UnsupportedDependency" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_clear_metadata_prerequisite_is_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_comment_clear_metadata_prerequisite_source_topology()",
+            main_source,
+        )
+
+
+    def test_numbers_table_cell_control_popup_split_lifecycle_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_control_popup_split_owner_requires_each_contract_part(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            marker_tokens = {
+                "per-member graph ownership": (
+                    "NativePopUpGraphInput",
+                    "NativePopUpMember",
+                    "NativePopUpObjectRoute",
+                    "NativeMemberEdit",
+                    "member_edits",
+                ),
+                "multi-member native transition": ("rewrite_native_popup_menu_multi",),
+                "component UUID ownership": (
+                    "require_current_uuid",
+                    "uuid_addition",
+                    "uuid_removal",
+                    "IdentifierCensus",
+                    "reserved_identifier",
+                ),
+                "external edge and save-token batch": (
+                    "require_external_edge",
+                    "prove_cross_component_reference",
+                    "external_reference",
+                    "selectors_for_components",
+                    "SaveTokenBatch",
+                    "save_tokens",
+                    "touched_components",
+                ),
+                "COW reuse cull and refcount census": (
+                    "copy_on_write",
+                    "prepare_desired_state",
+                    "existing_popup_model_identifiers",
+                    "archive_has_popup_reference",
+                    "census_bnc_references",
+                    "validate_bnc_refcounts",
+                    "refcount",
+                    "cull",
+                ),
+                "aggregate and FieldInfo transition": (
+                    "ArchiveInfo",
+                    "FieldInfo",
+                    "object_references",
+                    "replace_control_message_with_transition",
+                    "aggregate",
+                ),
+                "aggregate transaction budget": (
+                    "TransactionBudget",
+                    "charge_wire_fields",
+                    "residual_storage_options",
+                    "preflight",
+                ),
+                "prepared archive and ZIP reassembly": (
+                    "prepare_reassembly",
+                    "execution_requirements",
+                    "Prepared",
+                    "reassembly",
+                ),
+                "candidate reopen and object locality": (
+                    "candidate",
+                    "reopen",
+                    "verify_package_locality",
+                    "same_content",
+                ),
+            }
+            for label, tokens in marker_tokens.items():
+                with self.subTest(marker=label):
+                    owner_source = complete
+                    for token in tokens:
+                        owner_source = owner_source.replace(token, "")
+                    owner.write_text(owner_source, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+            owner.write_text(complete, encoding="utf-8")
+
+    def test_numbers_table_cell_control_popup_split_rejects_refusal_and_cfg_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn reject_cross_component_write() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                root
+            )
+            self.assertTrue(any("cross-component write refusal" in item for item in violations), violations)
+
+            owner_source = owner.read_text(encoding="utf-8").replace(
+                "fn rewrite_native_popup_menu_multi() { NativePopUpGraphInput; member_edits; }\n",
+                "",
+            )
+            owner.write_text(
+                owner_source
+                + "#[cfg(test)]\nfn rewrite_native_popup_menu_multi() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                root
+            )
+            self.assertTrue(any("multi-member native transition" in item for item in violations), violations)
+
+    def test_numbers_table_cell_control_popup_split_requires_integration_and_fuzz_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            complete_numbers_table_cell_control_popup_split_scaffold(root)
+            integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+            complete = integration.read_text(encoding="utf-8")
+            marker_names = tuple(
+                boundaries.NUMBERS_TABLE_CELL_CONTROL_POPUP_SPLIT_INTEGRATION_MARKERS
+            )
+            for label in marker_names:
+                with self.subTest(integration_marker=label):
+                    # Each marker is represented by a distinct lifecycle token
+                    # in the compact fixture line; remove the token family
+                    # that drives the corresponding regex.
+                    tokens = {
+                        "split PopUpMenu read/no-op": ("read_noop", "read no_op"),
+                        "split PopUpMenu replacement/COW": ("replacement copy_on_write",),
+                        "split PopUpMenu create/reuse/cull/refcount": ("create reuse cull refcount",),
+                        "split PopUpMenu inverse/apply/conflict": ("inverse apply conflict",),
+                        "split PopUpMenu member locality": ("member locality exact_bytes",),
+                        "split PopUpMenu metadata ownership": ("metadata uuid save_token external",),
+                        "split PopUpMenu hostile ownership atomicity": ("alias opaque versioned atomic",),
+                        "split PopUpMenu resource/reassembly": ("budget limit reassembly allocation",),
+                    }[label]
+                    modified = complete
+                    for token in tokens:
+                        modified = modified.replace(token, "")
+                    integration.write_text(modified, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label}" in item for item in violations),
+                        violations,
+                    )
+            integration.write_text(complete, encoding="utf-8")
+
+            package_fuzz = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE
+            package_source = package_fuzz.read_text(encoding="utf-8")
+            package_fuzz.write_text(
+                package_source.replace(
+                    "fn split_popup_fuzz_lifecycle() { split member PopUpMenu create clear reset inverse conflict atomic; }\n",
+                    "",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_popup_split_lifecycle_source_topology(
+                root
+            )
+            self.assertTrue(any("package fuzz split lifecycle" in item for item in violations), violations)
+
+
+    def test_focused_numbers_table_cell_control_requires_each_contract_part(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_SOURCE
+            semantic.write_text(
+                "pub mod transaction;\n"
+                + "\n".join(
+                    f"pub struct {name};"
+                    for name in boundaries.NUMBERS_TABLE_CELL_CONTROL_SEMANTIC_TYPES
+                    if name != "CellControl"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing canonical cell::data_format::control type CellControl" in item
+                    for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "At<'cell>", "MissingPosition<'cell>"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must accept selector-first At" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_CODEC_SOURCE
+            codec.write_text("", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("hidden codec is missing strict API" in item for item in violations),
+                violations,
+            )
+
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            (root / boundaries.NUMBERS_TABLE_CELL_CONTROL_FUZZ_SOURCE).unlink()
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+            marker_lines = {
+                "control-cell": "fn control_cell_graph() {}\n",
+                "table-data-list": "fn table_data_list_graph() {}\n",
+                "refcount": "fn refcount_graph() {}\n",
+                "copy-on-write": "fn copy_on_write_shared_cull() {}\n",
+                "metadata": "fn metadata_save_token_object_uuid_external_reference_watermark() {}\n",
+                "budget": "fn transaction_budget_preflight_residual() {}\n",
+                "resource": "fn resource_allocation_retained_max_minus_one() {}\n",
+                "prepared": "fn prepared_execution_requirements() {}\n",
+                "locality": "fn verify_locality_candidate_reopen_atomic_inverse() {}\n",
+            }
+            for label, marker_line in marker_lines.items():
+                with self.subTest(marker=label):
+                    add_numbers_table_cell_control_canonical_scaffold(root)
+                    owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+                    owner_source = owner.read_text(encoding="utf-8")
+                    removals = [marker_line]
+                    for removal in removals:
+                        owner_source = owner_source.replace(removal, "")
+                    owner_source = owner_source.replace(
+                        "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+                        "",
+                    )
+                    if label == "control-cell":
+                        owner_source = owner_source.replace("CellControl", "MissingControl")
+                    owner.write_text(owner_source, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_cell_control_rejects_aliases_leaks_and_duplicate_popup(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type CellControlEdit = Edit;\n"
+                + "fn rewrite_native_popup_menu() {}\n"
+                + "pub fn raw_control(table_id: u64, row: usize, column: usize, "
+                "source_bytes: &[u8], wire: WireView, archive: Archive, "
+                "generated: GeneratedProjection, prost: prost_types::MessageInfo) {}\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use crate::package::table_cell_control::*;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias CellControlEdit",
+                "duplicate popup lifecycle implementation rewrite_native_popup_menu",
+                "exposes raw identifier parameter table_id: u64",
+                "exposes raw identifier parameter row: usize",
+                "exposes raw identifier parameter column: usize",
+                "exposes raw source bytes source_bytes",
+                "exposes raw byte slice &[u8]",
+                "exposes wire type WireView",
+                "exposes archive/IWA type Archive",
+                "exposes generated type GeneratedProjection",
+                "exposes protobuf type prost",
+                "retains root aliases via glob",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_focused_numbers_table_cell_control_masks_cfg_test_items(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            bounded_lines = (
+                "fn prove_cross_component_reference() {}\n",
+                "fn reject_cross_component_write() {}\n",
+                "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+                "fn effective_locator() {}\n",
+                "fn require_external_edge() {}\n",
+                "fn object_identifier() {}\n",
+                "fn has_physical_alias() {}\n",
+            )
+            cfg_decoys = "".join(f"#[cfg(test)]\n{line}" for line in bounded_lines)
+            owner.write_text(
+                complete.replace("".join(bounded_lines), "") + cfg_decoys,
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("bounded cross-component owner is missing" in item for item in violations),
+                violations,
+            )
+            owner.write_text(
+                complete
+                + "#[cfg(test)]\n"
+                "pub fn test_only_raw_control(table_id: u64, bytes: &[u8]) {}\n"
+                + cfg_decoys,
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_cell_control_requires_bounded_split_contract(
+        self,
+    ) -> None:
+        owner_marker_lines = {
+            "strict cross-component read/no-op": "fn prove_cross_component_reference() {}\n",
+            "pre-candidate changed-operation refusal": "fn reject_cross_component_write() {}\n",
+            "refusal precedes candidate allocation": "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+            "effective locator coverage": "fn effective_locator() {}\n",
+            "current external-edge coverage": "fn require_external_edge() {}\n",
+            "object/component edge scope": "fn object_identifier() {}\n",
+            "target alias rejection": "fn has_physical_alias() {}\n",
+        }
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for label, marker_line in owner_marker_lines.items():
+                with self.subTest(owner_marker=label):
+                    owner_source = complete.replace(marker_line, "")
+                    if label == "current external-edge coverage":
+                        owner_source = owner_source.replace(
+                            "fn prove_cross_component_reference() {}\n", ""
+                        )
+                    if label == "pre-candidate changed-operation refusal":
+                        owner_source = owner_source.replace(
+                            "fn changed_route() { reject_cross_component_write(); let mut budget = (); }\n",
+                            "",
+                        )
+                    owner.write_text(owner_source, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(
+                            f"bounded cross-component owner is missing {label} marker" in item
+                            for item in violations
+                        ),
+                        violations,
+                    )
+
+            owner.write_text(complete, encoding="utf-8")
+            integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+            complete_test = integration.read_text(encoding="utf-8")
+            removals = {
+                "split-component read coverage": "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n",
+                "split-component no-op exact bytes": "is_noop; exact_bytes; ",
+                "split-component changed refusal": "write_reject; changed_edit_rejects; ",
+                "split-component alias/edge atomicity": "alias; external; opaque; atomic; ",
+            }
+            for label, removal in removals.items():
+                with self.subTest(integration_marker=label):
+                    integration.write_text(complete_test.replace(removal, ""), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"integration is missing {label}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_focused_numbers_table_cell_control_allows_same_component_fast_path(
+        self,
+    ) -> None:
+        """The bounded split ratchet must not reject the existing local route."""
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn same_component_fast_path() { let touched_components = 1; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_control_facade_source_topology(root),
+                [],
+            )
+
+    def test_focused_numbers_table_cell_control_split_fixture_is_cfg_test_masked(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_control_canonical_scaffold(root)
+            integration = root / boundaries.NUMBERS_TABLE_CELL_CONTROL_SPLIT_COMPONENT_SOURCE
+            integration.write_text(
+                "#[cfg(test)]\n"
+                "mod decoy {\n"
+                "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n"
+                "fn assert_split_read_noop_and_write_reject() { is_noop; exact_bytes; write_reject; }\n"
+                "fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() { alias; external; opaque; atomic; }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("integration is missing split-component read coverage" in item for item in violations), violations)
+
+            integration.write_text(
+                "fn split_components_read_noop_and_all_control_transitions_are_atomic() {}\n"
+                "fn assert_split_read_noop_and_write_reject() { is_noop; exact_bytes; write_reject; }\n"
+                "fn split_components_reject_bad_edges_aliases_and_opaque_inbound_refs_atomically() { alias; external; opaque; atomic; }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_control_facade_source_topology(
+                root
+            )
+            self.assertFalse(
+                any("cell-control integration is missing" in item for item in violations),
+                violations,
+            )
+
+
+    def test_focused_numbers_table_cell_control_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_control_facade_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_numbers_table_cell_control_popup_split_lifecycle_source_topology()",
+            main_source,
+        )
+
+    def test_numbers_table_cell_comment_reply_projection_is_dormant_until_type(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "#[cfg(test)]\n"
+                "pub struct CommentReply { raw: u64 }\n"
+                "struct CommentReplyVisitor;\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8") + "pub struct CommentReply;\n",
+                encoding="utf-8",
+            )
+            violations = (
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                )
+            )
+            self.assertTrue(
+                any("missing Package method" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_is_dormant_until_production_symbol(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "#[cfg(test)]\n"
+                "pub struct CommentStorageReplyRewrite;\n"
+                "#[cfg(test)]\n"
+                "fn prepare_comment_storage_reply_rewrite() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_accepts_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_codec_rewrite_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_requires_apis_markers_and_tests(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_codec_rewrite_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+
+            for api in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_APIS:
+                with self.subTest(api=api):
+                    modified = complete
+                    if api == "CommentStorageReplyRewrite":
+                        modified = modified.replace(
+                            "pub struct CommentStorageReplyRewrite;",
+                            "fn activate() { let _ = CommentStorageReplyRewrite; }",
+                        )
+                    else:
+                        modified = modified.replace(api, "MissingReplyRewriteApi")
+                    codec.write_text(modified, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing strict API {api}" in item for item in violations),
+                        violations,
+                    )
+
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_REQUIRED_MARKERS.items():
+                with self.subTest(marker=label):
+                    codec.write_text(marker.sub("", complete), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REWRITE_TEST_MARKERS.items():
+                with self.subTest(test_marker=label):
+                    modified = complete
+                    if label == "direct cfg(test) coverage":
+                        modified = modified.replace("    #[test]\n", "")
+                    else:
+                        modified = modified.replace(
+                            "        let prepared = prepare_comment_storage_reply_rewrite();\n"
+                            "        prepared.prepare_report();\n"
+                            "        prepared.execution_requirements();\n"
+                            "        prepared.execute(RewriteExecutionLimits);\n",
+                            "",
+                        )
+                    codec.write_text(modified, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_numbers_comment_storage_reply_rewrite_codec_masks_cfg_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "fn activates_reply_rewrite() { let _ = CommentStorageReplyRewrite; }\n"
+                "#[cfg(test)]\n"
+                "mod tests {\n"
+                "    pub struct CommentStorageReplyRewrite;\n"
+                "    pub struct PreparedCommentStorageReplyRewrite;\n"
+                "    pub struct RewriteExecutionRequirements;\n"
+                "    pub struct RewriteExecutionLimits;\n"
+                "    pub fn prepare_comment_storage_reply_rewrite() {}\n"
+                "    #[test]\n"
+                "    fn reply_rewrite() { prepare_report(); execution_requirements(); execute(); }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology(
+                root
+            )
+            self.assertTrue(any("missing strict API" in item for item in violations), violations)
+            self.assertTrue(
+                any("missing strict known-field/reference validation marker" in item for item in violations),
+                violations,
+            )
+            self.assertFalse(any("missing direct cfg(test) coverage" in item for item in violations), violations)
+
+    def test_numbers_comment_storage_reply_rewrite_codec_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_comment_reply_codec_rewrite_source_topology()",
+            main_source,
+        )
+
+    def test_numbers_table_cell_comment_reply_projection_accepts_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_metadata_accepts_typed_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_metadata_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_metadata_activation_masks_root_trivia(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "// CommentAuthor and CommentTimestamp are documented here.\n"
+                + 'const _COMMENT_METADATA_DOC: &str = "CommentAuthor CommentTimestamp";\n',
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_metadata_rejects_native_fields_and_missing_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_metadata_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+
+            for token in (
+                "u64",
+                "StorageId",
+                "Uuid",
+                "ObjectIdentifier",
+                "RawMessage",
+                "Archive",
+                "MessageInfo",
+                "bytes",
+            ):
+                with self.subTest(native_token=token):
+                    owner.write_text(
+                        complete.replace(
+                            "pub struct CommentAuthor {",
+                            f"pub struct CommentAuthor {{\n    native_field: {token},",
+                            1,
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(token in item for item in violations),
+                        msg=f"missing native metadata leak {token!r}: {violations!r}",
+                    )
+
+            owner.write_text(
+                complete
+                + "impl CommentAuthor {\n"
+                + "    pub fn native_id(&self) -> u64 { 0 }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("native_id" in item or " u64" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                complete.replace(
+                    "timestamp: Option<CommentTimestamp>,",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("Option<CommentTimestamp>" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                complete.replace(
+                    'f.debug_struct("CommentAuthor").finish_non_exhaustive()',
+                    'f.debug_struct("CommentAuthor").field("public_id", &self.public_id).finish()',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("CommentAuthor Debug exposes display metadata" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_requires_type_and_methods(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                complete.replace("pub struct CommentReply", "pub struct MissingReply"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing canonical CommentReply" in item for item in violations), violations)
+
+            for method in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_PACKAGE_METHODS:
+                with self.subTest(method=method):
+                    owner.write_text(complete, encoding="utf-8")
+                    source = owner.read_text(encoding="utf-8")
+                    if method == "table_cell_comment_replies":
+                        start = source.index("    pub fn table_cell_comment_replies<")
+                        end = source.index("    pub fn table_cell_comment_replies_a1<", start)
+                    else:
+                        start = source.index("    pub fn table_cell_comment_replies_a1<")
+                        end = source.index("}\n", start) + 2
+                    owner.write_text(source[:start] + source[end:], encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing Package method {method}" in item for item in violations),
+                        violations,
+                    )
+
+    def test_numbers_table_cell_comment_reply_projection_masks_cfg_test_decoys(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub struct CommentReplyDecoy { raw: u64, bytes: &[u8] }\n"
+                "#[cfg(test)]\n"
+                "pub type TableCellCommentReply = CommentReply;\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            complete = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                complete.replace("census_alias_checks();", "")
+                .replace("fn census_alias_checks() {}\n", "")
+                + "#[cfg(test)]\nfn census_alias_checks() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("duplicate/alias rejection marker" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_rejects_aliases_and_globs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type ReplyAlias = CommentReply;\n",
+                encoding="utf-8",
+            )
+            lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use package::comments::*;\n"
+                + "pub use package::comments::CommentReply;\n"
+                + "pub type TableCellCommentReply = CommentReply;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "retains flat alias ReplyAlias",
+                "retains root aliases via glob",
+                "retains flat alias CommentReply",
+                "must be a named re-export, not a type alias",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing violation containing {fragment!r}: {violations!r}",
+                )
+
+    def test_numbers_table_cell_comment_reply_projection_rejects_leaks_and_debug_content(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for token in (
+                "u64",
+                "StorageId",
+                "AuthorId",
+                "Uuid",
+                "RawMessage",
+                "IWA",
+                "Wire",
+                "Prost",
+                "Buffa",
+                "bytes",
+            ):
+                with self.subTest(token=token):
+                    owner.write_text(
+                        complete.replace("text: String", f"text: {token}"),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f" {token}:" in item for item in violations),
+                        violations,
+                    )
+
+            owner.write_text(
+                complete
+                + "impl Package { pub fn table_cell_comment_reply_raw("
+                "&self, storage_id: u64, bytes: &[u8], wire: WireView) "
+                "-> CommentReply { todo!() } }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            for fragment in (" u64:", " bytes:", " WireView:", "raw byte slice"):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    msg=f"missing extra reply-method leak {fragment!r}: {violations!r}",
+                )
+
+            owner.write_text(
+                complete.replace("pub struct CommentReply", "#[derive(Debug)]\npub struct CommentReply"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("must not derive Debug" in item for item in violations), violations)
+
+            owner.write_text(
+                complete.replace('&"<redacted>"', "&self.text"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("must redact authored content" in item for item in violations), violations)
+            self.assertTrue(any("exposes authored content" in item for item in violations), violations)
+
+            owner.write_text(
+                complete.replace("text: String", "text: &'a [u8]"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("raw byte slice" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_projection_requires_codec_and_census_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            codec = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_SOURCE
+            owner_complete = owner.read_text(encoding="utf-8")
+            codec_complete = codec.read_text(encoding="utf-8")
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CODEC_REQUIRED_MARKERS.items():
+                with self.subTest(marker=label):
+                    owner.write_text(marker.sub("", owner_complete), encoding="utf-8")
+                    codec.write_text(marker.sub("", codec_complete), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} marker" in item for item in violations),
+                        violations,
+                    )
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_CENSUS_REQUIRED_MARKERS.items():
+                with self.subTest(census_marker=label):
+                    owner.write_text(marker.sub("", owner_complete), encoding="utf-8")
+                    codec.write_text(codec_complete, encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing full ownership-census {label} marker" in item for item in violations),
+                        violations,
+                    )
+
+    def test_numbers_table_cell_comment_reply_projection_accepts_the_focused_owner(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            self.assertIn(
+                "retained mutation/identity compatibility",
+                inspect.getdoc(
+                    boundaries.audit_numbers_table_cell_comment_reply_facade_source_topology
+                ),
+            )
+
+    def test_numbers_table_cell_comment_reply_projection_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_comment_reply_facade_source_topology()",
+            main_source,
+        )
+
+    def test_numbers_table_cell_comment_reply_mutation_inventory_is_frozen(self) -> None:
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS,
+            (
+                "table_cell_comment_reply",
+                "table_cell_comment_reply_a1",
+                "edit_table_cell_comment_replies",
+                "edit_table_cell_comment_replies_a1",
+                "set_table_cell_comment_reply",
+                "set_table_cell_comment_reply_a1",
+                "remove_table_cell_comment_reply",
+                "remove_table_cell_comment_reply_a1",
+                "add_table_cell_comment_reply",
+                "add_table_cell_comment_reply_a1",
+                "apply_table_cell_comment_reply",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES,
+            (
+                "CommentReplyIndex",
+                "Edit",
+                "Patch",
+                "Commit",
+                "Diagnostics",
+                "Error",
+                "LimitKind",
+                "Path",
+            ),
+        )
+        self.assertEqual(
+            boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE,
+            Path("crates/litchi-iwa-protos/fuzz/fuzz_targets/comment_storage_reply_codec.rs"),
+        )
+
+    def test_numbers_table_cell_comment_reply_mutation_is_dormant_until_production_marker(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub struct CommentReply { raw: u64 }\n"
+                "#[cfg(test)]\n"
+                "pub struct CommentReplyIndex(u32);\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn add_table_cell_comment_reply() {}\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub fn add_table_cell_comment_reply() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(violations, violations)
+            self.assertTrue(
+                any("missing semantic cell::comment source" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_mutation_accepts_positive_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+    def test_numbers_table_cell_comment_reply_mutation_requires_each_api_and_index_accessor(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            owner_complete = owner.read_text(encoding="utf-8")
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+            semantic_complete = semantic.read_text(encoding="utf-8")
+
+            for method in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_PACKAGE_METHODS:
+                with self.subTest(method=method):
+                    owner.write_text(
+                        owner_complete.replace(
+                            f"pub fn {method}", f"pub fn missing_{method}", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing Package method {method}" in item for item in violations),
+                        violations,
+                    )
+
+            for name in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_TYPES:
+                with self.subTest(transaction_type=name):
+                    owner.write_text(owner_complete, encoding="utf-8")
+                    semantic.write_text(
+                        semantic_complete.replace(
+                            f"pub struct {name}", f"struct Missing{name}", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing canonical transaction type {name}" in item for item in violations),
+                        violations,
+                    )
+
+            semantic.write_text(semantic_complete, encoding="utf-8")
+            for name in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_INDEX_METHODS:
+                with self.subTest(index_accessor=name):
+                    semantic.write_text(
+                        semantic_complete.replace(
+                            f"pub fn {name}", f"fn missing_{name}", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {name} constructor/accessor" in item for item in violations),
+                        violations,
+                    )
+                    semantic.write_text(semantic_complete, encoding="utf-8")
+
+            semantic.write_text(
+                semantic_complete.replace(
+                    "-> Result<Self, CommentReplyError>", "-> Self", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("try_from_usize must return Result" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_comment_reply_mutation_requires_owner_markers(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for label, marker in boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_REQUIRED_MARKERS.items():
+                with self.subTest(marker=label):
+                    owner.write_text(marker.sub("", complete), encoding="utf-8")
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f"missing {label} transaction marker" in item for item in violations),
+                        violations,
+                    )
+            owner.write_text(complete, encoding="utf-8")
+
+    def test_numbers_table_cell_comment_reply_mutation_rejects_public_leaks_aliases_and_debug(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            complete = owner.read_text(encoding="utf-8")
+            for token in ("u64", "usize", "RawMessage", "Archive", "WireView", "MessageInfo", "FieldInfo", "ObjectReference", "bytes"):
+                with self.subTest(token=token):
+                    owner.write_text(
+                        complete
+                        + f"impl Package {{ pub fn leak_{token}(&self, value: {token}) -> CommentReply {{ todo!() }} }}\n",
+                        encoding="utf-8",
+                    )
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                        root
+                    )
+                    self.assertTrue(
+                        any(f" {token}" in item for item in violations),
+                        violations,
+                    )
+            owner.write_text(complete + "pub type ReplyEdit = Edit;\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("flat alias ReplyEdit" in item for item in violations), violations)
+
+            lib = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_EXPORT_SOURCES[0]
+            lib.write_text(
+                lib.read_text(encoding="utf-8")
+                + "pub use cell::comment::*;\n"
+                + "pub type TableCellCommentReply = CommentReply;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("comment transaction glob" in item for item in violations), violations)
+
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+            semantic_complete = semantic.read_text(encoding="utf-8")
+            semantic.write_text(
+                semantic_complete.replace(
+                    "pub struct CommentReply { pub text: String }",
+                    "#[derive(Debug)]\n"
+                    "pub struct CommentReply { pub text: String }",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            lib.write_text(
+                "pub mod cell;\n"
+                "pub use cell::comment::{CommentReply as TableCellCommentReply, CommentReplyIndex as TableCellCommentReplyIndex};\n"
+                "pub use cell::comment::transaction::{CommentReplyEdit as TableCellCommentReplyEdit, CommentReplyPatch as TableCellCommentReplyPatch, CommentReplyCommit as TableCellCommentReplyCommit, CommentReplyDiagnostics as TableCellCommentReplyDiagnostics, CommentReplyError as TableCellCommentReplyError, CommentReplyLimitKind as TableCellCommentReplyLimitKind, CommentReplyPath as TableCellCommentReplyPath};\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("text-bearing type must not derive Debug" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_mutation_allows_redacted_author_debug(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub struct CommentAuthor;\n"
+                + "impl fmt::Debug for CommentAuthor {\n"
+                + "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+                + "        f.debug_struct(\"CommentAuthor\").finish_non_exhaustive()\n"
+                + "    }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_SEMANTIC_SOURCE
+            semantic.write_text(
+                semantic.read_text(encoding="utf-8").replace(
+                    'f.debug_struct("CommentReply").field("text", &"<redacted>").finish()',
+                    'f.debug_struct("CommentReply").field("text", &"<redacted>").field("author", &self.author).finish()',
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub struct CommentAuthor;\n"
+                    "impl fmt::Debug for CommentAuthor {\n"
+                    "    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {\n"
+                    "        f.debug_struct(\"CommentAuthor\").finish_non_exhaustive()\n"
+                    "    }\n"
+                    "}\n",
+                    "",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("exposes authored content" in item for item in violations), violations)
+
+    def test_numbers_table_cell_comment_reply_mutation_masks_cfg_test_decoys_and_requires_fuzz_inventory(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_comment_reply_mutation_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "#[cfg(test)]\n"
+                "pub fn cfg_only_reply_marker() { RawMessage; u64; }\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(
+                    root
+                ),
+                [],
+            )
+            codec_fuzz = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_CODEC_FUZZ_SOURCE
+            package_fuzz = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_SOURCE
+            for path, fragment in (
+                (codec_fuzz, "codec fuzz target"),
+                (package_fuzz, "package fuzz target"),
+            ):
+                with self.subTest(path=path):
+                    original = path.read_text(encoding="utf-8")
+                    path.unlink()
+                    violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+                    self.assertTrue(any(fragment in item for item in violations), violations)
+                    path.write_text(original, encoding="utf-8")
+            corpus = root / boundaries.NUMBERS_TABLE_CELL_COMMENT_REPLY_MUTATION_FUZZ_CORPUS
+            corpus_file = next(corpus.iterdir())
+            corpus_file.unlink()
+            corpus.rmdir()
+            violations = boundaries.audit_numbers_table_cell_comment_reply_mutation_facade_source_topology(root)
+            self.assertTrue(any("package fuzz corpus" in item for item in violations), violations)
+
+
+    def test_numbers_table_cell_comment_reply_mutation_audits_are_in_main_dispatch(
+        self,
+    ) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_numbers_table_cell_comment_reply_mutation_facade_source_topology()",
+            main_source,
+        )
+
+
+    def test_keynote_chart_axis_title_facade_requires_axis_and_strict_codec_contract(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            semantic = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_SEMANTIC_SOURCE
+            semantic.write_text("pub struct ChartSelector;\n", encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_axis_title_facade_source_topology(root)
+            self.assertTrue(any("semantic API is missing Axis" in item for item in violations), violations)
+
+            semantic.write_text("pub enum Axis { Category, Value }\npub struct ChartSelector;\n", encoding="utf-8")
+            codec = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_CODEC_SOURCE
+            codec_source = codec.read_text(encoding="utf-8")
+            codec.write_text(codec_source.replace("prepare_axis_title_rewrite", "prepare_missing_axis_title_rewrite"), encoding="utf-8")
+            violations = boundaries.audit_keynote_chart_axis_title_facade_source_topology(root)
+            self.assertTrue(any("strict API prepare_axis_title_rewrite" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_title_resource_requires_one_budget_and_all_authority_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("exact_source_authority", "exact_source")
+                .replace("authority;", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_resource_source_topology(root)
+            self.assertTrue(any("source authority" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8") + "struct ChartAxisTitleOtherBudget;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_resource_source_topology(root)
+            self.assertTrue(any("exactly one aggregate transaction budget" in item for item in violations), violations)
+
+    def test_keynote_chart_axis_title_completion_requires_tests_fuzz_and_single_execute(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_keynote_chart_axis_title_canonical_scaffold(root)
+            owner = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            owner.write_text(
+                source.replace("let output = prepared.execute(requirements);", ""),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_completion_source_topology(root)
+            self.assertTrue(any("exactly one prepared execute" in item for item in violations), violations)
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "fn second() { prepared.execute(requirements); prepared.execute(requirements); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_chart_axis_title_completion_source_topology(root)
+            self.assertTrue(any("exactly one prepared execute" in item for item in violations), violations)
+
+            fuzz = root / boundaries.KEYNOTE_CHART_AXIS_TITLE_FUZZ_SOURCES[0]
+            fuzz.unlink()
+            violations = boundaries.audit_keynote_chart_axis_title_completion_source_topology(root)
+            self.assertTrue(any("missing fuzz target" in item for item in violations), violations)
+
+
+    def test_keynote_chart_axis_title_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_axis_title_legacy_calls()",
+            "+ audit_keynote_chart_axis_title_facade_source_topology()",
+            "+ audit_keynote_chart_axis_title_resource_source_topology()",
+            "+ audit_keynote_chart_axis_title_completion_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_keynote_chart_axis_value_settings_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_axis_value_settings_legacy_calls()",
+            "+ audit_keynote_chart_axis_value_settings_facade_source_topology()",
+            "+ audit_keynote_chart_axis_value_settings_resource_source_topology()",
+            "+ audit_keynote_chart_axis_value_settings_completion_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_chart_legend_visibility_public_api_is_selector_first_and_generated_free(
+        self,
+    ) -> None:
+        """Keep the focused legend surface semantic at the crate boundary.
+
+        This is deliberately a declaration-level check rather than a full
+        source snapshot.  Private package code may still carry native graph
+        state, but no public owner method or re-export may leak an object ID,
+        generated archive type, or the physical package representation.
+        """
+
+        owner_path = boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+        # ADR 0034: the family's public home is the focused
+        # `chart::legend` module rather than the package/crate-root facades.
+        family_path = boundaries.KEYNOTE_CHART_LEGEND_FAMILY_SOURCE
+        paths = tuple(boundaries.ROOT / path for path in (owner_path, family_path))
+
+        def scope(index: int, path: Path) -> str:
+            if not index:
+                return boundaries._mask_rust_cfg_test_items(
+                    path.read_text(encoding="utf-8")
+                )
+            return boundaries._keynote_family_view(
+                boundaries.ROOT, path, {}, boundaries.KEYNOTE_CHART_LEGEND_FAMILY_MODULE
+            )
+        for path in paths:
+            self.assertTrue(path.is_file(), f"missing focused legend source: {path}")
+
+        owner_source = boundaries._mask_rust_cfg_test_items(
+            paths[0].read_text(encoding="utf-8")
+        )
+        owner_methods = {
+            name: declaration
+            for name, declaration, _line in boundaries._rust_public_methods_in_impl(
+                owner_source, "Package"
+            )
+        }
+        for method in boundaries.KEYNOTE_CHART_LEGEND_PACKAGE_METHODS:
+            with self.subTest(method=method):
+                declaration = owner_methods.get(method)
+                self.assertIsNotNone(
+                    declaration,
+                    f"focused Package method is missing: {method}",
+                )
+                if declaration is None:
+                    continue
+                if method == "apply_slide_chart_legend":
+                    self.assertRegex(declaration, r"\bPatch\b")
+                else:
+                    self.assertRegex(declaration, r"\bSlideSelector\b")
+                    self.assertRegex(declaration, r"\bChartSelector\b")
+                self.assertNotRegex(declaration, r"\bu64\b")
+                self.assertIsNone(
+                    re.search(
+                        r"\b(?:native_id|object_id|drawable_object_id|"
+                        r"chart_object_id|identifier)\b",
+                        declaration,
+                    ),
+                    f"focused legend Package method leaks a native identifier: {declaration}",
+                )
+
+        # Public declarations include the owner signatures and the explicit
+        # package/lib re-exports, but stop before function bodies.  This keeps
+        # the assertion resilient to private implementation refactors.
+        public_declarations = []
+        for index, path in enumerate(paths):
+            source = scope(index, path)
+            if index:
+                # package.rs/lib.rs contain many unrelated public package and
+                # error declarations.  Only inspect the explicit legend
+                # re-export rather than coupling this test to those surfaces.
+                declarations = (
+                    declaration
+                    for declaration, _line in boundaries._rust_public_declarations(
+                        source
+                    )
+                    if "slide_chart_legend" in declaration
+                    or any(
+                        name in declaration
+                        for name in boundaries.KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
+                    )
+                )
+            else:
+                declarations = (
+                    declaration
+                    for declaration, _line in boundaries._rust_public_declarations(
+                        source
+                    )
+                )
+            public_declarations.extend(declarations)
+        forbidden_public_tokens = re.compile(
+            r"\b(?:native_id|object_id|drawable_object_id|chart_object_id|"
+            r"identifier|prost|prost_types|buffa|kn\w*|tsch?\w*|tsd\w*|"
+            r"Archive|RawMessage|HostPackage|ComponentCatalog)\b"
+        )
+        for declaration in public_declarations:
+            with self.subTest(declaration=declaration):
+                self.assertIsNone(
+                    forbidden_public_tokens.search(declaration),
+                    "focused legend public declaration leaks "
+                    f"native/generated state: {declaration}",
+                )
+
+        canonical_types = boundaries.KEYNOTE_CHART_LEGEND_CANONICAL_TYPES
+        exported_identifiers = set()
+        for index, path in enumerate(paths):
+            source = scope(index, path)
+            exported_identifiers.update(
+                boundaries._rust_canonical_exports(source, canonical_types)
+            )
+        self.assertTrue(
+            canonical_types <= exported_identifiers,
+            f"focused legend canonical transaction types are not all exported: "
+            f"{sorted(canonical_types - exported_identifiers)}",
+        )
+        for path in paths[1:]:
+            source = scope(1, path)
+            missing = canonical_types - boundaries._rust_canonical_exports(
+                source, canonical_types
+            )
+            self.assertFalse(
+                missing,
+                f"focused legend canonical types are not re-exported by {path}: "
+                f"{sorted(missing)}",
+            )
+
+
+    def test_keynote_chart_legend_visibility_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_legend_visibility_facade_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+    def test_keynote_chart_legend_visibility_facade_audit_catches_missing_selector_api(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            owner = root / boundaries.KEYNOTE_CHART_LEGEND_OWNER_SOURCE
+            owner.parent.mkdir(parents=True, exist_ok=True)
+            owner.write_text(
+                "pub struct Patch;\n"
+                "impl Package {\n"
+                "    pub fn slide_chart_legend_visible(&self, object_id: u64, chart: u64) {}\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[0]
+            package.parent.mkdir(parents=True, exist_ok=True)
+            package.write_text("mod slide_chart_legend;\n", encoding="utf-8")
+            library = root / boundaries.KEYNOTE_CHART_LEGEND_EXPORT_SOURCES[1]
+            library.parent.mkdir(parents=True, exist_ok=True)
+            library.write_text("", encoding="utf-8")
+
+            violations = boundaries.audit_keynote_chart_legend_visibility_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing edit_slide_chart_legend" in item for item in violations), violations)
+            self.assertTrue(any("missing apply_slide_chart_legend" in item for item in violations), violations)
+            self.assertTrue(any("selector-first SlideSelector" in item for item in violations), violations)
+            self.assertTrue(any("not expose u64" in item for item in violations), violations)
+            self.assertTrue(any("raw identifier object_id" in item for item in violations), violations)
+            self.assertTrue(any("missing canonical type" in item for item in violations), violations)
+
+
+    def test_numbers_and_pages_chart_arrangement_owners_require_focused_markers(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_focused_chart_arrangement_owner_scaffolds(root)
+
+            self.assertEqual(
+                boundaries.audit_numbers_chart_arrangement_owner_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_pages_body_chart_arrangement_owner_source_topology(root),
+                [],
+            )
+
+            numbers_owner = root / boundaries.NUMBERS_CHART_ARRANGEMENT_OWNER_SOURCE
+            numbers_owner.write_text(
+                numbers_owner.read_text(encoding="utf-8").replace(
+                    "verify_locality", "verify_locality_removed"
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_chart_arrangement_owner_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing admission/locality marker verify_locality" in item for item in violations),
+                violations,
+            )
+
+            pages_package = root / boundaries.PAGES_PACKAGE_SOURCE
+            pages_package.write_text(
+                pages_package.read_text(encoding="utf-8").replace(
+                    "pub(crate) mod body_chart_arrangement;",
+                    "pub mod body_chart_arrangement;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_chart_arrangement_owner_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("owner module must remain private" in item for item in violations),
+                violations,
+            )
+
+
+    def test_keynote_chart_arrangement_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for expression in (
+            "+ audit_keynote_chart_arrangement_facade_source_topology()",
+            "+ audit_chart_arrangement_codec_source_topology()",
+            "+ audit_numbers_chart_arrangement_owner_source_topology()",
+            "+ audit_pages_body_chart_arrangement_owner_source_topology()",
+        ):
+            self.assertIn(expression, main_source)
+
+
+    def test_iwork_atomic_publication_inventory_and_main_dispatch(self) -> None:
+        self.assertEqual(
+            boundaries.IWORK_ARCHIVE_PUBLICATION_FILE,
+            Path("crates/litchi-iwa-archive/src/publication.rs"),
+        )
+        self.assertIn(
+            "+ audit_iwork_atomic_publication()",
+            inspect.getsource(boundaries.main),
+        )
+
+
+    def test_cfg_test_masker_handles_composite_test_only_predicates(self) -> None:
+        source = (
+            '#[cfg(all(test, feature = "oracle"))]\n'
+            "fn hidden_all() {}\n"
+            '#[cfg(any(test, feature = "oracle"))]\n'
+            "fn visible_any() {}\n"
+            '#[cfg(any(all(test, feature = "oracle"), all(test, unix)))]\n'
+            "fn hidden_nested() {}\n"
+            "#[cfg(not(test))]\n"
+            "fn visible_not() {}\n"
+        )
+
+        masked = boundaries._mask_rust_cfg_test_items(source)
+
+        self.assertNotIn("hidden_all", masked)
+        self.assertNotIn("hidden_nested", masked)
+        self.assertIn("visible_any", masked)
+        self.assertIn("visible_not", masked)
+
+
+    def test_numbers_table_cell_custom_format_codec_rejects_decoys_and_bad_projection(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            codec = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_SOURCE
+            complete = codec.read_text(encoding="utf-8")
+
+            # Comments and string literals must not satisfy the production
+            # preflight/lazy-view marker groups.
+            decoy = re.sub(
+                r"fn scanner\(\) \{[\s\S]*?\n\}\n#\[cfg\(test\)\]",
+                "// Budget::new preflight scan_custom_format scan_custom_format_list "
+                "decode_lazy_view LazyView buffa projection generated duplicate "
+                "unique noncanonical canonical wire unknown raw uuid count "
+                "validate_unique_uuids extend_from_slice execution_requirements "
+                "Prepared execute retained scratch allocation\n"
+                'const NOTE: &str = "all strict codec markers are only decoys";\n'
+                "#[cfg(test)]",
+                complete,
+            )
+            codec.write_text(decoy, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing strict handwritten wire preflight marker" in item for item in violations),
+                violations,
+            )
+
+            # Lazy decoding is only legal after the bounded wire preflight.
+            codec.write_text(
+                complete.replace(
+                    "Budget::new; preflight; scan_custom_format; scan_custom_format_list;\n"
+                    "    decode_lazy_view; LazyView; buffa; projection; generated;",
+                    "decode_lazy_view; LazyView; Budget::new; preflight; "
+                    "scan_custom_format; scan_custom_format_list; buffa; projection; generated;",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must preflight wire before" in item for item in violations),
+                violations,
+            )
+
+            # Each wire discriminator is tied to its named constant, not merely
+            # to an unrelated occurrence of the same integer.
+            codec.write_text(
+                complete.replace(
+                    "CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 222",
+                    "CUSTOM_FORMAT_REGISTRY_MESSAGE_TYPE: u32 = 223",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing registry message type 222" in item for item in violations),
+                violations,
+            )
+
+            # The generated Buffa projection is private and must use the
+            # build-script output path.
+            public = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_PUBLIC_SOURCE
+            public.write_text(
+                "#[doc(hidden)]\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE};\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE};\n",
+                encoding="utf-8",
+            )
+            codec.write_text(complete, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated projection module must remain private" in item for item in violations),
+                violations,
+            )
+
+            public.write_text(
+                "#[doc(hidden)]\n"
+                f"pub mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_MODULE};\n"
+                f"mod {boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_CODEC_GENERATED_MODULE} {{\n"
+                "    include!(\"not-a-buffa-generated-file.rs\");\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("generated projection module has invalid include shape" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_cell_custom_format_facade_rejects_poisoned_receivers_and_leaks(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+            complete_owner = owner.read_text(encoding="utf-8")
+
+            # An impl nested beneath a decoy module must not be mistaken for
+            # the root Package receiver.
+            poisoned = complete_owner.replace(
+                "impl Package {\n", "mod decoy_receiver {\nimpl Package {\n", 1
+            ) + "}\n"
+            owner.write_text(poisoned, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing Package method table_cell_custom_format" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("missing Package method edit_table_cell_custom_format" in item for item in violations),
+                violations,
+            )
+
+            owner.write_text(
+                complete_owner.replace("&self", "self", 1), encoding="utf-8"
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("must retain its Package receiver" in item for item in violations),
+                violations,
+            )
+
+            # Public declarations cannot smuggle native UUIDs, member names,
+            # payload buffers, or raw registry helpers through the facade.
+            owner.write_text(
+                complete_owner
+                + "pub fn leak(uuid: Uuid, member_name: Vec<u8>, payload_bytes: Vec<u8>) {}\n"
+                + "pub fn read_custom_registry() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            for fragment in (
+                "native UUID or raw identifier Uuid",
+                "raw identifier/member/payload parameter member_name: Vec<u8>",
+                "opaque raw byte container payload_bytes: Vec<u8>",
+                "raw registry helper read_custom_registry",
+            ):
+                self.assertTrue(
+                    any(fragment in item for item in violations),
+                    (fragment, violations),
+                )
+
+            # A public package module and nested export decoys cannot activate
+            # or widen the private owner seam.
+            package = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            package.write_text(
+                "pub(crate) mod table_cell_custom_format;\n"
+                "pub mod table_cell_custom_format;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("exposes its public package owner module" in item for item in violations),
+                violations,
+            )
+
+            lib = root / boundaries.NUMBERS_SOURCE_ROOT / "lib.rs"
+            lib.write_text("mod decoy { pub mod cell; }\n", encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(any("missing root cell module" in item for item in violations), violations)
+
+    def test_numbers_table_cell_custom_format_masks_cfg_comments_and_strings(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_numbers_table_cell_custom_format_canonical_scaffold(root)
+            owner = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_OWNER_SOURCE
+            source = owner.read_text(encoding="utf-8")
+            source = re.sub(
+                r"fn custom_owner_policy\(\) \{[\s\S]*?\n\}\nimpl Package",
+                "// fn custom_owner_policy() { document_scoped_registry format_list "
+                "exact_source candidate budget unsupported fail_closed }\n"
+                "const NOTE: &str = \"document_scoped_registry format_list exact_source \"\n"
+                "    \"candidate budget unsupported fail_closed\";\n"
+                "impl Package",
+                source,
+            )
+            source += (
+                "// pub fn leak(uuid: Uuid, payload_bytes: Vec<u8>) {}\n"
+                'const DECOY: &str = "Uuid payload_bytes read_custom_registry";\n'
+            )
+            owner.write_text(source, encoding="utf-8")
+            violations = boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("missing document-scoped registry transaction marker" in item for item in violations),
+                violations,
+            )
+
+            # Test-only owner, semantic, and module declarations are ignored;
+            # this also proves a host Custom method cannot be retired by this
+            # focused checker while the owner is inactive.
+            owner.write_text(
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "pub fn fake_owner() { table_cell_custom_format(); }\n",
+                encoding="utf-8",
+            )
+            semantic = root / boundaries.NUMBERS_TABLE_CELL_CUSTOM_FORMAT_SEMANTIC_SOURCE
+            semantic.write_text(
+                "#[cfg(any(all(test, feature = \"oracle\"), all(test, unix)))]\n"
+                "pub enum Custom { Number, Text, DateTime }\n",
+                encoding="utf-8",
+            )
+            package = root / boundaries.NUMBERS_PACKAGE_SOURCE
+            package.write_text(
+                "#[cfg(all(test, feature = \"oracle\"))]\n"
+                "pub(crate) mod table_cell_custom_format;\n",
+                encoding="utf-8",
+            )
+            self.assertFalse(
+                boundaries._numbers_table_cell_custom_format_owner_present(root)
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_custom_format_codec_source_topology(root),
+                [],
+            )
+            self.assertEqual(
+                boundaries.audit_numbers_table_cell_custom_format_facade_source_topology(root),
+                [],
+            )
+
+
+    def test_numbers_table_cell_number_format_audits_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for audit in (
+            "audit_numbers_table_cell_number_format_codec_source_topology",
+            "audit_numbers_table_cell_number_format_facade_source_topology",
+            "audit_numbers_table_cell_text_format_codec_source_topology",
+            "audit_numbers_table_cell_text_format_facade_source_topology",
+            "audit_numbers_table_cell_date_time_format_codec_source_topology",
+            "audit_numbers_table_cell_date_time_format_facade_source_topology",
+            "audit_numbers_table_cell_duration_format_codec_source_topology",
+            "audit_numbers_table_cell_duration_format_facade_source_topology",
+            "audit_numbers_table_cell_custom_format_codec_source_topology",
+            "audit_numbers_table_cell_custom_format_facade_source_topology",
+            "audit_numbers_table_cell_percentage_format_codec_source_topology",
+            "audit_numbers_table_cell_percentage_format_facade_source_topology",
+            "audit_numbers_table_cell_currency_format_codec_source_topology",
+            "audit_numbers_table_cell_currency_format_facade_source_topology",
+            "audit_numbers_table_cell_scientific_format_codec_source_topology",
+            "audit_numbers_table_cell_scientific_format_facade_source_topology",
+            "audit_numbers_table_cell_fraction_format_codec_source_topology",
+            "audit_numbers_table_cell_fraction_format_facade_source_topology",
+            "audit_numbers_table_cell_display_format_shared_core_source_topology",
+        ):
+            self.assertIn(f"+ {audit}()", main_source)
+
+    def test_numbers_table_cell_number_format_main_dispatch_runs_audits(self) -> None:
+        """Exercise the real main aggregation so wiring cannot be text-only."""
+
+        policy = boundaries.load_policy(boundaries.DEFAULT_POLICY)
+        snapshot = valid_snapshot(policy)
+        focused_names = (
+            "audit_numbers_table_cell_number_format_codec_source_topology",
+            "audit_numbers_table_cell_number_format_facade_source_topology",
+            "audit_numbers_table_cell_text_format_codec_source_topology",
+            "audit_numbers_table_cell_text_format_facade_source_topology",
+            "audit_numbers_table_cell_date_time_format_codec_source_topology",
+            "audit_numbers_table_cell_date_time_format_facade_source_topology",
+            "audit_numbers_table_cell_duration_format_codec_source_topology",
+            "audit_numbers_table_cell_duration_format_facade_source_topology",
+            "audit_numbers_table_cell_custom_format_codec_source_topology",
+            "audit_numbers_table_cell_custom_format_facade_source_topology",
+            "audit_numbers_table_cell_percentage_format_codec_source_topology",
+            "audit_numbers_table_cell_percentage_format_facade_source_topology",
+            "audit_numbers_table_cell_currency_format_codec_source_topology",
+            "audit_numbers_table_cell_currency_format_facade_source_topology",
+            "audit_numbers_table_cell_scientific_format_codec_source_topology",
+            "audit_numbers_table_cell_scientific_format_facade_source_topology",
+            "audit_numbers_table_cell_fraction_format_codec_source_topology",
+            "audit_numbers_table_cell_fraction_format_facade_source_topology",
+            "audit_numbers_table_cell_display_format_shared_core_source_topology",
+        )
+        focused_calls: list[str] = []
+        patches = []
+        for name, value in vars(boundaries).items():
+            if not name.startswith("audit_") or not callable(value):
+                continue
+            if name in focused_names:
+                replacement = mock.Mock(
+                    side_effect=lambda name=name: focused_calls.append(name) or []
+                )
+            else:
+                replacement = mock.Mock(return_value=[])
+            patches.append(mock.patch.object(boundaries, name, replacement))
+
+        with mock.patch.object(
+            boundaries, "cargo_metadata", return_value={}
+        ), mock.patch.object(
+            boundaries, "snapshot_from_metadata", return_value=snapshot
+        ), mock.patch.object(boundaries, "debt_report", return_value=[]), ExitStack() as stack:
+            for patch in patches:
+                stack.enter_context(patch)
+            with redirect_stdout(io.StringIO()):
+                result = boundaries.main(["--policy", str(boundaries.DEFAULT_POLICY)])
+
+        self.assertEqual(result, 0)
+        self.assertEqual(focused_calls, list(focused_names))
+
+
+    def test_iwa_table_cell_borders_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_table_cell_borders_source_topology()",
+            main_source,
+        )
+
+
+    def test_iwa_shared_media_playback_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_shared_media_playback_source_topology()",
+            main_source,
+        )
+
+
+    def test_iwa_shared_image_adjustments_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_shared_image_adjustments_source_topology()",
+            main_source,
+        )
+
+
+    def test_annotation_author_codec_boundary_accepts_checked_in_source(self) -> None:
+        self.assertEqual(boundaries.audit_annotation_author_codec_source_topology(), [])
+
+    def test_annotation_author_codec_boundary_rejects_eager_prost_drift(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.ANNOTATION_AUTHOR_CODEC_SOURCE,
+                boundaries.ANNOTATION_AUTHOR_CODEC_PROJECTION_SOURCE,
+                boundaries.ANNOTATION_AUTHOR_CODEC_PUBLIC_SOURCE,
+                boundaries.ANNOTATION_AUTHOR_CODEC_BUILD_SOURCE,
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            source = root / boundaries.ANNOTATION_AUTHOR_CODEC_SOURCE
+            source.write_text(
+                source.read_text(encoding="utf-8")
+                + "\nfn eager_drift(bytes: &[u8]) { let _ = prost::Message::decode(bytes); }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_annotation_author_codec_source_topology(root)
+            self.assertTrue(any("prost import" in item for item in violations), violations)
+
+    def test_keynote_drawable_comment_boundary_accepts_checked_in_owner(self) -> None:
+        self.assertEqual(
+            boundaries.audit_keynote_slide_drawable_comment_source_topology(), []
+        )
+
+    def test_keynote_drawable_comment_boundary_rejects_public_child_and_missing_receipt(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_SOURCES,
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES,
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            fixture = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_bytes(b"native source receipt")
+            native_test = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE
+            native_test.parent.mkdir(parents=True, exist_ok=True)
+            native_test.write_text(
+                "const SOURCE: &[u8] = include_bytes!(\"../../../test-data/iwork/keynote/"
+                "drawable-comments-source-native.key\");\n"
+                "#[test]\nfn permanent_native_fixture_is_pinned() {}\n",
+                encoding="utf-8",
+            )
+
+            owner = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "mod engine;", "pub mod engine;", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(any("child modules must remain private" in item for item in violations), violations)
+
+            metadata = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "metadata.rs"
+            metadata.write_text(
+                metadata.read_text(encoding="utf-8").replace(
+                    "mod identities;", "pub mod identities;", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(
+                any("identities child must remain private" in item for item in violations),
+                violations,
+            )
+
+            fixture.unlink()
+            violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                root
+            )
+            self.assertTrue(any("missing native source fixture" in item for item in violations), violations)
+
+    def test_keynote_drawable_comment_boundary_requires_local_ownership_proofs(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_OWNER_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_SOURCES,
+                boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_SEMANTIC_SOURCE,
+                *boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_EXPORT_SOURCES,
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            fixture = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_FIXTURE
+            fixture.parent.mkdir(parents=True, exist_ok=True)
+            fixture.write_bytes(b"native source receipt")
+            native_test = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_NATIVE_TEST_SOURCE
+            native_test.parent.mkdir(parents=True, exist_ok=True)
+            native_test.write_text(
+                "const SOURCE: &[u8] = include_bytes!(\"../../../test-data/iwork/keynote/"
+                "drawable-comments-source-native.key\");\n"
+                "#[test]\nfn permanent_native_fixture_is_pinned() {}\n",
+                encoding="utf-8",
+            )
+
+            graph = root / boundaries.KEYNOTE_SLIDE_DRAWABLE_COMMENT_CHILD_ROOT / "graph.rs"
+            original = graph.read_text(encoding="utf-8")
+
+            def assert_rejected(replacement: str, message: str) -> None:
+                graph.write_text(replacement, encoding="utf-8")
+                violations = boundaries.audit_keynote_slide_drawable_comment_source_topology(
+                    root
+                )
+                self.assertTrue(any(message in item for item in violations), violations)
+                graph.write_text(original, encoding="utf-8")
+
+            assert_rejected(
+                original.replace(
+                    "let plan = plan_comment_graph_cross_component(\n",
+                    "let plan = plan_comment_graph(\n",
+                    1,
+                ),
+                "must use the package-scope cross-component",
+            )
+            assert_rejected(
+                original.replace(
+                    ".storage_component(identifier)",
+                    ".storage_component_removed(identifier)",
+                    1,
+                ),
+                "per-node storage-component accessor",
+            )
+            assert_rejected(
+                original.replace(
+                    "seen.insert(identifier)",
+                    "seen.contains(&identifier)",
+                    1,
+                ),
+                "unique drawable membership",
+            )
+            assert_rejected(
+                original.replace(
+                    "object_with_component(resolved.identifier)",
+                    "object_with_component(resolved.drawable_identifier)",
+                    1,
+                ),
+                "selected drawable component lookup",
+            )
+            assert_rejected(
+                original.replace(
+                    "census_core_header_root_reference(object, root_identifier, archive_limits, budget)?",
+                    "false",
+                    1,
+                ),
+                "complete header census",
+            )
+
+    def test_keynote_drawable_comment_boundary_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_annotation_author_codec_source_topology()",
+            main_source,
+        )
+        self.assertIn(
+            "+ audit_keynote_slide_drawable_comment_source_topology()",
+            main_source,
+        )
+
+
+    def test_common_table_merge_boundary_rejects_peer_import_and_duplicate_model(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.IWA_COMMON_TABLE_MERGE_SOURCE,
+                boundaries.NEUTRAL_TABLE_MODULE_SOURCE,
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            common = root / boundaries.IWA_COMMON_TABLE_MERGE_SOURCE
+            common.write_text(
+                common.read_text(encoding="utf-8")
+                + "\nuse litchi_numbers::table::merge::Region;\n",
+                encoding="utf-8",
+            )
+            compatibility = root / Path("crates/litchi-numbers/src/table/merge.rs")
+            compatibility.write_text(
+                compatibility.read_text(encoding="utf-8") + "\npub struct Region;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_common_table_merge_source_topology(root)
+            self.assertTrue(any("format/archive/wire owner" in item for item in violations), violations)
+            self.assertTrue(any("redeclares common type" in item for item in violations), violations)
+
+    def test_numbers_wire_table_merge_boundary_rejects_concrete_format_import(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE,
+                Path("crates/litchi-numbers-wire/src/lib.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            owner = root / boundaries.IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "\nuse litchi_pages::Package;\n"
+                + "pub struct MergeRead;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_merges_source_topology(root)
+            self.assertTrue(any("concrete format owner" in item for item in violations), violations)
+            self.assertTrue(any("redeclares shared type MergeRead" in item for item in violations), violations)
+
+    def test_focused_table_merge_boundaries_allow_host_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            paths = (
+                boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-pages/src/table/mod.rs"),
+                Path("crates/litchi-pages/src/table/merge.rs"),
+                boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-keynote/src/slide/table.rs"),
+                Path("crates/litchi-keynote/src/slide/table/merge.rs"),
+            )
+            for relative in paths:
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            self.assertEqual(boundaries.audit_pages_table_merge_source_topology(root), [])
+            self.assertEqual(boundaries.audit_keynote_table_merge_source_topology(root), [])
+
+            numbers_paths = (
+                boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+                boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-numbers/src/table.rs"),
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            )
+            for relative in numbers_paths:
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            self.assertEqual(boundaries.audit_numbers_table_merge_source_topology(root), [])
+
+    def test_numbers_table_merge_boundary_rejects_bnc_and_physical_leaks(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+                boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-numbers/src/table.rs"),
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            owner = root / boundaries.NUMBERS_TABLE_MERGE_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "\nuse litchi_iwa_protos::Archive;\n"
+                + "pub fn leaked_bnc() -> BncCellView {}\n"
+                + "pub fn leaked_proto(_: FormulaArchive) {}\n"
+                + "pub fn leaked_identity(table_id: u64) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_source_topology(root)
+            self.assertTrue(
+                any("format/archive or generated AST import" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("private wire/BNC type BncCellView" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated AST projection FormulaArchive" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+
+    def test_numbers_table_merge_reader_boundary_accepts_only_checked_ingress(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_numbers_table_merge_reader_fixture(root)
+            self.assertEqual(
+                boundaries.audit_numbers_table_merge_reader_source_topology(root), []
+            )
+
+    def test_retired_host_seams_stay_out_of_every_crate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            manifest = root / "crates/litchi-pages/Cargo.toml"
+            source = root / "crates/litchi-pages/src/lib.rs"
+            source.parent.mkdir(parents=True)
+            manifest.write_text("[features]\ndefault = []\n", encoding="utf-8")
+            source.write_text("pub fn decode_payload() {}\n", encoding="utf-8")
+            self.assertEqual(boundaries.audit_iwa_retired_host_seams(root), [])
+
+            manifest.write_text(
+                f"[features]\n{boundaries.IWA_RETIRED_HOST_FEATURE} = []\n",
+                encoding="utf-8",
+            )
+            source.write_text(
+                "pub fn __table_appearance_from_source_built() {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_retired_host_seams(root)
+            self.assertEqual(len(violations), 2, violations)
+            self.assertTrue(
+                any(boundaries.IWA_RETIRED_HOST_FEATURE in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("__table_appearance_from_source_built" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_merge_reader_boundary_rejects_raw_byte_methods_and_aliases(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_numbers_table_merge_reader_fixture(root)
+            reader = root / boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE
+            source = reader.read_text(encoding="utf-8").replace(
+                "    state: Arc<MergeReaderState>,",
+                "    pub source: Vec<u8>,\n    state: Arc<MergeReaderState>,",
+                1,
+            )
+            reader.write_text(
+                source + "\nimpl MergeReader {\n"
+                "    pub fn raw_payload(&self) -> Vec<u8> { Vec::new() }\n"
+                "    pub fn from_bytes(&self) -> Vec<u8> { Vec::new() }\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_reader_source_topology(root)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(
+                any("public MergeReader field" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("source ingress method" in item and "from_bytes" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_table_merge_reader_boundary_rejects_raw_ids_bnc_and_generated_imports(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            copy_numbers_table_merge_reader_fixture(root)
+            reader = root / boundaries.NUMBERS_TABLE_MERGE_READER_SOURCE
+            reader.write_text(
+                reader.read_text(encoding="utf-8")
+                + "\nuse litchi_iwa_protos::other;\n"
+                "use prost::Message;\n"
+                "pub fn leaked_identity(table_id: u64) {}\n"
+                "pub fn leaked_bnc(_: BncCellView) {}\n"
+                "pub fn leaked_proto(_: FormulaArchive) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_reader_source_topology(root)
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+            self.assertTrue(
+                any("generated/owned protobuf or BNC type BncCellView" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("generated/owned protobuf or BNC type FormulaArchive" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("exact numbers_names_codec import" in item for item in violations),
+                violations,
+            )
+
+    def test_pages_and_keynote_merge_readers_accept_checked_ingress(self) -> None:
+        for format_name, audit in (
+            ("Pages", boundaries.audit_pages_table_merge_reader_source_topology),
+            ("Keynote", boundaries.audit_keynote_table_merge_reader_source_topology),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                self.assertEqual(audit(root), [])
+
+    def test_pages_and_keynote_merge_readers_require_options_ingress(self) -> None:
+        for format_name, audit, reader_relative in (
+            (
+                "Pages",
+                boundaries.audit_pages_table_merge_reader_source_topology,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+            ),
+            (
+                "Keynote",
+                boundaries.audit_keynote_table_merge_reader_source_topology,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+            ),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                source_path = root / reader_relative
+                if not source_path.is_file():
+                    source_path = root / (
+                        boundaries.PAGES_TABLE_MERGE_SOURCE
+                        if format_name == "Pages"
+                        else boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+                    )
+                source = source_path.read_text(encoding="utf-8")
+                # Both readers take `OpenOptions` (the
+                # Pages `*_with_limits` ingress is retired).
+                before, after, expected = "options: OpenOptions", "options: ()", "options ingress"
+                method_start = source.index("pub fn open_with_options")
+                parameter_start = source.index(before, method_start)
+                mutated = source[:parameter_start] + source[parameter_start:].replace(before, after, 1)
+                source_path.write_text(mutated, encoding="utf-8")
+                violations = audit(root)
+                self.assertTrue(any(expected in item for item in violations), violations)
+
+    def test_pages_and_keynote_merge_readers_reject_public_leaks_and_raw_ids(self) -> None:
+        for format_name, audit, reader_relative in (
+            (
+                "Pages",
+                boundaries.audit_pages_table_merge_reader_source_topology,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+            ),
+            (
+                "Keynote",
+                boundaries.audit_keynote_table_merge_reader_source_topology,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+            ),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                source_path = root / reader_relative
+                if not source_path.is_file():
+                    source_path = root / (
+                        boundaries.PAGES_TABLE_MERGE_SOURCE
+                        if format_name == "Pages"
+                        else boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+                    )
+                source = source_path.read_text(encoding="utf-8")
+                source = source.replace("    state:", "    pub state:", 1)
+                source = source.replace("    package: Package,", "    pub package: Package,", 1)
+                source += (
+                    "\nimpl MergeReader {\n"
+                    "    pub fn leaked(&self, table_id: u64, bytes: &[u8]) -> Vec<u8> {\n"
+                    "        let _ = (table_id, bytes);\n"
+                    "        Vec::new()\n"
+                    "    }\n"
+                    "    pub fn leaked_document(&self, document: Document) {}\n"
+                    "    pub fn leaked_catalog(&self) -> Arc<ComponentCatalog> {\n"
+                    "        unreachable!()\n"
+                    "    }\n"
+                    "}\n"
+                    "use litchi_iwa_protos::other;\n"
+                )
+                source_path.write_text(source, encoding="utf-8")
+                violations = audit(root)
+                self.assertTrue(any("public MergeReader field" in item for item in violations), violations)
+                self.assertTrue(any("unsupported public method leaked" in item for item in violations), violations)
+                self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+                self.assertTrue(any("raw bytes from public method leaked" in item for item in violations), violations)
+                self.assertTrue(any("full document model reference" in item for item in violations), violations)
+                self.assertTrue(any("generated/owned protobuf" in item for item in violations), violations)
+                self.assertTrue(any("physical or semantic type" in item for item in violations), violations)
+
+    def test_pages_and_keynote_merge_readers_keep_the_child_private_and_selectors_typed(
+        self,
+    ) -> None:
+        for format_name, audit, owner_relative, reader_relative in (
+            (
+                "Pages",
+                boundaries.audit_pages_table_merge_reader_source_topology,
+                boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_READER_SOURCE,
+            ),
+            (
+                "Keynote",
+                boundaries.audit_keynote_table_merge_reader_source_topology,
+                boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_READER_SOURCE,
+            ),
+        ):
+            with self.subTest(format=format_name), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                copy_focused_table_merge_reader_fixture(root, format_name)
+                owner = root / owner_relative
+                reader = root / reader_relative
+                if reader.is_file():
+                    reader.unlink()
+                    violations = audit(root)
+                    self.assertTrue(any("reader child is missing" in item for item in violations), violations)
+
+                    reader.write_text(
+                        (boundaries.ROOT / reader_relative).read_text(encoding="utf-8"),
+                        encoding="utf-8",
+                    )
+                    owner.write_text(
+                        owner.read_text(encoding="utf-8").replace(
+                            "mod reader;", "pub mod reader;", 1
+                        ),
+                        encoding="utf-8",
+                    )
+                    violations = audit(root)
+                    self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+                    if format_name == "Pages":
+                        source = reader.read_text(encoding="utf-8").replace(
+                            "Into<BodyTableSelector<'table>>",
+                            "Into<SelectorRemoved>",
+                            1,
+                        )
+                    else:
+                        source = reader.read_text(encoding="utf-8").replace(
+                            "impl Into<crate::SlideSelector<'slide>>",
+                            "impl Into<SelectorRemoved>",
+                            1,
+                        )
+                    reader.write_text(source, encoding="utf-8")
+                    violations = audit(root)
+                    self.assertTrue(any("must use typed" in item for item in violations), violations)
+
+    def test_numbers_table_merge_boundary_rejects_public_module(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.NUMBERS_TABLE_MERGE_SOURCE,
+                boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-numbers/src/table.rs"),
+                Path("crates/litchi-numbers/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            package = root / boundaries.NUMBERS_TABLE_MERGE_PACKAGE_SOURCE
+            package_source = package.read_text(encoding="utf-8")
+            package.write_text(
+                package_source + "\npub mod table_merges;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_numbers_table_merge_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+
+    def test_focused_table_merge_boundaries_reject_raw_bytes_and_generated_ast(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.PAGES_TABLE_MERGE_SOURCE,
+                boundaries.PAGES_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-pages/src/table/mod.rs"),
+                Path("crates/litchi-pages/src/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            owner = root / boundaries.PAGES_TABLE_MERGE_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "\npub fn raw_table_id(table_id: u64, bytes: &[u8]) {}\n"
+                + "fn generated_projection(_: FormulaArchive) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_merge_source_topology(root)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+            self.assertTrue(any("generated AST projection" in item for item in violations), violations)
+
+    def test_focused_table_merge_boundaries_reject_public_module_and_peer_adapter(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.KEYNOTE_TABLE_MERGE_SOURCE,
+                boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE,
+                Path("crates/litchi-keynote/src/slide/table.rs"),
+                Path("crates/litchi-keynote/src/slide/table/merge.rs"),
+            ):
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(
+                    (boundaries.ROOT / relative).read_text(encoding="utf-8"),
+                    encoding="utf-8",
+                )
+            package = root / boundaries.KEYNOTE_TABLE_MERGE_PACKAGE_SOURCE
+            package.write_text(
+                package.read_text(encoding="utf-8").replace(
+                    "pub(crate) mod slide_table_merges;",
+                    "pub mod slide_table_merges;",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            owner = root / boundaries.KEYNOTE_TABLE_MERGE_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "use litchi_numbers_wire::table_merges",
+                    "use litchi_keynote::table_merges",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_table_merge_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+            self.assertTrue(
+                any("format/archive or generated AST import" in item for item in violations),
+                violations,
+            )
+
+
+    def test_iwa_numbers_wire_cell_value_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_wire_cell_value_ownership()",
+            main_source,
+        )
+
+
+    def test_iwa_numbers_wire_table_data_list_audit_is_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn(
+            "+ audit_iwa_numbers_wire_table_data_list_ownership()",
+            main_source,
+        )
+
+    def test_table_cell_read_boundaries_accept_shared_and_focused_owners(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            for audit in (
+                boundaries.audit_iwa_common_table_read_source_topology,
+                boundaries.audit_iwa_numbers_wire_table_cells_source_topology,
+                boundaries.audit_iwa_numbers_wire_table_sidecars_source_topology,
+                boundaries.audit_pages_table_cells_source_topology,
+                boundaries.audit_keynote_table_cells_source_topology,
+            ):
+                with self.subTest(audit=audit.__name__):
+                    self.assertEqual(audit(root), [])
+
+
+    def test_common_table_read_boundary_rejects_physical_imports_and_raw_ids(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(
+                root,
+                common_source=(
+                    "use litchi_numbers_wire::table_cells::TableDimensions;\n"
+                    "pub struct CommentTimestamp(u64);\n"
+                    "pub struct CommentAuthor;\n"
+                    "pub struct CommentReply;\n"
+                    "pub struct Comment;\n"
+                    "pub struct CellComment;\n"
+                    "pub struct TableRead;\n"
+                    "pub struct Builder;\n"
+                    "pub fn leaked(table_id: u64) {}\n"
+                ),
+            )
+            violations = boundaries.audit_iwa_common_table_read_source_topology(root)
+            self.assertTrue(
+                any("imports a concrete format, wire, or protobuf" in item for item in violations),
+                violations,
+            )
+            self.assertTrue(
+                any("exposes a raw ID parameter" in item for item in violations),
+                violations,
+            )
+
+    def test_numbers_wire_table_cell_owners_retain_shared_routes_and_peer_boundary(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            # Replace the generated source after the scaffold has installed it
+            # so the mutation stays focused on the peer dependency rule.
+            cells = root / boundaries.IWA_NUMBERS_WIRE_TABLE_CELLS_SOURCE
+            cells.write_text(
+                cells.read_text(encoding="utf-8")
+                + "use litchi_pages::Package;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_cells_source_topology(root)
+            self.assertTrue(any("concrete format peer" in item for item in violations), violations)
+
+            sidecars = root / boundaries.IWA_NUMBERS_WIRE_TABLE_SIDECARS_SOURCE
+            sidecars.write_text(
+                sidecars.read_text(encoding="utf-8").replace(
+                    "use crate::table_data_list::read_list_with_decoder;\n", ""
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_sidecars_source_topology(root)
+            self.assertTrue(any("missing a required shared import" in item for item in violations), violations)
+
+    def test_focused_table_cell_boundaries_reject_public_physical_apis_and_separate_budgets(
+        self,
+    ) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            pages = root / boundaries.PAGES_TABLE_CELLS_SOURCE
+            pages.write_text(
+                pages.read_text(encoding="utf-8")
+                + "pub struct ExposedSnapshot(TableModelSnapshot);\n"
+                + "impl Package {\n"
+                + "    pub fn leaked(&self, table_id: u64, bytes: &[u8]) -> Result<TableRead, ()> { todo!() }\n"
+                + "}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_cells_source_topology(root)
+            self.assertTrue(any("exposes generated or wire type" in item for item in violations), violations)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("exposes a raw ID parameter" in item for item in violations), violations)
+
+            pages.write_text(
+                pages.read_text(encoding="utf-8").replace(
+                    "impl SidecarReadBudget for Budget { type Error = (); }",
+                    "impl SidecarReadBudget for OtherBudget { type Error = (); }",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_table_cells_source_topology(root)
+            self.assertTrue(any("separate aggregate budget types" in item for item in violations), violations)
+
+    def test_focused_table_cell_boundaries_require_private_modules_and_delegation(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(root)
+            package = root / boundaries.KEYNOTE_TABLE_CELLS_PACKAGE_SOURCE
+            package.write_text("pub mod slide_table_cells;\n", encoding="utf-8")
+            keynote = root / boundaries.KEYNOTE_TABLE_CELLS_SOURCE
+            keynote.write_text(
+                keynote.read_text(encoding="utf-8")
+                .replace("read_sidecar_list();\n", "")
+                .replace("use litchi_numbers_wire::table_sidecars", "use litchi_keynote::table_sidecars"),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_keynote_table_cells_source_topology(root)
+            self.assertTrue(any("must remain private" in item for item in violations), violations)
+            self.assertTrue(any("concrete format peer" in item for item in violations), violations)
+            self.assertTrue(any("must delegate through read_sidecar_list" in item for item in violations), violations)
+
+    def test_focused_table_cell_boundaries_allow_adapter_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_table_cell_read_scaffold(
+                root,
+                include_pages=False,
+                include_keynote=False,
+            )
+            self.assertEqual(boundaries.audit_pages_table_cells_source_topology(root), [])
+            self.assertEqual(boundaries.audit_keynote_table_cells_source_topology(root), [])
+
+    def test_table_cell_read_boundaries_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for name in (
+            "audit_iwa_common_table_read_source_topology",
+            "audit_iwa_numbers_wire_table_cells_source_topology",
+            "audit_iwa_numbers_wire_table_sidecars_source_topology",
+            "audit_iwa_numbers_wire_formula_names_source_topology",
+            "audit_pages_table_cells_source_topology",
+            "audit_keynote_table_cells_source_topology",
+        ):
+            self.assertIn(f"+ {name}()", main_source)
+
+    def test_numbers_wire_formula_names_boundary_accepts_bounded_owner(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_names_scaffold(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root),
+                [],
+            )
+
+    def test_numbers_wire_formula_names_boundary_rejects_missing_route_and_peer(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_names_scaffold(root)
+            owner = root / boundaries.IWA_NUMBERS_WIRE_FORMULA_NAMES_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                .replace("pub fn read_formula_category_names", "pub fn removed_category_names")
+                + "use litchi_pages::Package;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root)
+            self.assertTrue(any("missing public read_formula_category_names" in item for item in violations), violations)
+            self.assertTrue(any("concrete format peer" in item for item in violations), violations)
+
+    def test_numbers_wire_formula_names_boundary_requires_export(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            add_iwa_numbers_wire_formula_names_scaffold(root, lib_source="pub mod other;\n")
+            violations = boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root)
+            self.assertTrue(any("missing its public module export" in item for item in violations), violations)
+
+    def test_numbers_wire_formula_names_boundary_allows_owner_deletion(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_wire_formula_names_source_topology(root),
+                [],
+            )
+
+
+    def test_chart_metadata_boundary_allows_future_owner_deletion_and_is_dispatched(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            self.assertEqual(
+                boundaries.audit_iwa_chart_metadata_source_topology(Path(directory)), []
+            )
+        main_source = inspect.getsource(boundaries.main)
+        self.assertIn("+ audit_iwa_chart_metadata_source_topology()", main_source)
+
+
+    def _write_pages_body_table_deletion_fixture(self, root: Path) -> None:
+        owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+        owner.parent.mkdir(parents=True, exist_ok=True)
+        owner.write_text(
+            "mod graph;\n"
+            "mod archive;\n"
+            "mod metadata;\n"
+            "mod formula;\n"
+            "mod text;\n"
+            "pub enum Error { InvalidSource }\n"
+            "pub enum LimitKind { Work }\n"
+            "pub struct Patch { removed: Snapshot }\n"
+            "pub struct Diagnostics { changed: bool }\n"
+            "pub struct Commit { patch: Patch }\n"
+            "impl Commit {\n"
+            "    pub fn package(&self) -> &Package { todo!() }\n"
+            "    pub fn into_package(self) -> Package { todo!() }\n"
+            "    pub fn patch(&self) -> &Patch { todo!() }\n"
+            "    pub fn diagnostics(&self) -> &Diagnostics { todo!() }\n"
+            "    pub fn removed_table(&self) -> &Snapshot { todo!() }\n"
+            "}\n"
+            "pub struct Edit<'a> { source: &'a Package }\n"
+            "impl<'a> Edit<'a> {\n"
+            "    pub fn remove(\n"
+            "        self, selector: impl Into<BodyTableSelector<'a>>\n"
+            "    ) -> Result<Self, Error> { let _ = selector; Ok(self) }\n"
+            "    pub fn commit(self) -> Result<Commit, Error> {\n"
+            "        let selected = resolve_body_table(selector);\n"
+            "        let staged = Patch { removed: Snapshot };\n"
+            "        let candidate = reassemble(staged);\n"
+            "        let reopened = reopen(candidate);\n"
+            "        verify(reopened)\n"
+            "    }\n"
+            "}\n"
+            "impl Package {\n"
+            "    pub fn edit_body_table_deletion(&self) -> Edit<'_> { Edit { source: self } }\n"
+            "    pub fn apply_body_table_deletion(\n"
+            "        &self, patch: &Patch\n"
+            "    ) -> Result<Commit, Error> {\n"
+            "        if !patch.authorizes_source() { return Err(Error::PatchConflict); }\n"
+            "        validate_patch(patch);\n"
+            "        let candidate = reassemble(patch);\n"
+            "        reopen(candidate)\n"
+            "    }\n"
+            "}\n"
+            "fn resolve_body_table(selector: BodyTableSelector<'_>) { let _ = selector; }\n"
+            "fn reassemble(value: impl Sized) -> impl Sized { value }\n"
+            "fn reopen(value: impl Sized) -> impl Sized { value }\n"
+            "fn verify(value: impl Sized) -> Result<Commit, Error> { let _ = value; todo!() }\n"
+            "fn validate_patch(value: &Patch) { let _ = value; }\n"
+            "fn exact_source() { let _ = (PatchConflict, source_fingerprint, inverse); }\n"
+            "fn bounded() { let _ = (Budget, Limits, limit, checked_add, checked_mul, try_reserve); }\n",
+            encoding="utf-8",
+        )
+        child_sources = {
+            "graph": (
+                "fn graph(selector: BodyTableSelector<'_>) {\n"
+                "    let _ = (selector, ownership, references, inbound, shared, private, checked_add, checked_mul, Budget);\n"
+                "}\n"
+            ),
+            "archive": (
+                "fn archive() {\n"
+                "    let _ = (Archive, archive, SourceCatalog, source_preserving, remove_object, candidate, verify, reopen, absence, checked);\n"
+                "}\n"
+            ),
+            "metadata": (
+                "fn metadata() {\n"
+                "    let _ = (package_metadata_codec, component_removal, ComponentRemoval, registration, uuid, external_reference, object_uuid);\n"
+                "}\n"
+            ),
+            "formula": (
+                "fn formula() {\n"
+                "    let _ = (numbers_table_cell_dependency_codec, dependency_wire, formula_engine, CalculationEngine, formula_owner, owner, tile, tiled, prune, remove_formula, number_of_formulas, checked_sub);\n"
+                "}\n"
+            ),
+            "text": (
+                "fn text() {\n"
+                "    let _ = (litchi_iwa_text_wire, text_wire, rewrite_storage_text, prepare_storage_text_rewrite, StorageText, utf16_index, UTF_16, anchor, character_index, selected_anchor, TextSpan, Position, try_reserve, checked_add, checked_sub, WireBudget, budget, limit, max);\n"
+                "}\n"
+            ),
+        }
+        for name, source in child_sources.items():
+            child = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_CHILD_ROOT / f"{name}.rs"
+            child.parent.mkdir(parents=True, exist_ok=True)
+            child.write_text(source, encoding="utf-8")
+
+        package = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_PACKAGE_SOURCE
+        package.parent.mkdir(parents=True, exist_ok=True)
+        package.write_text(
+            "mod body_table_deletion;\n"
+            "pub use body_table_deletion::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n",
+            encoding="utf-8",
+        )
+        library = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
+        library.parent.mkdir(parents=True, exist_ok=True)
+        library.write_text(
+            "pub use package::{Commit, Diagnostics, Edit, Error, LimitKind, Patch};\n",
+            encoding="utf-8",
+        )
+        add_pages_transaction_family_scaffold(root, "body_table_deletion")
+
+    def _write_component_removal_codec_fixture(
+        self, root: Path, *, dependency: bool = False
+    ) -> tuple[Path, Path]:
+        if dependency:
+            parent_path = boundaries.IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+            child_path = boundaries.IWA_NUMBERS_DEPENDENCY_REMOVAL_SOURCE
+            parent = (
+                "mod removal;\n"
+                "pub use removal::{CalculationEngineOwnerRemovalPlan, prepare_calculation_engine_owner_removal};\n"
+            )
+            child = (
+                "pub struct CalculationEngineOwnerRemovalPlan<'a> { source: &'a [u8] }\n"
+                "pub fn prepare_calculation_engine_owner_removal(source: &[u8]) {\n"
+                "    let _ = (source, CalculationEngine, calculation_engine, formula_engine, formula_owner, owner_id_map, number_of_formulas, cell_record_tile, range_precedents_tile, tiled, tile, prune, remove, checked_add, checked_sub, try_reserve, limit, budget, bounded);\n"
+                "    let _ = buffa.decode_lazy_view(source);\n"
+                "    let _ = candidate;\n"
+                "}\n"
+            )
+            build_marker = 'println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec.rs");'
+            guard_marker = 'include_str!("numbers_table_cell_dependency_codec/removal.rs")'
+        else:
+            parent_path = boundaries.IWA_PACKAGE_METADATA_CODEC_SOURCE
+            child_path = boundaries.IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_SOURCE
+            parent = (
+                "mod component_removal;\n"
+                "pub use component_removal::{PreparedPackageMetadataComponentRemovalRewrite, prepare_package_metadata_component_removals};\n"
+            )
+            child = (
+                "pub struct PreparedPackageMetadataComponentRemovalRewrite<'a> { source: &'a [u8] }\n"
+                "pub fn prepare_package_metadata_component_removals(source: &[u8]) {\n"
+                "    let _ = (source, ComponentRemovalBatch, component_registration, registration, component_header, prepared, execute, rewrite, unknown_fields, candidate, validate_candidate, RewriteExecutionRequirements, preflight_execution, try_reserve_exact, checked_add, Budget, max_output);\n"
+                "    let _ = buffa.decode_lazy_view(source);\n"
+                "}\n"
+            )
+            build_marker = boundaries.IWA_PACKAGE_METADATA_COMPONENT_REMOVAL_BUILD_MARKER
+            guard_marker = 'include_str!("package_metadata_codec/component_removal.rs")'
+
+        parent_absolute = root / parent_path
+        parent_absolute.parent.mkdir(parents=True, exist_ok=True)
+        parent_absolute.write_text(parent, encoding="utf-8")
+        child_absolute = root / child_path
+        child_absolute.parent.mkdir(parents=True, exist_ok=True)
+        child_absolute.write_text(child, encoding="utf-8")
+        build = root / boundaries.IWA_CODEC_BUILD_SOURCE
+        build.parent.mkdir(parents=True, exist_ok=True)
+        build.write_text(build_marker + "\n", encoding="utf-8")
+        guard = root / boundaries.IWA_CODEC_PRODUCTION_GUARD_SOURCE
+        guard.parent.mkdir(parents=True, exist_ok=True)
+        guard.write_text(guard_marker + "\n", encoding="utf-8")
+        return parent_path, child_path
+
+    def _write_dependency_inbound_codec_fixture(self, root: Path) -> None:
+        parent = root / boundaries.IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+        parent.parent.mkdir(parents=True, exist_ok=True)
+        parent.write_text(
+            "mod inbound;\n"
+            "pub use inbound::{FormulaDependencyFact, FormulaOwnerInternalDependencyFact, FormulaOwnerInternalDependencyKind, FormulaOwnerUuidDependencyFact, FormulaOwnerUuidDependencyKind};\n"
+            "pub fn decode_formula_owner_dependency_facts_with_visitor() {}\n"
+            "pub fn decode_formula_owner_dependency_facts() {}\n"
+            "pub fn decode_formula_owner_dependency_facts_with_report() {}\n",
+            encoding="utf-8",
+        )
+        child = root / boundaries.IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+        child.parent.mkdir(parents=True, exist_ok=True)
+        child.write_text(
+            "pub enum FormulaOwnerInternalDependencyKind { VolatileGeometry, SpanningColumn, SpanningRow, WholeOwner }\n"
+            "pub struct FormulaOwnerInternalDependencyFact { kind: FormulaOwnerInternalDependencyKind, owner_id: u32 }\n"
+            "pub enum FormulaOwnerUuidDependencyKind { TableReference, TableUuidReference }\n"
+            "pub struct FormulaOwnerUuidDependencyFact { owner_uuid: UuidSnapshot }\n"
+            "pub enum FormulaDependencyFact { InternalOwner(FormulaOwnerInternalDependencyFact), OwnerUuid(FormulaOwnerUuidDependencyFact) }\n"
+            "fn decode_volatile_dependencies_in() { let _ = VolatileGeometry; }\n"
+            "fn decode_spanning_dependencies_in() { let _ = (SpanningColumn, SpanningRow); }\n"
+            "fn decode_whole_owner_dependencies_in() { let _ = WholeOwner; }\n"
+            "fn decode_uuid_references_in() { let _ = (TableReference, TableUuidReference, OwnerUuid); }\n"
+            "fn dispatch() { let _ = (visit_formula_owner_internal_dependency, visit_formula_owner_uuid_dependency, FormulaDependencyFact); }\n"
+            "fn coordinates() { let _ = (decode_cell_coordinate_in, decode_range_coordinate_in, coord_set, range_context); }\n"
+            "fn bounded() { let _ = (budget.message, child_depth, checked_add, set_once, DecodeError::invalid); }\n",
+            encoding="utf-8",
+        )
+        build = root / boundaries.IWA_CODEC_BUILD_SOURCE
+        build.parent.mkdir(parents=True, exist_ok=True)
+        build.write_text(
+            'println!("cargo:rerun-if-changed=src/numbers_table_cell_dependency_codec/inbound.rs");\n',
+            encoding="utf-8",
+        )
+        guard = root / boundaries.IWA_CODEC_PRODUCTION_GUARD_SOURCE
+        guard.parent.mkdir(parents=True, exist_ok=True)
+        guard.write_text(
+            'include_str!("numbers_table_cell_dependency_codec/inbound.rs")\n',
+            encoding="utf-8",
+        )
+
+    def test_pages_body_table_deletion_boundaries_accept_and_dispatch(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            self.assertEqual(
+                boundaries.audit_pages_body_table_deletion_source_topology(root), []
+            )
+        main_source = inspect.getsource(boundaries.main)
+        for name in (
+            "audit_pages_body_table_deletion_source_topology",
+            "audit_iwa_package_metadata_component_removal_source_topology",
+            "audit_iwa_numbers_table_cell_dependency_removal_source_topology",
+            "audit_iwa_numbers_table_cell_dependency_inbound_source_topology",
+        ):
+            self.assertIn(f"+ {name}()", main_source)
+
+    def test_pages_body_table_deletion_rejects_public_native_surface_and_bad_order(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "impl Commit { pub fn leaked(&self, object_id: u64, bytes: &[u8]) -> Result<Archive, Error> { todo!() } }\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+            self.assertTrue(any("raw bytes" in item for item in violations), violations)
+            self.assertTrue(any("native, generated, or wire type Archive" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "let selected = resolve_body_table(selector);\n"
+                    "        let staged = Patch",
+                    "let staged = Patch"
+                    " { removed: Snapshot };\n"
+                    "        let selected = resolve_body_table(selector);\n"
+                    "        let staged_again = Patch",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("stages deletion before selector admission" in item for item in violations), violations)
+
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace("mod graph;", "pub mod graph;", 1),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+    def test_pages_body_table_deletion_rejects_prefixed_spellings_and_root_exports(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8")
+                + "pub type BodyTableDeletionPatch = Patch;\n",
+                encoding="utf-8",
+            )
+            library = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_LIBRARY_SOURCE
+            library.write_text(
+                library.read_text(encoding="utf-8")
+                + "pub use crate::package::body_table_deletion::Commit;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(
+                any("defines retired name BodyTableDeletionPatch" in item for item in violations),
+                violations,
+            )
+            violations = boundaries.audit_pages_transaction_family_source_topology(root)
+            self.assertTrue(
+                any(
+                    "owner body_table_deletion has 2 public re-export paths" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_pages_body_table_deletion_requires_all_private_children_and_semantic_removed_table(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_pages_body_table_deletion_fixture(root)
+            formula = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_CHILD_ROOT / "formula.rs"
+            formula.unlink()
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("missing child source" in item and "formula.rs" in item for item in violations), violations)
+
+            self._write_pages_body_table_deletion_fixture(root)
+            owner = root / boundaries.IWA_PAGES_BODY_TABLE_DELETION_OWNER_SOURCE
+            owner.write_text(
+                owner.read_text(encoding="utf-8").replace(
+                    "pub fn removed_table(&self) -> &Snapshot",
+                    "pub fn removed_table(&self) -> Vec<u8>",
+                    1,
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_pages_body_table_deletion_source_topology(root)
+            self.assertTrue(any("removed_table must return semantic table::catalog::Snapshot" in item for item in violations), violations)
+            self.assertTrue(any("public method exposes raw bytes" in item for item in violations), violations)
+
+    def test_component_removal_codec_boundaries_require_private_buffa_children_and_inventory(self) -> None:
+        for dependency in (False, True):
+            with self.subTest(dependency=dependency), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                _parent_path, child_path = self._write_component_removal_codec_fixture(
+                    root, dependency=dependency
+                )
+                audit = (
+                    boundaries.audit_iwa_numbers_table_cell_dependency_removal_source_topology
+                    if dependency
+                    else boundaries.audit_iwa_package_metadata_component_removal_source_topology
+                )
+                self.assertEqual(audit(root), [])
+                child = root / child_path
+                child.write_text(
+                    child.read_text(encoding="utf-8") + "use prost::Message;\n",
+                    encoding="utf-8",
+                )
+                violations = audit(root)
+                self.assertTrue(any("must not use Prost" in item for item in violations), violations)
+
+                parent = root / _parent_path
+                parent.write_text(
+                    parent.read_text(encoding="utf-8").replace(
+                        "mod removal;" if dependency else "mod component_removal;",
+                        "pub mod removal;" if dependency else "pub mod component_removal;",
+                        1,
+                    ),
+                    encoding="utf-8",
+                )
+                violations = audit(root)
+                self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+                parent.write_text(
+                    parent.read_text(encoding="utf-8").replace(
+                        "pub mod removal;" if dependency else "pub mod component_removal;",
+                        "mod removal;" if dependency else "mod component_removal;",
+                        1,
+                    ),
+                    encoding="utf-8",
+                )
+                guard = root / boundaries.IWA_CODEC_PRODUCTION_GUARD_SOURCE
+                guard.write_text("", encoding="utf-8")
+                violations = audit(root)
+                self.assertTrue(any("production inventory registration" in item for item in violations), violations)
+
+    def test_dependency_inbound_codec_boundaries_require_typed_private_visitor_child(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._write_dependency_inbound_codec_fixture(root)
+            self.assertEqual(
+                boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root),
+                [],
+            )
+            child = root / boundaries.IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+            child.unlink()
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("child is missing" in item for item in violations), violations)
+            self._write_dependency_inbound_codec_fixture(root)
+            child = root / boundaries.IWA_NUMBERS_DEPENDENCY_INBOUND_SOURCE
+            child.write_text(
+                child.read_text(encoding="utf-8") + "use prost::Message;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("must not use Prost" in item for item in violations), violations)
+
+            child.write_text(
+                child.read_text(encoding="utf-8")
+                + "pub fn leaked(source: &[u8]) {}\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+
+            parent = root / boundaries.IWA_NUMBERS_DEPENDENCY_CODEC_SOURCE
+            parent.write_text(
+                parent.read_text(encoding="utf-8").replace(
+                    "mod inbound;", "pub mod inbound;", 1
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_table_cell_dependency_inbound_source_topology(root)
+            self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+
+    def _copy_table_merge_transaction_fixture(
+        self, root: Path, spec: dict
+    ) -> None:
+        relatives = [
+            spec[key]
+            for key in (
+                "owner_path",
+                "transaction_path",
+                "package_path",
+                "library_path",
+                "focused_module",
+            )
+            if key in spec
+        ]
+        if spec.get("transaction_family_owner") is not None:
+            # ADR 0034: the public ``table::merge::transaction`` chain.
+            relatives.extend(
+                (
+                    boundaries.PAGES_SOURCE_ROOT / "table" / "mod.rs",
+                    boundaries.PAGES_SOURCE_ROOT / "table" / "merge.rs",
+                )
+            )
+        for relative in relatives:
+            source = boundaries.ROOT / relative
+            self.assertTrue(source.is_file(), source)
+            destination = root / relative
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+
+    def test_table_merge_transaction_boundaries_accept_checked_in_owners(self) -> None:
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                self.assertEqual(
+                    boundaries._audit_table_merge_transaction_source_topology(root, spec),
+                    [],
+                )
+
+    def test_pages_table_merge_transaction_rejects_prefixed_root_exports(self) -> None:
+        spec = boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS[1]
+        self.assertEqual(spec["format_name"], "Pages")
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self._copy_table_merge_transaction_fixture(root, spec)
+            library = root / spec["library_path"]
+            library.write_text(
+                library.read_text(encoding="utf-8")
+                + "pub use crate::package::body_table_merges::{Edit as BodyTableMergesEdit};\n",
+                encoding="utf-8",
+            )
+            violations = boundaries._audit_table_merge_transaction_source_topology(
+                root, spec
+            )
+            self.assertTrue(
+                any(
+                    "publicly re-exports retired name BodyTableMergesEdit" in item
+                    for item in violations
+                ),
+                violations,
+            )
+
+    def test_table_merge_transaction_boundaries_reject_public_native_surface(self) -> None:
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                transaction = root / spec["transaction_path"]
+                edit_type = spec.get("type_names", {}).get("Edit", f"{spec['prefix']}Edit")
+                transaction.write_text(
+                    transaction.read_text(encoding="utf-8")
+                    + f"\nimpl {edit_type}<'_> {{\n"
+                    + "    pub fn leaked(&self, object_id: u64, bytes: &[u8]) "
+                    + "-> Result<Archive, Error> { todo!() }\n"
+                    + "}\n",
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(
+                    root, spec
+                )
+                self.assertTrue(any("raw ID parameter" in item for item in violations), violations)
+                self.assertTrue(any("exposes raw bytes" in item for item in violations), violations)
+                self.assertTrue(any("physical/model type Archive" in item for item in violations), violations)
+
+    def test_table_merge_transaction_boundaries_require_private_child_and_ordered_selection(
+        self,
+    ) -> None:
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                owner = root / spec["owner_path"]
+                owner.write_text(
+                    owner.read_text(encoding="utf-8").replace(
+                        "mod transaction;", "pub mod transaction;", 1
+                    ),
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(
+                    root, spec
+                )
+                self.assertTrue(any("child module must remain private" in item for item in violations), violations)
+
+                owner.write_text(
+                    owner.read_text(encoding="utf-8").replace(
+                        "pub mod transaction;", "mod transaction;", 1
+                    ),
+                    encoding="utf-8",
+                )
+                transaction = root / spec["transaction_path"]
+                transaction_source = transaction.read_text(encoding="utf-8")
+                for marker in spec["admission_markers"]:
+                    transaction_source = transaction_source.replace(
+                        marker, "removed_selector_admission"
+                    )
+                transaction.write_text(transaction_source, encoding="utf-8")
+                violations = boundaries._audit_table_merge_transaction_source_topology(
+                    root, spec
+                )
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+    def test_lazy_table_merge_transactions_guard_every_staging_entry(self) -> None:
+        """A deferred selector must still guard each operation that can stage."""
+
+        for spec in boundaries.IWA_TABLE_MERGE_TRANSACTION_SPECS:
+            deferred = spec.get("deferred_admission")
+            if deferred is None:
+                continue
+            with self.subTest(format=spec["format_name"]), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self._copy_table_merge_transaction_fixture(root, spec)
+                transaction = root / spec["transaction_path"]
+                original = transaction.read_text(encoding="utf-8")
+                guard = f"self.{deferred['helper']}()?;"
+                self.assertGreaterEqual(original.count(guard), len(deferred["stage_methods"]))
+                def replace_in_method(source: str, method: str, value: str) -> str:
+                    match = re.search(
+                        rf"(?ms)(^[ \t]*(?:(?:pub(?:\([^()\r\n]*\))?)[ \t]+)?"
+                        rf"fn[ \t]+{re.escape(method)}\b.*?)(?=^[ \t]*"
+                        r"(?:(?:pub(?:\([^()\r\n]*\))?)[ \t]+)?fn[ \t]+|\Z)",
+                        source,
+                    )
+                    self.assertIsNotNone(match, method)
+                    segment = match.group(1)
+                    self.assertIn(guard, segment, method)
+                    segment = segment.replace(guard, value, 1)
+                    return source[: match.start(1)] + segment + source[match.end(1) :]
+
+                for method in deferred["stage_methods"]:
+                    transaction_source = replace_in_method(
+                        original,
+                        method,
+                        f"self.removed_{deferred['helper']}()?;",
+                    )
+                    transaction.write_text(transaction_source, encoding="utf-8")
+                    violations = boundaries._audit_table_merge_transaction_source_topology(
+                        root, spec
+                    )
+                    self.assertTrue(
+                        any("must resolve its typed selector" in item for item in violations),
+                        (method, violations),
+                    )
+
+                # A discarded resolver error is not admission proof.
+                transaction.write_text(
+                    replace_in_method(
+                        original,
+                        "regions",
+                        f"let _ = self.{deferred['helper']}();",
+                    ),
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(root, spec)
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+                # Target resolution must precede the first staging/readback
+                # operation in each entry point.
+                transaction.write_text(
+                    replace_in_method(
+                        original,
+                        "regions",
+                        f"let _ = self.regions.as_ref();\n        {guard}",
+                    ),
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(root, spec)
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+                # A same-named root helper cannot satisfy the Edit boundary.
+                transaction.write_text(
+                    replace_in_method(original, "regions", "self.removed_resolver()?;")
+                    + f"\nfn {deferred['helper']}() {{ {', '.join(deferred['stage_methods'])}; }}\n",
+                    encoding="utf-8",
+                )
+                violations = boundaries._audit_table_merge_transaction_source_topology(root, spec)
+                self.assertTrue(any("must resolve its typed selector" in item for item in violations), violations)
+
+    def test_numbers_wire_table_merge_writer_boundary_rejects_unbounded_or_peer_codec(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for relative in (
+                boundaries.IWA_NUMBERS_WIRE_TABLE_MERGES_SOURCE,
+                boundaries.IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE,
+            ):
+                source = boundaries.ROOT / relative
+                destination = root / relative
+                destination.parent.mkdir(parents=True, exist_ok=True)
+                destination.write_text(source.read_text(encoding="utf-8"), encoding="utf-8")
+            writer = root / boundaries.IWA_NUMBERS_WIRE_TABLE_MERGE_WRITER_SOURCE
+            original = writer.read_text(encoding="utf-8")
+            writer.write_text(
+                original.replace("gather_source", "gather_source_removed")
+                + "\nuse litchi_pages::Package;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_merge_writer_source_topology(root)
+            self.assertTrue(any("source-preserving walk" in item for item in violations), violations)
+            self.assertTrue(any("concrete format/protobuf owner" in item for item in violations), violations)
+
+            writer.write_text(
+                original.replace(
+                    "merge_formula_codec::encode_merge_formula",
+                    "manual_formula_encoder",
+                ),
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_numbers_wire_table_merge_writer_source_topology(root)
+            self.assertTrue(any("delegate formula encoding" in item for item in violations), violations)
+
+    def test_table_merge_formula_codec_boundary_is_strict_once_wired(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            codec = root / boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_SOURCE
+            codec.parent.mkdir(parents=True, exist_ok=True)
+            codec.write_text(
+                "use buffa::DecodeOptions;\n"
+                "pub struct EncodeOptions;\n"
+                "pub struct EncodeReport;\n"
+                "pub enum EncodeLimit { OutputBytes }\n"
+                "pub enum EncodeError { Unsupported }\n"
+                "pub fn encode_merge_formula(source: &[u8]) -> Result<(Vec<u8>, EncodeReport), EncodeError> {\n"
+                "    preflight(source);\n"
+                "    let _ = DecodeOptions::new().decode_lazy_view(source);\n"
+                "    try_encode_to_vec(source)\n"
+                "}\n",
+                encoding="utf-8",
+            )
+            facade = root / boundaries.IWA_PROTOS_FACADE_SOURCE
+            facade.parent.mkdir(parents=True, exist_ok=True)
+            facade.write_text(
+                "#[doc(hidden)]\npub mod table_merge_formula_codec;\n",
+                encoding="utf-8",
+            )
+            build = root / boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_SOURCE
+            build.parent.mkdir(parents=True, exist_ok=True)
+            build.write_text(
+                boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_RERUN_MARKER
+                + "\nconst CODECS: &[(&str, &str, &str)] = &[\n"
+                + '    ("src/table_merge_formula_codec.rs",\n'
+                + '     "crate::buffa_formula_generated::",\n'
+                + '     "mod buffa_formula_generated {"),\n'
+                + "];\n",
+                encoding="utf-8",
+            )
+            self.assertEqual(
+                boundaries.audit_iwa_table_merge_formula_codec_source_topology(root),
+                [],
+            )
+            valid_build = build.read_text(encoding="utf-8")
+            build.write_text(
+                boundaries.IWA_TABLE_MERGE_FORMULA_CODEC_BUILD_RERUN_MARKER + "\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_table_merge_formula_codec_source_topology(root)
+            self.assertTrue(
+                any("production-ingress inventory" in item for item in violations),
+                violations,
+            )
+            build.write_text(valid_build, encoding="utf-8")
+            codec.write_text(
+                codec.read_text(encoding="utf-8") + "use prost::Message;\n",
+                encoding="utf-8",
+            )
+            violations = boundaries.audit_iwa_table_merge_formula_codec_source_topology(root)
+            self.assertTrue(any("must not use Prost" in item for item in violations), violations)
+
+    def test_table_merge_boundaries_are_in_main_dispatch(self) -> None:
+        main_source = inspect.getsource(boundaries.main)
+        for name in (
+            "audit_iwa_common_table_merge_source_topology",
+            "audit_iwa_numbers_wire_table_merges_source_topology",
+            "audit_pages_table_merge_source_topology",
+            "audit_pages_table_merge_reader_source_topology",
+            "audit_keynote_table_merge_source_topology",
+            "audit_keynote_table_merge_reader_source_topology",
+            "audit_numbers_table_merge_source_topology",
+            "audit_iwa_numbers_wire_table_merge_writer_source_topology",
+            "audit_numbers_table_merge_transaction_source_topology",
+            "audit_pages_table_merge_transaction_source_topology",
+            "audit_keynote_table_merge_transaction_source_topology",
+            "audit_iwa_table_merge_formula_codec_source_topology",
+        ):
+            self.assertIn(f"+ {name}()", main_source)
+
+if __name__ == "__main__":
+    unittest.main()

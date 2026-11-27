@@ -41,6 +41,7 @@ pub enum PathCommand {
 }
 
 /// SVG Path Builder with optimization
+#[derive(Debug, Clone)]
 pub struct PathBuilder {
     commands: Vec<PathCommand>,
     current_pos: Option<(f64, f64)>,
@@ -122,6 +123,27 @@ impl PathBuilder {
         self.commands.push(PathCommand::Close);
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.commands.is_empty()
+    }
+
+    pub fn len(&self) -> usize {
+        self.commands.len()
+    }
+
+    pub fn current_position(&self) -> Option<(f64, f64)> {
+        self.current_pos
+    }
+
+    /// Append typed commands from another builder without serializing and
+    /// reparsing SVG path grammar.
+    pub fn append(&mut self, mut other: PathBuilder) {
+        self.commands.append(&mut other.commands);
+        if other.current_pos.is_some() {
+            self.current_pos = other.current_pos;
+        }
+    }
+
     /// Build optimized SVG path string
     pub fn build(&self) -> String {
         if self.commands.is_empty() {
@@ -195,6 +217,8 @@ impl PathBuilder {
     fn write_command(&self, out: &mut String, cmd: char, prev: Option<char>) {
         if prev.is_none() || prev != Some(cmd) {
             out.push(cmd);
+        } else if !out.is_empty() && !out.ends_with(' ') {
+            out.push(' ');
         }
     }
 

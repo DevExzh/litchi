@@ -1,0 +1,15 @@
+[package]
+name        = "litchi-iwa-index"
+description = "Archive-free typed object-location index primitives for Apple iWork documents."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-graph = { workspace = true }
+
+[lints]
+workspace = true

@@ -3,7 +3,7 @@ use litchi_core::sheet::{CellValue, Result};
 
 use super::super::{EvalCtx, for_each_value_in_expr, is_blank};
 
-pub(crate) async fn eval_count(
+pub(crate) fn eval_count(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -18,13 +18,12 @@ pub(crate) async fn eval_count(
                 count += 1;
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
     Ok(CellValue::Int(count as i64))
 }
 
-pub(crate) async fn eval_countblank(
+pub(crate) fn eval_countblank(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -36,13 +35,12 @@ pub(crate) async fn eval_countblank(
                 count += 1;
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
     Ok(CellValue::Int(count as i64))
 }
 
-pub(crate) async fn eval_counta(
+pub(crate) fn eval_counta(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -54,8 +52,7 @@ pub(crate) async fn eval_counta(
                 count += 1;
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
     Ok(CellValue::Int(count as i64))
 }
@@ -66,8 +63,8 @@ mod tests {
     use crate::engine::test_helpers::TestEngine;
     use crate::parser::Expr;
 
-    #[tokio::test]
-    async fn test_eval_count_basic() {
+    #[test]
+    fn test_eval_count_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(10));
@@ -81,22 +78,22 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_count(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_count(ctx, "Sheet1", &args).unwrap();
         // COUNT only counts numeric values (Int, Float, DateTime)
         assert_eq!(result, CellValue::Int(2));
     }
 
-    #[tokio::test]
-    async fn test_eval_count_empty() {
+    #[test]
+    fn test_eval_count_empty() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_count(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_count(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(0));
     }
 
-    #[tokio::test]
-    async fn test_eval_counta_basic() {
+    #[test]
+    fn test_eval_counta_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(10));
@@ -110,13 +107,13 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_counta(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_counta(ctx, "Sheet1", &args).unwrap();
         // COUNTA counts all non-empty cells
         assert_eq!(result, CellValue::Int(2));
     }
 
-    #[tokio::test]
-    async fn test_eval_countblank_basic() {
+    #[test]
+    fn test_eval_countblank_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(10));
@@ -130,7 +127,7 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_countblank(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_countblank(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(2));
     }
 }

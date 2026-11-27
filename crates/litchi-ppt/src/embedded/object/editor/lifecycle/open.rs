@@ -1,0 +1,253 @@
+//! Package discovery and initial persisted-record state.
+
+use super::super::{Collection, EditState, Editor, Result, mapping, rewrite};
+use crate::package::{Error, SourceLimits};
+use litchi_cfb::OleFile;
+use litchi_ole_common::protection::is_protected_component;
+use std::collections::{BTreeMap, HashSet};
+use std::io::{Cursor, Read, Seek};
+use std::sync::Arc;
+
+pub(crate) fn inspect_live_document(bytes: &[u8]) -> Result<(u32, Vec<u8>)> {
+    let mut ole = OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
+    inspect_live_document_from_ole(&mut ole)
+}
+
+pub(crate) fn inspect_live_document_from_ole<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+) -> Result<(u32, Vec<u8>)> {
+    let paths = ole.list_streams();
+    let document_path = find_stream(&paths, "PowerPoint Document")?;
+    let current_user_path = find_stream(&paths, "Current User")?;
+    let document = ole.open_stream(&stream_refs(&document_path))?;
+    let current_user = ole.open_stream(&stream_refs(&current_user_path))?;
+    validate_current_user(&current_user)?;
+    let current_edit_offset = rewrite::u32_at(&current_user, 16)?;
+    let (mappings, document_persist_id) = mapping::read(&document, current_edit_offset)?;
+    let offset = *mappings
+        .get(&document_persist_id)
+        .ok_or_else(|| Error::Corrupted("live Document persist mapping is missing".into()))?
+        as usize;
+    Ok((
+        document_persist_id,
+        rewrite::slice(&document, offset)?.to_vec(),
+    ))
+}
+
+#[cfg(test)]
+pub(crate) fn inspect_live_mapping(
+    document: &[u8],
+    current_user: &[u8],
+) -> Result<crate::persist::PersistMapping> {
+    validate_current_user(current_user)?;
+    inspect_live_mapping_at(
+        document,
+        rewrite::u32_at(current_user, 16)?,
+        crate::leniency::Leniency::Strict,
+        &mut crate::leniency::ToleranceReport::default(),
+    )
+}
+
+/// Read the live persist mapping, repairing persist-directory defects into
+/// `report` and, when `leniency` opts in, breaking a cyclic
+/// `UserEdit` chain.
+pub(crate) fn inspect_live_mapping_at(
+    document: &[u8],
+    current_edit_offset: u32,
+    leniency: crate::leniency::Leniency,
+    report: &mut crate::leniency::ToleranceReport,
+) -> Result<crate::persist::PersistMapping> {
+    let (mappings, _) =
+        mapping::read_reporting(document, current_edit_offset, Some(report), leniency)?;
+    let mut result = crate::persist::PersistMapping::new();
+    for (persist_id, offset) in mappings {
+        result.add_mapping(persist_id, offset);
+    }
+    Ok(result)
+}
+
+/// Open over a package that may be signed; the editor records the signature
+/// and `finish` refuses a changed publication.
+pub(crate) fn open_admitting_signature(
+    bytes: Arc<[u8]>,
+    collection: Collection,
+    cfb_limits: litchi_cfb::OleFileLimits,
+    source_limits: SourceLimits,
+) -> Result<Editor> {
+    open_with_limit(
+        bytes,
+        collection,
+        source_limits.max_package_bytes,
+        true,
+        cfb_limits,
+        source_limits,
+    )
+}
+
+/// The empty collection of a records-only editor.
+pub(crate) const fn no_objects() -> Collection {
+    Collection::empty()
+}
+
+fn open_with_limit(
+    bytes: Arc<[u8]>,
+    collection: Collection,
+    max_output_bytes: usize,
+    admit_signature: bool,
+    cfb_limits: litchi_cfb::OleFileLimits,
+    source_limits: SourceLimits,
+) -> Result<Editor> {
+    if bytes.len() > max_output_bytes {
+        return Err(Error::ResourceLimit(format!(
+            "PowerPoint editor source is {} bytes, exceeding the {max_output_bytes}-byte output limit",
+            bytes.len()
+        )));
+    }
+    let mut ole = OleFile::open(Cursor::new(bytes.clone()), cfb_limits)?;
+    let signed = reject_unsupported_package(&ole, admit_signature)?;
+    let paths = ole.list_streams();
+
+    let document_path = find_stream(&paths, "PowerPoint Document")?;
+    let current_user_path = find_stream(&paths, "Current User")?;
+    let document = ole.open_stream(&stream_refs(&document_path))?;
+    let current_user = ole.open_stream(&stream_refs(&current_user_path))?;
+    validate_current_user(&current_user)?;
+
+    let current_edit_offset = rewrite::u32_at(&current_user, 16)?;
+    let (mappings, document_persist_id) = mapping::read(&document, current_edit_offset)?;
+    collection.validate()?;
+    validate_object_mappings(&collection, &mappings)?;
+
+    // `document` and `current_user` already own those two streams, read and
+    // validated above, and `finish` always emits them from there. Their list
+    // entries therefore keep only the stream's position in the output order;
+    // reading them again would copy the largest stream a second time.
+    let streams = paths
+        .into_iter()
+        .map(|path| {
+            let data = if path == document_path || path == current_user_path {
+                Vec::new()
+            } else {
+                ole.open_stream(&stream_refs(&path))?
+            };
+            Ok((path, data))
+        })
+        .collect::<Result<Vec<_>>>()?;
+
+    Ok(Editor {
+        original: bytes,
+        max_output_bytes,
+        source_limits,
+        cfb_limits,
+        streams,
+        document_path,
+        current_user_path,
+        document,
+        current_user,
+        mappings,
+        current_edit_offset,
+        document_persist_id,
+        collection,
+        staged_storage: BTreeMap::default(),
+        removed_persist_ids: HashSet::default(),
+        state: EditState::Unchanged,
+        layout: litchi_cfb::SectorLayoutPolicy::default(),
+        signed,
+    })
+}
+
+pub(crate) fn open_records(bytes: Arc<[u8]>, source_limits: SourceLimits) -> Result<Editor> {
+    open_records_arc_with_limit(bytes, source_limits.max_package_bytes, source_limits)
+}
+
+pub(crate) fn open_records_arc_with_limit(
+    bytes: Arc<[u8]>,
+    max_output_bytes: usize,
+    source_limits: SourceLimits,
+) -> Result<Editor> {
+    open_with_limit(
+        bytes,
+        no_objects(),
+        max_output_bytes,
+        false,
+        litchi_cfb::OleFileLimits::default(),
+        source_limits,
+    )
+}
+
+/// Refuse a package with an encryption or rights-management component, and
+/// one with a signature component unless `admit_signature`. Returns whether
+/// a signature component was found.
+fn reject_unsupported_package<R: Read + Seek>(
+    ole: &OleFile<R>,
+    admit_signature: bool,
+) -> Result<bool> {
+    let mut signed = false;
+    let mut pending = vec![Vec::<String>::new()];
+    while let Some(directory) = pending.pop() {
+        let directory_refs: Vec<_> = directory.iter().map(String::as_str).collect();
+        for entry in ole.list_directory_entries(&directory_refs)? {
+            if admit_signature && is_signature_component(&entry.name) {
+                signed = true;
+            } else if is_protected_component(&entry.name) {
+                return Err(Error::Corrupted(
+                    "signed or encrypted PPT is not eligible for OLE editing".into(),
+                ));
+            }
+            let mut path = directory.clone();
+            path.push(entry.name.clone());
+            let path_refs: Vec<_> = path.iter().map(String::as_str).collect();
+            if ole.directory_exists(&path_refs) {
+                pending.push(path);
+            }
+        }
+    }
+    Ok(signed)
+}
+
+/// The digital-signature storages and streams: the subset of
+/// `is_protected_component` a signed, unencrypted deck carries (the same
+/// names `Package` reports as a signature).
+fn is_signature_component(name: &str) -> bool {
+    [
+        "_xmlsignatures",
+        "_signatures",
+        "DigitalSignature",
+        "\u{0005}DigitalSignature",
+    ]
+    .iter()
+    .any(|marker| name.eq_ignore_ascii_case(marker))
+}
+
+fn find_stream(paths: &[Vec<String>], name: &str) -> Result<Vec<String>> {
+    paths
+        .iter()
+        .find(|path| path.last().is_some_and(|value| value == name))
+        .cloned()
+        .ok_or_else(|| Error::StreamNotFound(name.into()))
+}
+
+fn validate_current_user(current_user: &[u8]) -> Result<()> {
+    if current_user.len() < 28 || rewrite::u32_at(current_user, 12)? != 0xE391_C05F {
+        return Err(Error::Corrupted(
+            "unsupported or encrypted CurrentUserAtom".into(),
+        ));
+    }
+    Ok(())
+}
+
+fn validate_object_mappings(collection: &Collection, mappings: &BTreeMap<u32, u32>) -> Result<()> {
+    for object in &collection.objects {
+        if !mappings.contains_key(&object.persist_id()) {
+            return Err(Error::Corrupted(format!(
+                "OLE object references missing persist ID {}",
+                object.persist_id()
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn stream_refs(path: &[String]) -> Vec<&str> {
+    path.iter().map(String::as_str).collect()
+}

@@ -1,0 +1,113 @@
+//! Parser for data-pilot fields and field-level references.
+
+use litchi_core::Result;
+use litchi_odf_common::{ResolvedReader, XmlStreamLimits};
+use quick_xml::events::{BytesStart, Event};
+
+use crate::model::data_pilot::model::{
+    Field, FieldReference, Orientation, ReferenceMemberType, ReferenceType,
+};
+
+use super::super::xml::{
+    is_table, optional_attr, optional_i64, required_attr, set_once, text_is_whitespace,
+};
+use super::{
+    grouping::parse_groups,
+    level::{level_from_start, parse_level},
+    support::xml_error,
+};
+use crate::model::data_pilot::invalid_message;
+
+pub(super) fn field_from_start(
+    reader: &ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+) -> Result<Field> {
+    let orientation = Orientation::parse(&required_attr(reader, start, b"orientation")?)?;
+    Ok(Field {
+        source_field_name: required_attr(reader, start, b"source-field-name")?,
+        orientation,
+        selected_page: optional_attr(reader, start, b"selected-page")?,
+        is_data_layout_field: optional_attr(reader, start, b"is-data-layout-field")?,
+        function: optional_attr(reader, start, b"function")?,
+        used_hierarchy: optional_i64(reader, start, b"used-hierarchy")?,
+        level: None,
+        reference: None,
+        groups: None,
+    })
+}
+
+pub(super) fn parse_field(
+    reader: &mut ResolvedReader<'_>,
+    start: &BytesStart<'_>,
+    limits: &XmlStreamLimits,
+) -> Result<Field> {
+    let mut field = field_from_start(reader, start)?;
+    loop {
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-level") => {
+                set_once(
+                    &mut field.level,
+                    parse_level(reader, element, limits)?,
+                    "data-pilot level",
+                )?;
+            },
+            Event::Empty(ref element) if is_table(&namespace, element, b"data-pilot-level") => {
+                set_once(
+                    &mut field.level,
+                    level_from_start(reader, element)?,
+                    "data-pilot level",
+                )?;
+            },
+            Event::Start(ref element) | Event::Empty(ref element)
+                if is_table(&namespace, element, b"data-pilot-field-reference") =>
+            {
+                set_once(
+                    &mut field.reference,
+                    parse_reference(reader, element)?,
+                    "field reference",
+                )?;
+            },
+            Event::Start(ref element) if is_table(&namespace, element, b"data-pilot-groups") => {
+                set_once(
+                    &mut field.groups,
+                    parse_groups(reader, element, limits)?,
+                    "field groups",
+                )?;
+            },
+            Event::End(ref element) if is_table(&namespace, element, b"data-pilot-field") => {
+                break;
+            },
+            Event::End(ref element)
+                if is_table(&namespace, element, b"data-pilot-field-reference") => {},
+            Event::Text(ref text) if text_is_whitespace(text)? => {},
+            Event::Comment(_) => {},
+            Event::Eof => return Err(invalid_message("unterminated table:data-pilot-field")),
+            Event::Start(_)
+            | Event::End(_)
+            | Event::Empty(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {
+                return Err(invalid_message("invalid child in table:data-pilot-field"));
+            },
+        }
+    }
+    field.validate()?;
+    Ok(field)
+}
+
+fn parse_reference(
+    reader: &ResolvedReader<'_>,
+    element: &BytesStart<'_>,
+) -> Result<FieldReference> {
+    Ok(FieldReference {
+        field_name: required_attr(reader, element, b"field-name")?,
+        member_type: ReferenceMemberType::parse(&required_attr(reader, element, b"member-type")?)?,
+        member_name: optional_attr(reader, element, b"member-name")?,
+        reference_type: ReferenceType::parse(&required_attr(reader, element, b"type")?)?,
+    })
+}

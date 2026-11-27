@@ -42,6 +42,7 @@ impl Length {
     /// let length = Length::from_emus(914400); // 1 inch
     /// ```
     #[inline]
+    #[must_use]
     pub const fn from_emus(emus: i64) -> Self {
         Self { emus }
     }
@@ -56,6 +57,7 @@ impl Length {
     /// let length = Length::from_inches(1.0);
     /// ```
     #[inline]
+    #[must_use]
     pub fn from_inches(inches: f64) -> Self {
         Self {
             emus: (inches * EMUS_PER_INCH as f64) as i64,
@@ -72,6 +74,7 @@ impl Length {
     /// let length = Length::from_cm(2.54); // ~1 inch
     /// ```
     #[inline]
+    #[must_use]
     pub fn from_cm(cm: f64) -> Self {
         Self {
             emus: (cm * EMUS_PER_CM as f64) as i64,
@@ -80,24 +83,28 @@ impl Length {
 
     /// Get the value in EMUs.
     #[inline]
+    #[must_use]
     pub const fn emus(&self) -> i64 {
         self.emus
     }
 
     /// Convert to inches.
     #[inline]
+    #[must_use]
     pub fn inches(&self) -> f64 {
         self.emus as f64 / EMUS_PER_INCH as f64
     }
 
     /// Convert to centimeters.
     #[inline]
+    #[must_use]
     pub fn cm(&self) -> f64 {
         self.emus as f64 / EMUS_PER_CM as f64
     }
 
     /// Convert to points (1/72 inch).
     #[inline]
+    #[must_use]
     pub fn points(&self) -> f64 {
         self.inches() * 72.0
     }

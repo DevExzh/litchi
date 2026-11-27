@@ -4,7 +4,68 @@ Format-agnostic Markdown emission helpers for the Litchi office-formats library.
 
 ## Overview
 
-`litchi-markdown` provides the `ToMarkdown` trait and configuration types used by Litchi's higher-level format crates (and the `litchi` umbrella crate) to render Office documents and presentations as Markdown. It deliberately has no knowledge of any concrete document format; per-format `impl ToMarkdown for ...` blocks live alongside their respective format crates.
+`litchi-markdown` provides bounded, exact-source CommonMark/GFM snapshots and
+reversible block edits, plus the `ToMarkdown` trait and configuration types
+used by Litchi's higher-level format adapters. It deliberately has no knowledge
+of any concrete document format.
+
+`Snapshot::read` and `Snapshot::read_bytes` are finite CommonMark convenience
+constructors. Callers that select GFM or a stricter policy use one retained
+`OpenOptions` value:
+
+```rust
+use litchi_markdown::OpenOptions;
+use litchi_markdown::reader::{Dialect, ReadLimits, Snapshot};
+
+let options = OpenOptions::default()
+    .dialect(Dialect::GitHubFlavored)
+    .read_limits(ReadLimits::DEFAULT);
+let source = Snapshot::read_with_options("# Original", options)?;
+# Ok::<(), litchi_markdown::reader::Error>(())
+```
+
+Snapshots expose source-ranged top-level blocks, nested block nodes, inline
+nodes, and a deterministic link/image/footnote reference graph. Transactions
+can stage multiple disjoint block, nested-block, and inline replacements plus
+appends, validate reference-definition dependencies, and publish atomically
+into bounded undo/redo history. Versioned JSON patches carry bounded,
+replay-verified semantic operations; independently prepared patches can be
+joined or inspected through a non-mutating three-way merge plan with
+deterministic structured conflicts.
+
+Reference-aware transfer preflights recursively include definitions missing
+from a destination and refuse conflicting definitions before returning a fully
+validated commit. Projection preflights report exact source ranges for raw
+HTML, tables, task lists, and footnotes unsupported by a declared target.
+
+```rust
+use litchi_markdown::reader::Snapshot;
+
+let source = Snapshot::read("# Original\n\nBody")?;
+let mut edit = source.edit();
+edit.replace_block_with_text(0, "# literal heading marker")?;
+let commit = edit.commit()?;
+assert_eq!(commit.package().source(), "\\# literal heading marker\n\nBody");
+
+let restored = commit.package().apply(&commit.patch().inverse())?;
+assert_eq!(restored.package().source(), source.source());
+# Ok::<(), litchi_markdown::reader::Error>(())
+```
+
+The offline release gate vendors all 652 normative CommonMark 0.31.2 examples
+and all 670 examples from a pinned GitHub `cmark-gfm` specification. It checks
+every expected CommonMark and GFM HTML result, exact source ranges,
+deterministic reparsing, reversible edits, and project-authored real-document
+roundtrips. Exact provenance, hashes, attribution, licenses, and explicit
+semantic limits are recorded in `tests/data/PROVENANCE.md`.
+
+## Reproducible release gate
+
+Run the focused gate from the repository root:
+
+```sh
+sh crates/litchi-markdown/scripts/release-gate.sh
+```
 
 ## Usage
 
@@ -17,18 +78,16 @@ litchi-markdown = "0.0.1"
 use litchi_markdown::{MarkdownOptions, TableStyle, ToMarkdown};
 
 fn render<T: ToMarkdown>(value: &T) -> String {
-    let opts = MarkdownOptions {
-        table_style: TableStyle::Pipe,
-        ..MarkdownOptions::default()
-    };
-    value.to_markdown(&opts)
+    let opts = MarkdownOptions::new().with_table_style(TableStyle::Markdown);
+    value.to_markdown_with_options(&opts).expect("Markdown conversion failed")
 }
 ```
 
 ## Features
 
-- `ToMarkdown` trait for converting types to Markdown.
-- `MarkdownOptions` plus `FormulaStyle`, `ScriptStyle`, `StrikethroughStyle`, `TableStyle` enums for tuning the output.
+- `ToMarkdown` trait for converting types to Markdown; each implementor names
+  the typed error its conversion reports.
+- `MarkdownOptions` plus `EquationStyle`, `ScriptStyle`, `StrikethroughStyle`, `TableStyle` enums for tuning the output.
 - Unicode helpers for rendering super- and subscript characters.
 
 ## License

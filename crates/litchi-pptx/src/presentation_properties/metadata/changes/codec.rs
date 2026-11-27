@@ -1,0 +1,1935 @@
+//! `PowerPoint` Changes Information package parts.
+//!
+//! Nested edit descriptors are retained as bounded XML. They are never
+//! executed and relationship-looking content inside them is never resolved.
+
+use super::model::{Data, Descriptor, Info, Kind, List, Namespace, Part};
+use crate::{Error, Result};
+use chrono::{DateTime, NaiveDateTime};
+use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_opc::{BlobPart, OpcPackage, PackURI, SourceLimits};
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::ResolveResult;
+use quick_xml::reader::NsReader;
+use std::collections::HashSet;
+
+pub const CONTENT_TYPE: &str = "application/vnd.ms-powerpoint.changesinfo+xml";
+pub const RELATIONSHIP_TYPE: &str =
+    "http://schemas.microsoft.com/office/2016/11/relationships/changesInfo";
+
+const PC: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2013/main/command";
+const PC_TEXT: &str = "http://schemas.microsoft.com/office/powerpoint/2013/main/command";
+const P: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
+const A: &[u8] = b"http://schemas.openxmlformats.org/drawingml/2006/main";
+const MAX_BYTES: usize = 16 * 1024 * 1024;
+const MAX_DEPTH: usize = 192;
+const MAX_NODES: usize = 250_000;
+const MAX_LISTS: usize = 16_384;
+const MAX_CHANGES: usize = 100_000;
+const MAX_EXTENSIONS: usize = 4_096;
+const MAX_STRING_BYTES: usize = 1024 * 1024;
+
+/// Caller-selected bounds for one Changes Information XML operation.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[must_use]
+pub struct Limits {
+    max_input_bytes: usize,
+    max_output_bytes: usize,
+    max_depth: usize,
+    max_nodes: usize,
+    max_lists: usize,
+    max_changes: usize,
+    max_extensions: usize,
+    max_string_bytes: usize,
+}
+
+impl Limits {
+    /// The historical Changes Information safety profile.
+    pub const DEFAULT: Self = Self {
+        max_input_bytes: MAX_BYTES,
+        max_output_bytes: MAX_BYTES,
+        max_depth: MAX_DEPTH,
+        max_nodes: MAX_NODES,
+        max_lists: MAX_LISTS,
+        max_changes: MAX_CHANGES,
+        max_extensions: MAX_EXTENSIONS,
+        max_string_bytes: MAX_STRING_BYTES,
+    };
+
+    /// Construct a finite policy no wider than the format safety ceilings.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: usize,
+        max_output_bytes: usize,
+        max_depth: usize,
+        max_nodes: usize,
+        max_lists: usize,
+        max_changes: usize,
+        max_extensions: usize,
+        max_string_bytes: usize,
+    ) -> Option<Self> {
+        let default = Self::DEFAULT;
+        if max_input_bytes == 0
+            || max_input_bytes > default.max_input_bytes
+            || max_output_bytes == 0
+            || max_output_bytes > default.max_output_bytes
+            || max_depth == 0
+            || max_depth > default.max_depth
+            || max_nodes == 0
+            || max_nodes > default.max_nodes
+            || max_lists == 0
+            || max_lists > default.max_lists
+            || max_changes == 0
+            || max_changes > default.max_changes
+            || max_extensions == 0
+            || max_extensions > default.max_extensions
+            || max_string_bytes == 0
+            || max_string_bytes > default.max_string_bytes
+        {
+            return None;
+        }
+        Some(Self {
+            max_input_bytes,
+            max_output_bytes,
+            max_depth,
+            max_nodes,
+            max_lists,
+            max_changes,
+            max_extensions,
+            max_string_bytes,
+        })
+    }
+
+    #[must_use]
+    pub const fn max_input_bytes(self) -> usize {
+        self.max_input_bytes
+    }
+
+    #[must_use]
+    pub const fn max_output_bytes(self) -> usize {
+        self.max_output_bytes
+    }
+
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    #[must_use]
+    pub const fn max_nodes(self) -> usize {
+        self.max_nodes
+    }
+
+    #[must_use]
+    pub const fn max_lists(self) -> usize {
+        self.max_lists
+    }
+
+    #[must_use]
+    pub const fn max_changes(self) -> usize {
+        self.max_changes
+    }
+
+    #[must_use]
+    pub const fn max_extensions(self) -> usize {
+        self.max_extensions
+    }
+
+    #[must_use]
+    pub const fn max_string_bytes(self) -> usize {
+        self.max_string_bytes
+    }
+
+    /// Derive a profile from the retained physical source policy.
+    pub fn from_source_limits(source: SourceLimits) -> Self {
+        let default = Self::DEFAULT;
+        let part = usize::try_from(source.max_part_bytes()).unwrap_or(usize::MAX);
+        let events = source.max_events();
+        let depth = source.max_depth();
+        let strings = source.max_xml_attribute_bytes();
+        Self {
+            max_input_bytes: default.max_input_bytes.min(part),
+            max_output_bytes: default.max_output_bytes.min(part),
+            max_depth: default.max_depth.min(depth),
+            max_nodes: default.max_nodes.min(events),
+            max_lists: default.max_lists.min(events),
+            max_changes: default.max_changes.min(events),
+            max_extensions: default.max_extensions.min(events),
+            max_string_bytes: default.max_string_bytes.min(strings),
+        }
+    }
+
+    /// Intersect this semantic profile with physical source bounds.
+    pub(crate) fn constrained_by_source(self, source: SourceLimits) -> Self {
+        let physical = Self::from_source_limits(source);
+        Self {
+            max_input_bytes: self.max_input_bytes.min(physical.max_input_bytes),
+            max_output_bytes: self.max_output_bytes.min(physical.max_output_bytes),
+            max_depth: self.max_depth.min(physical.max_depth),
+            max_nodes: self.max_nodes.min(physical.max_nodes),
+            max_lists: self.max_lists.min(physical.max_lists),
+            max_changes: self.max_changes.min(physical.max_changes),
+            max_extensions: self.max_extensions.min(physical.max_extensions),
+            max_string_bytes: self.max_string_bytes.min(physical.max_string_bytes),
+        }
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self::DEFAULT
+    }
+}
+
+impl Kind {
+    fn parse(value: &str) -> Result<Self> {
+        match value {
+            "custSel" => Ok(Self::CustomSelection),
+            "addSld" => Ok(Self::AddSlide),
+            "delSld" => Ok(Self::DeleteSlide),
+            "modSld" => Ok(Self::ModifySlide),
+            "sldOrd" => Ok(Self::SlideOrder),
+            "modMainMaster" => Ok(Self::ModifyMainMaster),
+            "modNotesMaster" => Ok(Self::ModifyNotesMaster),
+            "modHandoutMaster" => Ok(Self::ModifyHandoutMaster),
+            "addSection" => Ok(Self::AddSection),
+            "delSection" => Ok(Self::DeleteSection),
+            "modSection" => Ok(Self::ModifySection),
+            _ => Err(invalid(format!("unknown document change bit '{value}'"))),
+        }
+    }
+}
+
+impl Info {
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse(xml: &[u8], limits: Limits) -> Result<Self> {
+        parse_changes_information(xml, limits)
+    }
+
+    /// # Errors
+    ///
+    /// Returns an error if the output cannot be encoded or written.
+    pub fn to_xml(&self, limits: Limits) -> Result<Vec<u8>> {
+        // Authoring limits are independent from the input limit.  Opaque
+        // fragments retained by a source are checked against the source
+        // policy while a newly serialized value is checked against the
+        // output policy below.
+        let mut model_limits = limits;
+        model_limits.max_input_bytes = model_limits
+            .max_input_bytes
+            .max(model_limits.max_output_bytes);
+        validate_model(self, model_limits)?;
+        let output_len = serialized_len(self)?;
+        if output_len > limits.max_output_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::OutputBytes,
+                output_len,
+                limits.max_output_bytes(),
+            ));
+        }
+        let prefix = &self.command_prefix;
+        let mut out = Vec::new();
+        out.try_reserve_exact(output_len)
+            .map_err(|source| Error::Allocation {
+                resource: "Changes Information XML",
+                source,
+            })?;
+        out.extend_from_slice(br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#);
+        open_root(&mut out, prefix, &self.namespace_declarations);
+        if self.change_lists.is_empty() {
+            out.extend_from_slice(b"/>");
+        } else {
+            out.push(b'>');
+            for list in &self.change_lists {
+                open_pc(&mut out, prefix, "docChgLst");
+                out.push(b'>');
+                if let Some(author) = &list.author {
+                    write_changes_data(&mut out, prefix, author);
+                }
+                for change in &list.changes {
+                    out.extend_from_slice(&change.xml);
+                }
+                if let Some(extension) = &list.extension_xml {
+                    out.extend_from_slice(extension);
+                }
+                close_pc(&mut out, prefix, "docChgLst");
+            }
+            close_pc(&mut out, prefix, "chgInfo");
+        }
+        if out.len() != output_len {
+            return Err(invalid(
+                "Changes Information output length changed during emission",
+            ));
+        }
+        let mut parse_limits = limits;
+        parse_limits.max_input_bytes = parse_limits.max_input_bytes.max(out.len());
+        parse_changes_information(&out, parse_limits)?;
+        Ok(out)
+    }
+}
+
+pub(super) fn load(package: &OpcPackage, limits: Limits) -> Result<Option<Part>> {
+    let presentation = package.main_document_part()?;
+    require_presentation_content_type(presentation.content_type())?;
+    let presentation_name = presentation.partname().to_string();
+    if package
+        .rels()
+        .iter()
+        .any(|relationship| relationship.reltype() == RELATIONSHIP_TYPE)
+    {
+        return Err(invalid(
+            "Changes Information relationship cannot originate at the package root",
+        ));
+    }
+    for source in package.iter_parts() {
+        if source.partname().as_str() != presentation_name.as_str()
+            && source
+                .rels()
+                .iter()
+                .any(|relationship| relationship.reltype() == RELATIONSHIP_TYPE)
+        {
+            return Err(invalid(
+                "Changes Information relationship has a non-Presentation source",
+            ));
+        }
+    }
+    let relationships: Vec<_> = presentation
+        .rels()
+        .iter()
+        .filter(|relationship| relationship.reltype() == RELATIONSHIP_TYPE)
+        .collect();
+    if relationships.len() > 1 {
+        return Err(invalid(
+            "Presentation has multiple Changes Information relationships",
+        ));
+    }
+    let Some(relationship) = relationships.first().copied() else {
+        if package
+            .iter_parts()
+            .any(|part| part.content_type() == CONTENT_TYPE)
+        {
+            return Err(invalid(
+                "package contains an orphan Changes Information part",
+            ));
+        }
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid(
+            "Changes Information relationship cannot be external",
+        ));
+    }
+    let target = relationship.target_partname()?;
+    let part = package.get_part(&target)?;
+    if part.content_type() != CONTENT_TYPE {
+        return Err(Error::ContentType {
+            expected: CONTENT_TYPE.into(),
+            actual: part.content_type().into(),
+        });
+    }
+    if !part.rels().is_empty() {
+        return Err(invalid(
+            "Changes Information part cannot have outbound relationships",
+        ));
+    }
+    if package.iter_parts().any(|candidate| {
+        candidate.content_type() == CONTENT_TYPE && candidate.partname() != &target
+    }) {
+        return Err(invalid(
+            "package contains an orphan Changes Information part",
+        ));
+    }
+    validate_inbound_relationships(package, &presentation_name, relationship, &target)?;
+    Ok(Some(Part {
+        relationship_id: relationship.r_id().to_string(),
+        part_name: target.to_string(),
+        changes_information: Info::parse(part.blob(), limits)?,
+    }))
+}
+
+pub(super) fn store(package: &mut OpcPackage, value: &Part, limits: Limits) -> Result<()> {
+    if load(package, limits)?.is_some() {
+        return Err(invalid("package already contains Changes Information"));
+    }
+    validate_ncname(&value.relationship_id, "relationship ID")?;
+    let presentation = package.main_document_part()?;
+    require_presentation_content_type(presentation.content_type())?;
+    if presentation.rels().get(&value.relationship_id).is_some() {
+        return Err(invalid(
+            "Changes Information relationship ID already exists",
+        ));
+    }
+    let presentation_name = presentation.partname().clone();
+    let part_name = PackURI::new(&value.part_name).map_err(Error::Uri)?;
+    if package
+        .iter_parts()
+        .any(|part| part.partname() == &part_name)
+    {
+        return Err(invalid(format!("part '{part_name}' already exists")));
+    }
+    let xml = value.changes_information.to_xml(limits)?;
+    let target = part_name.relative_ref(presentation_name.base_uri());
+    package.try_add_part(Box::new(BlobPart::new(part_name, CONTENT_TYPE.into(), xml)))?;
+    package
+        .get_part_mut(&presentation_name)?
+        .rels_mut()
+        .add_relationship(
+            RELATIONSHIP_TYPE.into(),
+            target,
+            value.relationship_id.clone(),
+            false,
+        );
+    Ok(())
+}
+
+/// The last child group a `pc:docChgLst` accepted:
+///
+/// ```text
+/// Start --chgData--> Changes
+/// Start | Changes --docChg--> Changes
+/// Start | Changes --extLst--> Extensions
+/// ```
+///
+/// Every child is optional. `chgData` is accepted in `Start` only, so it is
+/// refused after a `docChg` as well as after another `chgData`; `docChg`
+/// repeats; `extLst` is accepted once and nothing is accepted after it.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum ListStage {
+    Start,
+    Changes,
+    Extensions,
+}
+
+/// The last child a `pc:docChg` accepted, in schema order:
+///
+/// ```text
+/// Data --chgData--> Data --docMkLst--> MonikerList --sldChg--> SlideChange
+///      --sldMasterChg--> MasterChange --cmAuthorChg--> AuthorChange
+///      --extLst--> Extensions
+/// ```
+///
+/// `Data` is also the phase of a descriptor without children yet. A child
+/// may enter its own phase from any earlier one and is refused once a later
+/// phase has been reached. Every child except `docMkLst` may repeat while its
+/// phase lasts; a second `docMkLst` is refused as a duplicate. `docMkLst` is
+/// required, but a descriptor that skipped it is refused only when it
+/// closes, so `Frame::Document` records separately whether one was seen.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
+enum DocumentPhase {
+    Data,
+    MonikerList,
+    SlideChange,
+    MasterChange,
+    AuthorChange,
+    Extensions,
+}
+
+#[derive(Debug)]
+enum Frame {
+    Root,
+    List,
+    Metadata,
+    MetadataExtension,
+    Document {
+        kinds: Vec<Kind>,
+        phase: DocumentPhase,
+        has_moniker: bool,
+    },
+    MonikerList {
+        count: u8,
+    },
+    Moniker,
+    DescriptorOpaque,
+    ListExtension {
+        extensions: usize,
+    },
+    Extension {
+        payloads: u8,
+    },
+    Payload,
+    Opaque,
+}
+
+#[derive(Debug)]
+enum PendingSlice {
+    Metadata(usize),
+    Document(usize, Vec<Kind>),
+    ListExtension(usize),
+}
+
+/// Where the changes-information reader is relative to the `pc:chgInfo` root.
+///
+/// ```text
+/// Prolog --pc:chgInfo start tag--> Open
+/// Prolog --empty pc:chgInfo tag--> Closed
+/// Open   --pc:chgInfo end tag----> Closed
+/// any    --declaration, comment, whitespace--> unchanged
+/// ```
+///
+/// The last line holds in every phase: a declaration is accepted anywhere.
+/// Refused: a first top-level element other than the root; a second top-level
+/// element ("multiple roots"); text or CDATA outside the root unless it is
+/// whitespace; a processing instruction, DOCTYPE or general reference
+/// anywhere; and the end of input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No root start tag has been read.
+    Prolog,
+    /// Inside the root.
+    Open,
+    /// The root has ended.
+    Closed,
+}
+
+fn parse_changes_information(xml: &[u8], limits: Limits) -> Result<Info> {
+    if xml.len() > limits.max_input_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_input_bytes(),
+        ));
+    }
+    // MCE can expand an AlternateContent branch before the semantic parser
+    // sees it.  Admit that expansion under the selected profile, rather than
+    // running the common default policy and checking only after allocation.
+    let mce_limits = mce_limits(limits);
+    let selected = process_markup_compatibility(xml, &Capabilities::default(), &mce_limits)?.xml;
+    if selected.len() > limits.max_input_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::XmlBytes,
+            selected.len(),
+            limits.max_input_bytes(),
+        ));
+    }
+    let bytes = selected.as_ref();
+    let mut reader = NsReader::from_reader(bytes);
+    let origin = ReaderOrigin::of(bytes);
+    reader.config_mut().trim_text(false);
+    let mut buffer = Vec::new();
+    let mut stack = Vec::new();
+    let mut phase = RootPhase::Prolog;
+    let mut command_prefix = String::new();
+    let mut namespaces = Vec::new();
+    let mut lists = Vec::new();
+    let mut current_list: Option<List> = None;
+    let mut list_stage = ListStage::Start;
+    let mut metadata_extension_start = None;
+    let mut document_start = None;
+    let mut list_extension_start = None;
+    let mut pending: Option<PendingSlice> = None;
+    let mut nodes = 0usize;
+    let mut total_changes = 0usize;
+
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
+        if let Some(slice) = pending.take() {
+            let list = current_list
+                .as_mut()
+                .ok_or_else(|| invalid("captured change XML outside docChgLst"))?;
+            match slice {
+                PendingSlice::Metadata(from) => {
+                    list.author
+                        .as_mut()
+                        .ok_or_else(|| invalid("missing changes metadata"))?
+                        .extension_xml = Some(bytes[from..start].to_vec());
+                },
+                PendingSlice::Document(from, kinds) => {
+                    list.changes.push(Descriptor {
+                        change_kinds: kinds,
+                        xml: bytes[from..start].to_vec(),
+                    });
+                },
+                PendingSlice::ListExtension(from) => {
+                    list.extension_xml = Some(bytes[from..start].to_vec());
+                },
+            }
+        }
+        let (namespace, event) = reader
+            .read_resolved_event_into(&mut buffer)
+            .map_err(xml_error)?;
+        let empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_nodes(),
+                    ));
+                }
+                let depth = stack.len().checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        usize::MAX,
+                        limits.max_depth(),
+                    )
+                })?;
+                if depth > limits.max_depth() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlDepth,
+                        depth,
+                        limits.max_depth(),
+                    ));
+                }
+                let local = element.local_name();
+                let frame = if stack.is_empty() {
+                    match phase {
+                        RootPhase::Prolog => {},
+                        RootPhase::Open | RootPhase::Closed => {
+                            return Err(invalid("Changes Information has multiple roots"));
+                        },
+                    }
+                    expect(&namespace, PC, local.as_ref(), b"chgInfo")?;
+                    command_prefix = element_prefix(&element)?;
+                    namespaces =
+                        root_namespaces(&element, reader.decoder(), &command_prefix, limits)?;
+                    phase = RootPhase::Open;
+                    Frame::Root
+                } else {
+                    match stack
+                        .last_mut()
+                        .ok_or_else(|| invalid("Changes Information child has no parent"))?
+                    {
+                        Frame::Root => {
+                            expect(&namespace, PC, local.as_ref(), b"docChgLst")?;
+                            no_attributes(&element, reader.decoder(), limits)?;
+                            let next_lists = lists.len().checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::ChangeLists,
+                                    usize::MAX,
+                                    limits.max_lists(),
+                                )
+                            })?;
+                            if current_list.is_some() {
+                                return Err(invalid("document change list is nested"));
+                            }
+                            if next_lists > limits.max_lists() {
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::ChangeLists,
+                                    next_lists,
+                                    limits.max_lists(),
+                                ));
+                            }
+                            current_list = Some(List::default());
+                            list_stage = ListStage::Start;
+                            Frame::List
+                        },
+                        Frame::List => {
+                            if is(&namespace, PC, local.as_ref(), b"chgData") {
+                                if list_stage != ListStage::Start {
+                                    return Err(invalid(
+                                        "docChgLst chgData is duplicated or out of order",
+                                    ));
+                                }
+                                let data = parse_changes_data(&element, reader.decoder(), limits)?;
+                                current_list
+                                    .as_mut()
+                                    .ok_or_else(|| {
+                                        invalid("document change list state is missing")
+                                    })?
+                                    .author = Some(data);
+                                list_stage = ListStage::Changes;
+                                Frame::Metadata
+                            } else if is(&namespace, PC, local.as_ref(), b"docChg") {
+                                if list_stage == ListStage::Extensions {
+                                    return Err(invalid("docChg is out of order"));
+                                }
+                                total_changes = total_changes.checked_add(1).ok_or_else(|| {
+                                    limit(
+                                        crate::error::CodecLimitKind::Changes,
+                                        usize::MAX,
+                                        limits.max_changes(),
+                                    )
+                                })?;
+                                if empty {
+                                    return Err(invalid("docChg cannot be empty"));
+                                }
+                                if total_changes > limits.max_changes() {
+                                    return Err(limit(
+                                        crate::error::CodecLimitKind::Changes,
+                                        total_changes,
+                                        limits.max_changes(),
+                                    ));
+                                }
+                                let kinds = parse_change_kinds(&element, reader.decoder(), limits)?;
+                                document_start = Some(start);
+                                list_stage = ListStage::Changes;
+                                Frame::Document {
+                                    kinds,
+                                    phase: DocumentPhase::Data,
+                                    has_moniker: false,
+                                }
+                            } else if is(&namespace, P, local.as_ref(), b"extLst") {
+                                if list_stage == ListStage::Extensions {
+                                    return Err(invalid(
+                                        "docChgLst extLst is duplicated or out of order",
+                                    ));
+                                }
+                                no_attributes(&element, reader.decoder(), limits)?;
+                                list_stage = ListStage::Extensions;
+                                list_extension_start = Some(start);
+                                Frame::ListExtension { extensions: 0 }
+                            } else {
+                                return Err(invalid("unexpected docChgLst child"));
+                            }
+                        },
+                        Frame::Metadata => {
+                            expect(&namespace, A, local.as_ref(), b"extLst")?;
+                            no_attributes(&element, reader.decoder(), limits)?;
+                            metadata_extension_start = Some(start);
+                            Frame::MetadataExtension
+                        },
+                        Frame::Document {
+                            phase, has_moniker, ..
+                        } => {
+                            let next = if is(&namespace, PC, local.as_ref(), b"chgData") {
+                                DocumentPhase::Data
+                            } else if is(&namespace, PC, local.as_ref(), b"docMkLst") {
+                                DocumentPhase::MonikerList
+                            } else if is(&namespace, PC, local.as_ref(), b"sldChg") {
+                                DocumentPhase::SlideChange
+                            } else if is(&namespace, PC, local.as_ref(), b"sldMasterChg") {
+                                DocumentPhase::MasterChange
+                            } else if is(&namespace, PC, local.as_ref(), b"cmAuthorChg") {
+                                DocumentPhase::AuthorChange
+                            } else if is(&namespace, P, local.as_ref(), b"extLst") {
+                                DocumentPhase::Extensions
+                            } else {
+                                return Err(invalid("unexpected docChg child"));
+                            };
+                            if next < *phase {
+                                return Err(invalid(
+                                    "docChg children are duplicated or out of order",
+                                ));
+                            }
+                            *phase = next;
+                            match next {
+                                DocumentPhase::Data => {
+                                    parse_changes_data(&element, reader.decoder(), limits)?;
+                                    Frame::DescriptorOpaque
+                                },
+                                DocumentPhase::MonikerList => {
+                                    if *has_moniker {
+                                        return Err(invalid("docChg has duplicate docMkLst"));
+                                    }
+                                    *has_moniker = true;
+                                    no_attributes(&element, reader.decoder(), limits)?;
+                                    Frame::MonikerList { count: 0 }
+                                },
+                                DocumentPhase::SlideChange
+                                | DocumentPhase::MasterChange
+                                | DocumentPhase::AuthorChange => {
+                                    required_change_attribute(&element, reader.decoder(), limits)?;
+                                    Frame::DescriptorOpaque
+                                },
+                                DocumentPhase::Extensions => {
+                                    no_attributes(&element, reader.decoder(), limits)?;
+                                    Frame::DescriptorOpaque
+                                },
+                            }
+                        },
+                        Frame::MonikerList { count } => {
+                            expect(&namespace, PC, local.as_ref(), b"docMk")?;
+                            no_attributes(&element, reader.decoder(), limits)?;
+                            *count += 1;
+                            if *count > 1 {
+                                return Err(invalid("docMkLst permits exactly one docMk"));
+                            }
+                            Frame::Moniker
+                        },
+                        Frame::ListExtension { extensions } => {
+                            expect(&namespace, P, local.as_ref(), b"ext")?;
+                            *extensions = extensions.checked_add(1).ok_or_else(|| {
+                                limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    usize::MAX,
+                                    limits.max_extensions(),
+                                )
+                            })?;
+                            if *extensions > limits.max_extensions() {
+                                return Err(limit(
+                                    crate::error::CodecLimitKind::Extensions,
+                                    *extensions,
+                                    limits.max_extensions(),
+                                ));
+                            }
+                            extension_attributes(&element, reader.decoder(), limits)?;
+                            Frame::Extension { payloads: 0 }
+                        },
+                        Frame::Extension { payloads } => {
+                            if *payloads != 0 || !other_than_p(&namespace) {
+                                return Err(invalid("p:ext requires one foreign payload"));
+                            }
+                            *payloads = 1;
+                            any_attributes(&element, reader.decoder(), limits)?;
+                            Frame::Payload
+                        },
+                        Frame::MetadataExtension
+                        | Frame::DescriptorOpaque
+                        | Frame::Moniker
+                        | Frame::Payload
+                        | Frame::Opaque => {
+                            any_attributes(&element, reader.decoder(), limits)?;
+                            Frame::Opaque
+                        },
+                    }
+                };
+                if empty {
+                    close_empty(&frame)?;
+                    match &frame {
+                        Frame::Root => phase = RootPhase::Closed,
+                        Frame::List => {
+                            lists.push(
+                                current_list.take().ok_or_else(|| {
+                                    invalid("document change list state is missing")
+                                })?,
+                            );
+                        },
+                        Frame::MetadataExtension => {
+                            pending = Some(PendingSlice::Metadata(
+                                metadata_extension_start.take().ok_or_else(|| {
+                                    invalid("metadata extension start is missing")
+                                })?,
+                            ));
+                        },
+                        Frame::ListExtension { .. } => {
+                            pending = Some(PendingSlice::ListExtension(
+                                list_extension_start
+                                    .take()
+                                    .ok_or_else(|| invalid("list extension start is missing"))?,
+                            ));
+                        },
+                        _ => {},
+                    }
+                } else {
+                    stack.push(frame);
+                }
+            },
+            Event::End(element) => {
+                let frame = stack
+                    .pop()
+                    .ok_or_else(|| invalid("unexpected closing element"))?;
+                validate_end(&namespace, element.local_name().as_ref(), &frame)?;
+                match frame {
+                    Frame::Root => phase = RootPhase::Closed,
+                    Frame::List => lists.push(
+                        current_list
+                            .take()
+                            .ok_or_else(|| invalid("document change list state is missing"))?,
+                    ),
+                    Frame::MetadataExtension => {
+                        pending = Some(PendingSlice::Metadata(
+                            metadata_extension_start
+                                .take()
+                                .ok_or_else(|| invalid("metadata extension start is missing"))?,
+                        ));
+                    },
+                    Frame::Document {
+                        kinds, has_moniker, ..
+                    } => {
+                        if !has_moniker {
+                            return Err(invalid("docChg requires docMkLst"));
+                        }
+                        pending = Some(PendingSlice::Document(
+                            document_start
+                                .take()
+                                .ok_or_else(|| invalid("document change start is missing"))?,
+                            kinds,
+                        ));
+                    },
+                    Frame::MonikerList { count } if count != 1 => {
+                        return Err(invalid("docMkLst requires exactly one docMk"));
+                    },
+                    Frame::ListExtension { .. } => {
+                        pending = Some(PendingSlice::ListExtension(
+                            list_extension_start
+                                .take()
+                                .ok_or_else(|| invalid("list extension start is missing"))?,
+                        ));
+                    },
+                    Frame::Extension { payloads } if payloads != 1 => {
+                        return Err(invalid("p:ext requires one foreign payload"));
+                    },
+                    _ => {},
+                }
+            },
+            Event::Text(text) => {
+                if !matches!(
+                    stack.last(),
+                    Some(
+                        Frame::MetadataExtension
+                            | Frame::DescriptorOpaque
+                            | Frame::Payload
+                            | Frame::Opaque
+                    )
+                ) {
+                    let decoded = text.decode().map_err(xml_error)?;
+                    let unescaped = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
+                    if !unescaped.trim().is_empty() {
+                        return Err(invalid("unexpected Changes Information text"));
+                    }
+                }
+            },
+            Event::CData(text) => {
+                if !matches!(
+                    stack.last(),
+                    Some(
+                        Frame::MetadataExtension
+                            | Frame::DescriptorOpaque
+                            | Frame::Payload
+                            | Frame::Opaque
+                    )
+                ) && !text.decode().map_err(xml_error)?.trim().is_empty()
+                {
+                    return Err(invalid("unexpected Changes Information CDATA"));
+                }
+            },
+            Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
+                return Err(invalid("DTD, PI, and general references are rejected"));
+            },
+            // Accepted in every phase, including after the root.
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Eof => break,
+        }
+        buffer.clear();
+    }
+    if let Some(slice) = pending.take() {
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("XML source position exceeds usize"))?;
+        let list = current_list
+            .as_mut()
+            .ok_or_else(|| invalid("captured change XML outside docChgLst"))?;
+        match slice {
+            PendingSlice::Metadata(from) => {
+                list.author
+                    .as_mut()
+                    .ok_or_else(|| invalid("change author metadata is missing"))?
+                    .extension_xml = Some(bytes[from..end].to_vec());
+            },
+            PendingSlice::Document(from, kinds) => list.changes.push(Descriptor {
+                change_kinds: kinds,
+                xml: bytes[from..end].to_vec(),
+            }),
+            PendingSlice::ListExtension(from) => {
+                list.extension_xml = Some(bytes[from..end].to_vec());
+            },
+        }
+    }
+    match phase {
+        RootPhase::Closed if stack.is_empty() && current_list.is_none() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("unterminated Changes Information part"));
+        },
+    }
+    let value = Info {
+        command_prefix,
+        namespace_declarations: namespaces,
+        change_lists: lists,
+    };
+    validate_model(&value, limits)?;
+    Ok(value)
+}
+
+fn mce_limits(limits: Limits) -> MceLimits {
+    MceLimits {
+        max_input_bytes: limits.max_input_bytes(),
+        max_output_bytes: limits.max_output_bytes(),
+        max_depth: limits.max_depth(),
+        max_namespace_bindings: 4096.min(limits.max_nodes()),
+        max_directive_tokens: 4096.min(limits.max_nodes()),
+        max_choices_per_alternate: 1024.min(limits.max_nodes()),
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
+}
+
+fn parse_changes_data(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<Data> {
+    let attrs = known_attributes(
+        element,
+        decoder,
+        &[
+            "name",
+            "userId",
+            "providerId",
+            "clId",
+            "email",
+            "dt",
+            "v",
+            "id",
+            "actId",
+        ],
+        limits,
+    )?;
+    let get = |name: &str| {
+        attrs
+            .iter()
+            .find(|(key, _)| key == name)
+            .map(|(_, value)| value.clone())
+    };
+    let date_time = get("dt");
+    if let Some(value) = &date_time {
+        validate_date_time(value, limits)?;
+    }
+    let version = get("v")
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|_err| invalid("invalid change version"))
+        })
+        .transpose()?;
+    let action_id = get("actId")
+        .map(|value| {
+            value
+                .parse()
+                .map_err(|_err| invalid("invalid change action ID"))
+        })
+        .transpose()?;
+    let change_id = get("id");
+    if let Some(value) = &change_id {
+        validate_guid(value)?;
+    }
+    Ok(Data {
+        name: get("name"),
+        user_id: get("userId"),
+        provider_id: get("providerId"),
+        client_id: get("clId"),
+        email: get("email"),
+        date_time,
+        version,
+        change_id,
+        action_id,
+        extension_xml: None,
+    })
+}
+
+fn parse_change_kinds(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    limits: Limits,
+) -> Result<Vec<Kind>> {
+    let attrs = known_attributes(element, decoder, &["chg"], limits)?;
+    let value = attrs
+        .iter()
+        .find(|(key, _)| key == "chg")
+        .map(|(_, value)| value.as_str())
+        .ok_or_else(|| invalid("docChg is missing required chg"))?;
+    let kinds: Vec<_> = value
+        .split_whitespace()
+        .map(Kind::parse)
+        .collect::<Result<_>>()?;
+    if kinds.is_empty() {
+        return Err(invalid("docChg chg list cannot be empty"));
+    }
+    let mut unique = HashSet::new();
+    if kinds.iter().any(|kind| !unique.insert(*kind as u8)) {
+        return Err(invalid("docChg contains duplicate change bits"));
+    }
+    Ok(kinds)
+}
+
+fn required_change_attribute(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    limits: Limits,
+) -> Result<()> {
+    let attrs = known_attributes(element, decoder, &["chg"], limits)?;
+    if attrs
+        .iter()
+        .find(|(key, _)| key == "chg")
+        .is_none_or(|(_, value)| value.split_whitespace().next().is_none())
+    {
+        return Err(invalid("nested change descriptor requires chg"));
+    }
+    Ok(())
+}
+
+fn validate_model(value: &Info, limits: Limits) -> Result<()> {
+    if !value.command_prefix.is_empty() {
+        validate_ncname(&value.command_prefix, "command prefix")?;
+    }
+    if value.change_lists.len() > limits.max_lists() {
+        return Err(limit(
+            crate::error::CodecLimitKind::ChangeLists,
+            value.change_lists.len(),
+            limits.max_lists(),
+        ));
+    }
+    let mut prefixes = HashSet::new();
+    for declaration in &value.namespace_declarations {
+        if (!declaration.prefix.is_empty() && !ncname(&declaration.prefix))
+            || matches!(declaration.prefix.as_str(), "xml" | "xmlns")
+            || declaration.uri.is_empty()
+            || declaration.prefix == value.command_prefix
+            || !prefixes.insert(declaration.prefix.as_str())
+        {
+            return Err(invalid("invalid preserved Changes Information namespace"));
+        }
+        bounded(&declaration.uri, limits)?;
+    }
+    let mut total = 0usize;
+    for list in &value.change_lists {
+        if let Some(author) = &list.author {
+            validate_changes_data(author, limits)?;
+        }
+        total = total.checked_add(list.changes.len()).ok_or_else(|| {
+            limit(
+                crate::error::CodecLimitKind::Changes,
+                usize::MAX,
+                limits.max_changes(),
+            )
+        })?;
+        if total > limits.max_changes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::Changes,
+                total,
+                limits.max_changes(),
+            ));
+        }
+        for change in &list.changes {
+            if change.change_kinds.is_empty() {
+                return Err(invalid("invalid document change descriptor"));
+            }
+            if change.xml.len() > limits.max_input_bytes() {
+                return Err(limit(
+                    crate::error::CodecLimitKind::XmlBytes,
+                    change.xml.len(),
+                    limits.max_input_bytes(),
+                ));
+            }
+        }
+        if list
+            .extension_xml
+            .as_ref()
+            .is_some_and(|xml| xml.len() > limits.max_input_bytes())
+        {
+            return Err(limit(
+                crate::error::CodecLimitKind::ExtensionBytes,
+                list.extension_xml.as_ref().map_or(0, Vec::len),
+                limits.max_input_bytes(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_changes_data(value: &Data, limits: Limits) -> Result<()> {
+    for text in [
+        value.name.as_deref(),
+        value.user_id.as_deref(),
+        value.provider_id.as_deref(),
+        value.client_id.as_deref(),
+        value.email.as_deref(),
+    ]
+    .into_iter()
+    .flatten()
+    {
+        bounded(text, limits)?;
+    }
+    if let Some(date) = &value.date_time {
+        validate_date_time(date, limits)?;
+    }
+    if let Some(id) = &value.change_id {
+        validate_guid(id)?;
+    }
+    Ok(())
+}
+
+fn serialized_len(value: &Info) -> Result<usize> {
+    let mut length = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>"#.len();
+    add_len(
+        &mut length,
+        open_root_len(&value.command_prefix, &value.namespace_declarations)?,
+    )?;
+    if value.change_lists.is_empty() {
+        add_len(&mut length, 2)?;
+    } else {
+        add_len(&mut length, 1)?;
+        for list in &value.change_lists {
+            add_len(&mut length, open_pc_len(&value.command_prefix, "docChgLst"))?;
+            add_len(&mut length, 1)?;
+            if let Some(author) = &list.author {
+                add_len(
+                    &mut length,
+                    changes_data_len(&value.command_prefix, author)?,
+                )?;
+            }
+            for change in &list.changes {
+                add_len(&mut length, change.xml.len())?;
+            }
+            if let Some(extension) = &list.extension_xml {
+                add_len(&mut length, extension.len())?;
+            }
+            add_len(
+                &mut length,
+                close_pc_len(&value.command_prefix, "docChgLst"),
+            )?;
+        }
+        add_len(&mut length, close_pc_len(&value.command_prefix, "chgInfo"))?;
+    }
+    Ok(length)
+}
+
+fn changes_data_len(prefix: &str, value: &Data) -> Result<usize> {
+    let mut length = open_pc_len(prefix, "chgData");
+    for (name, text) in [
+        ("name", value.name.as_deref()),
+        ("userId", value.user_id.as_deref()),
+        ("providerId", value.provider_id.as_deref()),
+        ("clId", value.client_id.as_deref()),
+        ("email", value.email.as_deref()),
+        ("dt", value.date_time.as_deref()),
+        ("id", value.change_id.as_deref()),
+    ] {
+        if let Some(text) = text {
+            add_len(&mut length, attr_len(name, text)?)?;
+        }
+    }
+    if let Some(version) = value.version {
+        let text = version.to_string();
+        add_len(&mut length, attr_len("v", &text)?)?;
+    }
+    if let Some(action_id) = value.action_id {
+        let text = action_id.to_string();
+        add_len(&mut length, attr_len("actId", &text)?)?;
+    }
+    if let Some(extension) = &value.extension_xml {
+        add_len(&mut length, 1)?;
+        add_len(&mut length, extension.len())?;
+        add_len(&mut length, close_pc_len(prefix, "chgData"))?;
+    } else {
+        add_len(&mut length, 2)?;
+    }
+    Ok(length)
+}
+
+fn open_root_len(prefix: &str, declarations: &[Namespace]) -> Result<usize> {
+    let mut length = 1 + "chgInfo xmlns".len();
+    if !prefix.is_empty() {
+        add_len(&mut length, prefix.len() + 1)?;
+        add_len(&mut length, prefix.len() + 1)?;
+    }
+    add_len(&mut length, 2 + escaped_len(PC_TEXT)? + 1)?;
+    for declaration in declarations {
+        add_len(&mut length, 6)?;
+        if !declaration.prefix.is_empty() {
+            add_len(&mut length, declaration.prefix.len() + 1)?;
+        }
+        add_len(&mut length, 3 + escaped_len(&declaration.uri)?)?;
+    }
+    Ok(length)
+}
+
+fn open_pc_len(prefix: &str, local: &str) -> usize {
+    1 + usize::from(!prefix.is_empty()) * (prefix.len() + 1) + local.len()
+}
+
+fn close_pc_len(prefix: &str, local: &str) -> usize {
+    2 + usize::from(!prefix.is_empty()) * (prefix.len() + 1) + local.len() + 1
+}
+
+fn attr_len(name: &str, value: &str) -> Result<usize> {
+    let escaped = escaped_len(value)?;
+    let mut length = 1usize;
+    add_len(&mut length, name.len())?;
+    add_len(&mut length, 3 + escaped)?;
+    Ok(length)
+}
+
+fn escaped_len(value: &str) -> Result<usize> {
+    let mut length = 0usize;
+    for character in value.chars() {
+        let bytes = match character {
+            '&' => 5,
+            '<' => 4,
+            '"' => 6,
+            '\t' | '\n' | '\r' => 5,
+            _ => character.len_utf8(),
+        };
+        add_len(&mut length, bytes)?;
+    }
+    Ok(length)
+}
+
+fn add_len(length: &mut usize, additional: usize) -> Result<()> {
+    *length = length
+        .checked_add(additional)
+        .ok_or(Error::CapacityOverflow {
+            resource: "serialized Changes Information bytes",
+        })?;
+    Ok(())
+}
+
+fn write_changes_data(out: &mut Vec<u8>, prefix: &str, value: &Data) {
+    open_pc(out, prefix, "chgData");
+    for (name, text) in [
+        ("name", value.name.as_deref()),
+        ("userId", value.user_id.as_deref()),
+        ("providerId", value.provider_id.as_deref()),
+        ("clId", value.client_id.as_deref()),
+        ("email", value.email.as_deref()),
+        ("dt", value.date_time.as_deref()),
+        ("id", value.change_id.as_deref()),
+    ] {
+        if let Some(text) = text {
+            attr(out, name, text);
+        }
+    }
+    if let Some(version) = value.version {
+        attr(out, "v", &version.to_string());
+    }
+    if let Some(action_id) = value.action_id {
+        attr(out, "actId", &action_id.to_string());
+    }
+    if let Some(extension) = &value.extension_xml {
+        out.push(b'>');
+        out.extend_from_slice(extension);
+        close_pc(out, prefix, "chgData");
+    } else {
+        out.extend_from_slice(b"/>");
+    }
+}
+
+fn open_root(out: &mut Vec<u8>, prefix: &str, declarations: &[Namespace]) {
+    out.push(b'<');
+    if !prefix.is_empty() {
+        out.extend_from_slice(prefix.as_bytes());
+        out.push(b':');
+    }
+    out.extend_from_slice(b"chgInfo xmlns");
+    if !prefix.is_empty() {
+        out.push(b':');
+        out.extend_from_slice(prefix.as_bytes());
+    }
+    out.extend_from_slice(b"=\"");
+    escape(out, PC_TEXT);
+    out.push(b'"');
+    for declaration in declarations {
+        out.extend_from_slice(b" xmlns");
+        if !declaration.prefix.is_empty() {
+            out.push(b':');
+            out.extend_from_slice(declaration.prefix.as_bytes());
+        }
+        out.extend_from_slice(b"=\"");
+        escape(out, &declaration.uri);
+        out.push(b'"');
+    }
+}
+
+fn open_pc(out: &mut Vec<u8>, prefix: &str, local: &str) {
+    out.push(b'<');
+    if !prefix.is_empty() {
+        out.extend_from_slice(prefix.as_bytes());
+        out.push(b':');
+    }
+    out.extend_from_slice(local.as_bytes());
+}
+
+fn close_pc(out: &mut Vec<u8>, prefix: &str, local: &str) {
+    out.extend_from_slice(b"</");
+    if !prefix.is_empty() {
+        out.extend_from_slice(prefix.as_bytes());
+        out.push(b':');
+    }
+    out.extend_from_slice(local.as_bytes());
+    out.push(b'>');
+}
+
+fn root_namespaces(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    root_prefix: &str,
+    limits: Limits,
+) -> Result<Vec<Namespace>> {
+    let mut output = Vec::new();
+    let mut seen = HashSet::new();
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let key = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
+        if key != "xmlns" && !key.starts_with("xmlns:") {
+            return Err(invalid(format!("unexpected chgInfo attribute '{key}'")));
+        }
+        let prefix = key.strip_prefix("xmlns:").unwrap_or("").to_string();
+        if !seen.insert(prefix.clone()) {
+            return Err(invalid("duplicate root namespace declaration"));
+        }
+        let uri = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?
+            .into_owned();
+        bounded(&uri, limits)?;
+        if prefix != root_prefix {
+            output.push(Namespace { prefix, uri });
+        }
+    }
+    Ok(output)
+}
+
+fn known_attributes(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    known: &[&str],
+    limits: Limits,
+) -> Result<Vec<(String, String)>> {
+    let mut output = Vec::new();
+    let mut seen = HashSet::new();
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let key = std::str::from_utf8(attribute.key.as_ref()).map_err(xml_error)?;
+        if key == "xmlns" || key.starts_with("xmlns:") {
+            continue;
+        }
+        if key.contains(':') || !known.contains(&key) || !seen.insert(key.to_string()) {
+            return Err(invalid(format!(
+                "unexpected or duplicate attribute '{key}'"
+            )));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?
+            .into_owned();
+        bounded(&value, limits)?;
+        output.push((key.to_string(), value));
+    }
+    Ok(output)
+}
+
+fn no_attributes(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<()> {
+    known_attributes(element, decoder, &[], limits).map(|_| ())
+}
+
+fn extension_attributes(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<()> {
+    let values = known_attributes(element, decoder, &["uri"], limits)?;
+    if values
+        .iter()
+        .find(|(key, _)| key == "uri")
+        .is_none_or(|(_, value)| value.trim().is_empty())
+    {
+        return Err(invalid("p:ext requires nonempty uri"));
+    }
+    Ok(())
+}
+
+fn any_attributes(element: &BytesStart<'_>, decoder: Decoder, limits: Limits) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let value = attribute
+            .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?;
+        bounded(&value, limits)?;
+    }
+    Ok(())
+}
+
+fn close_empty(frame: &Frame) -> Result<()> {
+    match frame {
+        Frame::Document { .. } => Err(invalid("docChg cannot be empty")),
+        Frame::MonikerList { .. } => Err(invalid("docMkLst requires docMk")),
+        Frame::Extension { .. } => Err(invalid("p:ext requires one foreign payload")),
+        _ => Ok(()),
+    }
+}
+
+fn validate_end(namespace: &ResolveResult<'_>, local: &[u8], frame: &Frame) -> Result<()> {
+    match frame {
+        Frame::Root => expect(namespace, PC, local, b"chgInfo"),
+        Frame::List => expect(namespace, PC, local, b"docChgLst"),
+        Frame::Metadata => expect(namespace, PC, local, b"chgData"),
+        Frame::MetadataExtension => expect(namespace, A, local, b"extLst"),
+        Frame::Document { .. } => expect(namespace, PC, local, b"docChg"),
+        Frame::MonikerList { .. } => expect(namespace, PC, local, b"docMkLst"),
+        Frame::Moniker => expect(namespace, PC, local, b"docMk"),
+        Frame::ListExtension { .. } => expect(namespace, P, local, b"extLst"),
+        Frame::Extension { .. } => expect(namespace, P, local, b"ext"),
+        Frame::DescriptorOpaque | Frame::Payload | Frame::Opaque => Ok(()),
+    }
+}
+
+fn is(namespace: &ResolveResult<'_>, expected: &[u8], local: &[u8], name: &[u8]) -> bool {
+    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() == expected) && local == name
+}
+
+fn expect(namespace: &ResolveResult<'_>, expected: &[u8], local: &[u8], name: &[u8]) -> Result<()> {
+    if is(namespace, expected, local, name) {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "expected namespaced element '{}'",
+            String::from_utf8_lossy(name)
+        )))
+    }
+}
+
+fn other_than_p(namespace: &ResolveResult<'_>) -> bool {
+    matches!(namespace, ResolveResult::Bound(value) if value.as_ref() != P)
+}
+
+fn element_prefix(element: &BytesStart<'_>) -> Result<String> {
+    let name = element.name();
+    let qualified = std::str::from_utf8(name.as_ref()).map_err(xml_error)?;
+    Ok(qualified
+        .rsplit_once(':')
+        .map_or("", |(prefix, _)| prefix)
+        .to_string())
+}
+
+fn validate_guid(value: &str) -> Result<()> {
+    let bytes = value.as_bytes();
+    if bytes.len() != 38
+        || bytes[0] != b'{'
+        || bytes[37] != b'}'
+        || [9, 14, 19, 24].iter().any(|index| bytes[*index] != b'-')
+        || bytes[1..37]
+            .iter()
+            .enumerate()
+            .any(|(index, byte)| ![8, 13, 18, 23].contains(&index) && !byte.is_ascii_hexdigit())
+    {
+        Err(invalid(format!("invalid GUID '{value}'")))
+    } else {
+        Ok(())
+    }
+}
+
+fn validate_date_time(value: &str, limits: Limits) -> Result<()> {
+    bounded(value, limits)?;
+    if DateTime::parse_from_rfc3339(value).is_ok()
+        || NaiveDateTime::parse_from_str(value, "%Y-%m-%dT%H:%M:%S%.f").is_ok()
+    {
+        Ok(())
+    } else {
+        Err(invalid(format!("invalid XML dateTime '{value}'")))
+    }
+}
+
+fn validate_ncname(value: &str, label: &str) -> Result<()> {
+    if ncname(value) {
+        Ok(())
+    } else {
+        Err(invalid(format!("{label} is not an XML NCName")))
+    }
+}
+
+fn ncname(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters
+        .next()
+        .is_some_and(|character| character == '_' || character.is_alphabetic())
+        && characters.all(|character| {
+            character == '_' || character == '-' || character == '.' || character.is_alphanumeric()
+        })
+}
+
+fn require_presentation_content_type(value: &str) -> Result<()> {
+    if matches!(
+        value,
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml"
+            | "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml"
+            | "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml"
+            | "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml"
+            | "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml"
+            | "application/vnd.ms-powerpoint.template.macroEnabled.main+xml"
+            | "application/vnd.ms-powerpoint.addin.macroEnabled.main+xml"
+    ) {
+        Ok(())
+    } else {
+        Err(invalid("main document is not a Presentation part"))
+    }
+}
+
+fn validate_inbound_relationships(
+    package: &OpcPackage,
+    presentation_name: &str,
+    owner: &litchi_opc::Relationship,
+    target: &PackURI,
+) -> Result<()> {
+    for relationship in package.rels().iter() {
+        if !relationship.is_external()
+            && relationship.target_partname()?.as_str() == target.as_str()
+        {
+            return Err(invalid(
+                "Changes Information part has an unexpected package relationship",
+            ));
+        }
+    }
+    for source in package.iter_parts() {
+        for relationship in source.rels().iter() {
+            if relationship.is_external()
+                || relationship.target_partname()?.as_str() != target.as_str()
+            {
+                continue;
+            }
+            let expected = source.partname().as_str() == presentation_name
+                && relationship.r_id() == owner.r_id()
+                && relationship.reltype() == RELATIONSHIP_TYPE;
+            if !expected {
+                return Err(invalid(
+                    "Changes Information part has an unexpected inbound relationship",
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+fn bounded(value: &str, limits: Limits) -> Result<()> {
+    if value.len() > limits.max_string_bytes() {
+        Err(limit(
+            crate::error::CodecLimitKind::StringBytes,
+            value.len(),
+            limits.max_string_bytes(),
+        ))
+    } else {
+        Ok(())
+    }
+}
+
+fn attr(out: &mut Vec<u8>, name: &str, value: &str) {
+    out.push(b' ');
+    out.extend_from_slice(name.as_bytes());
+    out.extend_from_slice(b"=\"");
+    escape(out, value);
+    out.push(b'"');
+}
+
+fn escape(out: &mut Vec<u8>, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => out.extend_from_slice(b"&amp;"),
+            '<' => out.extend_from_slice(b"&lt;"),
+            '"' => out.extend_from_slice(b"&quot;"),
+            '\t' => out.extend_from_slice(b"&#x9;"),
+            '\n' => out.extend_from_slice(b"&#xA;"),
+            '\r' => out.extend_from_slice(b"&#xD;"),
+            _ => {
+                let mut bytes = [0; 4];
+                out.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
+            },
+        }
+    }
+}
+
+fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(error.to_string())
+}
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const MAIN_CT: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+
+    fn package() -> OpcPackage {
+        let mut package = OpcPackage::new();
+        package.rels_mut().add_relationship(
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument"
+                .into(),
+            "ppt/presentation.xml".into(),
+            "rId1".into(),
+            false,
+        );
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/ppt/presentation.xml").unwrap(),
+            MAIN_CT.into(),
+            Vec::new(),
+        )));
+        package
+    }
+
+    fn value() -> Part {
+        let xml = format!(
+            r#"<pc:chgInfo xmlns:pc="{PC_TEXT}" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:v="urn:vendor"><pc:docChgLst><pc:chgData name="Ada" userId="ada@example.test" providerId="AD" clId="Web-{{AAAAAAAA-BBBB-CCCC-DDDD-EEEEEEEEEEEE}}"/><pc:docChg chg="addSld modSld"><pc:docMkLst><pc:docMk/></pc:docMkLst><p:extLst><p:ext uri="urn:nested"><v:data href="https://example.invalid/not-opened"/></p:ext></p:extLst></pc:docChg><p:extLst><p:ext uri="urn:list"><v:data xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships" r:id="rIdNeverFetched"/></p:ext></p:extLst></pc:docChgLst></pc:chgInfo>"#
+        );
+        Part {
+            relationship_id: "rIdChanges".into(),
+            part_name: "/ppt/changesInfos/changesInfo1.xml".into(),
+            changes_information: Info::parse(xml.as_bytes(), Limits::DEFAULT).unwrap(),
+        }
+    }
+
+    #[test]
+    fn loads_powerpoint_and_libreoffice_changes_packages() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let powerpoint = OpcPackage::open(
+            root.join("test-data/poi/test-data/slideshow/ArtisticEffectSample.pptx"),
+            SourceLimits::default(),
+        )
+        .unwrap();
+        let loaded = load(&powerpoint, Limits::DEFAULT).unwrap().unwrap();
+        assert!(!loaded.changes_information.change_lists.is_empty());
+        assert_eq!(
+            loaded.changes_information.change_lists[0]
+                .author
+                .as_ref()
+                .unwrap()
+                .name
+                .as_deref(),
+            Some("Frank Pavelski")
+        );
+
+        let libreoffice = OpcPackage::open(
+            root.join("test-data/libreoffice-core/sd/qa/unit/data/pptx/slide-sections.pptx"),
+            SourceLimits::default(),
+        )
+        .unwrap();
+        let loaded = load(&libreoffice, Limits::DEFAULT).unwrap().unwrap();
+        assert!(
+            loaded
+                .changes_information
+                .change_lists
+                .iter()
+                .flat_map(|list| &list.changes)
+                .any(|change| change.change_kinds.contains(&Kind::AddSection))
+        );
+    }
+
+    #[test]
+    fn package_round_trip_keeps_nested_commands_and_extensions_inert() {
+        let expected = value();
+        let mut package = package();
+        store(&mut package, &expected, Limits::DEFAULT).unwrap();
+        let loaded = load(&package, Limits::DEFAULT).unwrap().unwrap();
+        assert_eq!(loaded, expected);
+        let text =
+            String::from_utf8(loaded.changes_information.to_xml(Limits::DEFAULT).unwrap()).unwrap();
+        assert!(text.contains("rIdNeverFetched"));
+        assert!(text.contains("https://example.invalid/not-opened"));
+    }
+
+    #[test]
+    fn rejects_hostile_changes_grammar() {
+        let wrap = |body: &str| {
+            format!(
+                r#"<pc:chgInfo xmlns:pc="{PC_TEXT}" xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">{body}</pc:chgInfo>"#
+            )
+        };
+        let cases = [
+            wrap("<pc:wrong/>"),
+            wrap("<pc:docChgLst bad=\"1\"/>"),
+            wrap(
+                "<pc:docChgLst><pc:docChg chg=\"unknown\"><pc:docMkLst><pc:docMk/></pc:docMkLst></pc:docChg></pc:docChgLst>",
+            ),
+            wrap(
+                "<pc:docChgLst><pc:docChg chg=\"addSld\"><pc:sldChg chg=\"mod\"/></pc:docChg></pc:docChgLst>",
+            ),
+            wrap(
+                "<pc:docChgLst><pc:docChg chg=\"addSld\"><pc:docMkLst/></pc:docChg></pc:docChgLst>",
+            ),
+            wrap("<pc:docChgLst><p:extLst/><pc:chgData/></pc:docChgLst>"),
+            wrap("<pc:docChgLst><p:extLst><p:ext uri=\"urn:x\"/></p:extLst></pc:docChgLst>"),
+            format!("<!DOCTYPE x>{}", wrap("")),
+        ];
+        for xml in cases {
+            assert!(
+                Info::parse(xml.as_bytes(), Limits::DEFAULT).is_err(),
+                "accepted {xml}"
+            );
+        }
+    }
+
+    #[test]
+    fn rejects_invalid_package_graphs_and_failed_store_is_atomic() {
+        let mut external = package();
+        external
+            .get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                RELATIONSHIP_TYPE.into(),
+                "https://example.invalid/changes.xml".into(),
+                "rIdChanges".into(),
+                true,
+            );
+        assert!(load(&external, Limits::DEFAULT).is_err());
+
+        let mut outbound = package();
+        store(&mut outbound, &value(), Limits::DEFAULT).unwrap();
+        outbound
+            .get_part_mut(&PackURI::new("/ppt/changesInfos/changesInfo1.xml").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship("urn:forbidden".into(), "x".into(), "rId1".into(), false);
+        assert!(load(&outbound, Limits::DEFAULT).is_err());
+
+        let mut bad = value();
+        bad.changes_information.command_prefix = "bad prefix".into();
+        let mut package = package();
+        let count = package.part_count();
+        assert!(store(&mut package, &bad, Limits::DEFAULT).is_err());
+        assert_eq!(package.part_count(), count);
+        assert!(load(&package, Limits::DEFAULT).unwrap().is_none());
+    }
+
+    #[test]
+    fn selected_profile_bounds_mce_admission() {
+        let limits = Limits::new(512, 768, 7, 19, 3, 11, 5, 23).unwrap();
+        let mce = mce_limits(limits);
+        assert_eq!(mce.max_input_bytes, 512);
+        assert_eq!(mce.max_output_bytes, 768);
+        assert_eq!(mce.max_depth, 7);
+        assert_eq!(mce.max_namespace_bindings, 19);
+        assert_eq!(mce.max_directive_tokens, 19);
+        assert_eq!(mce.max_choices_per_alternate, 19);
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the changes-information reader accepts before, around and after `pc:chgInfo`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The reader of one changes-information part.
+    #[test]
+    fn changes_information_envelope() {
+        let root = Root {
+            open: r#"<pc:chgInfo xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command">"#,
+            body: r"<pc:docChgLst/>",
+            close: r"</pc:chgInfo>",
+            empty: r#"<pc:chgInfo xmlns:pc="http://schemas.microsoft.com/office/powerpoint/2013/main/command"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"unterminated Changes Information part\")",
+                "whitespace only: Invalid(\"unterminated Changes Information part\")",
+                "declaration only: Invalid(\"unterminated Changes Information part\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Invalid(\"DTD, PI, and general references are rejected\")",
+                "root then text: Invalid(\"unexpected Changes Information text\")",
+                "root then second root: Invalid(\"Changes Information has multiple roots\")",
+                "root then foreign start: Invalid(\"Changes Information has multiple roots\")",
+                "root then foreign empty: Invalid(\"Changes Information has multiple roots\")",
+                "declaration after root: Ok()",
+                "two declarations: Ok()",
+                "comment before declaration: Ok()",
+                "text before root: Invalid(\"unexpected Changes Information text\")",
+                "unterminated root: Invalid(\"unterminated Changes Information part\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD, PI, and general references are rejected\")",
+                "top-level CDATA: Invalid(\"unexpected Changes Information CDATA\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Ok()",
+                "PI before declaration: Invalid(\"DTD, PI, and general references are rejected\")",
+                "comment then root: Ok()",
+                "PI then root: Invalid(\"DTD, PI, and general references are rejected\")",
+                "root then text then second root: Invalid(\"unexpected Changes Information text\")",
+                "empty-element root then root: Invalid(\"Changes Information has multiple roots\")",
+                "declaration after empty-element root: Ok()",
+            ],
+            |xml| {
+                outcome(
+                    super::parse_changes_information(xml, super::Limits::default()),
+                    |_| String::new(),
+                )
+            },
+        );
+    }
+}

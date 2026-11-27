@@ -606,10 +606,10 @@ impl XForm {
     /// Multiply two transforms
     pub fn multiply(&self, other: &XForm) -> XForm {
         XForm {
-            m11: self.m11 * other.m11 + self.m12 * other.m21,
-            m12: self.m11 * other.m12 + self.m12 * other.m22,
-            m21: self.m21 * other.m11 + self.m22 * other.m21,
-            m22: self.m21 * other.m12 + self.m22 * other.m22,
+            m11: self.m11 * other.m11 + self.m21 * other.m12,
+            m12: self.m12 * other.m11 + self.m22 * other.m12,
+            m21: self.m11 * other.m21 + self.m21 * other.m22,
+            m22: self.m12 * other.m21 + self.m22 * other.m22,
             dx: self.m11 * other.dx + self.m21 * other.dy + self.dx,
             dy: self.m12 * other.dx + self.m22 * other.dy + self.dy,
         }

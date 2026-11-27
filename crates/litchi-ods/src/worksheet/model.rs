@@ -1,0 +1,1037 @@
+//! Typed worksheet vocabulary for the ODS facade.
+//!
+//! The model stores the physical ODF runs instead of expanding repeated rows
+//! and cells.  A run is still addressable through the logical row/column
+//! accessors, while round trips retain the producer's compact representation.
+
+use crate::model::hyperlink::Link;
+use litchi_core::{Error, Result};
+use std::{num::NonZeroUsize, ops::Range};
+
+/// A typed value stored by an ODF table cell.
+#[derive(Clone, Debug, PartialEq)]
+pub enum CellValue {
+    /// A cell with no `office:value-type` and no displayed content.
+    Empty,
+    /// ODF string content.
+    Text(String),
+    /// ODF floating-point content.
+    Number(f64),
+    /// ODF currency content and its ISO/application currency token.
+    Currency { value: f64, currency: String },
+    /// ODF percentage content, represented in the stored fractional domain.
+    Percentage(f64),
+    /// ODF Boolean content.
+    Boolean(bool),
+    /// ODF date lexical value.
+    Date(String),
+    /// ODF duration/time lexical value.
+    Time(String),
+    /// A value type not interpreted by this worksheet facade.
+    ///
+    /// The type token and value are retained so an unsupported producer value
+    /// is not silently converted into ordinary text during an edit.
+    Unknown { kind: String, value: Option<String> },
+}
+
+impl CellValue {
+    pub(crate) fn validate(&self) -> Result<()> {
+        match self {
+            Self::Empty => Ok(()),
+            Self::Text(value) => super::validation::validate_text(value, "cell text"),
+            Self::Number(value) | Self::Percentage(value) => {
+                if value.is_finite() {
+                    Ok(())
+                } else {
+                    Err(Error::InvalidFormat(
+                        "ODS numeric cell values must be finite".to_string(),
+                    ))
+                }
+            },
+            Self::Currency { value, currency } => {
+                if !value.is_finite() {
+                    return Err(Error::InvalidFormat(
+                        "ODS currency values must be finite".to_string(),
+                    ));
+                }
+                super::validation::validate_text(currency, "cell currency")?;
+                if currency.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "ODS currency values require a non-empty currency token".to_string(),
+                    ));
+                }
+                Ok(())
+            },
+            Self::Boolean(_) => Ok(()),
+            Self::Date(value) => super::validation::validate_text(value, "cell date value"),
+            Self::Time(value) => super::validation::validate_text(value, "cell time value"),
+            Self::Unknown { kind, value } => {
+                super::validation::validate_text(kind, "cell value type")?;
+                if kind.is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "unknown ODS cell values require a non-empty type token".to_string(),
+                    ));
+                }
+                if let Some(value) = value {
+                    super::validation::validate_text(value, "cell value")?;
+                }
+                Ok(())
+            },
+        }
+    }
+}
+
+/// The merge role carried by one physical cell run.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Merge {
+    /// The cell occupies one ordinary grid position.
+    None,
+    /// The cell is the anchor for a rectangular span.
+    Span {
+        rows: NonZeroUsize,
+        columns: NonZeroUsize,
+    },
+    /// The cell is a covered position belonging to another span anchor.
+    Covered,
+}
+
+/// One physical ODF cell run.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Cell {
+    /// Typed stored value.
+    pub value: CellValue,
+    /// Displayed text, which may differ from the typed value's lexical form.
+    pub text: String,
+    /// Inert ODF formula token, if present.
+    pub formula: Option<String>,
+    /// Direct `table:style-name`, if present.
+    pub style_name: Option<String>,
+    /// Inert external range metadata carried by the first cell of an
+    /// externally linked range.
+    pub range_source: Option<crate::model::source::CellRange>,
+    /// Ordered inert `text:a` links over the cell's canonical UTF-8 text.
+    pub hyperlinks: Vec<Link>,
+    /// Merge/covered-cell role for this physical cell run.
+    pub merge: Merge,
+    /// Number of adjacent logical cells represented by this physical cell.
+    pub repeat: NonZeroUsize,
+}
+
+impl Cell {
+    /// Create one ordinary cell.
+    pub fn new(value: CellValue, text: impl Into<String>) -> Self {
+        Self {
+            value,
+            text: text.into(),
+            formula: None,
+            style_name: None,
+            range_source: None,
+            hyperlinks: Vec::new(),
+            merge: Merge::None,
+            repeat: NonZeroUsize::MIN,
+        }
+    }
+
+    /// Create a compact repeated cell run.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn repeated(value: CellValue, text: impl Into<String>, repeat: usize) -> Result<Self> {
+        let repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
+            Error::InvalidFormat("ODS cell repetition must be positive".to_string())
+        })?;
+        Ok(Self {
+            value,
+            text: text.into(),
+            formula: None,
+            style_name: None,
+            range_source: None,
+            hyperlinks: Vec::new(),
+            merge: Merge::None,
+            repeat,
+        })
+    }
+
+    /// Create an empty physical cell.
+    #[must_use]
+    pub fn empty() -> Self {
+        Self::new(CellValue::Empty, "")
+    }
+
+    /// Number of logical cells represented by this run.
+    #[must_use]
+    pub fn repeat(&self) -> usize {
+        self.repeat.get()
+    }
+
+    /// Set an inert formula after validating its lexical payload.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_formula(&mut self, formula: impl Into<String>) -> Result<()> {
+        let formula = formula.into();
+        super::validation::validate_text(&formula, "cell formula")?;
+        if formula.is_empty() {
+            return Err(Error::InvalidFormat(
+                "ODS cell formulas must be non-empty".to_string(),
+            ));
+        }
+        self.formula = Some(formula);
+        Ok(())
+    }
+
+    /// Clear the inert formula while retaining the cached value and text.
+    pub fn clear_formula(&mut self) {
+        self.formula = None;
+    }
+
+    /// Set a direct ODF cell style reference.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_style_name(&mut self, style_name: impl Into<String>) -> Result<()> {
+        let style_name = style_name.into();
+        super::validation::validate_text(&style_name, "cell style name")?;
+        if style_name.is_empty() {
+            return Err(Error::InvalidFormat(
+                "ODS cell style names must be non-empty".to_string(),
+            ));
+        }
+        self.style_name = Some(style_name);
+        Ok(())
+    }
+
+    /// Remove the direct cell style reference.
+    pub fn clear_style_name(&mut self) {
+        self.style_name = None;
+    }
+
+    /// Return the inert external range declaration, if present.
+    #[must_use]
+    pub fn range_source(&self) -> Option<&crate::model::source::CellRange> {
+        self.range_source.as_ref()
+    }
+
+    /// Attach an inert external range declaration without dereferencing it.
+    pub fn set_range_source(&mut self, source: crate::model::source::CellRange) {
+        self.range_source = Some(source);
+    }
+
+    /// Remove and return the inert external range declaration.
+    pub fn take_range_source(&mut self) -> Option<crate::model::source::CellRange> {
+        self.range_source.take()
+    }
+
+    /// Return all direct cell hyperlinks in document order.
+    #[must_use]
+    pub fn hyperlinks(&self) -> &[Link] {
+        &self.hyperlinks
+    }
+
+    /// Alias for [`Self::hyperlinks`].
+    #[must_use]
+    pub fn links(&self) -> &[Link] {
+        self.hyperlinks()
+    }
+
+    /// Return the first hyperlink in document order, if any.
+    #[must_use]
+    pub fn hyperlink(&self) -> Option<&Link> {
+        self.hyperlinks.first()
+    }
+
+    /// Return one hyperlink by document-order index.
+    #[must_use]
+    pub fn hyperlink_at(&self, index: usize) -> Option<&Link> {
+        self.hyperlinks.get(index)
+    }
+
+    /// Alias for [`Self::hyperlink_at`].
+    #[must_use]
+    pub fn link(&self, index: usize) -> Option<&Link> {
+        self.hyperlink_at(index)
+    }
+
+    /// Whether this cell contains one or more direct hyperlinks.
+    #[must_use]
+    pub fn has_hyperlinks(&self) -> bool {
+        !self.hyperlinks.is_empty()
+    }
+
+    /// Alias for [`Self::has_hyperlinks`].
+    #[must_use]
+    pub fn has_links(&self) -> bool {
+        self.has_hyperlinks()
+    }
+
+    /// Add a hyperlink around a checked UTF-8 byte range of the cell text.
+    ///
+    /// The supplied visible text must exactly equal `self.text[range]`.
+    /// Hyperlink targets are inert and are never dereferenced by this crate.
+    pub fn add_hyperlink(&mut self, range: Range<usize>, mut hyperlink: Link) -> Result<()> {
+        if self.merge == Merge::Covered {
+            return Err(Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        hyperlink.validate_for_authoring()?;
+        let Some(anchor) = self.text.get(range.clone()) else {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if hyperlink.text != anchor {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        hyperlink.set_range(range);
+        let mut candidate = self.hyperlinks.clone();
+        candidate.push(hyperlink);
+        candidate.sort_by_key(|link| {
+            let range = link.range();
+            (range.start, range.end)
+        });
+        validate_hyperlink_ranges(&self.text, &candidate)?;
+        let mut checked = self.clone();
+        checked.hyperlinks = candidate.clone();
+        checked.validate()?;
+        self.hyperlinks = candidate;
+        Ok(())
+    }
+
+    /// Alias for [`Self::add_hyperlink`].
+    pub fn add_link(&mut self, range: Range<usize>, hyperlink: Link) -> Result<()> {
+        self.add_hyperlink(range, hyperlink)
+    }
+
+    /// Replace one hyperlink by index while retaining its checked range.
+    pub fn replace_hyperlink(&mut self, index: usize, mut hyperlink: Link) -> Result<Option<Link>> {
+        let Some(existing) = self.hyperlinks.get(index) else {
+            return Ok(None);
+        };
+        let range = existing.range();
+        hyperlink.validate_for_authoring()?;
+        let Some(anchor) = self.text.get(range.clone()) else {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if hyperlink.text != anchor {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        hyperlink.set_range(range);
+        let mut candidate = self.hyperlinks.clone();
+        let previous = std::mem::replace(&mut candidate[index], hyperlink);
+        validate_hyperlink_ranges(&self.text, &candidate)?;
+        let mut checked = self.clone();
+        checked.hyperlinks = candidate.clone();
+        checked.validate()?;
+        self.hyperlinks = candidate;
+        Ok(Some(previous))
+    }
+
+    /// Alias for [`Self::replace_hyperlink`].
+    pub fn replace_link(&mut self, index: usize, hyperlink: Link) -> Result<Option<Link>> {
+        self.replace_hyperlink(index, hyperlink)
+    }
+
+    /// Replace the hyperlink occupying an exact range.
+    pub fn replace_hyperlink_at(
+        &mut self,
+        range: Range<usize>,
+        hyperlink: Link,
+    ) -> Result<Option<Link>> {
+        let Some(index) = self
+            .hyperlinks
+            .iter()
+            .position(|link| link.range() == range)
+        else {
+            return Ok(None);
+        };
+        let mut hyperlink = hyperlink;
+        hyperlink.set_range(range);
+        self.replace_hyperlink(index, hyperlink)
+    }
+
+    /// Alias for [`Self::replace_hyperlink_at`].
+    pub fn replace_link_at(
+        &mut self,
+        range: Range<usize>,
+        hyperlink: Link,
+    ) -> Result<Option<Link>> {
+        self.replace_hyperlink_at(range, hyperlink)
+    }
+
+    /// Replace the complete displayed cell text with one hyperlink.
+    pub fn set_hyperlink(&mut self, mut hyperlink: Link) -> Result<()> {
+        if self.merge == Merge::Covered {
+            return Err(Error::InvalidFormat(
+                "cannot author a hyperlink in a covered cell".to_string(),
+            ));
+        }
+        hyperlink.validate_for_authoring()?;
+        let text = hyperlink.text.clone();
+        hyperlink.set_range(0..text.len());
+        let mut candidate = self.clone();
+        candidate.text = text.clone();
+        candidate.value = CellValue::Text(text);
+        candidate.formula = None;
+        candidate.hyperlinks = vec![hyperlink];
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Alias for [`Self::set_hyperlink`].
+    pub fn set_link(&mut self, hyperlink: Link) -> Result<()> {
+        self.set_hyperlink(hyperlink)
+    }
+
+    /// Remove one hyperlink by document-order index.
+    pub fn remove_hyperlink(&mut self, index: usize) -> Option<Link> {
+        (index < self.hyperlinks.len()).then(|| self.hyperlinks.remove(index))
+    }
+
+    /// Alias for [`Self::remove_hyperlink`].
+    pub fn remove_link(&mut self, index: usize) -> Option<Link> {
+        self.remove_hyperlink(index)
+    }
+
+    /// Remove all hyperlinks while retaining the cell text.
+    pub fn clear_hyperlinks(&mut self) -> Vec<Link> {
+        std::mem::take(&mut self.hyperlinks)
+    }
+
+    /// Alias for [`Self::clear_hyperlinks`].
+    pub fn clear_links(&mut self) -> Vec<Link> {
+        self.clear_hyperlinks()
+    }
+
+    /// Set a rectangular merge span on this cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_span(&mut self, rows: usize, columns: usize) -> Result<()> {
+        let rows = NonZeroUsize::new(rows).ok_or_else(|| {
+            Error::InvalidFormat("ODS merged-cell row span must be positive".to_string())
+        })?;
+        let columns = NonZeroUsize::new(columns).ok_or_else(|| {
+            Error::InvalidFormat("ODS merged-cell column span must be positive".to_string())
+        })?;
+        self.merge = if rows.get() == 1 && columns.get() == 1 {
+            Merge::None
+        } else {
+            Merge::Span { rows, columns }
+        };
+        Ok(())
+    }
+
+    /// Mark this cell as a covered position or restore it to an ordinary cell.
+    pub fn set_covered(&mut self, covered: bool) {
+        self.merge = if covered { Merge::Covered } else { Merge::None };
+    }
+
+    /// Logical column interval covered by this run when it starts at `start`.
+    #[must_use]
+    pub fn columns(&self, start: usize) -> Range<usize> {
+        start..start.saturating_add(self.repeat())
+    }
+
+    pub(crate) fn with_repeat(&self, repeat: usize) -> Result<Self> {
+        let repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
+            Error::InvalidFormat("ODS cell repetition must be positive".to_string())
+        })?;
+        let mut value = self.clone();
+        value.repeat = repeat;
+        Ok(value)
+    }
+
+    pub(crate) fn equivalent_run(&self, other: &Self) -> bool {
+        self.value == other.value
+            && self.text == other.text
+            && self.formula == other.formula
+            && self.style_name == other.style_name
+            && self.range_source == other.range_source
+            && self.hyperlinks == other.hyperlinks
+            && self.merge == other.merge
+    }
+}
+
+/// One physical ODF row run.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Row {
+    /// Physical cell runs in logical column order.
+    pub cells: Vec<Cell>,
+    /// Direct `table:style-name`, if present.
+    pub style_name: Option<String>,
+    /// Direct `table:default-cell-style-name`, if present.
+    pub default_cell_style_name: Option<String>,
+    /// Number of adjacent logical rows represented by this physical row.
+    pub repeat: NonZeroUsize,
+}
+
+impl Row {
+    /// Create one ordinary row.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            cells: Vec::new(),
+            style_name: None,
+            default_cell_style_name: None,
+            repeat: NonZeroUsize::MIN,
+        }
+    }
+
+    /// Create a compact repeated row run.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn repeated(repeat: usize) -> Result<Self> {
+        let repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
+            Error::InvalidFormat("ODS row repetition must be positive".to_string())
+        })?;
+        Ok(Self {
+            repeat,
+            ..Self::new()
+        })
+    }
+
+    /// Number of logical rows represented by this run.
+    #[must_use]
+    pub fn repeat(&self) -> usize {
+        self.repeat.get()
+    }
+
+    /// Number of logical cells covered by the physical cell runs.
+    #[must_use]
+    pub fn logical_cell_count(&self) -> usize {
+        self.cells
+            .iter()
+            .fold(0usize, |total, cell| total.saturating_add(cell.repeat()))
+    }
+
+    /// Return physical cell runs in logical order.
+    #[must_use]
+    pub fn cells(&self) -> &[Cell] {
+        &self.cells
+    }
+
+    /// Return the physical run covering a logical column.
+    #[must_use]
+    pub fn cell(&self, column: usize) -> Option<&Cell> {
+        let mut start = 0usize;
+        for cell in &self.cells {
+            let end = start.saturating_add(cell.repeat());
+            if column < end {
+                return Some(cell);
+            }
+            start = end;
+        }
+        None
+    }
+
+    /// Append one physical cell run.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn push_cell(&mut self, cell: Cell) -> Result<()> {
+        cell.validate()?;
+        self.cells.push(cell);
+        Ok(())
+    }
+
+    pub(crate) fn with_repeat(&self, repeat: usize) -> Result<Self> {
+        let repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
+            Error::InvalidFormat("ODS row repetition must be positive".to_string())
+        })?;
+        let mut value = self.clone();
+        value.repeat = repeat;
+        Ok(value)
+    }
+
+    pub(crate) fn equivalent_run(&self, other: &Self) -> bool {
+        self.style_name == other.style_name
+            && self.default_cell_style_name == other.default_cell_style_name
+            && self.cells.len() == other.cells.len()
+            && self
+                .cells
+                .iter()
+                .zip(&other.cells)
+                .all(|(left, right)| left.repeat() == right.repeat() && left.equivalent_run(right))
+    }
+}
+
+impl Default for Row {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// An immutable lookup result that distinguishes missing cells from stored runs.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub enum CellView<'a> {
+    /// No physical cell covers the requested coordinate.
+    Missing,
+    /// A physical cell run covers the requested coordinate.
+    Stored(&'a Cell),
+}
+
+/// A typed ODS worksheet.
+#[derive(Clone, Debug, PartialEq)]
+pub struct Sheet {
+    /// Exact ODF `table:name`.
+    pub name: String,
+    /// Physical row runs in document order.
+    pub rows: Vec<Row>,
+    /// Direct `table:style-name`, if present.
+    pub style_name: Option<String>,
+    /// Direct `table:template-name`, if present.
+    pub template_name: Option<String>,
+    /// Direct table-level selection flags for the referenced template.
+    pub style_usage: crate::model::structure::StyleUsage,
+    /// Optional accessibility title from the direct `table:title` child.
+    pub title: Option<String>,
+    /// Optional accessibility description from the direct `table:desc` child.
+    pub description: Option<String>,
+}
+
+impl Sheet {
+    /// Create an empty named worksheet.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn new(name: impl Into<String>) -> Result<Self> {
+        let sheet = Self {
+            name: name.into(),
+            rows: Vec::new(),
+            style_name: None,
+            template_name: None,
+            style_usage: crate::model::structure::StyleUsage::default(),
+            title: None,
+            description: None,
+        };
+        sheet.validate()?;
+        Ok(sheet)
+    }
+
+    /// Number of logical rows, including repeated rows.
+    #[must_use]
+    pub fn logical_row_count(&self) -> usize {
+        self.rows
+            .iter()
+            .fold(0usize, |total, row| total.saturating_add(row.repeat()))
+    }
+
+    /// Number of logical columns in the widest physical row.
+    pub fn logical_column_count(&self) -> usize {
+        self.rows
+            .iter()
+            .map(Row::logical_cell_count)
+            .max()
+            .unwrap_or(0)
+    }
+
+    /// Return the optional accessibility title.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Set or clear the accessibility title.
+    pub fn set_title(&mut self, title: Option<String>) -> Result<()> {
+        if let Some(title) = &title {
+            super::validation::validate_text(title, "table title")?;
+        }
+        self.title = title;
+        Ok(())
+    }
+
+    /// Return the optional accessibility description.
+    #[must_use]
+    pub fn description(&self) -> Option<&str> {
+        self.description.as_deref()
+    }
+
+    /// Set or clear the accessibility description.
+    pub fn set_description(&mut self, description: Option<String>) -> Result<()> {
+        if let Some(description) = &description {
+            super::validation::validate_text(description, "table description")?;
+        }
+        self.description = description;
+        Ok(())
+    }
+
+    /// Set or clear the direct table-template reference.
+    pub fn set_template_name(&mut self, template_name: Option<String>) -> Result<()> {
+        if let Some(template_name) = &template_name {
+            super::validation::validate_non_empty_text(template_name, "table template name")?;
+        }
+        self.template_name = template_name;
+        Ok(())
+    }
+
+    /// Replace the direct table-template style-selection flags.
+    pub fn set_style_usage(&mut self, style_usage: crate::model::structure::StyleUsage) {
+        self.style_usage = style_usage;
+    }
+
+    /// Return the physical row run covering a logical row.
+    #[must_use]
+    pub fn row(&self, index: usize) -> Option<&Row> {
+        let mut start = 0usize;
+        for row in &self.rows {
+            let end = start.saturating_add(row.repeat());
+            if index < end {
+                return Some(row);
+            }
+            start = end;
+        }
+        None
+    }
+
+    /// Return the physical cell run covering a logical coordinate.
+    #[must_use]
+    pub fn cell(&self, row: usize, column: usize) -> Option<&Cell> {
+        self.row(row).and_then(|row| row.cell(column))
+    }
+
+    /// Return a lookup view that distinguishes missing and stored coordinates.
+    pub fn cell_view(&self, row: usize, column: usize) -> CellView<'_> {
+        self.cell(row, column)
+            .map_or(CellView::Missing, CellView::Stored)
+    }
+
+    /// Set a single logical cell as one atomic model operation.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_cell(&mut self, row: usize, column: usize, cell: Cell) -> Result<()> {
+        let mut candidate = self.clone();
+        candidate.set_cell_unchecked(row, column, cell)?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Clear one stored logical cell. Missing coordinates are a no-op.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn clear_cell(&mut self, row: usize, column: usize) -> Result<()> {
+        let Some(existing) = self.cell(row, column).cloned() else {
+            return Ok(());
+        };
+        let mut candidate = self.clone();
+        let mut replacement = Cell::empty();
+        replacement.style_name = existing.style_name.clone();
+        candidate.set_cell_unchecked(row, column, replacement)?;
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Set a formula while retaining its cached typed value and displayed text.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_formula(
+        &mut self,
+        row: usize,
+        column: usize,
+        formula: impl Into<String>,
+    ) -> Result<()> {
+        let mut cell = self.cell(row, column).cloned().unwrap_or_else(Cell::empty);
+        cell.repeat = NonZeroUsize::MIN;
+        cell.set_formula(formula)?;
+        self.set_cell(row, column, cell)
+    }
+
+    /// Set or replace the direct style on one logical cell.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_cell_style(
+        &mut self,
+        row: usize,
+        column: usize,
+        style_name: impl Into<String>,
+    ) -> Result<()> {
+        let mut cell = self.cell(row, column).cloned().unwrap_or_else(Cell::empty);
+        cell.repeat = NonZeroUsize::MIN;
+        cell.set_style_name(style_name)?;
+        self.set_cell(row, column, cell)
+    }
+
+    /// Append a physical row run and validate the resulting graph.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn push_row(&mut self, row: Row) -> Result<()> {
+        let mut candidate = self.clone();
+        candidate.rows.push(row);
+        candidate.validate()?;
+        *self = candidate;
+        Ok(())
+    }
+
+    /// Set the direct sheet style reference.
+    ///
+    /// # Errors
+    /// Returns an error when the operation cannot be completed.
+    pub fn set_style_name(&mut self, style_name: impl Into<String>) -> Result<()> {
+        let style_name = style_name.into();
+        super::validation::validate_text(&style_name, "sheet style name")?;
+        if style_name.is_empty() {
+            return Err(Error::InvalidFormat(
+                "ODS sheet style names must be non-empty".to_string(),
+            ));
+        }
+        self.style_name = Some(style_name);
+        Ok(())
+    }
+
+    /// Remove the direct sheet style reference.
+    pub fn clear_style_name(&mut self) {
+        self.style_name = None;
+    }
+
+    pub(crate) fn validate(&self) -> Result<()> {
+        super::validation::validate_sheet(self)
+    }
+
+    fn set_cell_unchecked(&mut self, row: usize, column: usize, mut cell: Cell) -> Result<()> {
+        if cell.repeat.get() != 1 {
+            return Err(Error::InvalidFormat(
+                "setting one logical cell requires a non-repeated Cell".to_string(),
+            ));
+        }
+        let row_index = isolate_row(&mut self.rows, row)?;
+        let cell_index = isolate_cell(&mut self.rows[row_index].cells, column)?;
+        cell.repeat = NonZeroUsize::MIN;
+        self.rows[row_index].cells[cell_index] = cell;
+        compact_cells(&mut self.rows[row_index].cells)?;
+        compact_rows(&mut self.rows)?;
+        Ok(())
+    }
+
+    pub(crate) fn set_cells_prevalidated(
+        &mut self,
+        changes: Vec<(usize, usize, Cell)>,
+    ) -> Result<()> {
+        let mut touched_rows = Vec::with_capacity(changes.len());
+        let mut changes = changes.into_iter().peekable();
+        let mut row_cursor = 0usize;
+        let mut row_start = 0usize;
+        while let Some((row, column, mut cell)) = changes.next() {
+            let row_index = isolate_row_from(&mut self.rows, row, &mut row_cursor, &mut row_start)?;
+            let mut cell_cursor = 0usize;
+            let mut cell_start = 0usize;
+            let cell_index = isolate_cell_from(
+                &mut self.rows[row_index].cells,
+                column,
+                &mut cell_cursor,
+                &mut cell_start,
+            )?;
+            cell.repeat = NonZeroUsize::MIN;
+            self.rows[row_index].cells[cell_index] = cell;
+
+            while changes
+                .peek()
+                .is_some_and(|(next_row, _, _)| *next_row == row)
+            {
+                let (_, column, mut cell) = changes.next().ok_or_else(|| {
+                    Error::InvalidFormat("ODS cell batch ended early".to_string())
+                })?;
+                let cell_index = isolate_cell_from(
+                    &mut self.rows[row_index].cells,
+                    column,
+                    &mut cell_cursor,
+                    &mut cell_start,
+                )?;
+                cell.repeat = NonZeroUsize::MIN;
+                self.rows[row_index].cells[cell_index] = cell;
+            }
+            touched_rows.push(row_index);
+        }
+        for row_index in touched_rows {
+            compact_cells(&mut self.rows[row_index].cells)?;
+        }
+        compact_rows(&mut self.rows)
+    }
+}
+
+impl Cell {
+    pub(crate) fn validate(&self) -> Result<()> {
+        super::validation::validate_cell(self)
+    }
+}
+
+pub(crate) fn validate_hyperlink_ranges(text: &str, hyperlinks: &[Link]) -> Result<()> {
+    let mut previous_start = 0usize;
+    let mut previous_end = 0usize;
+    for hyperlink in hyperlinks {
+        hyperlink.validate_storage()?;
+        let range = hyperlink.range();
+        if range.start > range.end {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range starts after it ends".to_string(),
+            ));
+        }
+        if range.start < previous_start || range.start < previous_end {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink ranges must be ordered and non-overlapping".to_string(),
+            ));
+        }
+        let Some(anchor) = text.get(range.clone()) else {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink range is not on a UTF-8 character boundary".to_string(),
+            ));
+        };
+        if anchor != hyperlink.text {
+            return Err(Error::InvalidFormat(
+                "cell hyperlink text must match its cell range".to_string(),
+            ));
+        }
+        previous_start = range.start;
+        previous_end = range.end;
+    }
+    Ok(())
+}
+
+fn isolate_row(rows: &mut Vec<Row>, target: usize) -> Result<usize> {
+    let mut index = 0;
+    let mut start = 0;
+    isolate_row_from(rows, target, &mut index, &mut start)
+}
+
+fn isolate_row_from(
+    rows: &mut Vec<Row>,
+    target: usize,
+    index: &mut usize,
+    start: &mut usize,
+) -> Result<usize> {
+    while *index < rows.len() {
+        let count = rows[*index].repeat();
+        let end = start.checked_add(count).ok_or_else(|| {
+            Error::InvalidFormat("ODS row address overflows the logical grid".to_string())
+        })?;
+        if target < end {
+            let offset = target - *start;
+            let original = rows[*index].clone();
+            let mut replacement = Vec::with_capacity(3);
+            if offset > 0 {
+                replacement.push(original.with_repeat(offset)?);
+            }
+            replacement.push(original.with_repeat(1)?);
+            let suffix = count - offset - 1;
+            if suffix > 0 {
+                replacement.push(original.with_repeat(suffix)?);
+            }
+            rows.splice(*index..=*index, replacement);
+            *index += usize::from(offset > 0);
+            *start = target;
+            return Ok(*index);
+        }
+        *start = end;
+        *index += 1;
+    }
+
+    if target > *start {
+        rows.push(Row::repeated(target - *start)?);
+    }
+    rows.push(Row::new());
+    *index = rows.len() - 1;
+    *start = target;
+    Ok(*index)
+}
+
+fn isolate_cell(cells: &mut Vec<Cell>, target: usize) -> Result<usize> {
+    let mut index = 0;
+    let mut start = 0;
+    isolate_cell_from(cells, target, &mut index, &mut start)
+}
+
+fn isolate_cell_from(
+    cells: &mut Vec<Cell>,
+    target: usize,
+    index: &mut usize,
+    start: &mut usize,
+) -> Result<usize> {
+    while *index < cells.len() {
+        let count = cells[*index].repeat();
+        let end = start.checked_add(count).ok_or_else(|| {
+            Error::InvalidFormat("ODS cell address overflows the logical grid".to_string())
+        })?;
+        if target < end {
+            let offset = target - *start;
+            let original = cells[*index].clone();
+            let mut replacement = Vec::with_capacity(3);
+            if offset > 0 {
+                replacement.push(original.with_repeat(offset)?);
+            }
+            replacement.push(original.with_repeat(1)?);
+            let suffix = count - offset - 1;
+            if suffix > 0 {
+                replacement.push(original.with_repeat(suffix)?);
+            }
+            cells.splice(*index..=*index, replacement);
+            *index += usize::from(offset > 0);
+            *start = target;
+            return Ok(*index);
+        }
+        *start = end;
+        *index += 1;
+    }
+    if target > *start {
+        cells.push(Cell::repeated(CellValue::Empty, "", target - *start)?);
+    }
+    cells.push(Cell::empty());
+    *index = cells.len() - 1;
+    *start = target;
+    Ok(*index)
+}
+
+fn compact_cells(cells: &mut Vec<Cell>) -> Result<()> {
+    let mut compacted: Vec<Cell> = Vec::with_capacity(cells.len());
+    for cell in cells.drain(..) {
+        if let Some(previous) = compacted.last_mut()
+            && previous.equivalent_run(&cell)
+        {
+            let repeat = previous
+                .repeat()
+                .checked_add(cell.repeat())
+                .ok_or_else(|| Error::InvalidFormat("ODS cell repetition overflows".to_string()))?;
+            previous.repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
+                Error::InvalidFormat("ODS cell repetition must be positive".to_string())
+            })?;
+        } else {
+            compacted.push(cell);
+        }
+    }
+    *cells = compacted;
+    Ok(())
+}
+
+fn compact_rows(rows: &mut Vec<Row>) -> Result<()> {
+    let mut compacted: Vec<Row> = Vec::with_capacity(rows.len());
+    for row in rows.drain(..) {
+        if let Some(previous) = compacted.last_mut()
+            && previous.equivalent_run(&row)
+        {
+            let repeat = previous
+                .repeat()
+                .checked_add(row.repeat())
+                .ok_or_else(|| Error::InvalidFormat("ODS row repetition overflows".to_string()))?;
+            previous.repeat = NonZeroUsize::new(repeat).ok_or_else(|| {
+                Error::InvalidFormat("ODS row repetition must be positive".to_string())
+            })?;
+        } else {
+            compacted.push(row);
+        }
+    }
+    *rows = compacted;
+    Ok(())
+}

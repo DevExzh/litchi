@@ -10,8 +10,16 @@ license = "Apache-2.0"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
-litchi-odf = { path = ".." }
+libfuzzer-sys = "0.4.13"
+litchi-odf = { path = "..", default-features = false }
+litchi-odt = { path = "../../litchi-odt" }
+
+[[bin]]
+name = "detect"
+path = "fuzz_targets/detect.rs"
+test = false
+doc = false
+bench = false
 
 [[bin]]
 name = "parse_odt"

@@ -1,0 +1,394 @@
+//! Owned chart snapshots, source-checked edits, and reversible package patches.
+
+use super::codec::{content_xml, locate_pages, page_index};
+use super::model::{Chart, Limits, Location, Page, Part, Selector, Storage};
+use super::package;
+use crate::Presentation;
+use crate::core::OwnedPackage;
+use litchi_core::{Error, Result};
+use std::sync::Arc;
+use xml_minifier::audit;
+
+const MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
+const MAX_XML_PARTS: usize = 65_536;
+
+/// Immutable embedded-chart inventory tied to exact ODP package bytes.
+#[derive(Clone)]
+pub struct Snapshot {
+    source: Arc<Vec<u8>>,
+    package: OwnedPackage,
+    limits: Limits,
+    charts: Arc<[Chart]>,
+}
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("source_len", &self.source.len())
+            .field("limits", &self.limits)
+            .field("charts", &self.charts)
+            .finish()
+    }
+}
+
+impl Snapshot {
+    /// Parse an owned ODP package under the default chart resource budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package is oversized, malformed, or is not an ODP package.
+    pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
+        Self::from_bytes_with(source, Limits::default())
+    }
+
+    /// Parse an owned ODP package with an explicit chart resource budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package or chart inventory violates the supplied limits.
+    pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
+        Self::from_shared_bytes(Arc::new(source), limits)
+    }
+
+    pub(crate) fn from_shared_bytes(source: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
+        if source.len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP chart snapshot exceeds the 128 MiB package limit");
+        }
+        let package = OwnedPackage::from_shared_bytes(Arc::clone(&source))?;
+        Self::from_owned_package(package, limits)
+    }
+
+    pub(crate) fn from_owned_package(package: OwnedPackage, limits: Limits) -> Result<Self> {
+        if package.as_bytes().len() > MAX_PACKAGE_BYTES {
+            return invalid("ODP chart snapshot exceeds the 128 MiB package limit");
+        }
+        let presentation = Presentation::from_owned_package(package)?;
+        let charts = presentation.charts_with(limits)?.charts;
+        let package = presentation.owned_package().clone_without_password();
+        let source = package.shared_bytes();
+        Ok(Self {
+            source,
+            package,
+            limits,
+            charts: Arc::from(charts),
+        })
+    }
+
+    /// Borrow the exact complete ODP package bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        self.source.as_slice()
+    }
+
+    /// Return the chart resource budget retained by this snapshot.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Borrow embedded charts in presentation drawing order.
+    #[must_use]
+    pub fn charts(&self) -> &[Chart] {
+        &self.charts
+    }
+
+    /// Select one chart by exact frame name or checked discovery position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an exact frame name is ambiguous.
+    pub fn get<'a, S>(&self, selector: S) -> Result<Option<&Chart>>
+    where
+        S: Into<Selector<'a>>,
+    {
+        select(&self.charts, selector.into())
+            .map(|index| index.map(|selected| &self.charts[selected]))
+    }
+
+    /// Start an isolated, source-checked embedded-chart edit.
+    #[must_use]
+    pub(crate) fn edit(&self) -> Edit {
+        Edit {
+            before: self.clone(),
+            draft: self.charts.to_vec(),
+            next_add_token: 0,
+        }
+    }
+
+    /// Materialize this snapshot as the ordinary presentation facade.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the retained package can no longer be parsed.
+    pub fn to_presentation(&self) -> Result<Presentation> {
+        Presentation::from_owned_package(self.package.clone())
+    }
+
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        &self.package
+    }
+
+    /// Return the identity of the validated archive index retained by this
+    /// immutable chart snapshot.
+    #[doc(hidden)]
+    #[must_use]
+    pub fn prepared_index_identity(&self) -> usize {
+        self.package.prepared_index_identity()
+    }
+}
+
+/// Clone-staged embedded-chart edit over one immutable ODP package.
+#[derive(Clone, Debug)]
+pub(crate) struct Edit {
+    before: Snapshot,
+    draft: Vec<Chart>,
+    next_add_token: usize,
+}
+
+impl Edit {
+    /// Replace one chart part, including occurrences sharing its package part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous selector or a resource-limit breach.
+    pub(crate) fn replace<'a, S>(&mut self, selector: S, part: Part) -> Result<()>
+    where
+        S: Into<Selector<'a>>,
+    {
+        validate_part(&part, self.before.limits)?;
+        let index = select(&self.draft, selector.into())?
+            .ok_or_else(|| invalid_error("ODP embedded chart selector did not match"))?;
+        let selected = self.draft[index].clone();
+        for chart in &mut self.draft {
+            if chart.same_identity(&selected) || chart.shares_storage(&selected) {
+                *chart = chart.with_part(part.clone());
+            }
+        }
+        validate_total(&self.draft, self.before.limits)
+    }
+
+    /// Remove one selected chart occurrence from its drawing page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing or ambiguous selector.
+    pub(crate) fn remove<'a, S>(&mut self, selector: S) -> Result<Chart>
+    where
+        S: Into<Selector<'a>>,
+    {
+        let index = select(&self.draft, selector.into())?
+            .ok_or_else(|| invalid_error("ODP embedded chart selector did not match"))?;
+        Ok(self.draft.remove(index))
+    }
+
+    /// Add a named chart frame to a selected presentation page.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an invalid name, page selector, or resource-limit breach.
+    pub(crate) fn add<'a, P, N>(
+        &mut self,
+        page: P,
+        name: N,
+        storage: Storage,
+        part: Part,
+    ) -> Result<usize>
+    where
+        P: Into<Page<'a>>,
+        N: Into<String>,
+    {
+        validate_part(&part, self.before.limits)?;
+        let frame_name = name.into();
+        validate_name(&frame_name)?;
+        if self
+            .draft
+            .iter()
+            .any(|chart| chart.name() == Some(frame_name.as_str()))
+        {
+            return invalid("ODP chart frame names must be unique for selector stability");
+        }
+        if self.draft.len() >= self.before.limits.max_charts() {
+            return invalid("ODP staged chart count exceeds the chart limit");
+        }
+
+        let presentation = self.before.to_presentation()?;
+        let content = content_xml(presentation.owned_package())?;
+        let selected_page = page_index(&content, page.into())?;
+        let page_name = locate_pages(&content)?
+            .into_iter()
+            .find(|candidate| candidate.index == selected_page)
+            .and_then(|candidate| candidate.name);
+        let index = self.draft.len();
+        let token = self.next_add_token;
+        self.next_add_token = token
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("ODP chart insertion token overflow"))?;
+        self.draft.push(Chart {
+            frame: Some(litchi_odf_common::drawing::Frame {
+                name: Some(frame_name),
+                page_name,
+                ..Default::default()
+            }),
+            storage,
+            part,
+            location: Location::Added {
+                page_index: selected_page,
+                token,
+            },
+        });
+        validate_total(&self.draft, self.before.limits)?;
+        Ok(index)
+    }
+
+    /// Rebuild, audit, reopen, and semantically verify the complete package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when serialization, compactness auditing, package reopening, or typed
+    /// readback fails. The source snapshot is never changed.
+    pub(crate) fn commit(self) -> Result<Commit> {
+        let changed = !charts_semantically_equal(&self.before.charts, &self.draft);
+        let snapshot = if changed {
+            let presentation = self.before.to_presentation()?;
+            let bytes = package::apply(
+                presentation.owned_package(),
+                &self.before.charts,
+                &self.draft,
+            )?;
+            let target = OwnedPackage::from_bytes(bytes)?;
+            validate_compact_package(&target)?;
+            let reopened = Snapshot::from_owned_package(target, self.before.limits)?;
+            if !charts_semantically_equal(&reopened.charts, &self.draft) {
+                return invalid("ODP chart commit failed typed readback");
+            }
+            reopened
+        } else {
+            self.before.clone()
+        };
+        Ok(Commit { snapshot })
+    }
+}
+
+/// A fully rehydrated chart publication.
+#[derive(Clone, Debug)]
+pub(crate) struct Commit {
+    snapshot: Snapshot,
+}
+
+impl Commit {
+    /// Borrow the resulting immutable chart snapshot.
+    #[must_use]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+}
+
+pub(super) fn validate_compact_package(package: &OwnedPackage) -> Result<()> {
+    let mut part_count = 0usize;
+    let mut aggregate_bytes = 0usize;
+    for path in package.files()? {
+        if !path
+            .rsplit_once('.')
+            .is_some_and(|(_, extension)| extension.eq_ignore_ascii_case("xml"))
+        {
+            continue;
+        }
+        let payload = package.get_file(&path)?;
+        part_count = part_count
+            .checked_add(1)
+            .ok_or_else(|| invalid_error("ODP chart XML part count overflow"))?;
+        aggregate_bytes = aggregate_bytes
+            .checked_add(payload.len())
+            .ok_or_else(|| invalid_error("ODP chart aggregate XML size overflow"))?;
+        if part_count > MAX_XML_PARTS || aggregate_bytes > MAX_PACKAGE_BYTES {
+            return invalid("ODP chart XML package audit exceeds its aggregate limit");
+        }
+        let limits = audit::Limits::new(
+            MAX_PACKAGE_BYTES,
+            512,
+            1_000_000,
+            250_000,
+            audit::Limits::TOKEN_BYTE_CEILING,
+            MAX_PACKAGE_BYTES,
+        )
+        .map_err(|source| invalid_error(format!("invalid ODP chart XML audit limits: {source}")))?;
+        let _report = audit::verify(&payload, limits).map_err(|source| match source {
+            audit::Error::NotCompact(_) => Error::Refused(litchi_core::edit::Refusal::new(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "odp.charts.snapshot",
+                "ODP chart XML part is not compact",
+            )),
+            audit::Error::Limit { .. }
+            | audit::Error::Encoding { .. }
+            | audit::Error::Malformed { .. }
+            | audit::Error::Doctype { .. }
+            | audit::Error::Allocation
+            | _ => Error::InvalidFormat(format!(
+                "ODP chart XML part '{path}' failed audit: {source}"
+            )),
+        })?;
+    }
+    Ok(())
+}
+
+pub(super) fn charts_semantically_equal(left: &[Chart], right: &[Chart]) -> bool {
+    left.len() == right.len()
+        && left.iter().zip(right).all(|(left_chart, right_chart)| {
+            left_chart.frame == right_chart.frame
+                && left_chart.storage == right_chart.storage
+                && left_chart.part.chart == right_chart.part.chart
+        })
+}
+
+fn validate_part(part: &Part, limits: Limits) -> Result<()> {
+    if part.xml().is_empty() || part.xml().len() > limits.max_part_bytes() {
+        return invalid("ODP replacement chart exceeds the part-byte limit");
+    }
+    Ok(())
+}
+
+fn validate_total(charts: &[Chart], limits: Limits) -> Result<()> {
+    let total = charts.iter().try_fold(0usize, |total, chart| {
+        total
+            .checked_add(chart.part().xml().len())
+            .ok_or_else(|| invalid_error("ODP chart byte count overflow"))
+    })?;
+    if total > limits.max_total_bytes() {
+        return invalid("ODP staged chart content exceeds the total-byte limit");
+    }
+    Ok(())
+}
+
+fn select(charts: &[Chart], selector: Selector<'_>) -> Result<Option<usize>> {
+    match selector {
+        Selector::Index(index) => Ok((index < charts.len()).then_some(index)),
+        Selector::Name(name) => {
+            let mut selected = None;
+            for (index, chart) in charts.iter().enumerate() {
+                if chart.name() == Some(name) {
+                    if selected.is_some() {
+                        return invalid("ODP embedded chart name is ambiguous");
+                    }
+                    selected = Some(index);
+                }
+            }
+            Ok(selected)
+        },
+    }
+}
+
+fn validate_name(name: &str) -> Result<()> {
+    if name.is_empty() || name.len() > 64 * 1024 || name.chars().any(char::is_control) {
+        return invalid("ODP chart frame name is empty or invalid");
+    }
+    Ok(())
+}
+
+fn invalid<T>(message: impl Into<String>) -> Result<T> {
+    Err(invalid_error(message))
+}
+
+fn invalid_error(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
+}

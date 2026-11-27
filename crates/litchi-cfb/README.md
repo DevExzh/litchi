@@ -6,9 +6,11 @@ Parser and writer for the Microsoft Compound File Binary (CFB / OLE2) container 
 
 CFB is the storage substrate underneath the legacy Microsoft Office binary
 documents (`.doc`, `.xls`, `.ppt`) and is also used to wrap encrypted OOXML
-packages. This crate implements `[MS-CFB]` reading and writing, exposes the
-directory tree, stream I/O, and standard property-set metadata, and is consumed
-by `litchi-ole` and the `crypto` feature of `litchi-ooxml`.
+packages. This crate implements `[MS-CFB]` reading and writing and exposes the
+directory tree and stream I/O. Shared OLE Property Set grammar is owned by
+`litchi-ole-common`, which consumes this CFB substrate. The container is
+consumed directly by `litchi-doc`, `litchi-ppt`, `litchi-xls`, umbrella format
+detection, and OOXML encryption.
 
 ## Usage
 
@@ -18,11 +20,11 @@ litchi-cfb = "0.0.1"
 ```
 
 ```rust
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, OleFileLimits};
 use std::fs::File;
 
 let file = File::open("example.doc")?;
-let mut ole = OleFile::open(file)?;
+let mut ole = OleFile::open(file, OleFileLimits::default())?;
 let word_doc = ole.open_stream(&["WordDocument"])?;
 # Ok::<(), litchi_cfb::OleError>(())
 ```
@@ -31,8 +33,19 @@ let word_doc = ole.open_stream(&["WordDocument"])?;
 
 - Zero-copy parsing of CFB headers, FAT/MiniFAT, and directory entries
 - Stream extraction by path through the storage tree
-- Standard property-set metadata (`SummaryInformation`, `DocumentSummaryInformation`)
+- CFB storage primitives consumed by the shared OLE Property Set owner
 - Optional `write` feature for authoring new CFB containers via `OleWriter`
+- Version 4 range-lock sector reservation in seekable and sequential output,
+  including FAT/DIFAT layouts that cross the 2 GiB boundary. Readers reject
+  metadata or data chains that reuse the reserved sector. Large sequential
+  output requires explicit writer limits that admit the requested size.
+  Readers retain a 2 GiB default input limit; `OleFileLimits::new` and
+  `SharedOleFileLimits::new` allow explicit v4 input ceilings up to 32 GiB.
+  This is a resource profile, below the format's theoretical maximum. Readers
+  also apply a combined 64 MiB default and 2 GiB hard ceiling to decoded
+  FAT/DIFAT/MiniFAT sector bytes plus their `u32` sector-location vectors.
+  This metadata budget excludes directory bytes, physical-sector roles, chain
+  scratch, source bytes, and total process memory.
 
 ## License
 

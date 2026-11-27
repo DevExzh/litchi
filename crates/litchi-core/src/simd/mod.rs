@@ -5,7 +5,7 @@
 //!
 //! # Supported Architectures
 //!
-//! ## x86_64
+//! ## `x86_64`
 //! - **SSE** (Streaming SIMD Extensions): 128-bit vectors
 //! - **SSE2**: Enhanced 128-bit integer operations
 //! - **SSE3**: Additional 128-bit operations
@@ -82,7 +82,7 @@
 //!
 //! When using low-level intrinsics directly, ensure the target CPU supports the required features
 //! either through:
-//! - Runtime detection with `is_x86_feature_detected!()` on x86_64
+//! - Runtime detection with `is_x86_feature_detected!()` on `x86_64`
 //! - Compile-time target features: `#[target_feature(enable = "avx2")]` or `#[target_feature(enable = "sve")]`
 //! - Compiler flags: `RUSTFLAGS="-C target-feature=+avx2"` or `RUSTFLAGS="-C target-feature=+sve"`
 //!

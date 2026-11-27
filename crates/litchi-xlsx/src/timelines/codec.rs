@@ -1,0 +1,1102 @@
+//! Bounded strict/transitional `SpreadsheetML` XML and opaque-fragment codec.
+
+use super::model::{
+    CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, PivotFilter, Range, State,
+    View, Views, validate_cache_definition, validate_range, validate_state,
+    validate_timeline_filter, validate_views_local,
+};
+use super::{
+    MAX_DEPTH, MAX_NODES, MAX_OPAQUE_BYTES, MAX_PIVOT_TABLES, MAX_STRING_BYTES, MAX_TIMELINES,
+    MAX_XML_BYTES, REL, SML, STRICT_REL, STRICT_SML, X15, XR10, bounded, invalid, limit, xml_error,
+};
+use crate::auto_filter::{parse_auto_filter_fragment, write_auto_filter_fragment_limited};
+use crate::error::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::SeenNames;
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::collections::{BTreeMap, HashMap, HashSet};
+
+fn parse_range(n: &Node) -> Result<Range> {
+    no_attributes(n, &[("", "startDate"), ("", "endDate")])?;
+    empty(n)?;
+    Range::new(required(n, "", "startDate")?, required(n, "", "endDate")?)
+}
+
+/// The last child an `x15:state` accepted, in schema order:
+///
+/// ```text
+/// Start --selection--> Selection --bounds--> Bounds --extLst--> ExtensionList
+/// Start --bounds--> Bounds
+/// ```
+///
+/// `selection` is optional and only accepted first. `bounds` is required,
+/// which is checked after the last child. `extLst` is optional and only
+/// accepted directly after `bounds`. No child repeats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum StateStage {
+    Start,
+    Selection,
+    Bounds,
+    ExtensionList,
+}
+
+fn parse_state(n: &Node) -> Result<State> {
+    require(n, X15, "state")?;
+    whitespace(n)?;
+    no_attributes(
+        n,
+        &[
+            ("", "singleRangeFilterState"),
+            ("", "minimalRefreshVersion"),
+            ("", "lastRefreshVersion"),
+            ("", "pivotCacheId"),
+            ("", "filterType"),
+        ],
+    )?;
+    let mut selection = None;
+    let mut bounds = None;
+    let mut extension_list = None;
+    let mut stage = StateStage::Start;
+    for c in &n.children {
+        match (c.namespace.as_str(), c.name.as_str()) {
+            (X15, "selection") if stage == StateStage::Start => {
+                selection = Some(parse_range(c)?);
+                stage = StateStage::Selection;
+            },
+            (X15, "bounds") if matches!(stage, StateStage::Start | StateStage::Selection) => {
+                bounds = Some(parse_range(c)?);
+                stage = StateStage::Bounds;
+            },
+            (ns, "extLst")
+                if stage == StateStage::Bounds && (ns == X15 || ns == SML || ns == STRICT_SML) =>
+            {
+                extension_list = Some(opaque_from_node(c)?);
+                stage = StateStage::ExtensionList;
+            },
+            _ => return Err(invalid("invalid or out-of-order View state child")),
+        }
+    }
+    let state = State {
+        selection,
+        bounds: bounds.ok_or_else(|| invalid("View state requires bounds"))?,
+        extension_list,
+        single_range_filter_state: optional_bool(n, "singleRangeFilterState")?,
+        minimal_refresh_version: required(n, "", "minimalRefreshVersion")?
+            .parse()
+            .map_err(|_source| invalid("invalid minimalRefreshVersion"))?,
+        last_refresh_version: required(n, "", "lastRefreshVersion")?
+            .parse()
+            .map_err(|_source| invalid("invalid lastRefreshVersion"))?,
+        pivot_cache_id: required(n, "", "pivotCacheId")?
+            .parse()
+            .map_err(|_source| invalid("invalid pivotCacheId"))?,
+        filter_type: FilterType::parse(required(n, "", "filterType")?)?,
+    };
+    validate_state(&state)?;
+    Ok(state)
+}
+fn parse_timeline_pivot_filter(n: &Node) -> Result<PivotFilter> {
+    require(n, X15, "timelinePivotFilter")?;
+    whitespace(n)?;
+    no_attributes(
+        n,
+        &[
+            ("", "useWholeDay"),
+            ("", "fld"),
+            ("", "id"),
+            ("", "name"),
+            ("", "description"),
+        ],
+    )?;
+    if n.children.len() > 1 {
+        return Err(invalid(
+            "timelinePivotFilter permits at most one autoFilter",
+        ));
+    }
+    let auto_filter = n
+        .children
+        .first()
+        .map(|c| {
+            if !matches!(c.namespace.as_str(), SML | STRICT_SML) || c.name != "autoFilter" {
+                return Err(invalid("timelinePivotFilter child must be autoFilter"));
+            }
+            parse_auto_filter_fragment(&serialize_node(c)?)
+        })
+        .transpose()?;
+    let v = PivotFilter {
+        use_whole_day: optional_bool(n, "useWholeDay")?,
+        field: required(n, "", "fld")?
+            .parse()
+            .map_err(|_source| invalid("invalid timeline filter fld"))?,
+        id: required(n, "", "id")?
+            .parse()
+            .map_err(|_source| invalid("invalid timeline filter id"))?,
+        name: optional(n, "", "name").map(str::to_owned),
+        description: optional(n, "", "description").map(str::to_owned),
+        auto_filter,
+    };
+    validate_timeline_filter(&v)?;
+    Ok(v)
+}
+
+struct BoundedXml {
+    bytes: Vec<u8>,
+    limit: usize,
+}
+
+impl BoundedXml {
+    fn new(limit: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            limit: limit.min(MAX_XML_BYTES),
+        }
+    }
+
+    fn append(&mut self, bytes: &[u8]) -> Result<()> {
+        let length = self
+            .bytes
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| limit("serialized XML bytes"))?;
+        if length > self.limit {
+            return Err(limit("serialized XML bytes"));
+        }
+        self.bytes
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "Timeline XML output",
+                source,
+            })?;
+        self.bytes.extend_from_slice(bytes);
+        Ok(())
+    }
+
+    fn push(&mut self, byte: u8) -> Result<()> {
+        self.append(&[byte])
+    }
+
+    fn finish(self) -> Vec<u8> {
+        self.bytes
+    }
+
+    fn remaining(&self) -> usize {
+        self.limit.saturating_sub(self.bytes.len())
+    }
+}
+
+fn write_range(x: &mut BoundedXml, name: &str, v: &Range) -> Result<()> {
+    validate_range(v)?;
+    x.append(b"<x15:")?;
+    x.append(name.as_bytes())?;
+    attr_limited(x, "startDate", &v.start_date)?;
+    attr_limited(x, "endDate", &v.end_date)?;
+    x.append(b"/>")?;
+    Ok(())
+}
+fn write_state(x: &mut BoundedXml, v: &State) -> Result<()> {
+    validate_state(v)?;
+    x.append(b"<x15:state")?;
+    if let Some(q) = v.single_range_filter_state {
+        bool_attr(x, "singleRangeFilterState", q)?;
+    }
+    attr_limited(
+        x,
+        "minimalRefreshVersion",
+        &v.minimal_refresh_version.to_string(),
+    )?;
+    attr_limited(x, "lastRefreshVersion", &v.last_refresh_version.to_string())?;
+    attr_limited(x, "pivotCacheId", &v.pivot_cache_id.to_string())?;
+    attr_limited(x, "filterType", v.filter_type.as_str())?;
+    x.push(b'>')?;
+    if let Some(q) = &v.selection {
+        write_range(x, "selection", q)?;
+    }
+    write_range(x, "bounds", &v.bounds)?;
+    if let Some(q) = &v.extension_list {
+        append_opaque_any_namespace(x, q, "extLst")?;
+    }
+    x.append(b"</x15:state>")?;
+    Ok(())
+}
+fn write_timeline_pivot_filter(x: &mut BoundedXml, v: &PivotFilter) -> Result<()> {
+    validate_timeline_filter(v)?;
+    x.append(b"<x15:timelinePivotFilter")?;
+    if let Some(q) = v.use_whole_day {
+        bool_attr(x, "useWholeDay", q)?;
+    }
+    attr_limited(x, "fld", &v.field.to_string())?;
+    attr_limited(x, "id", &v.id.to_string())?;
+    if let Some(q) = &v.name {
+        attr_limited(x, "name", q)?;
+    }
+    if let Some(q) = &v.description {
+        attr_limited(x, "description", q)?;
+    }
+    if let Some(q) = &v.auto_filter {
+        x.push(b'>')?;
+        let fragment = write_auto_filter_fragment_limited(q, x.remaining())?;
+        x.append(&fragment)?;
+        x.append(b"</x15:timelinePivotFilter>")?;
+    } else {
+        x.append(b"/>")?;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Attribute {
+    pub(super) namespace: String,
+    pub(super) name: String,
+    pub(super) value: String,
+}
+#[derive(Clone, Debug)]
+pub(super) struct Node {
+    pub(super) namespace: String,
+    pub(super) name: String,
+    pub(super) attributes: Vec<Attribute>,
+    pub(super) children: Vec<Node>,
+    pub(super) text: String,
+}
+
+/// Parse one MS-XLSX View Cache part.
+pub fn parse_timeline_cache_definition(xml: &[u8]) -> Result<CacheDefinition> {
+    parse_timeline_cache_definition_limited(xml, &litchi_opc::SourceLimits::default())
+}
+
+/// The last child an `x15:timelineCacheDefinition` accepted, in schema order:
+///
+/// ```text
+/// Start --pivotTables--> PivotTables --state--> State
+/// Start --state--> State
+/// State --timelinePivotFilter--> PivotFilter --extLst--> ExtensionList
+/// State --extLst--> ExtensionList
+/// ```
+///
+/// `pivotTables` is optional and only accepted first. `state` is required,
+/// which is checked after the last child. `timelinePivotFilter` is optional
+/// and only accepted directly after `state`; `extLst` is optional and
+/// accepted after `state` or `timelinePivotFilter`. No child repeats.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CacheStage {
+    Start,
+    PivotTables,
+    State,
+    PivotFilter,
+    ExtensionList,
+}
+
+fn parse_cache_root(root: Node) -> Result<CacheDefinition> {
+    require(&root, X15, "timelineCacheDefinition")?;
+    whitespace(&root)?;
+    no_attributes(&root, &[("", "name"), ("", "sourceName"), (XR10, "uid")])?;
+    let name = required(&root, "", "name")?.to_owned();
+    let source_name = required(&root, "", "sourceName")?.to_owned();
+    let uid = optional(&root, XR10, "uid").map(str::to_owned);
+    let mut pivot_tables = Vec::new();
+    let mut state = None;
+    let mut timeline_pivot_filter = None;
+    let mut extension_list = None;
+    let mut stage = CacheStage::Start;
+    for child in &root.children {
+        match child.name.as_str() {
+            "pivotTables" if child.namespace == X15 && stage == CacheStage::Start => {
+                stage = CacheStage::PivotTables;
+                parse_pivot_tables(child, &mut pivot_tables)?;
+            },
+            "state"
+                if child.namespace == X15
+                    && matches!(stage, CacheStage::Start | CacheStage::PivotTables) =>
+            {
+                stage = CacheStage::State;
+                state = Some(parse_state(child)?);
+            },
+            "timelinePivotFilter" if child.namespace == X15 && stage == CacheStage::State => {
+                stage = CacheStage::PivotFilter;
+                timeline_pivot_filter = Some(parse_timeline_pivot_filter(child)?);
+            },
+            "extLst"
+                if (child.namespace == X15
+                    || child.namespace == SML
+                    || child.namespace == STRICT_SML)
+                    && matches!(stage, CacheStage::State | CacheStage::PivotFilter) =>
+            {
+                stage = CacheStage::ExtensionList;
+                extension_list = Some(opaque_from_node(child)?);
+            },
+            _ => {
+                return Err(invalid(format!(
+                    "unexpected or out-of-order View Cache child '{}'",
+                    child.name
+                )));
+            },
+        }
+    }
+    let value = CacheDefinition {
+        name,
+        uid,
+        source_name,
+        pivot_tables,
+        state: state.ok_or_else(|| invalid("View Cache requires exactly one state element"))?,
+        timeline_pivot_filter,
+        extension_list,
+    };
+    validate_cache_definition(&value)?;
+    Ok(value)
+}
+
+pub(crate) fn parse_timeline_cache_definition_limited(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<CacheDefinition> {
+    parse_cache_root(parse_timeline_document(xml, limits)?)
+}
+
+fn parse_pivot_tables(node: &Node, output: &mut Vec<CachePivotTable>) -> Result<()> {
+    no_attributes(node, &[])?;
+    whitespace(node)?;
+    if node.children.is_empty() {
+        return Err(invalid("pivotTables must contain at least one pivotTable"));
+    }
+    if node.children.len() > MAX_PIVOT_TABLES {
+        return Err(limit("pivot table count"));
+    }
+    let mut bindings = HashSet::new();
+    for child in &node.children {
+        require(child, X15, "pivotTable")?;
+        no_attributes(child, &[("", "tabId"), ("", "name")])?;
+        empty(child)?;
+        let tab_id = required(child, "", "tabId")?
+            .parse::<u32>()
+            .map_err(|_source| invalid("invalid View Cache pivotTable tabId"))?;
+        let name = required(child, "", "name")?.to_owned();
+        bounded(&name, "pivot table name")?;
+        if !bindings.insert((tab_id, name.to_lowercase())) {
+            return Err(invalid("duplicate View Cache pivotTable binding"));
+        }
+        output.push(CachePivotTable { tab_id, name });
+    }
+    Ok(())
+}
+
+/// Deterministically serialize one View Cache part.
+pub fn write_timeline_cache_definition(value: &CacheDefinition) -> Result<Vec<u8>> {
+    write_timeline_cache_definition_limited(value, MAX_XML_BYTES)
+}
+
+pub(crate) fn write_timeline_cache_definition_limited(
+    value: &CacheDefinition,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    if let Some(filter) = value
+        .timeline_pivot_filter
+        .as_ref()
+        .and_then(|filter| filter.auto_filter.as_ref())
+    {
+        write_auto_filter_fragment_limited(filter, maximum)?;
+    }
+    validate_cache_definition(value)?;
+    let mut output = BoundedXml::new(maximum);
+    output.append(b"<x15:timelineCacheDefinition xmlns:x15=\"")?;
+    escape_limited(&mut output, X15)?;
+    output.append(b"\" xmlns:xr10=\"")?;
+    escape_limited(&mut output, XR10)?;
+    output.push(b'\"')?;
+    attr_limited(&mut output, "name", &value.name)?;
+    attr_limited(&mut output, "sourceName", &value.source_name)?;
+    if let Some(uid) = &value.uid {
+        attr_limited(&mut output, "xr10:uid", uid)?;
+    }
+    output.push(b'>')?;
+    if !value.pivot_tables.is_empty() {
+        output.append(b"<x15:pivotTables>")?;
+        for pivot in &value.pivot_tables {
+            output.append(b"<x15:pivotTable")?;
+            attr_limited(&mut output, "tabId", &pivot.tab_id.to_string())?;
+            attr_limited(&mut output, "name", &pivot.name)?;
+            output.append(b"/>")?;
+        }
+        output.append(b"</x15:pivotTables>")?;
+    }
+    write_state(&mut output, &value.state)?;
+    if let Some(payload) = &value.timeline_pivot_filter {
+        write_timeline_pivot_filter(&mut output, payload)?;
+    }
+    if let Some(payload) = &value.extension_list {
+        append_opaque_any_namespace(&mut output, payload, "extLst")?;
+    }
+    output.append(b"</x15:timelineCacheDefinition>")?;
+    Ok(output.finish())
+}
+
+pub(super) fn preflight_cache_definition_limited(
+    value: &CacheDefinition,
+    maximum: usize,
+) -> Result<()> {
+    if let Some(filter) = value
+        .timeline_pivot_filter
+        .as_ref()
+        .and_then(|filter| filter.auto_filter.as_ref())
+    {
+        write_auto_filter_fragment_limited(filter, maximum)?;
+    }
+    Ok(())
+}
+
+/// Parse one worksheet-scoped Views part.
+pub fn parse_timelines(xml: &[u8]) -> Result<Views> {
+    parse_timelines_limited(xml, &litchi_opc::SourceLimits::default())
+}
+
+fn parse_views_root(root: Node) -> Result<Views> {
+    require(&root, X15, "timelines")?;
+    no_attributes(&root, &[])?;
+    whitespace(&root)?;
+    if root.children.is_empty() {
+        return Err(invalid("Views part must contain at least one timeline"));
+    }
+    if root.children.len() > MAX_TIMELINES {
+        return Err(limit("timeline count"));
+    }
+    let mut timelines = Vec::with_capacity(root.children.len());
+    for child in &root.children {
+        timelines.push(parse_timeline(child)?);
+    }
+    let value = Views { timelines };
+    validate_views_local(&value)?;
+    Ok(value)
+}
+
+pub(crate) fn parse_timelines_limited(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<Views> {
+    parse_views_root(parse_timeline_document(xml, limits)?)
+}
+
+/// Select active compatibility branches with the timeline and revision-UID
+/// namespaces understood. This projection is only for cache/view payloads;
+/// package-integration scans still retain their original source coordinates.
+fn parse_timeline_document(xml: &[u8], source: &litchi_opc::SourceLimits) -> Result<Node> {
+    use litchi_ooxml_common::mce::{Capabilities, Limits, Name, process_markup_compatibility};
+    crate::raw::check_xml_limits(xml, source)?;
+    let bytes = source
+        .max_part_bytes()
+        .min(source.max_entry_bytes())
+        .min(MAX_XML_BYTES as u64);
+    let maximum = usize::try_from(bytes).map_err(|_source| limit("XML bytes"))?;
+    let limits = Limits {
+        max_input_bytes: maximum,
+        max_output_bytes: maximum,
+        max_depth: source.max_depth().min(MAX_DEPTH),
+        ..Limits::default()
+    };
+    let mut capabilities = Capabilities::default();
+    capabilities
+        .understand_namespace(X15)
+        .understand_namespace(XR10);
+    for namespace in [X15, SML, STRICT_SML] {
+        capabilities.preserve_extension_element(Name {
+            namespace: namespace.into(),
+            local_name: "extLst".into(),
+        });
+    }
+    let processed = process_markup_compatibility(xml, &capabilities, &limits)?;
+    crate::raw::check_xml_limits(processed.xml.as_ref(), source)?;
+    parse_document(processed.xml.as_ref())
+}
+
+fn parse_timeline(node: &Node) -> Result<View> {
+    require(node, X15, "timeline")?;
+    whitespace(node)?;
+    no_attributes(
+        node,
+        &[
+            ("", "name"),
+            (XR10, "uid"),
+            ("", "cache"),
+            ("", "caption"),
+            ("", "showHeader"),
+            ("", "showSelectionLabel"),
+            ("", "showTimeLevel"),
+            ("", "showHorizontalScrollbar"),
+            ("", "level"),
+            ("", "selectionLevel"),
+            ("", "scrollPosition"),
+            ("", "style"),
+        ],
+    )?;
+    if node.children.len() > 1 {
+        return Err(invalid("timeline permits at most one extLst"));
+    }
+    let extension_list = node
+        .children
+        .first()
+        .map(|child| {
+            if child.name != "extLst"
+                || !(child.namespace == X15
+                    || child.namespace == SML
+                    || child.namespace == STRICT_SML)
+            {
+                return Err(invalid("timeline child must be extLst"));
+            }
+            opaque_from_node(child)
+        })
+        .transpose()?;
+    Ok(View {
+        name: required(node, "", "name")?.to_owned(),
+        uid: optional(node, XR10, "uid").map(str::to_owned),
+        cache: required(node, "", "cache")?.to_owned(),
+        caption: optional(node, "", "caption").map(str::to_owned),
+        show_header: optional_bool(node, "showHeader")?,
+        show_selection_label: optional_bool(node, "showSelectionLabel")?,
+        show_time_level: optional_bool(node, "showTimeLevel")?,
+        show_horizontal_scrollbar: optional_bool(node, "showHorizontalScrollbar")?,
+        level: Level::parse(required(node, "", "level")?, "level")?,
+        selection_level: Level::parse(required(node, "", "selectionLevel")?, "selectionLevel")?,
+        scroll_position: optional(node, "", "scrollPosition").map(str::to_owned),
+        style: optional(node, "", "style").map(str::to_owned),
+        extension_list,
+    })
+}
+
+/// Deterministically serialize one worksheet-scoped Views part.
+pub fn write_timelines(value: &Views) -> Result<Vec<u8>> {
+    write_timelines_limited(value, MAX_XML_BYTES)
+}
+
+pub(crate) fn write_timelines_limited(value: &Views, maximum: usize) -> Result<Vec<u8>> {
+    validate_views_local(value)?;
+    let mut output = BoundedXml::new(maximum);
+    output.append(b"<x15:timelines xmlns:x15=\"")?;
+    escape_limited(&mut output, X15)?;
+    output.append(b"\" xmlns:xr10=\"")?;
+    escape_limited(&mut output, XR10)?;
+    output.append(b"\">")?;
+    for timeline in &value.timelines {
+        output.append(b"<x15:timeline")?;
+        attr_limited(&mut output, "name", &timeline.name)?;
+        if let Some(uid) = &timeline.uid {
+            attr_limited(&mut output, "xr10:uid", uid)?;
+        }
+        attr_limited(&mut output, "cache", &timeline.cache)?;
+        if let Some(value) = &timeline.caption {
+            attr_limited(&mut output, "caption", value)?;
+        }
+        for (name, value) in [
+            ("showHeader", timeline.show_header),
+            ("showSelectionLabel", timeline.show_selection_label),
+            ("showTimeLevel", timeline.show_time_level),
+            (
+                "showHorizontalScrollbar",
+                timeline.show_horizontal_scrollbar,
+            ),
+        ] {
+            if let Some(value) = value {
+                bool_attr(&mut output, name, value)?;
+            }
+        }
+        attr_limited(&mut output, "level", timeline.level.number())?;
+        attr_limited(
+            &mut output,
+            "selectionLevel",
+            timeline.selection_level.number(),
+        )?;
+        if let Some(value) = &timeline.scroll_position {
+            attr_limited(&mut output, "scrollPosition", value)?;
+        }
+        if let Some(value) = &timeline.style {
+            attr_limited(&mut output, "style", value)?;
+        }
+        if let Some(payload) = &timeline.extension_list {
+            output.push(b'>')?;
+            append_opaque_any_namespace(&mut output, payload, "extLst")?;
+            output.append(b"</x15:timeline>")?;
+        } else {
+            output.append(b"/>")?;
+        }
+    }
+    output.append(b"</x15:timelines>")?;
+    Ok(output.finish())
+}
+
+/// Load and validate all workbook View Cache parts.
+pub(super) fn parse_document(xml: &[u8]) -> Result<Node> {
+    if xml.len() > MAX_XML_BYTES {
+        return Err(limit("XML bytes"));
+    }
+    std::str::from_utf8(xml).map_err(xml_error)?;
+    let mut reader = NsReader::from_reader(xml);
+    let mut stack = Vec::new();
+    let mut root = None;
+    let mut nodes = 0usize;
+    let mut strings = 0usize;
+    loop {
+        let event = reader.read_event().map_err(xml_error)?;
+        match event {
+            Event::Start(ref element) | Event::Empty(ref element) => {
+                nodes += 1;
+                if nodes > MAX_NODES || stack.len() >= MAX_DEPTH {
+                    return Err(limit("XML structure"));
+                }
+                let empty = matches!(&event, Event::Empty(_));
+                let node = make_node(&reader, element, reader.decoder(), &mut strings)?;
+                if empty {
+                    attach(node, &mut stack, &mut root)?;
+                } else {
+                    stack.push(node);
+                }
+            },
+            Event::End(_) => {
+                let node = stack
+                    .pop()
+                    .ok_or_else(|| invalid("unexpected XML closing element"))?;
+                attach(node, &mut stack, &mut root)?;
+            },
+            Event::Text(text) => {
+                let decoded = text.decode().map_err(xml_error)?;
+                let decoded = quick_xml::escape::unescape(&decoded).map_err(xml_error)?;
+                add_strings(&mut strings, decoded.len())?;
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&decoded);
+                } else if !decoded.trim().is_empty() {
+                    return Err(invalid("text outside XML root"));
+                }
+            },
+            Event::GeneralRef(reference) => {
+                let name = reference.decode().map_err(xml_error)?;
+                let value = reference
+                    .resolve_char_ref()
+                    .map_err(xml_error)?
+                    .map(|value| value.to_string())
+                    .or_else(|| match name.as_ref() {
+                        "amp" => Some("&".into()),
+                        "lt" => Some("<".into()),
+                        "gt" => Some(">".into()),
+                        "apos" => Some("'".into()),
+                        "quot" => Some("\"".into()),
+                        _ => None,
+                    })
+                    .ok_or_else(|| invalid("custom XML entity is rejected"))?;
+                add_strings(&mut strings, value.len())?;
+                if let Some(node) = stack.last_mut() {
+                    node.text.push_str(&value);
+                } else {
+                    return Err(invalid("entity outside XML root"));
+                }
+            },
+            Event::CData(_) => return Err(invalid("CDATA is rejected")),
+            Event::DocType(_) | Event::PI(_) => {
+                return Err(invalid("DTDs and processing instructions are rejected"));
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Eof => break,
+        }
+    }
+    if !stack.is_empty() {
+        return Err(invalid("unterminated XML"));
+    }
+    root.ok_or_else(|| invalid("missing XML root"))
+}
+
+pub(super) fn parse_document_limited(
+    xml: &[u8],
+    limits: &litchi_opc::SourceLimits,
+) -> Result<Node> {
+    crate::raw::check_xml_limits(xml, limits)?;
+    parse_document(xml)
+}
+
+fn make_node(
+    reader: &NsReader<&[u8]>,
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    strings: &mut usize,
+) -> Result<Node> {
+    let namespace = resolved(reader.resolver().resolve_element(element.name()).0)?;
+    let name = std::str::from_utf8(element.local_name().as_ref())
+        .map_err(xml_error)?
+        .to_owned();
+    add_strings(strings, namespace.len() + name.len())?;
+    let mut attributes = Vec::new();
+    // Expanded names borrowed from the resolver and the tag: checking each
+    // one costs O(log n), where scanning `attributes` would cost O(n).
+    let mut expanded = SeenNames::new();
+    for item in element.checked_attributes() {
+        let item = item.map_err(xml_error)?;
+        let qname = item.key.as_ref();
+        if qname == b"xmlns" || qname.starts_with(b"xmlns:") {
+            continue;
+        }
+        let (namespace, local) = reader.resolver().resolve_attribute(item.key);
+        let key = (resolved_bytes(&namespace), local.into_inner());
+        let namespace = resolved(namespace)?;
+        let name = std::str::from_utf8(local.as_ref())
+            .map_err(xml_error)?
+            .to_owned();
+        let value = item
+            .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+            .map_err(xml_error)?
+            .into_owned();
+        add_strings(strings, namespace.len() + name.len() + value.len())?;
+        if !expanded.insert(key) {
+            return Err(invalid("duplicate expanded XML attribute"));
+        }
+        attributes.push(Attribute {
+            namespace,
+            name,
+            value,
+        });
+    }
+    Ok(Node {
+        namespace,
+        name,
+        attributes,
+        children: Vec::new(),
+        text: String::new(),
+    })
+}
+
+fn attach(node: Node, stack: &mut [Node], root: &mut Option<Node>) -> Result<()> {
+    if let Some(parent) = stack.last_mut() {
+        parent.children.push(node);
+    } else if root.replace(node).is_some() {
+        return Err(invalid("multiple XML roots"));
+    }
+    Ok(())
+}
+
+pub(super) fn opaque_from_node(node: &Node) -> Result<OpaqueXml> {
+    let xml = serialize_node(node)?;
+    if xml.len() > MAX_OPAQUE_BYTES {
+        return Err(limit("opaque XML bytes"));
+    }
+    Ok(OpaqueXml { xml })
+}
+
+pub(super) fn serialize_node(node: &Node) -> Result<Vec<u8>> {
+    let mut namespaces = BTreeMap::<String, String>::new();
+    collect_namespaces(node, &mut namespaces);
+    let mut prefixes = HashMap::new();
+    let mut next = 0usize;
+    for namespace in namespaces.keys() {
+        let prefix = match namespace.as_str() {
+            X15 => "x15".into(),
+            SML | STRICT_SML => "x".into(),
+            REL | STRICT_REL => "r".into(),
+            XR10 => "xr10".into(),
+            _ => {
+                let value = format!("n{next}");
+                next += 1;
+                value
+            },
+        };
+        prefixes.insert(namespace.clone(), prefix);
+    }
+    let mut output = Vec::new();
+    write_node(node, &prefixes, true, &mut output);
+    Ok(output)
+}
+
+fn collect_namespaces(node: &Node, output: &mut BTreeMap<String, String>) {
+    if !node.namespace.is_empty() {
+        output.insert(node.namespace.clone(), String::new());
+    }
+    for attr in &node.attributes {
+        if !attr.namespace.is_empty() {
+            output.insert(attr.namespace.clone(), String::new());
+        }
+    }
+    for child in &node.children {
+        collect_namespaces(child, output);
+    }
+}
+fn write_node(node: &Node, prefixes: &HashMap<String, String>, root: bool, output: &mut Vec<u8>) {
+    output.push(b'<');
+    qname(output, &node.namespace, &node.name, prefixes);
+    if root {
+        let mut entries: Vec<_> = prefixes.iter().collect();
+        entries.sort_by(|a, b| a.1.cmp(b.1));
+        for (namespace, prefix) in entries {
+            output.extend_from_slice(b" xmlns:");
+            output.extend_from_slice(prefix.as_bytes());
+            output.extend_from_slice(b"=\"");
+            escape(output, namespace);
+            output.push(b'\"');
+        }
+    }
+    for attr_value in &node.attributes {
+        output.push(b' ');
+        qname(output, &attr_value.namespace, &attr_value.name, prefixes);
+        output.extend_from_slice(b"=\"");
+        escape(output, &attr_value.value);
+        output.push(b'\"');
+    }
+    if node.children.is_empty() && node.text.is_empty() {
+        output.extend_from_slice(b"/>");
+        return;
+    }
+    output.push(b'>');
+    escape_text(output, &node.text);
+    for child in &node.children {
+        write_node(child, prefixes, false, output);
+    }
+    output.extend_from_slice(b"</");
+    qname(output, &node.namespace, &node.name, prefixes);
+    output.push(b'>');
+}
+fn qname(output: &mut Vec<u8>, namespace: &str, name: &str, prefixes: &HashMap<String, String>) {
+    if !namespace.is_empty() {
+        output.extend_from_slice(prefixes[namespace].as_bytes());
+        output.push(b':');
+    }
+    output.extend_from_slice(name.as_bytes());
+}
+
+fn append_opaque_any_namespace(
+    output: &mut BoundedXml,
+    payload: &OpaqueXml,
+    name: &str,
+) -> Result<()> {
+    validate_opaque_kind(payload, &[X15, SML, STRICT_SML], name)?;
+    output.append(&payload.xml)
+}
+pub(super) fn validate_opaque_kind(
+    payload: &OpaqueXml,
+    namespaces: &[&str],
+    name: &str,
+) -> Result<()> {
+    if payload.xml.len() > MAX_OPAQUE_BYTES {
+        return Err(limit("opaque XML bytes"));
+    }
+    let root = parse_document(&payload.xml)?;
+    if root.name != name || !namespaces.contains(&root.namespace.as_str()) {
+        return Err(invalid(format!(
+            "opaque XML must be a {name} element in its normative namespace"
+        )));
+    }
+    Ok(())
+}
+
+pub(super) fn require(node: &Node, namespace: &str, name: &str) -> Result<()> {
+    if node.namespace == namespace && node.name == name {
+        Ok(())
+    } else {
+        Err(invalid(format!(
+            "expected {{{namespace}}}{name}, got {{{}}}{}",
+            node.namespace, node.name
+        )))
+    }
+}
+pub(super) fn optional<'a>(node: &'a Node, namespace: &str, name: &str) -> Option<&'a str> {
+    node.attributes
+        .iter()
+        .find(|attribute| attribute.namespace == namespace && attribute.name == name)
+        .map(|attribute| attribute.value.as_str())
+}
+pub(super) fn required<'a>(node: &'a Node, namespace: &str, name: &str) -> Result<&'a str> {
+    optional(node, namespace, name)
+        .filter(|value| !value.is_empty())
+        .ok_or_else(|| invalid(format!("{} is missing attribute '{name}'", node.name)))
+}
+pub(super) fn optional_bool(node: &Node, name: &str) -> Result<Option<bool>> {
+    optional(node, "", name)
+        .map(|value| parse_bool(value, name))
+        .transpose()
+}
+fn parse_bool(value: &str, name: &str) -> Result<bool> {
+    match value {
+        "1" | "true" => Ok(true),
+        "0" | "false" => Ok(false),
+        _ => Err(invalid(format!("invalid boolean '{value}' for {name}"))),
+    }
+}
+pub(super) fn no_attributes(node: &Node, allowed: &[(&str, &str)]) -> Result<()> {
+    if let Some(attribute) = node.attributes.iter().find(|attribute| {
+        !allowed.contains(&(attribute.namespace.as_str(), attribute.name.as_str()))
+    }) {
+        Err(invalid(format!(
+            "unexpected attribute '{}' on {}",
+            attribute.name, node.name
+        )))
+    } else {
+        Ok(())
+    }
+}
+pub(super) fn whitespace(node: &Node) -> Result<()> {
+    if node.text.trim().is_empty() {
+        Ok(())
+    } else {
+        Err(invalid(format!("unexpected text in {}", node.name)))
+    }
+}
+pub(super) fn empty(node: &Node) -> Result<()> {
+    whitespace(node)?;
+    if node.children.is_empty() {
+        Ok(())
+    } else {
+        Err(invalid(format!("{} must be empty", node.name)))
+    }
+}
+fn add_strings(total: &mut usize, size: usize) -> Result<()> {
+    *total = total
+        .checked_add(size)
+        .ok_or_else(|| limit("XML string bytes"))?;
+    if *total > MAX_STRING_BYTES {
+        Err(limit("XML string bytes"))
+    } else {
+        Ok(())
+    }
+}
+fn resolved(value: ResolveResult<'_>) -> Result<String> {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => {
+            Ok(std::str::from_utf8(value).map_err(xml_error)?.to_owned())
+        },
+        ResolveResult::Unbound => Ok(String::new()),
+        ResolveResult::Unknown(prefix) => Err(invalid(format!(
+            "unbound XML prefix '{}'",
+            String::from_utf8_lossy(prefix.as_ref())
+        ))),
+    }
+}
+/// The bytes of the namespace [`resolved`] returns: the URI when bound and
+/// empty when unbound. An unknown prefix, which `resolved` refuses, is empty.
+fn resolved_bytes<'a>(value: &ResolveResult<'a>) -> &'a [u8] {
+    match value {
+        ResolveResult::Bound(Namespace(value)) => value,
+        ResolveResult::Unbound | ResolveResult::Unknown(_) => &[],
+    }
+}
+fn bool_attr(output: &mut BoundedXml, name: &str, value: bool) -> Result<()> {
+    attr_limited(output, name, if value { "1" } else { "0" })
+}
+fn attr_limited(output: &mut BoundedXml, name: &str, value: &str) -> Result<()> {
+    output.push(b' ')?;
+    output.append(name.as_bytes())?;
+    output.append(b"=\"")?;
+    escape_limited(output, value)?;
+    output.push(b'\"')?;
+    Ok(())
+}
+
+pub(super) fn attr(output: &mut Vec<u8>, name: &str, value: &str) {
+    output.push(b' ');
+    output.extend_from_slice(name.as_bytes());
+    output.extend_from_slice(b"=\"");
+    escape(output, value);
+    output.push(b'\"');
+}
+pub(super) fn escape(output: &mut Vec<u8>, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => output.extend_from_slice(b"&amp;"),
+            '<' => output.extend_from_slice(b"&lt;"),
+            '"' => output.extend_from_slice(b"&quot;"),
+            '\t' => output.extend_from_slice(b"&#x9;"),
+            '\n' => output.extend_from_slice(b"&#xA;"),
+            '\r' => output.extend_from_slice(b"&#xD;"),
+            _ => {
+                let mut bytes = [0; 4];
+                output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
+            },
+        }
+    }
+}
+
+fn escape_limited(output: &mut BoundedXml, value: &str) -> Result<()> {
+    for character in value.chars() {
+        match character {
+            '&' => output.append(b"&amp;")?,
+            '<' => output.append(b"&lt;")?,
+            '"' => output.append(b"&quot;")?,
+            '\t' => output.append(b"&#x9;")?,
+            '\n' => output.append(b"&#xA;")?,
+            '\r' => output.append(b"&#xD;")?,
+            _ => {
+                let mut bytes = [0; 4];
+                output.append(character.encode_utf8(&mut bytes).as_bytes())?;
+            },
+        }
+    }
+    Ok(())
+}
+pub(super) fn escape_text(output: &mut Vec<u8>, value: &str) {
+    for character in value.chars() {
+        match character {
+            '&' => output.extend_from_slice(b"&amp;"),
+            '<' => output.extend_from_slice(b"&lt;"),
+            '>' => output.extend_from_slice(b"&gt;"),
+            _ => {
+                let mut bytes = [0; 4];
+                output.extend_from_slice(character.encode_utf8(&mut bytes).as_bytes());
+            },
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::error::Error;
+
+    /// ` a00000="0" a00001="1" ...`: `count` distinct attribute names.
+    fn distinct_attributes(count: usize) -> String {
+        (0..count)
+            .map(|index| format!(" a{index:05}=\"{index}\""))
+            .collect()
+    }
+
+    fn parse(xml: &str) -> Result<Node> {
+        parse_document(xml.as_bytes())
+    }
+
+    fn attributes(node: &Node) -> Vec<(&str, &str, &str)> {
+        node.attributes
+            .iter()
+            .map(|attribute| {
+                (
+                    attribute.namespace.as_str(),
+                    attribute.name.as_str(),
+                    attribute.value.as_str(),
+                )
+            })
+            .collect()
+    }
+
+    #[test]
+    fn duplicate_attribute_names_are_refused_as_before() {
+        let node = parse("<e xmlns:p='urn:p' xmlns:q='urn:q' p:a='1' q:a='2' a='3'/>").unwrap();
+        assert_eq!(
+            attributes(&node),
+            [("urn:p", "a", "1"), ("urn:q", "a", "2"), ("", "a", "3")]
+        );
+        assert!(matches!(
+            parse("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='2'/>"),
+            Err(Error::Invalid(message)) if message == "duplicate expanded XML attribute"
+        ));
+        assert!(matches!(
+            parse("<e a='1' a='2'/>"),
+            Err(Error::Xml(litchi_ooxml_common::XmlError::Malformed(message)))
+                if message.contains("duplicated attribute")
+        ));
+        // A value is checked before its name, as before.
+        assert!(matches!(
+            parse("<e xmlns:p='urn:p' xmlns:q='urn:p' p:a='1' q:a='&bogus;'/>"),
+            Err(Error::Xml(_))
+        ));
+    }
+
+    #[test]
+    fn many_distinct_attribute_names_are_read_in_order() {
+        // Scanning the attributes read so far compared ~1.25e9 pairs here.
+        let node = parse(&format!("<e{}/>", distinct_attributes(50_000))).unwrap();
+        assert_eq!(node.attributes.len(), 50_000);
+        for (index, attribute) in node.attributes.iter().enumerate() {
+            assert_eq!(attribute.name, format!("a{index:05}"));
+            assert_eq!(attribute.value, index.to_string());
+        }
+    }
+}

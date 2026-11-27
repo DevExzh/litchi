@@ -1,0 +1,1345 @@
+{
+  "status": "semantic contract landed; production support pending",
+  "normative_archive_sha256": "9867665f9702b365076c2c6557b23c8c938959b443f6f50712fdb2d0dfb8aac4",
+  "contract_sha256": "f227e861c55e3360d60d41a42ee7f101ba3c29bbc00d25d56cc01d80c3cd7923",
+  "profile": {
+    "date_epoch": "1899-12-30; proleptic Gregorian; no 1900 leap-day insertion",
+    "numeric_text": "invariant decimal/exponent plus the required en_US currency/grouping forms",
+    "fraction": "mixed fraction with a space and denominator 1 through 99",
+    "numbervalue": "explicit separators; whitespace removal; repeated trailing percent scaling",
+    "logical_type_code": 4,
+    "n_text_empty": "explicit zero choice from the value-inspection contract"
+  },
+  "functions": [
+    "ERROR.TYPE",
+    "ISBLANK",
+    "ISERR",
+    "ISERROR",
+    "ISEVEN",
+    "ISLOGICAL",
+    "ISNA",
+    "ISNONTEXT",
+    "ISNUMBER",
+    "ISODD",
+    "ISTEXT",
+    "N",
+    "NA",
+    "NUMBERVALUE",
+    "TYPE",
+    "VALUE"
+  ],
+  "observations": [
+    {
+      "case": "blank.empty",
+      "function": "ISBLANK",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=ISBLANK(<Empty>)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "blank.empty_text",
+      "function": "ISBLANK",
+      "args": [
+        "\"\""
+      ],
+      "formula": "=ISBLANK(\"\")",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "err.na",
+      "function": "ISERR",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=ISERR(#N/A)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "err.div0",
+      "function": "ISERR",
+      "args": [
+        "#DIV/0!"
+      ],
+      "formula": "=ISERR(#DIV/0!)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "error.any",
+      "function": "ISERROR",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=ISERROR(#N/A)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "error.type.na",
+      "function": "ERROR.TYPE",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=ERROR.TYPE(#N/A)",
+      "expected": {
+        "type": "number",
+        "value": 7
+      }
+    },
+    {
+      "case": "error.type.number",
+      "function": "ERROR.TYPE",
+      "args": [
+        "42"
+      ],
+      "formula": "=ERROR.TYPE(42)",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "logical.true",
+      "function": "ISLOGICAL",
+      "args": [
+        "TRUE"
+      ],
+      "formula": "=ISLOGICAL(TRUE())",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "logical.number",
+      "function": "ISLOGICAL",
+      "args": [
+        "42"
+      ],
+      "formula": "=ISLOGICAL(42)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "na.only",
+      "function": "ISNA",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=ISNA(#N/A)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "na.other_error",
+      "function": "ISNA",
+      "args": [
+        "#DIV/0!"
+      ],
+      "formula": "=ISNA(#DIV/0!)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "nont text",
+      "function": "ISNONTEXT",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=ISNONTEXT(<Empty>)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "nont text_value",
+      "function": "ISNONTEXT",
+      "args": [
+        "\"x\""
+      ],
+      "formula": "=ISNONTEXT(\"x\")",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "number.number",
+      "function": "ISNUMBER",
+      "args": [
+        "42"
+      ],
+      "formula": "=ISNUMBER(42)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "number.error",
+      "function": "ISNUMBER",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=ISNUMBER(#N/A)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "text.text",
+      "function": "ISTEXT",
+      "args": [
+        "\"x\""
+      ],
+      "formula": "=ISTEXT(\"x\")",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "text.empty",
+      "function": "ISTEXT",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=ISTEXT(<Empty>)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "n.number",
+      "function": "N",
+      "args": [
+        "42"
+      ],
+      "formula": "=N(42)",
+      "expected": {
+        "type": "number",
+        "value": 42
+      }
+    },
+    {
+      "case": "n.logical",
+      "function": "N",
+      "args": [
+        "TRUE"
+      ],
+      "formula": "=N(TRUE())",
+      "expected": {
+        "type": "number",
+        "value": 1
+      }
+    },
+    {
+      "case": "n.text_draft",
+      "function": "N",
+      "args": [
+        "\"x\""
+      ],
+      "formula": "=N(\"x\")",
+      "expected": {
+        "type": "number",
+        "value": 0
+      }
+    },
+    {
+      "case": "n.empty_draft",
+      "function": "N",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=N(<Empty>)",
+      "expected": {
+        "type": "number",
+        "value": 0
+      }
+    },
+    {
+      "case": "n.error",
+      "function": "N",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=N(#N/A)",
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      }
+    },
+    {
+      "case": "na.zero_arguments",
+      "function": "NA",
+      "args": [],
+      "formula": "=NA()",
+      "expected": {
+        "type": "error",
+        "value": "#N/A"
+      }
+    },
+    {
+      "case": "type.number",
+      "function": "TYPE",
+      "args": [
+        "42"
+      ],
+      "formula": "=TYPE(42)",
+      "expected": {
+        "type": "number",
+        "value": 1
+      }
+    },
+    {
+      "case": "type.text",
+      "function": "TYPE",
+      "args": [
+        "\"x\""
+      ],
+      "formula": "=TYPE(\"x\")",
+      "expected": {
+        "type": "number",
+        "value": 2
+      }
+    },
+    {
+      "case": "type.logical",
+      "function": "TYPE",
+      "args": [
+        "TRUE"
+      ],
+      "formula": "=TYPE(TRUE())",
+      "expected": {
+        "type": "number",
+        "value": 4
+      }
+    },
+    {
+      "case": "type.error",
+      "function": "TYPE",
+      "args": [
+        "#N/A"
+      ],
+      "formula": "=TYPE(#N/A)",
+      "expected": {
+        "type": "number",
+        "value": 16
+      }
+    },
+    {
+      "case": "type.empty",
+      "function": "TYPE",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=TYPE(<Empty>)",
+      "expected": {
+        "type": "number",
+        "value": 1
+      }
+    },
+    {
+      "case": "type.array",
+      "function": "TYPE",
+      "args": [
+        "{1;2}"
+      ],
+      "formula": "=TYPE({1;2})",
+      "expected": {
+        "type": "number",
+        "value": 64
+      }
+    },
+    {
+      "case": "iseven.0",
+      "function": "ISEVEN",
+      "args": [
+        "0"
+      ],
+      "formula": "=ISEVEN(0)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.1",
+      "function": "ISEVEN",
+      "args": [
+        "1"
+      ],
+      "formula": "=ISEVEN(1)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "iseven.-1",
+      "function": "ISEVEN",
+      "args": [
+        "-1"
+      ],
+      "formula": "=ISEVEN(-1)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "iseven.2.5",
+      "function": "ISEVEN",
+      "args": [
+        "2.5"
+      ],
+      "formula": "=ISEVEN(2.5)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.-2.5",
+      "function": "ISEVEN",
+      "args": [
+        "-2.5"
+      ],
+      "formula": "=ISEVEN(-2.5)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.0.999",
+      "function": "ISEVEN",
+      "args": [
+        "0.999"
+      ],
+      "formula": "=ISEVEN(0.999)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.-0.999",
+      "function": "ISEVEN",
+      "args": [
+        "-0.999"
+      ],
+      "formula": "=ISEVEN(-0.999)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.9007199254740992",
+      "function": "ISEVEN",
+      "args": [
+        "9007199254740992"
+      ],
+      "formula": "=ISEVEN(9007199254740992)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.9007199254740991",
+      "function": "ISEVEN",
+      "args": [
+        "9007199254740991"
+      ],
+      "formula": "=ISEVEN(9007199254740991)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.0",
+      "function": "ISODD",
+      "args": [
+        "0"
+      ],
+      "formula": "=ISODD(0)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.1",
+      "function": "ISODD",
+      "args": [
+        "1"
+      ],
+      "formula": "=ISODD(1)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "isodd.-1",
+      "function": "ISODD",
+      "args": [
+        "-1"
+      ],
+      "formula": "=ISODD(-1)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "isodd.2.5",
+      "function": "ISODD",
+      "args": [
+        "2.5"
+      ],
+      "formula": "=ISODD(2.5)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.-2.5",
+      "function": "ISODD",
+      "args": [
+        "-2.5"
+      ],
+      "formula": "=ISODD(-2.5)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.0.999",
+      "function": "ISODD",
+      "args": [
+        "0.999"
+      ],
+      "formula": "=ISODD(0.999)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.-0.999",
+      "function": "ISODD",
+      "args": [
+        "-0.999"
+      ],
+      "formula": "=ISODD(-0.999)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.9007199254740992",
+      "function": "ISODD",
+      "args": [
+        "9007199254740992"
+      ],
+      "formula": "=ISODD(9007199254740992)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.9007199254740991",
+      "function": "ISODD",
+      "args": [
+        "9007199254740991"
+      ],
+      "formula": "=ISODD(9007199254740991)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.logical",
+      "function": "ISEVEN",
+      "args": [
+        "TRUE"
+      ],
+      "formula": "=ISEVEN(TRUE())",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "isodd.logical",
+      "function": "ISODD",
+      "args": [
+        "TRUE"
+      ],
+      "formula": "=ISODD(TRUE())",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "iseven.empty",
+      "function": "ISEVEN",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=ISEVEN(<Empty>)",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "isodd.empty",
+      "function": "ISODD",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=ISODD(<Empty>)",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "iseven.text",
+      "function": "ISEVEN",
+      "args": [
+        "\"2\""
+      ],
+      "formula": "=ISEVEN(\"2\")",
+      "expected": {
+        "type": "logical",
+        "value": true
+      }
+    },
+    {
+      "case": "isodd.text",
+      "function": "ISODD",
+      "args": [
+        "\"2\""
+      ],
+      "formula": "=ISODD(\"2\")",
+      "expected": {
+        "type": "logical",
+        "value": false
+      }
+    },
+    {
+      "case": "iseven.malformed_text",
+      "function": "ISEVEN",
+      "args": [
+        "\"x\""
+      ],
+      "formula": "=ISEVEN(\"x\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "numbervalue.us",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234.56\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234.56\";\".\";\",\")",
+      "expected": {
+        "type": "number",
+        "value": 1234.56
+      }
+    },
+    {
+      "case": "numbervalue.eu",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1.234,56\"",
+        "\",\"",
+        "\".\""
+      ],
+      "formula": "=NUMBERVALUE(\"1.234,56\";\",\";\".\")",
+      "expected": {
+        "type": "number",
+        "value": 1234.56
+      }
+    },
+    {
+      "case": "numbervalue.percent",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\" .5 % \"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\" .5 % \";\".\";\",\")",
+      "expected": {
+        "type": "number",
+        "value": 0.005
+      }
+    },
+    {
+      "case": "numbervalue.space_group",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1 234,50\"",
+        "\",\"",
+        "\" \""
+      ],
+      "formula": "=NUMBERVALUE(\"1 234,50\";\",\";\" \")",
+      "expected": {
+        "type": "number",
+        "value": 1234.5
+      }
+    },
+    {
+      "case": "numbervalue.leading_decimal",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\".5\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\".5\";\".\";\",\")",
+      "expected": {
+        "type": "number",
+        "value": 0.5
+      }
+    },
+    {
+      "case": "numbervalue.exponent",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1E3\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"1E3\";\".\";\",\")",
+      "expected": {
+        "type": "number",
+        "value": 1000.0
+      }
+    },
+    {
+      "case": "numbervalue.repeat_percent",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"12%%\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"12%%\";\".\";\",\")",
+      "expected": {
+        "type": "number",
+        "value": 0.0012
+      }
+    },
+    {
+      "case": "numbervalue.group_after_decimal",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1.2,3\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"1.2,3\";\".\";\",\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "numbervalue.equal_separators",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234\"",
+        "\",\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234\";\",\";\",\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "numbervalue.nonfinite",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"INF\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"INF\";\".\";\",\")",
+      "expected": {
+        "type": "error",
+        "value": "#NUM!"
+      }
+    },
+    {
+      "case": "numbervalue.malformed",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"abc\"",
+        "\".\"",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"abc\";\".\";\",\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "numbervalue.omitted",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234.5\""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234.5\")",
+      "expected": {
+        "type": "number",
+        "value": 1234.5
+      }
+    },
+    {
+      "case": "numbervalue.omitted_slots",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234.5\"",
+        "",
+        ""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234.5\";;)",
+      "expected": {
+        "type": "number",
+        "value": 1234.5
+      }
+    },
+    {
+      "case": "numbervalue.omitted_group",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234.5\"",
+        "\".\"",
+        ""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234.5\";\".\";)",
+      "expected": {
+        "type": "number",
+        "value": 1234.5
+      }
+    },
+    {
+      "case": "numbervalue.omitted_decimal",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234.5\"",
+        "",
+        "\",\""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234.5\";;\",\")",
+      "expected": {
+        "type": "number",
+        "value": 1234.5
+      }
+    },
+    {
+      "case": "numbervalue.explicit_empty_group",
+      "function": "NUMBERVALUE",
+      "args": [
+        "\"1,234.5\"",
+        "\".\"",
+        "\"\""
+      ],
+      "formula": "=NUMBERVALUE(\"1,234.5\";\".\";\"\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "value.integer",
+      "function": "VALUE",
+      "args": [
+        "\"123\""
+      ],
+      "formula": "=VALUE(\"123\")",
+      "expected": {
+        "type": "number",
+        "value": 123.0
+      }
+    },
+    {
+      "case": "value.leading_decimal",
+      "function": "VALUE",
+      "args": [
+        "\".5\""
+      ],
+      "formula": "=VALUE(\".5\")",
+      "expected": {
+        "type": "number",
+        "value": 0.5
+      }
+    },
+    {
+      "case": "value.signed_exponent",
+      "function": "VALUE",
+      "args": [
+        "\"-1.25E2\""
+      ],
+      "formula": "=VALUE(\"-1.25E2\")",
+      "expected": {
+        "type": "number",
+        "value": -125.0
+      }
+    },
+    {
+      "case": "value.signed_negative_exponent_lower",
+      "function": "VALUE",
+      "args": [
+        "\"-1e-3\""
+      ],
+      "formula": "=VALUE(\"-1e-3\")",
+      "expected": {
+        "type": "number",
+        "value": -0.001
+      }
+    },
+    {
+      "case": "value.signed_negative_exponent_upper",
+      "function": "VALUE",
+      "args": [
+        "\"-1E-3\""
+      ],
+      "formula": "=VALUE(\"-1E-3\")",
+      "expected": {
+        "type": "number",
+        "value": -0.001
+      }
+    },
+    {
+      "case": "value.grouped_signed_negative_exponent",
+      "function": "VALUE",
+      "args": [
+        "\"-1,234e-3\""
+      ],
+      "formula": "=VALUE(\"-1,234e-3\")",
+      "expected": {
+        "type": "number",
+        "value": -1.234
+      }
+    },
+    {
+      "case": "value.currency_signed_negative_exponent",
+      "function": "VALUE",
+      "args": [
+        "\"-$1,234.5e-3\""
+      ],
+      "formula": "=VALUE(\"-$1,234.5e-3\")",
+      "expected": {
+        "type": "number",
+        "value": -1.2345
+      }
+    },
+    {
+      "case": "value.percent",
+      "function": "VALUE",
+      "args": [
+        "\"12%\""
+      ],
+      "formula": "=VALUE(\"12%\")",
+      "expected": {
+        "type": "number",
+        "value": 0.12
+      }
+    },
+    {
+      "case": "value.currency",
+      "function": "VALUE",
+      "args": [
+        "\"$1,234.50\""
+      ],
+      "formula": "=VALUE(\"$1,234.50\")",
+      "expected": {
+        "type": "number",
+        "value": 1234.5
+      }
+    },
+    {
+      "case": "value.unbounded_first_group",
+      "function": "VALUE",
+      "args": [
+        "\"1234,567\""
+      ],
+      "formula": "=VALUE(\"1234,567\")",
+      "expected": {
+        "type": "number",
+        "value": 1234567.0
+      }
+    },
+    {
+      "case": "value.fraction",
+      "function": "VALUE",
+      "args": [
+        "\"1 1/2\""
+      ],
+      "formula": "=VALUE(\"1 1/2\")",
+      "expected": {
+        "type": "number",
+        "value": 1.5
+      }
+    },
+    {
+      "case": "value.negative_fraction",
+      "function": "VALUE",
+      "args": [
+        "\"-1 1/2\""
+      ],
+      "formula": "=VALUE(\"-1 1/2\")",
+      "expected": {
+        "type": "number",
+        "value": -1.5
+      }
+    },
+    {
+      "case": "value.fraction_99",
+      "function": "VALUE",
+      "args": [
+        "\"1 1/99\""
+      ],
+      "formula": "=VALUE(\"1 1/99\")",
+      "expected": {
+        "type": "number",
+        "value": 1.0101010101010102
+      }
+    },
+    {
+      "case": "value.fraction_100_rejected",
+      "function": "VALUE",
+      "args": [
+        "\"1 1/100\""
+      ],
+      "formula": "=VALUE(\"1 1/100\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "value.time_hm",
+      "function": "VALUE",
+      "args": [
+        "\"2:00\""
+      ],
+      "formula": "=VALUE(\"2:00\")",
+      "expected": {
+        "type": "number",
+        "value": 0.08333333333333333
+      }
+    },
+    {
+      "case": "value.time_hms",
+      "function": "VALUE",
+      "args": [
+        "\"02:03:04\""
+      ],
+      "formula": "=VALUE(\"02:03:04\")",
+      "expected": {
+        "type": "number",
+        "value": 0.08546296296296296
+      }
+    },
+    {
+      "case": "value.time_fractional",
+      "function": "VALUE",
+      "args": [
+        "\"12:34:56.5\""
+      ],
+      "formula": "=VALUE(\"12:34:56.5\")",
+      "expected": {
+        "type": "number",
+        "value": 0.5242650462962963
+      }
+    },
+    {
+      "case": "value.time_fractional_two_digits",
+      "function": "VALUE",
+      "args": [
+        "\"12:34:56.12\""
+      ],
+      "formula": "=VALUE(\"12:34:56.12\")",
+      "expected": {
+        "type": "number",
+        "value": 0.5242606481481481
+      }
+    },
+    {
+      "case": "value.time_fractional_three_digits",
+      "function": "VALUE",
+      "args": [
+        "\"00:00:00.001\""
+      ],
+      "formula": "=VALUE(\"00:00:00.001\")",
+      "expected": {
+        "type": "number",
+        "value": 1.1574074074074074e-08
+      }
+    },
+    {
+      "case": "value.time_fractional_near_day_end",
+      "function": "VALUE",
+      "args": [
+        "\"23:59:59.999999999999999999\""
+      ],
+      "formula": "=VALUE(\"23:59:59.999999999999999999\")",
+      "expected": {
+        "type": "number",
+        "value": 1.0
+      }
+    },
+    {
+      "case": "value.iso_date",
+      "function": "VALUE",
+      "args": [
+        "\"2024-02-29\""
+      ],
+      "formula": "=VALUE(\"2024-02-29\")",
+      "expected": {
+        "type": "number",
+        "value": 45351.0
+      }
+    },
+    {
+      "case": "value.short_us_date",
+      "function": "VALUE",
+      "args": [
+        "\"5/21/06\""
+      ],
+      "formula": "=VALUE(\"5/21/06\")",
+      "expected": {
+        "type": "number",
+        "value": 38858.0
+      }
+    },
+    {
+      "case": "value.dash_us_date",
+      "function": "VALUE",
+      "args": [
+        "\"5-21-2006\""
+      ],
+      "formula": "=VALUE(\"5-21-2006\")",
+      "expected": {
+        "type": "number",
+        "value": 38858.0
+      }
+    },
+    {
+      "case": "value.short_month_day_date",
+      "function": "VALUE",
+      "args": [
+        "\"29 Oct 2006\""
+      ],
+      "formula": "=VALUE(\"29 Oct 2006\")",
+      "expected": {
+        "type": "number",
+        "value": 39019.0
+      }
+    },
+    {
+      "case": "value.date_1900_02_28",
+      "function": "VALUE",
+      "args": [
+        "\"1900-02-28\""
+      ],
+      "formula": "=VALUE(\"1900-02-28\")",
+      "expected": {
+        "type": "number",
+        "value": 60.0
+      }
+    },
+    {
+      "case": "value.date_1900_03_01",
+      "function": "VALUE",
+      "args": [
+        "\"1900-03-01\""
+      ],
+      "formula": "=VALUE(\"1900-03-01\")",
+      "expected": {
+        "type": "number",
+        "value": 61.0
+      }
+    },
+    {
+      "case": "value.iso_datetime",
+      "function": "VALUE",
+      "args": [
+        "\"2024-02-29 12:34:56\""
+      ],
+      "formula": "=VALUE(\"2024-02-29 12:34:56\")",
+      "expected": {
+        "type": "number",
+        "value": 45351.52425925926
+      }
+    },
+    {
+      "case": "value.iso_datetime_fractional",
+      "function": "VALUE",
+      "args": [
+        "\"2024-02-29 12:34:56.12\""
+      ],
+      "formula": "=VALUE(\"2024-02-29 12:34:56.12\")",
+      "expected": {
+        "type": "number",
+        "value": 45351.52426064815
+      }
+    },
+    {
+      "case": "value.iso_t_datetime",
+      "function": "VALUE",
+      "args": [
+        "\"2024-02-29T12:34:56\""
+      ],
+      "formula": "=VALUE(\"2024-02-29T12:34:56\")",
+      "expected": {
+        "type": "number",
+        "value": 45351.52425925926
+      }
+    },
+    {
+      "case": "value.us_date",
+      "function": "VALUE",
+      "args": [
+        "\"5/21/2006\""
+      ],
+      "formula": "=VALUE(\"5/21/2006\")",
+      "expected": {
+        "type": "number",
+        "value": 38858.0
+      }
+    },
+    {
+      "case": "value.abbreviated_month_date",
+      "function": "VALUE",
+      "args": [
+        "\"Oct 29, 2006\""
+      ],
+      "formula": "=VALUE(\"Oct 29, 2006\")",
+      "expected": {
+        "type": "number",
+        "value": 39019.0
+      }
+    },
+    {
+      "case": "value.full_month_date",
+      "function": "VALUE",
+      "args": [
+        "\"29 October 2006\""
+      ],
+      "formula": "=VALUE(\"29 October 2006\")",
+      "expected": {
+        "type": "number",
+        "value": 39019.0
+      }
+    },
+    {
+      "case": "value.malformed",
+      "function": "VALUE",
+      "args": [
+        "\"bogus\""
+      ],
+      "formula": "=VALUE(\"bogus\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "value.empty",
+      "function": "VALUE",
+      "args": [
+        "<Empty>"
+      ],
+      "formula": "=VALUE(<Empty>)",
+      "expected": {
+        "type": "number",
+        "value": 0
+      }
+    },
+    {
+      "case": "value.empty_text",
+      "function": "VALUE",
+      "args": [
+        "\"\""
+      ],
+      "formula": "=VALUE(\"\")",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "value.logical",
+      "function": "VALUE",
+      "args": [
+        "TRUE"
+      ],
+      "formula": "=VALUE(TRUE())",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    },
+    {
+      "case": "value.number",
+      "function": "VALUE",
+      "args": [
+        "42"
+      ],
+      "formula": "=VALUE(42)",
+      "expected": {
+        "type": "error",
+        "value": "#VALUE!"
+      }
+    }
+  ]
+}

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:cmLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cm authorId="0" idx="1">
+    <p:pos x="120" y="240"/>
+    <p:text>Review this slide</p:text>
+  </p:cm>
+</p:cmLst>

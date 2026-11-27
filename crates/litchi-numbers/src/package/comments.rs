@@ -1,0 +1,6008 @@
+//! Selector-first semantic comments for rooted Numbers table cells.
+//!
+//! This module is deliberately separate from the scalar-cell and formula
+//! editors.  A cell comment is a format-owned annotation graph, not a cell
+//! value.  The public boundary therefore exposes only a small archive-free
+//! semantic value; native object identifiers, table-list keys, protobuf
+//! messages, and archive member names remain private to this adapter while
+//! timestamps and author display metadata are projected safely.
+//!
+//! The exact-source write seam is intentionally narrow: it can create a root
+//! comment in an already-addressable cell whose strict comment list and
+//! author graph are co-located, and can replace or clear an existing,
+//! unshared root comment whose table-list entry and cell key are globally
+//! unique and whose storage has no replies. Changed publication requires an
+//! exact PackageMetadata sidecar and source-authoritative archive metadata.
+
+use std::{
+    collections::{HashMap, HashSet},
+    fmt,
+    sync::Arc,
+};
+
+use litchi_iwa_archive::package::OwnedExactArtifacts;
+use litchi_iwa_archive::{SourceCatalog, package::EntryEdit};
+use litchi_iwa_common::WireLimits;
+use litchi_iwa_common::wire::{
+    WireDescent, WireView, patch_length_delimited_field, preflight_wire_tree,
+};
+use litchi_iwa_core::{
+    Archive, ArchiveReferenceKind, ArchiveReferenceOccurrence, ArchiveReferencePolicy,
+    ArchiveReferenceVisitor, RawMessage, SnappyStream,
+};
+use litchi_iwa_protos::{
+    comment_storage_codec, numbers_table_cell_storage_codec,
+    package_metadata_codec::{
+        RewriteOptions as MetadataRewriteOptions, SaveTokenBatch,
+        inspect_package_metadata_with_visitor, rewrite_package_metadata_save_tokens,
+    },
+    table_info_codec, tst,
+};
+use thiserror::Error as ThisError;
+
+use crate::{SheetSelector, TableSelector, table::At};
+
+use super::Package;
+
+#[path = "comments_create.rs"]
+mod comments_create;
+#[path = "comments_read.rs"]
+mod comments_read;
+#[path = "comments_reply.rs"]
+pub(crate) mod comments_reply;
+pub use comments_reply::CommentReplyIndex;
+
+const TILE_MESSAGE_TYPE: u32 = 6_002;
+const TABLE_DATA_LIST_MESSAGE_TYPES: [u32; 2] = [6_005, 6_201];
+const COMMENT_STORAGE_MESSAGE_TYPE: u32 = 3_056;
+const ANNOTATION_AUTHOR_MESSAGE_TYPE: u32 = 212;
+const DEFAULT_TILE_SIZE: usize = 256;
+const COMMENT_MAX_NESTING: u32 = 64;
+const ROOT_PREVIEWS: [&str; 3] = ["preview.jpg", "preview-micro.jpg", "preview-web.jpg"];
+
+/// A checked finite comment timestamp measured in seconds from Apple's
+/// 2001-01-01 reference date.
+///
+/// Numbers stores this value as a native floating-point scalar. The public
+/// wrapper rejects non-finite values and canonicalizes both signed-zero
+/// spellings, retaining the existing `Eq` guarantee of Numbers comments.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct CommentTimestamp(u64);
+
+impl CommentTimestamp {
+    /// Construct a timestamp from Apple-epoch seconds.
+    #[must_use]
+    pub const fn new(seconds: f64) -> Option<Self> {
+        if !seconds.is_finite() {
+            return None;
+        }
+        let seconds = if seconds == 0.0 { 0.0 } else { seconds };
+        Some(Self(seconds.to_bits()))
+    }
+
+    /// Return Apple-epoch seconds.
+    #[must_use]
+    pub const fn as_f64(self) -> f64 {
+        f64::from_bits(self.0)
+    }
+}
+
+impl fmt::Debug for CommentTimestamp {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_tuple("CommentTimestamp")
+            .field(&self.as_f64())
+            .finish()
+    }
+}
+
+impl PartialOrd for CommentTimestamp {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        self.as_f64().partial_cmp(&other.as_f64())
+    }
+}
+
+impl fmt::Display for CommentTimestamp {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.as_f64().fmt(formatter)
+    }
+}
+
+/// Display metadata for a comment author.
+///
+/// Native author object identifiers, storage UUIDs, and registry references
+/// never cross the Numbers package boundary. `public_id` is the semantic
+/// identifier carried by the author payload itself.
+#[derive(Clone, Default, PartialEq, Eq)]
+pub struct CommentAuthor {
+    display_name: Option<Arc<str>>,
+    public_id: Option<Arc<str>>,
+}
+
+impl fmt::Debug for CommentAuthor {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CommentAuthor")
+            .field("display_name", &"<redacted>")
+            .field("public_id", &"<redacted>")
+            .finish()
+    }
+}
+
+impl CommentAuthor {
+    /// Construct display metadata with optional semantic fields.
+    #[must_use]
+    pub fn new(display_name: Option<Box<str>>, public_id: Option<Box<str>>) -> Self {
+        Self {
+            display_name: display_name.map(Arc::from),
+            public_id: public_id.map(Arc::from),
+        }
+    }
+
+    /// Return the optional display name.
+    #[must_use]
+    pub fn display_name(&self) -> Option<&str> {
+        self.display_name.as_deref()
+    }
+
+    /// Return the optional semantic public author identifier.
+    #[must_use]
+    pub fn public_id(&self) -> Option<&str> {
+        self.public_id.as_deref()
+    }
+}
+
+/// A semantic comment attached to one table cell.
+///
+/// Native object identifiers, reply identities, and storage UUIDs remain
+/// private to the Numbers adapter. Optional creation and author metadata is
+/// retained as an archive-free semantic projection.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Comment {
+    text: Arc<str>,
+    timestamp: Option<CommentTimestamp>,
+    author: Option<CommentAuthor>,
+}
+
+impl fmt::Debug for Comment {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Comment")
+            .field("text", &"<redacted>")
+            .field("timestamp", &self.timestamp)
+            .field("author", &self.author)
+            .finish()
+    }
+}
+
+impl Comment {
+    /// Construct a semantic comment value with no optional metadata.
+    ///
+    /// This convenience constructor has no limit-bearing `Result` return
+    /// type. Source-backed edits use [`Edit::set`], which validates caller
+    /// text against the package's semantic limit and copies it with a
+    /// fallible reservation before staging it.
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        Self::with_metadata(text, None, None)
+    }
+
+    /// Construct a semantic comment snapshot with optional metadata.
+    #[must_use]
+    pub fn with_metadata(
+        text: impl Into<String>,
+        timestamp: Option<CommentTimestamp>,
+        author: Option<CommentAuthor>,
+    ) -> Self {
+        Self {
+            text: Arc::from(text.into().into_boxed_str()),
+            timestamp,
+            author,
+        }
+    }
+
+    /// Fallibly construct a bounded semantic comment value.
+    ///
+    /// This constructor applies the hard Numbers semantic text ceiling. A
+    /// package edit may impose a lower configured ceiling; [`Edit::set`]
+    /// performs that package-specific validation before staging. The text is
+    /// copied with a fallible reservation, so oversized or allocation-failed
+    /// values are rejected without publishing a partial comment value.
+    pub fn try_new(text: impl AsRef<str>) -> Result<Self, Error> {
+        Self::try_from_text(text.as_ref(), crate::MAX_TEXT_BYTES, Path::Package)
+    }
+
+    /// Borrow the comment text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        self.text.as_ref()
+    }
+
+    /// Return the optional creation timestamp.
+    #[must_use]
+    pub const fn timestamp(&self) -> Option<CommentTimestamp> {
+        self.timestamp
+    }
+
+    /// Borrow optional author display metadata.
+    #[must_use]
+    pub fn author(&self) -> Option<&CommentAuthor> {
+        self.author.as_ref()
+    }
+
+    fn try_from_text(text: &str, maximum: usize, path: Path) -> Result<Self, Error> {
+        Self::try_from_text_with_metadata(text, maximum, path, None, None)
+    }
+
+    fn try_from_text_with_metadata(
+        text: &str,
+        maximum: usize,
+        path: Path,
+        timestamp: Option<CommentTimestamp>,
+        author: Option<CommentAuthor>,
+    ) -> Result<Self, Error> {
+        if text.len() > maximum {
+            return Err(Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed: text.len(),
+                maximum,
+                path,
+            });
+        }
+        let mut retained = String::new();
+        retained
+            .try_reserve_exact(text.len())
+            .map_err(|_| Error::Allocation {
+                amount: text.len(),
+                path,
+            })?;
+        retained.push_str(text);
+        Ok(Self {
+            text: Arc::from(retained.into_boxed_str()),
+            timestamp,
+            author,
+        })
+    }
+}
+
+/// One archive-free semantic reply attached to a table-cell comment.
+///
+/// Native object identifiers, storage UUIDs, and the physical archive graph
+/// remain private to the Numbers adapter. Optional creation and author
+/// metadata is retained as an archive-free semantic projection.
+#[derive(Clone, PartialEq, Eq)]
+pub struct CommentReply {
+    text: Arc<str>,
+    timestamp: Option<CommentTimestamp>,
+    author: Option<CommentAuthor>,
+}
+
+impl fmt::Debug for CommentReply {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("CommentReply")
+            .field("text", &"<redacted>")
+            .field("timestamp", &self.timestamp)
+            .field("author", &self.author)
+            .finish()
+    }
+}
+
+impl CommentReply {
+    /// Construct a reply snapshot with no optional metadata.
+    #[must_use]
+    pub fn new(text: impl Into<String>) -> Self {
+        Self::with_metadata(text, None, None)
+    }
+
+    /// Construct a reply snapshot with optional metadata.
+    #[must_use]
+    pub fn with_metadata(
+        text: impl Into<String>,
+        timestamp: Option<CommentTimestamp>,
+        author: Option<CommentAuthor>,
+    ) -> Self {
+        Self {
+            text: Arc::from(text.into().into_boxed_str()),
+            timestamp,
+            author,
+        }
+    }
+
+    /// Borrow the reply text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        self.text.as_ref()
+    }
+
+    /// Return the optional creation timestamp.
+    #[must_use]
+    pub const fn timestamp(&self) -> Option<CommentTimestamp> {
+        self.timestamp
+    }
+
+    /// Borrow optional author display metadata.
+    #[must_use]
+    pub fn author(&self) -> Option<&CommentAuthor> {
+        self.author.as_ref()
+    }
+}
+
+/// A content-free location associated with a comment operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Path {
+    /// The complete Numbers package.
+    Package,
+    /// One selected table and cell, in zero-based semantic positions.
+    Cell {
+        /// Rooted sheet position.
+        sheet: usize,
+        /// Table position within the sheet.
+        table: usize,
+        /// Zero-based row.
+        row: usize,
+        /// Zero-based column.
+        column: usize,
+    },
+}
+
+impl Path {
+    const fn cell_parts(self) -> (usize, usize, usize, usize) {
+        match self {
+            Self::Cell {
+                sheet,
+                table,
+                row,
+                column,
+            } => (sheet, table, row, column),
+            Self::Package => (0, 0, 0, 0),
+        }
+    }
+
+    const fn sheet(self) -> usize {
+        self.cell_parts().0
+    }
+
+    const fn table(self) -> usize {
+        self.cell_parts().1
+    }
+}
+
+fn cell_position_for_path(path: Path) -> Result<At, Error> {
+    match path {
+        Path::Cell { row, column, .. } => {
+            At::try_from_usize(row, column).map_err(|_| Error::InvalidSource { path })
+        },
+        Path::Package => Err(Error::PatchConflict),
+    }
+}
+
+/// A finite resource governed by a comment transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Encoded source bytes inspected.
+    InputBytes,
+    /// Candidate package bytes emitted.
+    OutputBytes,
+    /// Protobuf fields inspected.
+    WireFields,
+    /// Protobuf bytes inspected.
+    WireBytes,
+    /// Protobuf rewrite work.
+    WireWork,
+    /// Native objects inspected by the archive validator.
+    Objects,
+    /// Native messages inspected by the archive validator.
+    Messages,
+    /// Native messages per object inspected by the archive validator.
+    MessagesPerObject,
+    /// Native metadata items inspected by the archive validator.
+    MetadataItems,
+    /// Snappy frames inspected by the archive validator.
+    SnappyFrames,
+    /// Addressable table rows inspected.
+    TableRows,
+    /// Addressable table columns inspected.
+    TableColumns,
+    /// Addressable table cells inspected.
+    TableCells,
+    /// Materialized sparse table cells inspected.
+    MaterializedCells,
+    /// Repeated Numbers-wire items inspected.
+    Items,
+    /// Comment text bytes retained or requested.
+    TextBytes,
+    /// Native references inspected.
+    References,
+    /// Encoded native reference payload bytes inspected.
+    ReferenceBytes,
+    /// Reply records inspected.
+    Replies,
+    /// Wire nesting inspected.
+    WireNesting,
+    /// Temporary rewrite scratch bytes retained.
+    ScratchBytes,
+    /// Candidate bytes retained by the codec.
+    RetainedBytes,
+    /// Logical allocations requested by the codec.
+    Allocations,
+    /// Compressed IWA member bytes inspected or emitted.
+    CompressedBytes,
+}
+
+/// Failure from a selector-first Numbers comment operation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The source has an ambiguous or malformed native ownership graph.
+    #[error("the Numbers comment source is invalid at {path:?}")]
+    InvalidSource { path: Path },
+    /// A bounded resource ceiling was exceeded.
+    #[error(
+        "Numbers comment {kind:?} limit exceeded: observed {observed}, maximum {maximum} at {path:?}"
+    )]
+    Limit {
+        /// Resource category.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+        /// Semantic location.
+        path: Path,
+    },
+    /// A fallible allocation failed before publication.
+    #[error("could not allocate {amount} units for the Numbers comment operation at {path:?}")]
+    Allocation {
+        /// Requested bytes or elements.
+        amount: usize,
+        /// Semantic location.
+        path: Path,
+    },
+    /// Candidate reopening did not reproduce the requested semantic state.
+    #[error("the edited Numbers comment failed semantic verification")]
+    Verification,
+    /// A patch was applied to another source package.
+    #[error("the Numbers comment patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// A relative or absolute A1 address is malformed.
+    #[error("invalid Numbers comment cell address")]
+    InvalidAddress,
+    /// The sheet selector did not resolve.
+    #[error("the Numbers workbook has no sheet matching the comment selector")]
+    SheetNotFound,
+    /// The table selector did not resolve.
+    #[error("the selected Numbers sheet has no table matching the comment selector")]
+    TableNotFound,
+    /// The requested cell is outside the selected table.
+    #[error("the Numbers comment cell is outside the selected table")]
+    OutOfBounds { path: Path },
+    /// The source does not retain an exact physical package suitable for edit.
+    #[error("this Numbers source does not support exact comment editing")]
+    UnsupportedSource,
+    /// The selected cell has no existing comment for an operation that needs one.
+    #[error("the selected Numbers cell has no comment")]
+    CommentNotFound { path: Path },
+    /// Creating a new native comment would require an unsupported ownership graph.
+    #[error("creating a new Numbers cell comment is not supported for this source")]
+    UnsupportedDependency { path: Path },
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::InvalidAddress { .. } | Self::OutOfBounds { .. } => RefusalKind::InvalidValue,
+            Self::SheetNotFound { .. }
+            | Self::TableNotFound { .. }
+            | Self::CommentNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } | Self::UnsupportedDependency { .. } => {
+                RefusalKind::UnsupportedContent
+            },
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
+/// Content-free publication diagnostics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    touched_components: usize,
+    deleted_previews: usize,
+    full_reparse_performed: bool,
+}
+
+impl Diagnostics {
+    const fn unchanged() -> Self {
+        Self {
+            changed: false,
+            touched_components: 0,
+            deleted_previews: 0,
+            full_reparse_performed: false,
+        }
+    }
+
+    const fn published(touched_components: usize, deleted_previews: usize) -> Self {
+        Self {
+            changed: true,
+            touched_components,
+            deleted_previews,
+            full_reparse_performed: true,
+        }
+    }
+
+    /// Whether package bytes changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
+    /// Number of rewritten IWA components.
+    #[must_use]
+    pub const fn touched_components(self) -> usize {
+        self.touched_components
+    }
+
+    /// Number of canonical previews removed by the changed operation.
+    #[must_use]
+    pub const fn deleted_previews(self) -> usize {
+        self.deleted_previews
+    }
+
+    /// Whether the candidate was reopened and verified.
+    #[must_use]
+    pub const fn full_reparse_performed(self) -> bool {
+        self.full_reparse_performed
+    }
+}
+
+/// A selector-first comment edit staged against one immutable package.
+pub struct Edit<'a> {
+    source: &'a Package,
+    target: Target,
+    before: Option<Comment>,
+    after: Option<Comment>,
+    staging_error: Option<Error>,
+    /// A clear for a row or column removal: the root previews stay and a
+    /// released last comment key is handed back, as the host's axis removal does.
+    axis_removal: bool,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("path", &self.target.path)
+            .field("after", &self.after)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Edit<'_> {
+    /// Return the selected semantic cell.
+    #[must_use]
+    pub const fn path(&self) -> Path {
+        self.target.path
+    }
+
+    /// Return the staged comment, if any.
+    #[must_use]
+    pub fn comment(&self) -> Option<&Comment> {
+        self.after.as_ref()
+    }
+
+    /// Stage a replacement for the selected existing comment.
+    ///
+    /// New native comments are not part of this seam. Text is copied with a
+    /// bounded, fallible allocation before the edit is staged.
+    pub fn set(mut self, text: impl AsRef<str>) -> Self {
+        let maximum = self.source.state.options.semantic().max_output_text_bytes();
+        let (timestamp, author) = self
+            .before
+            .as_ref()
+            .map(|comment| (comment.timestamp, comment.author.clone()))
+            .unwrap_or((None, None));
+        match Comment::try_from_text_with_metadata(
+            text.as_ref(),
+            maximum,
+            self.target.path,
+            timestamp,
+            author,
+        ) {
+            Ok(comment) => {
+                self.after = Some(comment);
+                self.staging_error = None;
+            },
+            Err(error) => {
+                self.staging_error = Some(error);
+            },
+        }
+        self
+    }
+
+    /// Stage removal of the selected comment.
+    ///
+    /// A changed clear is admitted only for the exact, globally unshared root
+    /// graph described by [`Package::clear_table_cell_comment`]. Re-staging a
+    /// clear supersedes any earlier setter validation error on this edit.
+    #[must_use]
+    pub fn clear(mut self) -> Self {
+        self.after = None;
+        self.staging_error = None;
+        self
+    }
+
+    /// Validate and atomically publish this edit.
+    pub fn commit(self) -> Result<Commit, Error> {
+        if let Some(error) = self.staging_error {
+            return Err(error);
+        }
+        commit_edit(self)
+    }
+}
+
+/// A reversible process-local exact-source comment patch.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Patch {
+    artifacts: OwnedExactArtifacts,
+    path: Path,
+    before: Option<Comment>,
+    after: Option<Comment>,
+    source_cell: Arc<[u8]>,
+    target_cell: Arc<[u8]>,
+    source_previews: usize,
+    target_previews: usize,
+    touched_components: usize,
+}
+
+impl fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("path", &self.path)
+            .field("before", &self.before)
+            .field("after", &self.after)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Patch {
+    /// Return the selected semantic cell.
+    #[must_use]
+    pub const fn path(&self) -> Path {
+        self.path
+    }
+
+    /// Return the source comment state.
+    #[must_use]
+    pub fn before(&self) -> Option<&Comment> {
+        self.before.as_ref()
+    }
+
+    /// Return the target comment state.
+    #[must_use]
+    pub fn after(&self) -> Option<&Comment> {
+        self.after.as_ref()
+    }
+
+    /// Return the source diagnostic fingerprint.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.artifacts.source_fingerprint()
+    }
+
+    /// Return the target diagnostic fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.artifacts.target_fingerprint()
+    }
+
+    /// Return whether the patch is an exact no-op.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after && self.artifacts.is_byte_noop()
+    }
+
+    /// Return the exact target-to-source inverse.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            artifacts: self.artifacts.inverse(),
+            path: self.path,
+            before: self.after.clone(),
+            after: self.before.clone(),
+            source_cell: Arc::clone(&self.target_cell),
+            target_cell: Arc::clone(&self.source_cell),
+            source_previews: self.target_previews,
+            target_previews: self.source_previews,
+            touched_components: self.touched_components,
+        }
+    }
+}
+
+/// One fully validated immutable comment publication.
+#[must_use = "a comment commit contains the validated package snapshot"]
+#[derive(Debug)]
+pub struct Commit {
+    package: Package,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+impl Commit {
+    /// Borrow the validated package snapshot.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.package
+    }
+
+    /// Consume this publication and return its package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    /// Borrow the reversible patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Borrow publication diagnostics.
+    #[must_use]
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+}
+
+#[derive(Debug, Clone)]
+struct Target {
+    path: Path,
+    native: super::table_headers::Target,
+    row: usize,
+    column: usize,
+    tile_size: usize,
+}
+
+#[derive(Debug, Clone)]
+struct Located {
+    target: Target,
+    comment: Option<Comment>,
+    entry: Option<CommentEntryLocation>,
+    storage: Option<MessageRoute>,
+    tile: Option<MessageRoute>,
+    cell_bytes: Option<Arc<[u8]>>,
+    comment_key: Option<u32>,
+    comment_table_id: Option<u64>,
+    replies: usize,
+    reply_ids: Vec<u64>,
+}
+
+#[derive(Debug, Clone)]
+struct CommentStorageFact {
+    object_id: u64,
+    author_id: Option<u64>,
+    replies: usize,
+    reply_ids: Vec<u64>,
+    storage_uuid: Option<(u64, u64)>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CommentListFact {
+    component_index: usize,
+    table_id: u64,
+    list_type: i32,
+    key: u32,
+    storage_id: Option<u64>,
+    refcount: u32,
+    root: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CommentSegmentFact {
+    root_id: u64,
+    segment_id: u64,
+    root_component_index: usize,
+    segment_component_index: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CommentCellFact {
+    table_id: u64,
+    key: u32,
+}
+
+#[derive(Debug, Default)]
+struct CommentOwnershipCensus {
+    comment_list_ids: Vec<u64>,
+    rooted_segment_ids: Vec<u64>,
+    segment_edges: Vec<CommentSegmentFact>,
+    list_entries: Vec<CommentListFact>,
+    table_references: Vec<u64>,
+    cell_comment_keys: Vec<u32>,
+    cell_comment_owners: Vec<(usize, u32)>,
+    cell_comments: Vec<CommentCellFact>,
+    storages: Vec<CommentStorageFact>,
+    author_ids: Vec<u64>,
+    reply_ids: Vec<u64>,
+    entry_storage_ids: Vec<u64>,
+    uuids: Vec<(u64, u64)>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct CensusBudget {
+    observed: usize,
+    maximum: usize,
+}
+
+impl CensusBudget {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            observed: 0,
+            maximum,
+        }
+    }
+
+    fn charge(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        let observed = self.observed.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::References,
+            observed: usize::MAX,
+            maximum: self.maximum,
+            path,
+        })?;
+        if observed > self.maximum {
+            return Err(Error::Limit {
+                kind: LimitKind::References,
+                observed,
+                maximum: self.maximum,
+                path,
+            });
+        }
+        self.observed = observed;
+        Ok(())
+    }
+}
+
+/// The archive census serves two different contracts.  Mutation requires an
+/// exact ArchiveInfo aggregate/FieldInfo ownership proof and one inbound owner
+/// for every reply leaf.  A semantic read only needs the source graph to be
+/// coherent: the aggregate references, list entries, storage payloads, and
+/// direct reply topology must agree.  Keeping this policy explicit prevents a
+/// native reader quirk from weakening any write authorization gate.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum CommentCensusMode {
+    Mutation,
+    Read,
+}
+
+impl CommentCensusMode {
+    const fn requires_field_infos(self) -> bool {
+        matches!(self, Self::Mutation)
+    }
+
+    const fn allows_shared_replies(self) -> bool {
+        matches!(self, Self::Read)
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct MessageRoute {
+    component_index: usize,
+    object_index: usize,
+    message_index: usize,
+    message_type: u32,
+}
+
+#[derive(Debug, Clone)]
+enum ArchiveMutation {
+    ReplaceMessage {
+        route: MessageRoute,
+        data: Vec<u8>,
+        pruned_object_references: Vec<u64>,
+    },
+    DeleteObject {
+        component_index: usize,
+        object_identifier: u64,
+    },
+}
+
+struct PreparedRootClear {
+    cell: Vec<u8>,
+    mutations: Vec<ArchiveMutation>,
+    metadata_entry: (String, Vec<u8>),
+}
+
+impl ArchiveMutation {
+    const fn component_index(&self) -> usize {
+        match self {
+            Self::ReplaceMessage { route, .. } => route.component_index,
+            Self::DeleteObject {
+                component_index, ..
+            } => *component_index,
+        }
+    }
+
+    const fn ordering_key(&self) -> (usize, usize, usize, u64) {
+        match self {
+            Self::ReplaceMessage { route, .. } => (
+                route.component_index,
+                route.object_index,
+                route.message_index,
+                0,
+            ),
+            Self::DeleteObject {
+                component_index,
+                object_identifier,
+            } => (*component_index, usize::MAX, usize::MAX, *object_identifier),
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+struct CommentEntryLocation {
+    owner: EntryOwner,
+    segment_id: Option<u64>,
+    route: MessageRoute,
+    entry: EntryFact,
+    storage_occurrences: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum EntryOwner {
+    Root,
+    Segment,
+}
+
+impl EntryOwner {
+    // Segment-backed entries are readable but deliberately outside the text
+    // rewrite seam: publishing one would require updating the owning root
+    // list's segment graph, not just the storage payload.
+    const fn supports_text_rewrite(self) -> bool {
+        matches!(self, Self::Root)
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct EntryFact {
+    refcount: u32,
+    storage_id: u64,
+}
+
+impl Package {
+    /// Read one semantic comment from a selector-first table cell.
+    pub fn table_cell_comment<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: At,
+    ) -> Result<Option<Comment>, Error> {
+        let located = resolve_comment(self, sheet, table, position)?;
+        Ok(located.comment)
+    }
+
+    /// Read every comment of one table, in row-major cell order.
+    ///
+    /// A table whose comment list holds no entry costs one table-model and
+    /// list decode; otherwise each stored cell is resolved as
+    /// [`Self::table_cell_comment`] resolves it.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::table_cell_comment`].
+    pub fn table_cell_comments<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+    ) -> Result<Vec<(At, Comment)>, Error> {
+        let (sheet, table) = (sheet.into(), table.into());
+        // A positional selection reads the table's comment list through
+        // its model alone: most tables' lists are empty.
+        if let (SheetSelector::Position(sheet), TableSelector::Position(table)) = (sheet, table)
+            && !comment_list_populated(self, sheet.get(), table.get())?
+        {
+            return Ok(Vec::new());
+        }
+        let origin = resolve_comment(self, sheet, table, At::new(0, 0))?;
+        let target = origin.target.clone();
+        let path = target.path;
+        let decoded = decode_table_storage(self, &target)?;
+        let Some(list) = decoded.data_store.comment_storage_table() else {
+            return Ok(Vec::new());
+        };
+        let resolved = self
+            .state
+            .index
+            .resolve_ref_id(&self.state.components, list.identifier())
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        let mut populated = false;
+        for message in resolved.messages {
+            let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
+                .map_err(|error| map_wire_error(error, path))?;
+            if view
+                .fields()
+                .any(|field| field.number() == 3 || field.number() == 4)
+            {
+                populated = true;
+                break;
+            }
+        }
+        if !populated {
+            return Ok(Vec::new());
+        }
+        let Path::Cell { sheet, table, .. } = path else {
+            return Err(Error::InvalidSource { path });
+        };
+        let semantic = self
+            .state
+            .document
+            .sheets()
+            .get(sheet)
+            .and_then(|candidate| candidate.tables().nth(table))
+            .ok_or(Error::Refused(Refusal::TableNotFound))?;
+        let mut output = Vec::new();
+        for cell in semantic.iter_cells() {
+            let position = cell.position();
+            let row = usize::try_from(position.row()).map_err(|_| Error::InvalidSource { path })?;
+            let column =
+                usize::try_from(position.column()).map_err(|_| Error::InvalidSource { path })?;
+            let located = resolve_comment_native(
+                self,
+                Target {
+                    path: Path::Cell {
+                        sheet,
+                        table,
+                        row,
+                        column,
+                    },
+                    native: target.native,
+                    row,
+                    column,
+                    tile_size: DEFAULT_TILE_SIZE,
+                },
+            )?;
+            if let Some(comment) = located.comment {
+                output
+                    .try_reserve(1)
+                    .map_err(|_| Error::Allocation { amount: 1, path })?;
+                output.push((position, comment));
+            }
+        }
+        Ok(output)
+    }
+
+    /// Read the source-ordered semantic replies for one table-cell comment.
+    ///
+    /// The recognized native comment graph is validated package-wide before
+    /// any direct-reply text is published. Reply identities, authors, UUIDs,
+    /// and archive objects never cross this boundary. A cell without a root
+    /// comment returns [`Refusal::CommentNotFound`]; a comment without replies
+    /// returns an empty slice. Nested replies are outside this focused read
+    /// contract and fail closed.
+    pub fn table_cell_comment_replies<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: At,
+    ) -> Result<Box<[CommentReply]>, Error> {
+        let located = resolve_comment(self, sheet, table, position)?;
+        self.read_comment_replies(located)
+    }
+
+    /// Read source-ordered semantic replies from a resolved comment target.
+    ///
+    /// The package reader reaches it through the fully projected semantic
+    /// document above.
+    fn read_comment_replies(&self, located: Located) -> Result<Box<[CommentReply]>, Error> {
+        let path = located.target.path;
+        if located.comment.is_none() {
+            return Err(Error::Refused(Refusal::CommentNotFound { path }));
+        }
+
+        // The semantic reader uses a deliberately separate census policy.
+        // ArchiveInfo/FieldInfo ownership is required before a mutation, but
+        // native Numbers may omit the FieldInfo mirror for an otherwise
+        // readable comment list.  Likewise, a reply may live in another
+        // current component or be shared by more than one root.  Keep those
+        // facts out of the mutation census below.
+        let census = census_comment_read(self, path)?;
+        validate_comment_authors(self, &census, path)?;
+        validate_reply_package_metadata(self, path)?;
+        let entry = located
+            .entry
+            .as_ref()
+            .ok_or(Error::InvalidSource { path })?;
+        let mut storage_indices = HashMap::new();
+        storage_indices
+            .try_reserve(census.storages.len())
+            .map_err(|_| Error::Allocation {
+                amount: census.storages.len(),
+                path,
+            })?;
+        for (index, storage) in census.storages.iter().enumerate() {
+            if storage_indices.insert(storage.object_id, index).is_some() {
+                return Err(Error::InvalidSource { path });
+            }
+        }
+        let root = census
+            .storages
+            .get(
+                storage_indices
+                    .get(&entry.entry.storage_id)
+                    .copied()
+                    .ok_or(Error::InvalidSource { path })?,
+            )
+            .ok_or(Error::InvalidSource { path })?;
+        let selected_key = located.comment_key.ok_or(Error::InvalidSource { path })?;
+        let selected_table_id = located
+            .comment_table_id
+            .ok_or(Error::InvalidSource { path })?;
+        let selected_storage_id = entry.entry.storage_id;
+        let mut matching_lists = census.list_entries.iter().filter(|fact| {
+            fact.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                && fact.key == selected_key
+                && fact.storage_id == Some(selected_storage_id)
+                && match entry.owner {
+                    EntryOwner::Root => {
+                        fact.root
+                            && fact.table_id == selected_table_id
+                            && fact.component_index == entry.route.component_index
+                    },
+                    // A segmented entry is owned by its 6011 object.  The
+                    // semantic route intentionally keeps the root list route;
+                    // ownership here is established by the selected root's
+                    // explicit segment edge, rather than by a global key.
+                    EntryOwner::Segment => {
+                        let Some(segment_id) = entry.segment_id else {
+                            return false;
+                        };
+                        !fact.root
+                            && fact.table_id == segment_id
+                            && census.segment_edges.iter().any(|edge| {
+                                edge.root_id == selected_table_id
+                                    && edge.segment_id == segment_id
+                                    && edge.root_component_index == entry.route.component_index
+                                    && edge.segment_component_index == fact.component_index
+                            })
+                    },
+                }
+        });
+        let list = matching_lists.next().ok_or(Error::InvalidSource { path })?;
+        let selected_cells = census
+            .cell_comments
+            .iter()
+            .filter(|cell| cell.table_id == selected_table_id && cell.key == selected_key)
+            .count();
+        if matching_lists.next().is_some()
+            || census
+                .table_references
+                .iter()
+                .filter(|identifier| **identifier == selected_table_id)
+                .count()
+                != 1
+            || usize::try_from(list.refcount).ok() != Some(selected_cells)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        if root.reply_ids != located.reply_ids {
+            return Err(Error::InvalidSource { path });
+        }
+        if located.reply_ids.is_empty() {
+            return Ok(Box::default());
+        }
+
+        let mut text_budget =
+            CommentTextBudget::new(self.state.options.semantic().max_output_text_bytes());
+        let mut replies = Vec::new();
+        replies
+            .try_reserve_exact(located.reply_ids.len())
+            .map_err(|_| Error::Allocation {
+                amount: located.reply_ids.len(),
+                path,
+            })?;
+        for reply_id in located.reply_ids {
+            let storage = census
+                .storages
+                .get(
+                    storage_indices
+                        .get(&reply_id)
+                        .copied()
+                        .ok_or(Error::InvalidSource { path })?,
+                )
+                .ok_or(Error::InvalidSource { path })?;
+            let resolved = self
+                .state
+                .index
+                .resolve_ref_id(&self.state.components, storage.object_id)
+                .map_err(|_| Error::InvalidSource { path })?
+                .ok_or(Error::InvalidSource { path })?;
+            let message_index =
+                unique_message_index(resolved.messages, COMMENT_STORAGE_MESSAGE_TYPE, path)?;
+            if resolved.messages.len() != 1 {
+                return Err(Error::InvalidSource { path });
+            }
+            let details = decode_comment_storage_with_budget(
+                self,
+                resolved.messages[message_index].data.as_slice(),
+                path,
+                &mut text_budget,
+            )?;
+            let comment = details.comment;
+            replies.push(CommentReply {
+                text: comment.text,
+                timestamp: comment.timestamp,
+                author: comment.author,
+            });
+        }
+        Ok(replies.into_boxed_slice())
+    }
+
+    /// Read source-ordered semantic replies using a relative or absolute A1
+    /// address.
+    pub fn table_cell_comment_replies_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<Box<[CommentReply]>, Error> {
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
+        self.table_cell_comment_replies(sheet, table, position)
+    }
+
+    /// Read one semantic comment using a relative or absolute A1 address.
+    pub fn table_cell_comment_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<Option<Comment>, Error> {
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
+        self.table_cell_comment(sheet, table, position)
+    }
+
+    /// Start a selector-first immutable comment edit.
+    pub fn edit_table_cell_comment<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: At,
+    ) -> Result<Edit<'_>, Error> {
+        let located = resolve_comment(self, sheet, table, position)?;
+        Ok(Edit {
+            source: self,
+            target: located.target,
+            before: located.comment.clone(),
+            after: located.comment,
+            staging_error: None,
+            axis_removal: false,
+        })
+    }
+
+    /// Clear one table-cell comment for a row or column removal: the root
+    /// previews stay and a released last key is handed back.
+    pub(crate) fn clear_table_cell_comment_for_axis_removal(
+        &self,
+        sheet: SheetSelector<'_>,
+        table: TableSelector<'_>,
+        position: At,
+    ) -> Result<Commit, Error> {
+        let mut edit = self
+            .edit_table_cell_comment(sheet, table, position)?
+            .clear();
+        edit.axis_removal = true;
+        edit.commit()
+    }
+
+    /// Create or replace one selector-first table-cell comment.
+    ///
+    /// A new comment is written by the package's one commenting author, or,
+    /// among several (or none), by the generated `litchi-iwa` author; an
+    /// empty cell takes the comment as a comment-only cell.
+    pub fn set_table_cell_comment<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: At,
+        text: impl AsRef<str>,
+    ) -> Result<Commit, Error> {
+        self.edit_table_cell_comment(sheet, table, position)?
+            .set(text)
+            .commit()
+    }
+
+    /// Remove a table-cell comment.
+    ///
+    /// A changed clear is supported only for an exact, globally unshared root
+    /// comment graph (the root and its direct leaf replies) with strict
+    /// PackageMetadata ownership and save-token attribution. Shared,
+    /// segmented, nested-reply, metadata-owned, or otherwise ambiguous graphs
+    /// fail closed with
+    /// [`Refusal::UnsupportedDependency`]. Clearing an already-empty cell is an
+    /// exact no-op.
+    pub fn clear_table_cell_comment<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        position: At,
+    ) -> Result<Commit, Error> {
+        self.edit_table_cell_comment(sheet, table, position)?
+            .clear()
+            .commit()
+    }
+
+    /// Create or replace a table-cell comment using an A1 address.
+    pub fn set_table_cell_comment_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+        text: impl AsRef<str>,
+    ) -> Result<Commit, Error> {
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
+        self.set_table_cell_comment(sheet, table, position, text)
+    }
+
+    /// Clear a table-cell comment using an A1 address.
+    pub fn clear_table_cell_comment_a1<'sheet, 'table>(
+        &self,
+        sheet: impl Into<SheetSelector<'sheet>>,
+        table: impl Into<TableSelector<'table>>,
+        address: &str,
+    ) -> Result<Commit, Error> {
+        let position = At::from_a1(address).map_err(|_| Error::Refused(Refusal::InvalidAddress))?;
+        self.clear_table_cell_comment(sheet, table, position)
+    }
+
+    /// Apply a reversible exact-source comment patch.
+    pub fn apply_table_cell_comment(&self, patch: &Patch) -> Result<Commit, Error> {
+        let source_catalog = physical_source(self)?;
+        let source = source_catalog.source_owner();
+        if !patch.artifacts.authorizes_owner(&source) {
+            return Err(Error::PatchConflict);
+        }
+        if patch.is_noop() {
+            return Ok(Commit {
+                package: self.snapshot(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::unchanged(),
+            });
+        }
+        let position = cell_position_for_path(patch.path)?;
+        let located = resolve_comment_at_target(self, patch.path, position, patch.before.as_ref())?;
+        if located.comment != patch.before
+            || located.cell_bytes.as_deref() != Some(patch.source_cell.as_ref())
+        {
+            return Err(Error::PatchConflict);
+        }
+        if patch.before.is_none() && patch.after.is_some() {
+            if located.comment.is_some() {
+                return Err(Error::PatchConflict);
+            }
+        } else if patch.before.is_some() && patch.after.is_none() {
+            // An inverse of an exact creation restores the byte-owned source
+            // artifact directly below. Its newly created root is expected to
+            // be metadata-owned, so the ordinary user-facing clear policy is
+            // intentionally not re-applied here. Authorization, selected
+            // semantic state, source-cell bytes, preview counts, and the
+            // target semantic reopen are still checked on both sides.
+        } else if patch.before.is_some() {
+            let Some(entry) = located.entry.as_ref() else {
+                return Err(Error::PatchConflict);
+            };
+            // A text replacement keeps a reply-bearing root's replies; only a
+            // clear still requires a reply-free root here.
+            if !entry.owner.supports_text_rewrite()
+                || entry.entry.refcount != 1
+                || entry.storage_occurrences != 1
+                || (located.replies != 0 && patch.after.is_none())
+            {
+                return Err(Error::Refused(Refusal::UnsupportedDependency {
+                    path: patch.path,
+                }));
+            }
+            if patch.after.is_none() {
+                let _ = prove_root_clear_ownership(self, &located)?;
+            }
+        }
+        let source_previews = root_preview_deletions(source_catalog)?;
+        if source_previews.len() != patch.source_previews {
+            return Err(Error::PatchConflict);
+        }
+        let target_owner = patch.artifacts.target_owner();
+        let package = Package::from_source_owner_with_options(target_owner, self.state.options)
+            .map_err(|_| Error::Verification)?;
+        let target_previews = root_preview_deletions(physical_source(&package)?)?;
+        if target_previews.len() != patch.target_previews {
+            return Err(Error::Verification);
+        }
+        if package.table_cell_comment(
+            SheetSelector::index(patch.path.sheet()),
+            TableSelector::index(patch.path.table()),
+            position,
+        )? != patch.after
+        {
+            return Err(Error::Verification);
+        }
+        Ok(Commit {
+            package,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::published(
+                patch.touched_components,
+                patch.source_previews.saturating_sub(patch.target_previews),
+            ),
+        })
+    }
+}
+
+fn validate_reply_package_metadata(source: &Package, path: Path) -> Result<(), Error> {
+    let metadata = match super::comments_metadata::strict_source(source) {
+        Ok(metadata) => metadata,
+        Err(_) => return Err(Error::InvalidSource { path }),
+    };
+    let payload_len = metadata.payload().len();
+    if payload_len == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    if payload_len > maximum_wire {
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: payload_len,
+            maximum: maximum_wire,
+            path,
+        });
+    }
+    let options = MetadataRewriteOptions::new(
+        payload_len,
+        payload_len.saturating_mul(2).max(1),
+        payload_len.saturating_mul(16).max(1),
+        payload_len.saturating_mul(64).max(1),
+        COMMENT_MAX_NESTING,
+        payload_len.saturating_mul(2).max(1),
+        payload_len.saturating_mul(2).max(1),
+        1,
+    );
+    // A semantic read may encounter a current component whose descriptor is
+    // not present in the legacy metadata registry (native Numbers does this
+    // for otherwise readable empty-reply graphs). The mutation path remains
+    // strict in comments_reply.rs; this read-only inspection still validates
+    // metadata syntax, conflicts, and ownership namespaces.
+    super::comments_metadata::inspect_cross_component_read(source, options)
+        .map_err(|_| Error::InvalidSource { path })?;
+    Ok(())
+}
+
+fn validate_comment_authors(
+    source: &Package,
+    census: &CommentOwnershipCensus,
+    path: Path,
+) -> Result<(), Error> {
+    for identifier in &census.author_ids {
+        let resolved = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, *identifier)
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        if resolved.messages.len() != 1
+            || resolved.messages[0].type_ != ANNOTATION_AUTHOR_MESSAGE_TYPE
+        {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    Ok(())
+}
+
+/// Whether the table's comment list holds an entry or a segment: the table
+/// model's data store, its comment-list reference and the list's fields,
+/// read without decoding the table.
+fn comment_list_populated(source: &Package, sheet: usize, table: usize) -> Result<bool, Error> {
+    let path = Path::Package;
+    let target = super::table_headers::resolve::resolve_target(source, sheet, table)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let model = source
+        .state
+        .components
+        .catalog()
+        .get_index(target.component_index)
+        .and_then(|component| component.archive().objects.get(target.object_index))
+        .and_then(|object| object.messages.get(target.message_index))
+        .ok_or(Error::InvalidSource { path })?;
+    let field = |data: &[u8], number: u32| -> Result<Option<Vec<u8>>, Error> {
+        let view = WireView::parse(data, WireLimits::DEFAULT)
+            .map_err(|error| map_wire_error(error, path))?;
+        Ok(view
+            .fields()
+            .find(|field| field.number() == number && field.wire_type() == 2)
+            .map(|field| field.payload().to_vec()))
+    };
+    let Some(store) = field(model.data.as_slice(), 4)? else {
+        return Err(Error::InvalidSource { path });
+    };
+    let Some(reference) = field(&store, 19)? else {
+        return Ok(false);
+    };
+    let view = WireView::parse(&reference, WireLimits::DEFAULT)
+        .map_err(|error| map_wire_error(error, path))?;
+    let identifier = view
+        .fields()
+        .find(|field| field.number() == 1 && field.wire_type() == 0)
+        .and_then(|field| litchi_iwa_common::decode_varint_from_bytes(field.payload()).ok())
+        .map(|(value, _)| value)
+        .ok_or(Error::InvalidSource { path })?;
+    let resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    for message in resolved.messages {
+        let view = WireView::parse(message.data.as_slice(), WireLimits::DEFAULT)
+            .map_err(|error| map_wire_error(error, path))?;
+        if view
+            .fields()
+            .any(|field| field.number() == 3 || field.number() == 4)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn resolve_comment<'sheet, 'table>(
+    source: &Package,
+    sheet: impl Into<SheetSelector<'sheet>>,
+    table: impl Into<TableSelector<'table>>,
+    position: At,
+) -> Result<Located, Error> {
+    let selected_sheet = source
+        .state
+        .document
+        .sheet(sheet)
+        .map_err(|_| Error::InvalidSource {
+            path: Path::Package,
+        })?
+        .ok_or(Error::Refused(Refusal::SheetNotFound))?;
+    if selected_sheet
+        .tables()
+        .enumerate()
+        .any(|(position, candidate)| {
+            selected_sheet
+                .tables()
+                .skip(position.saturating_add(1))
+                .any(|later| later.name() == candidate.name())
+        })
+    {
+        return Err(Error::InvalidSource {
+            path: Path::Package,
+        });
+    }
+    let table_position = match table.into() {
+        TableSelector::Position(index) => {
+            let index = index.get();
+            selected_sheet.tables().nth(index).map(|_| index)
+        },
+        TableSelector::Name(name) => {
+            let mut matches = selected_sheet
+                .tables()
+                .enumerate()
+                .filter(|(_, candidate)| candidate.name() == name);
+            let selected = matches.next();
+            if selected.is_some() && matches.next().is_some() {
+                return Err(Error::InvalidSource {
+                    path: Path::Package,
+                });
+            }
+            selected.map(|(index, _)| index)
+        },
+    }
+    .ok_or(Error::Refused(Refusal::TableNotFound))?;
+    let table = selected_sheet
+        .tables()
+        .nth(table_position)
+        .ok_or(Error::Refused(Refusal::TableNotFound))?;
+    let dimensions = table.dimensions();
+    let row = usize::try_from(position.row()).map_err(|_| Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    let column = usize::try_from(position.column()).map_err(|_| Error::InvalidSource {
+        path: Path::Package,
+    })?;
+    if position.row() >= dimensions.rows() || position.column() >= dimensions.columns() {
+        return Err(Error::Refused(Refusal::OutOfBounds {
+            path: Path::Cell {
+                sheet: selected_sheet.index(),
+                table: table_position,
+                row,
+                column,
+            },
+        }));
+    }
+    let path = Path::Cell {
+        sheet: selected_sheet.index(),
+        table: table_position,
+        row,
+        column,
+    };
+    let native = super::table_headers::resolve::resolve_target(
+        source,
+        selected_sheet.index(),
+        table_position,
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    resolve_comment_native(
+        source,
+        Target {
+            path,
+            native,
+            row,
+            column,
+            tile_size: DEFAULT_TILE_SIZE,
+        },
+    )
+}
+
+fn resolve_comment_at_target(
+    source: &Package,
+    path: Path,
+    position: At,
+    expected: Option<&Comment>,
+) -> Result<Located, Error> {
+    let Path::Cell { sheet, table, .. } = path else {
+        return Err(Error::PatchConflict);
+    };
+    let native = super::table_headers::resolve::resolve_target(source, sheet, table)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let row = usize::try_from(position.row()).map_err(|_| Error::PatchConflict)?;
+    let column = usize::try_from(position.column()).map_err(|_| Error::PatchConflict)?;
+    let located = resolve_comment_native(
+        source,
+        Target {
+            path,
+            native,
+            row,
+            column,
+            tile_size: DEFAULT_TILE_SIZE,
+        },
+    )?;
+    if expected.is_some() != located.comment.is_some() {
+        return Err(Error::PatchConflict);
+    }
+    Ok(located)
+}
+
+#[derive(Clone, Copy)]
+struct DecodedTableStorage<'source> {
+    data_store: numbers_table_cell_storage_codec::DataStoreSnapshot<'source>,
+    tile_storage: numbers_table_cell_storage_codec::TileStorageSnapshot,
+}
+
+#[derive(Clone, Copy)]
+enum CommentTableModelMode {
+    Strict,
+    DenseNative,
+}
+
+fn decode_comment_table_model<'source>(
+    payload: &'source [u8],
+    message_type: u32,
+    options: numbers_table_cell_storage_codec::DecodeOptions,
+    path: Path,
+) -> Result<
+    Option<(
+        numbers_table_cell_storage_codec::TableModelSnapshot<'source>,
+        CommentTableModelMode,
+    )>,
+    Error,
+> {
+    let strict = numbers_table_cell_storage_codec::decode_table_model_with_report(payload, options);
+    let (model, mode) = match strict {
+        Ok((model, _report)) => {
+            return Ok(Some((model, CommentTableModelMode::Strict)));
+        },
+        Err(error) if error.resource_limit().is_some() => {
+            return Err(map_table_codec_error(error, path));
+        },
+        Err(_strict_error) => {
+            match numbers_table_cell_storage_codec::decode_table_model_with_compatibility_data_store_with_report(
+                payload, options,
+            ) {
+                Ok((model, _report)) => (model, CommentTableModelMode::DenseNative),
+                Err(error) if error.resource_limit().is_some() => {
+                    return Err(map_table_codec_error(error, path));
+                },
+                Err(dense_error) => {
+                    // A 6000 message can be either the historical table
+                    // model or the modern TableInfo envelope.  Probe the
+                    // typed TableInfo shape only after both model routes have
+                    // failed, so a legacy 6000 model remains admissible.
+                    if message_type == 6_000
+                        && !has_comment_legacy_table_model_shape(payload, path)?
+                    {
+                        match table_info_codec::decode_table_model_reference(
+                            payload,
+                            super::table_info_decode_options(payload),
+                        ) {
+                            Ok(_) => return Ok(None),
+                            Err(error) if table_info_error_is_resource(&error) => {
+                                return Err(map_comment_table_info_error(error, path));
+                            },
+                            Err(_) => {},
+                        }
+                    }
+                    return Err(map_table_codec_error(dense_error, path));
+                },
+            }
+        },
+    };
+    Ok(Some((model, mode)))
+}
+
+fn has_comment_legacy_table_model_shape(source: &[u8], path: Path) -> Result<bool, Error> {
+    const DATA_STORE: u8 = 1 << 0;
+    const ROW_COUNT: u8 = 1 << 1;
+    const COLUMN_COUNT: u8 = 1 << 2;
+    const TABLE_NAME: u8 = 1 << 3;
+    const REQUIRED: u8 = DATA_STORE | ROW_COUNT | COLUMN_COUNT | TABLE_NAME;
+
+    let mut present = 0_u8;
+    let mut ambiguous = false;
+    let limits = wire_limits_for(source.len(), 0, path)?;
+    preflight_wire_tree(source, limits, |visit| {
+        if !visit.path().is_empty() {
+            return Ok(WireDescent::Skip);
+        }
+        let field = visit.field();
+        let Some((bit, expected_wire_type)) = (match field.number() {
+            4 => Some((DATA_STORE, 2)),
+            6 => Some((ROW_COUNT, 0)),
+            7 => Some((COLUMN_COUNT, 0)),
+            8 => Some((TABLE_NAME, 2)),
+            _ => None,
+        }) else {
+            return Ok(WireDescent::Skip);
+        };
+        if field.wire_type() != expected_wire_type
+            || present & bit != 0
+            || field.validate_canonical_framing().is_err()
+        {
+            ambiguous = true;
+            return Ok(WireDescent::Skip);
+        }
+        if matches!(field.number(), 6 | 7) {
+            let payload = field.payload();
+            let canonical =
+                litchi_iwa_common::decode_varint_from_bytes(payload).is_ok_and(|(value, width)| {
+                    width == payload.len()
+                        && width == litchi_iwa_common::varint::encoded_len(value)
+                        && u32::try_from(value).is_ok()
+                });
+            if !canonical {
+                ambiguous = true;
+                return Ok(WireDescent::Skip);
+            }
+        }
+        present |= bit;
+        Ok(WireDescent::Skip)
+    })
+    .map_err(|error| map_wire_error(error, path))?;
+    Ok(!ambiguous && present == REQUIRED)
+}
+
+fn decode_table_storage<'source>(
+    source: &'source Package,
+    target: &Target,
+) -> Result<DecodedTableStorage<'source>, Error> {
+    let model_route = MessageRoute {
+        component_index: target.native.component_index,
+        object_index: target.native.object_index,
+        message_index: target.native.message_index,
+        message_type: target.native.message_type,
+    };
+    let model_message = message_at_route(source, model_route, target.path)?;
+    let model_options = table_cell_decode_options(
+        source,
+        model_message.data.len(),
+        source.state.options.semantic().max_references(),
+    );
+    let Some((model, model_mode)) = decode_comment_table_model(
+        model_message.data.as_slice(),
+        model_message.type_,
+        model_options,
+        target.path,
+    )?
+    else {
+        return Err(Error::InvalidSource { path: target.path });
+    };
+    let data_store_options = table_cell_decode_options(
+        source,
+        model.base_data_store().len(),
+        source.state.options.semantic().max_references(),
+    );
+    let data_store = decode_comment_data_store(
+        model.base_data_store(),
+        data_store_options,
+        model_mode,
+        false,
+        target.path,
+    )?;
+    let (tile_storage, _report) =
+        numbers_table_cell_storage_codec::decode_tile_storage_with_report(
+            data_store.tiles(),
+            data_store_options,
+        )
+        .map_err(|error| map_table_codec_error(error, target.path))?;
+    Ok(DecodedTableStorage {
+        data_store,
+        tile_storage,
+    })
+}
+
+fn decode_comment_data_store<'source>(
+    payload: &'source [u8],
+    options: numbers_table_cell_storage_codec::DecodeOptions,
+    model_mode: CommentTableModelMode,
+    allow_strict_fallback: bool,
+    path: Path,
+) -> Result<numbers_table_cell_storage_codec::DataStoreSnapshot<'source>, Error> {
+    let strict =
+        match numbers_table_cell_storage_codec::decode_data_store_with_report(payload, options) {
+            Err(error) if error.resource_limit().is_some() => {
+                return Err(map_table_codec_error(error, path));
+            },
+            result => result,
+        };
+    match model_mode {
+        CommentTableModelMode::Strict => match strict {
+            Ok((store, _report)) => Ok(store),
+            Err(strict_error) if !allow_strict_fallback => {
+                Err(map_table_codec_error(strict_error, path))
+            },
+            Err(_strict_error) => {
+                numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                    payload, options,
+                )
+                .map(|(store, _report)| store)
+                .map_err(|fallback| map_table_codec_error(fallback, path))
+            },
+        },
+        CommentTableModelMode::DenseNative => {
+            numbers_table_cell_storage_codec::decode_data_store_compatibility_with_report(
+                payload, options,
+            )
+            .map(|(store, _report)| store)
+            .map_err(|error| map_table_codec_error(error, path))
+        },
+    }
+}
+
+fn table_info_error_is_resource(error: &table_info_codec::DecodeError) -> bool {
+    error.field_limit_values().is_some()
+        || error.work_limit_values().is_some()
+        || error.wire_resource_limit().is_some()
+        || error.output_limit_values().is_some()
+        || error.allocation_limit_values().is_some()
+        || error.retained_limit_values().is_some()
+        || error.scratch_limit_values().is_some()
+        || error.allocation_amount().is_some()
+}
+
+fn map_comment_table_info_error(error: table_info_codec::DecodeError, path: Path) -> Error {
+    if let Some((observed, maximum)) = error.field_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireFields,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    if let Some((observed, maximum)) = error.work_limit_values() {
+        return Error::Limit {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum,
+            path,
+        };
+    }
+    if let Some(amount) = error.allocation_amount() {
+        return Error::Allocation { amount, path };
+    }
+    match error.wire_resource_limit() {
+        Some(table_info_codec::WireResourceLimit::Bytes { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: observed.unwrap_or(usize::MAX),
+            maximum: maximum.unwrap_or(usize::MAX),
+            path,
+        },
+        Some(table_info_codec::WireResourceLimit::Nesting { observed, maximum }) => Error::Limit {
+            kind: LimitKind::WireNesting,
+            observed: observed
+                .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                .unwrap_or(usize::MAX),
+            maximum: maximum
+                .map(|value| usize::try_from(value).unwrap_or(usize::MAX))
+                .unwrap_or(usize::MAX),
+            path,
+        },
+        _ => {
+            if let Some((observed, maximum)) = error.output_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::OutputBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.allocation_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::Allocations,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.retained_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            if let Some((observed, maximum)) = error.scratch_limit_values() {
+                return Error::Limit {
+                    kind: LimitKind::ScratchBytes,
+                    observed,
+                    maximum,
+                    path,
+                };
+            }
+            Error::InvalidSource { path }
+        },
+    }
+}
+
+fn resolve_comment_native(source: &Package, mut target: Target) -> Result<Located, Error> {
+    let decoded = decode_table_storage(source, &target)?;
+    let data_store = decoded.data_store;
+    let tile_storage = decoded.tile_storage;
+    let data_store_comment_table_id = data_store
+        .comment_storage_table()
+        .map(|reference| reference.identifier());
+    let tile_size = usize::try_from(
+        tile_storage
+            .tile_size()
+            .unwrap_or(u32::try_from(DEFAULT_TILE_SIZE).unwrap_or(u32::MAX)),
+    )
+    .map_err(|_| Error::InvalidSource { path: target.path })?;
+    if tile_size == 0 {
+        return Err(Error::InvalidSource { path: target.path });
+    }
+    target.tile_size = tile_size;
+    let tile_key = target.row / tile_size;
+    let mut tile_finder = TileFinder {
+        target: u32::try_from(tile_key).map_err(|_| Error::InvalidSource { path: target.path })?,
+        ..TileFinder::default()
+    };
+    let (_, _report) = numbers_table_cell_storage_codec::decode_tile_storage_with_visitor(
+        data_store.tiles(),
+        table_cell_decode_options(
+            source,
+            data_store.tiles().len(),
+            source.state.options.semantic().max_references(),
+        ),
+        &mut tile_finder,
+    )
+    .map_err(|error| map_table_codec_error(error, target.path))?;
+    if tile_finder.duplicate {
+        return Err(Error::InvalidSource { path: target.path });
+    }
+    let Some(tile_id) = tile_finder.identifier else {
+        return Ok(Located {
+            target,
+            comment: None,
+            entry: None,
+            storage: None,
+            tile: None,
+            cell_bytes: None,
+            comment_key: None,
+            comment_table_id: data_store_comment_table_id,
+            replies: 0,
+            reply_ids: Vec::new(),
+        });
+    };
+    let tile_resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, tile_id)
+        .map_err(|_| Error::InvalidSource { path: target.path })?
+        .ok_or(Error::InvalidSource { path: target.path })?;
+    let tile_route = MessageRoute {
+        component_index: tile_resolved.component_index,
+        object_index: tile_resolved.object_index,
+        message_index: unique_message_index(
+            tile_resolved.messages,
+            TILE_MESSAGE_TYPE,
+            target.path,
+        )?,
+        message_type: TILE_MESSAGE_TYPE,
+    };
+    let tile_message = message_at_route(source, tile_route, target.path)?;
+    let mut row_finder = RowFinder {
+        target: u32::try_from(target.row % tile_size)
+            .map_err(|_| Error::InvalidSource { path: target.path })?,
+        ..RowFinder::default()
+    };
+    let (_, _report) = numbers_table_cell_storage_codec::decode_tile_with_visitor(
+        tile_message.data.as_slice(),
+        table_cell_decode_options(
+            source,
+            tile_message.data.len(),
+            source.state.options.semantic().max_references(),
+        ),
+        &mut row_finder,
+    )
+    .map_err(|error| map_table_codec_error(error, target.path))?;
+    if row_finder.duplicate {
+        return Err(Error::InvalidSource { path: target.path });
+    }
+    let Some(row_occurrence) = row_finder.selected_occurrence else {
+        return Ok(Located {
+            target,
+            comment: None,
+            entry: None,
+            storage: None,
+            tile: Some(tile_route),
+            cell_bytes: None,
+            comment_key: None,
+            comment_table_id: data_store_comment_table_id,
+            replies: 0,
+            reply_ids: Vec::new(),
+        });
+    };
+    let tile_view = WireView::parse(
+        tile_message.data.as_slice(),
+        wire_limits_for(tile_message.data.len(), 0, target.path)?,
+    )
+    .map_err(|error| map_wire_error(error, target.path))?;
+    let row_field = tile_view
+        .fields()
+        .filter(|field| field.number() == 5)
+        .nth(row_occurrence)
+        .ok_or(Error::InvalidSource { path: target.path })?;
+    let row_info = numbers_table_cell_storage_codec::decode_tile_row_info(
+        row_field.payload(),
+        table_cell_decode_options(
+            source,
+            row_field.payload().len(),
+            source.state.options.semantic().max_references(),
+        ),
+    )
+    .map_err(|error| map_table_codec_error(error, target.path))?;
+    // Package ingress intentionally falls back to the pre-BNC pair whenever
+    // either modern row buffer is absent. Keep this route identical so a
+    // comment read/edit cannot disagree with the semantic table projection.
+    let (storage_buffer, offsets) = match (row_info.cell_storage_buffer(), row_info.cell_offsets())
+    {
+        (Some(storage), Some(offsets)) => (storage, offsets),
+        _ => (
+            row_info.cell_storage_buffer_pre_bnc(),
+            row_info.cell_offsets_pre_bnc(),
+        ),
+    };
+    let cell_range = cell_range(
+        offsets,
+        storage_buffer.len(),
+        target.column,
+        usize::try_from(row_info.cell_count())
+            .map_err(|_| Error::InvalidSource { path: target.path })?,
+        row_info.has_wide_offsets().unwrap_or(false),
+        target.native.columns as usize,
+        target.path,
+    )?;
+    let Some(cell_range) = cell_range else {
+        return Ok(Located {
+            target,
+            comment: None,
+            entry: None,
+            storage: None,
+            tile: Some(tile_route),
+            cell_bytes: None,
+            comment_key: None,
+            comment_table_id: data_store_comment_table_id,
+            replies: 0,
+            reply_ids: Vec::new(),
+        });
+    };
+    let cell_source = storage_buffer
+        .get(cell_range)
+        .ok_or(Error::InvalidSource { path: target.path })?;
+    let cell = crate::cell::wire::BncCell::parse(
+        cell_source,
+        &crate::cell::wire::limits_for_source(cell_source),
+    )
+    .map_err(|error| map_bnc_error(error, target.path))?;
+    let Some(comment_key) = cell.comment_identifier() else {
+        let path = target.path;
+        return Ok(Located {
+            target,
+            comment: None,
+            entry: None,
+            storage: None,
+            tile: Some(tile_route),
+            cell_bytes: Some(copy_bytes(cell_source, path)?),
+            comment_key: None,
+            comment_table_id: data_store_comment_table_id,
+            replies: 0,
+            reply_ids: Vec::new(),
+        });
+    };
+    if comment_key == 0 {
+        return Err(Error::InvalidSource { path: target.path });
+    }
+    let comment_table_id =
+        data_store_comment_table_id.ok_or(Error::InvalidSource { path: target.path })?;
+    if comment_table_id == 0 {
+        return Err(Error::InvalidSource { path: target.path });
+    }
+    let list_resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, comment_table_id)
+        .map_err(|_| Error::InvalidSource { path: target.path })?
+        .ok_or(Error::InvalidSource { path: target.path })?;
+    let list_location = comment_table_entry(source, list_resolved, comment_key, target.path)?;
+    let storage_resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, list_location.storage_id)
+        .map_err(|_| Error::InvalidSource { path: target.path })?
+        .ok_or(Error::InvalidSource { path: target.path })?;
+    let storage_message_index = unique_message_index(
+        storage_resolved.messages,
+        COMMENT_STORAGE_MESSAGE_TYPE,
+        target.path,
+    )?;
+    if storage_resolved.messages.len() != 1 {
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
+            path: target.path,
+        }));
+    }
+    let storage_route = MessageRoute {
+        component_index: storage_resolved.component_index,
+        object_index: storage_resolved.object_index,
+        message_index: storage_message_index,
+        message_type: COMMENT_STORAGE_MESSAGE_TYPE,
+    };
+    let storage_message = &storage_resolved.messages[storage_message_index];
+    let details = decode_comment_storage(source, storage_message.data.as_slice(), target.path)?;
+    let entry = CommentEntryLocation {
+        owner: list_location.owner,
+        segment_id: list_location.segment_id,
+        route: list_location.route,
+        entry: list_location.entry,
+        storage_occurrences: list_location.storage_occurrences,
+    };
+    let path = target.path;
+    Ok(Located {
+        target,
+        comment: Some(details.comment),
+        entry: Some(entry),
+        storage: Some(storage_route),
+        tile: Some(tile_route),
+        cell_bytes: Some(copy_bytes(cell_source, path)?),
+        comment_key: Some(comment_key),
+        comment_table_id: Some(comment_table_id),
+        replies: details.replies,
+        reply_ids: details.reply_ids,
+    })
+}
+
+#[derive(Debug, Default)]
+struct TileFinder {
+    target: u32,
+    identifier: Option<u64>,
+    duplicate: bool,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for TileFinder {
+    fn visit_tile_reference(
+        &mut self,
+        record: numbers_table_cell_storage_codec::TileReferenceRecord<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        if record.tile_id() != self.target {
+            return Ok(());
+        }
+        if self
+            .identifier
+            .replace(record.reference().identifier())
+            .is_some()
+        {
+            self.duplicate = true;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct RowFinder {
+    target: u32,
+    occurrence: usize,
+    selected_occurrence: Option<usize>,
+    duplicate: bool,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for RowFinder {
+    fn visit_tile_row(
+        &mut self,
+        row: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        if row.tile_row_index() == self.target {
+            if self.selected_occurrence.is_some() {
+                self.duplicate = true;
+            } else {
+                self.selected_occurrence = Some(self.occurrence);
+            }
+        }
+        self.occurrence = self.occurrence.saturating_add(1);
+        Ok(())
+    }
+}
+
+fn table_cell_decode_options(
+    source: &Package,
+    payload_bytes: usize,
+    max_references: usize,
+) -> numbers_table_cell_storage_codec::DecodeOptions {
+    let fields = payload_bytes.clamp(1, WireLimits::MAX_FIELDS);
+    let work = payload_bytes
+        .saturating_mul(32)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    numbers_table_cell_storage_codec::DecodeOptions::new(
+        payload_bytes.clamp(1, WireLimits::MAX_INPUT_BYTES),
+        fields,
+        work,
+        COMMENT_MAX_NESTING,
+        max_references.max(1),
+        source
+            .state
+            .options
+            .semantic()
+            .max_output_text_bytes()
+            .max(1),
+    )
+}
+
+fn map_table_codec_error(
+    error: numbers_table_cell_storage_codec::DecodeError,
+    path: Path,
+) -> Error {
+    if let Some(limit) = error.resource_limit() {
+        return match limit {
+            numbers_table_cell_storage_codec::DecodeLimit::Bytes { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::WireBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::References { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::References,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Text { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::TextBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Fields { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::WireFields,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Work { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::WireWork,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Nesting { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::WireNesting,
+                    observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                    maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Allocation { requested } => {
+                Error::Allocation {
+                    amount: requested,
+                    path,
+                }
+            },
+            numbers_table_cell_storage_codec::DecodeLimit::Retained { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::RetainedBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            _ => Error::InvalidSource { path },
+        };
+    }
+    if let Some(amount) = error.allocation_requested() {
+        return Error::Allocation { amount, path };
+    }
+    Error::InvalidSource { path }
+}
+
+#[derive(Debug)]
+struct CommentStorageDetails {
+    comment: Comment,
+    replies: usize,
+    reply_ids: Vec<u64>,
+}
+
+#[derive(Debug)]
+struct CommentStorageGraphDetails {
+    replies: usize,
+    author_id: Option<u64>,
+    storage_uuid: Option<(u64, u64)>,
+    reply_ids: Vec<u64>,
+}
+
+#[derive(Debug)]
+struct CommentTextBudget {
+    maximum: usize,
+    retained: usize,
+}
+
+impl CommentTextBudget {
+    const fn new(maximum: usize) -> Self {
+        Self {
+            maximum,
+            retained: 0,
+        }
+    }
+
+    const fn remaining(&self) -> usize {
+        self.maximum.saturating_sub(self.retained)
+    }
+
+    fn retain(&mut self, amount: usize, path: Path) -> Result<(), Error> {
+        let observed = self.retained.checked_add(amount).ok_or(Error::Limit {
+            kind: LimitKind::TextBytes,
+            observed: usize::MAX,
+            maximum: self.maximum,
+            path,
+        })?;
+        if observed > self.maximum {
+            return Err(Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed,
+                maximum: self.maximum,
+                path,
+            });
+        }
+        self.retained = observed;
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct ReplyIdCollector {
+    ids: Vec<u64>,
+    allocation_failed: Option<usize>,
+    unsupported_reference: bool,
+}
+
+impl comment_storage_codec::CommentStorageVisitor for ReplyIdCollector {
+    fn visit_reply(
+        &mut self,
+        reply: comment_storage_codec::ReferenceRecord<'_>,
+    ) -> Result<(), comment_storage_codec::DecodeError> {
+        let reference = reply.reference();
+        if reference.deprecated_is_external() == Some(true)
+            || reference
+                .deprecated_type()
+                .is_some_and(|deprecated_type| deprecated_type != 0)
+        {
+            self.unsupported_reference = true;
+            return Ok(());
+        }
+        if self.ids.try_reserve(1).is_err() {
+            self.allocation_failed = Some(self.ids.len().saturating_add(1));
+        } else {
+            self.ids.push(reply.identifier());
+        }
+        Ok(())
+    }
+}
+
+fn decode_comment_storage(
+    source: &Package,
+    data: &[u8],
+    path: Path,
+) -> Result<CommentStorageDetails, Error> {
+    let max_text = source.state.options.semantic().max_output_text_bytes();
+    let mut text_budget = CommentTextBudget::new(max_text);
+    decode_comment_storage_with_budget(source, data, path, &mut text_budget)
+}
+
+fn decode_comment_storage_graph(
+    source: &Package,
+    data: &[u8],
+    path: Path,
+) -> Result<CommentStorageGraphDetails, Error> {
+    let max_text = source.state.options.semantic().max_output_text_bytes();
+    let (snapshot, report, reply_ids) = decode_comment_storage_wire(source, data, max_text, path)?;
+    let author_id = snapshot
+        .author()
+        .map(|reference| comment_author_id(reference, path))
+        .transpose()?;
+    Ok(CommentStorageGraphDetails {
+        replies: report.replies(),
+        author_id,
+        storage_uuid: snapshot
+            .storage_uuid()
+            .map(|uuid| (uuid.lower(), uuid.upper())),
+        reply_ids,
+    })
+}
+
+fn decode_comment_storage_with_budget(
+    source: &Package,
+    data: &[u8],
+    path: Path,
+    text_budget: &mut CommentTextBudget,
+) -> Result<CommentStorageDetails, Error> {
+    let max_text = text_budget.maximum;
+    let (snapshot, report, reply_ids) = decode_comment_storage_wire(source, data, max_text, path)?;
+    let text = snapshot.text().unwrap_or_default();
+    text_budget.retain(text.len(), path)?;
+    let author_id = snapshot
+        .author()
+        .map(|reference| comment_author_id(reference, path))
+        .transpose()?;
+    let author = author_id
+        .map(|identifier| decode_comment_author(source, identifier, text_budget.remaining(), path))
+        .transpose()?;
+    if let Some((_, amount)) = author.as_ref() {
+        text_budget.retain(*amount, path)?;
+    }
+    let author = author.map(|(author, _)| author);
+    let timestamp = snapshot
+        .creation_date()
+        .map(|date| CommentTimestamp::new(date.seconds()).ok_or(Error::InvalidSource { path }))
+        .transpose()?;
+    let comment = Comment::try_from_text_with_metadata(text, max_text, path, timestamp, author)?;
+    Ok(CommentStorageDetails {
+        comment,
+        replies: report.replies(),
+        reply_ids,
+    })
+}
+
+fn comment_author_id(
+    reference: comment_storage_codec::ReferenceSnapshot,
+    path: Path,
+) -> Result<u64, Error> {
+    if reference.identifier() == 0
+        || reference
+            .deprecated_type()
+            .is_some_and(|deprecated_type| deprecated_type != 0)
+        || reference.deprecated_is_external() == Some(true)
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(reference.identifier())
+}
+
+fn decode_comment_storage_wire<'data>(
+    source: &Package,
+    data: &'data [u8],
+    max_text: usize,
+    path: Path,
+) -> Result<
+    (
+        comment_storage_codec::CommentStorageSnapshot<'data>,
+        comment_storage_codec::DecodeReport,
+        Vec<u64>,
+    ),
+    Error,
+> {
+    let options = comment_storage_codec::DecodeOptions::new(
+        data.len().clamp(1, WireLimits::MAX_INPUT_BYTES),
+        data.len().clamp(1, WireLimits::MAX_FIELDS),
+        data.len()
+            .saturating_mul(16)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_MAX_NESTING,
+        source.state.options.semantic().max_references().max(1),
+        max_text.max(1),
+    );
+    let mut replies = ReplyIdCollector::default();
+    let (snapshot, report) = comment_storage_codec::decode_comment_storage_archive_with_visitor(
+        data,
+        options,
+        &mut replies,
+    )
+    .map_err(|error| map_comment_codec_error(error, path))?;
+    if let Some(amount) = replies.allocation_failed {
+        return Err(Error::Allocation { amount, path });
+    }
+    if replies.unsupported_reference {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok((snapshot, report, replies.ids))
+}
+
+fn decode_comment_author(
+    source: &Package,
+    identifier: u64,
+    max_text: usize,
+    path: Path,
+) -> Result<(CommentAuthor, usize), Error> {
+    let resolved = source
+        .state
+        .index
+        .resolve_ref_id(&source.state.components, identifier)
+        .map_err(|_| Error::InvalidSource { path })?
+        .ok_or(Error::InvalidSource { path })?;
+    let object = source
+        .state
+        .components
+        .catalog()
+        .get_index(resolved.component_index)
+        .and_then(|component| component.archive().objects.get(resolved.object_index))
+        .ok_or(Error::InvalidSource { path })?;
+    if object.archive_info.identifier != Some(identifier)
+        || object.messages.len() != 1
+        || object.archive_info.message_infos.len() != 1
+        || object.messages[0].type_ != ANNOTATION_AUTHOR_MESSAGE_TYPE
+        || object.archive_info.message_infos[0].type_ != ANNOTATION_AUTHOR_MESSAGE_TYPE
+        || usize::try_from(object.archive_info.message_infos[0].length).ok()
+            != Some(object.messages[0].data.len())
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    comments_read::decode_author(
+        object.messages[0].data.as_slice(),
+        max_text,
+        source.state.options.semantic().max_references(),
+        path,
+    )
+}
+
+fn map_comment_codec_error(error: comment_storage_codec::DecodeError, path: Path) -> Error {
+    if let Some(limit) = error.resource_limit() {
+        return match limit {
+            comment_storage_codec::DecodeLimit::Bytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireBytes,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::OutputBytes { observed, maximum } => Error::Limit {
+                kind: LimitKind::OutputBytes,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::References { observed, maximum } => Error::Limit {
+                kind: LimitKind::References,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Replies { observed, maximum } => Error::Limit {
+                kind: LimitKind::Replies,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::ReferenceBytes { observed, maximum } => {
+                Error::Limit {
+                    kind: LimitKind::ReferenceBytes,
+                    observed,
+                    maximum,
+                    path,
+                }
+            },
+            comment_storage_codec::DecodeLimit::Text { observed, maximum } => Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Fields { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireFields,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Work { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireWork,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Nesting { observed, maximum } => Error::Limit {
+                kind: LimitKind::WireNesting,
+                observed: usize::try_from(observed).unwrap_or(usize::MAX),
+                maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Allocations { observed, maximum } => Error::Limit {
+                kind: LimitKind::Allocations,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Scratch { observed, maximum } => Error::Limit {
+                kind: LimitKind::ScratchBytes,
+                observed,
+                maximum,
+                path,
+            },
+            comment_storage_codec::DecodeLimit::Retained { observed, maximum } => Error::Limit {
+                kind: LimitKind::RetainedBytes,
+                observed,
+                maximum,
+                path,
+            },
+            _ => Error::InvalidSource { path },
+        };
+    }
+    Error::InvalidSource { path }
+}
+
+fn commit_shared_root(edit: Edit<'_>, located: Located) -> Result<Commit, Error> {
+    let path = edit.target.path;
+    let native_operation = match edit.after.as_ref() {
+        Some(comment) => {
+            litchi_iwa_table::comments_native::RootOperation::Set(comment.text().into())
+        },
+        None => litchi_iwa_table::comments_native::RootOperation::Clear,
+    };
+    let selection = native_selection(edit.source, &located)?;
+    let mutation = litchi_iwa_table::comments_native::rewrite_root(
+        edit.source,
+        &selection,
+        &native_operation,
+        litchi_iwa_table::comments_native::Profile::NUMBERS,
+    )
+    .map_err(|fault| map_native_fault(fault, path))?;
+    let touched_components = mutation.touched_components();
+    let deleted_previews = mutation.deleted_previews();
+    let package = mutation.into_package();
+    let position = cell_position_for_path(path)?;
+    let readback = resolve_comment(
+        &package,
+        SheetSelector::index(path.sheet()),
+        TableSelector::index(path.table()),
+        position,
+    )?;
+    if readback.comment.as_ref().map(Comment::text) != edit.after.as_ref().map(Comment::text) {
+        return Err(Error::Verification);
+    }
+    let actual_after = readback.comment.clone();
+    let source_cell = located.cell_bytes.clone().unwrap_or_else(|| Arc::from([]));
+    let target_cell = readback
+        .cell_bytes
+        .clone()
+        .ok_or(Error::InvalidSource { path })?;
+    let source_catalog = physical_source(edit.source)?;
+    let source_previews = root_preview_deletions(source_catalog)?.len();
+    let source_owner = source_catalog.source_owner();
+    let target_owner = physical_source(&package)?.source_owner();
+    Ok(Commit {
+        package,
+        patch: Patch {
+            artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+            path,
+            before: edit.before,
+            after: actual_after,
+            source_cell,
+            target_cell,
+            source_previews,
+            target_previews: source_previews.saturating_sub(deleted_previews),
+            touched_components,
+        },
+        diagnostics: Diagnostics::published(touched_components, deleted_previews),
+    })
+}
+
+fn native_selection(
+    source: &Package,
+    located: &Located,
+) -> Result<litchi_iwa_table::comments_native::Selection, Error> {
+    let path = located.target.path;
+    let tile = located
+        .tile
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    if located
+        .entry
+        .as_ref()
+        .is_some_and(|entry| !entry.owner.supports_text_rewrite())
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
+    }
+    let model_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(located.target.native.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let tile_identifier = source
+        .state
+        .components
+        .catalog()
+        .get_index(tile.component_index)
+        .and_then(|component| component.archive().objects.get(tile.object_index))
+        .and_then(|object| object.archive_info.identifier)
+        .ok_or(Error::InvalidSource { path })?;
+    Ok(litchi_iwa_table::comments_native::Selection {
+        model_component: model_component.name().into(),
+        tile_component: tile_component.name().into(),
+        model_identifier: located.target.native.model_identifier,
+        model_message_index: located.target.native.message_index,
+        model_message_type: located.target.native.message_type,
+        tile_identifier,
+        tile_message_index: tile.message_index,
+        tile_message_type: tile.message_type,
+        tile_row: u32::try_from(located.target.row % located.target.tile_size)
+            .map_err(|_| Error::InvalidSource { path })?,
+        column: u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
+        table_columns: located.target.native.columns,
+        comment_key: located.comment_key,
+        list_identifier: located.comment_table_id,
+        root_identifier: located.entry.as_ref().map(|entry| entry.entry.storage_id),
+    })
+}
+
+fn map_native_fault(fault: litchi_iwa_table::comments_native::Fault, path: Path) -> Error {
+    use litchi_iwa_table::comments_native::{Fault, LimitKind as NativeLimitKind};
+    match fault {
+        Fault::Unsupported | Fault::Dependency => {
+            Error::Refused(Refusal::UnsupportedDependency { path })
+        },
+        Fault::Invalid => Error::InvalidSource { path },
+        Fault::Verification => Error::Verification,
+        Fault::Allocation { amount } => Error::Allocation { amount, path },
+        Fault::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                NativeLimitKind::InputBytes => LimitKind::WireBytes,
+                NativeLimitKind::PackageBytes => LimitKind::CompressedBytes,
+                // PayloadBytes is a byte ceiling at the shared native
+                // boundary.  Do not coerce it into work: a low payload-byte
+                // refusal must remain distinguishable from a work refusal.
+                NativeLimitKind::PayloadBytes => LimitKind::WireBytes,
+                NativeLimitKind::References => LimitKind::References,
+                NativeLimitKind::Replies => LimitKind::Replies,
+                NativeLimitKind::TextBytes => LimitKind::TextBytes,
+                NativeLimitKind::WireFields => LimitKind::WireFields,
+                NativeLimitKind::WireBytes => LimitKind::WireBytes,
+                NativeLimitKind::WireOutputBytes => LimitKind::OutputBytes,
+                NativeLimitKind::WireNesting => LimitKind::WireNesting,
+                NativeLimitKind::WireWork => LimitKind::WireWork,
+                NativeLimitKind::Objects => LimitKind::Objects,
+                NativeLimitKind::Messages => LimitKind::Messages,
+                NativeLimitKind::MessagesPerObject => LimitKind::MessagesPerObject,
+                NativeLimitKind::MetadataItems => LimitKind::MetadataItems,
+                NativeLimitKind::SnappyFrames => LimitKind::SnappyFrames,
+                NativeLimitKind::TableRows => LimitKind::TableRows,
+                NativeLimitKind::TableColumns => LimitKind::TableColumns,
+                NativeLimitKind::TableCells => LimitKind::TableCells,
+                NativeLimitKind::MaterializedCells => LimitKind::MaterializedCells,
+                NativeLimitKind::Items => LimitKind::Items,
+                NativeLimitKind::Allocations => LimitKind::Allocations,
+                NativeLimitKind::ScratchBytes => LimitKind::ScratchBytes,
+                NativeLimitKind::RetainedBytes => LimitKind::RetainedBytes,
+            },
+            observed: usize::try_from(observed).unwrap_or(usize::MAX),
+            maximum: usize::try_from(maximum).unwrap_or(usize::MAX),
+            path,
+        },
+    }
+}
+
+fn commit_edit(edit: Edit<'_>) -> Result<Commit, Error> {
+    let source_catalog = physical_source(edit.source)?;
+    let source_owner = source_catalog.source_owner();
+    if edit.before == edit.after {
+        return Ok(Commit {
+            package: edit.source.snapshot(),
+            patch: Patch {
+                artifacts: OwnedExactArtifacts::new(source_owner.clone(), source_owner),
+                path: edit.target.path,
+                before: edit.before,
+                after: edit.after,
+                source_cell: Arc::from([]),
+                target_cell: Arc::from([]),
+                source_previews: 0,
+                target_previews: 0,
+                touched_components: 0,
+            },
+            diagnostics: Diagnostics::unchanged(),
+        });
+    }
+    if edit.before.is_some() && edit.after.is_none() && edit.axis_removal {
+        if !source_catalog.source_is_exact() {
+            return Err(Error::Refused(Refusal::UnsupportedSource));
+        }
+        let located = resolve_comment_native(edit.source, edit.target.clone())?;
+        if located.comment != edit.before {
+            return Err(Error::InvalidSource {
+                path: edit.target.path,
+            });
+        }
+        let remove_uuid = prove_root_clear_ownership(edit.source, &located)?;
+        let mut prepared =
+            prepare_root_clear(edit.source, &located, remove_uuid, edit.axis_removal)?;
+        if prepared.cell.is_empty()
+            || prepared.mutations.len() != 3
+            || prepared.metadata_entry.0 != super::metadata::ENTRY_NAME
+            || prepared.metadata_entry.1.is_empty()
+        {
+            return Err(Error::Verification);
+        }
+        let source_cell = located.cell_bytes.clone().ok_or(Error::InvalidSource {
+            path: edit.target.path,
+        })?;
+        let previews = if edit.axis_removal {
+            Vec::new()
+        } else {
+            root_preview_deletions(source_catalog)?
+        };
+        let (native_entries, touched) = rewrite_archives(
+            edit.source,
+            prepared.mutations.as_mut_slice(),
+            edit.target.path,
+        )?;
+        let mut edits = Vec::new();
+        edits
+            .try_reserve_exact(native_entries.len().saturating_add(1))
+            .map_err(|_| Error::Allocation {
+                amount: native_entries.len().saturating_add(1),
+                path: edit.target.path,
+            })?;
+        for (name, data) in &native_entries {
+            edits.push(EntryEdit::new(name.as_str(), data.as_slice()));
+        }
+        edits.push(EntryEdit::new(
+            prepared.metadata_entry.0.as_str(),
+            prepared.metadata_entry.1.as_slice(),
+        ));
+        let deleted_names = previews.iter().map(String::as_str).collect::<Vec<_>>();
+        let output = source_catalog
+            .package()
+            .reassemble_with_deletions_to_bytes(&edits, &deleted_names, source_catalog.limits())
+            .map_err(|_| Error::InvalidSource {
+                path: edit.target.path,
+            })?;
+        let package = edit
+            .source
+            .reopen_candidate(output.into())
+            .map_err(|_| Error::Verification)?;
+        let position = cell_position_for_path(edit.target.path)?;
+        if package
+            .table_cell_comment(
+                SheetSelector::index(edit.target.path.sheet()),
+                TableSelector::index(edit.target.path.table()),
+                position,
+            )?
+            .is_some()
+        {
+            return Err(Error::Verification);
+        }
+        let target_owner = physical_source(&package)?.source_owner();
+        let target_cell = Arc::from(prepared.cell.into_boxed_slice());
+        return Ok(Commit {
+            package,
+            patch: Patch {
+                artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+                path: edit.target.path,
+                before: edit.before,
+                after: None,
+                source_cell,
+                target_cell,
+                source_previews: previews.len(),
+                target_previews: 0,
+                touched_components: touched,
+            },
+            diagnostics: Diagnostics::published(touched, previews.len()),
+        });
+    }
+    if !source_catalog.source_is_exact() {
+        return Err(Error::Refused(Refusal::UnsupportedSource));
+    }
+    let located = resolve_comment_native(edit.source, edit.target.clone())?;
+    if located.comment != edit.before {
+        return Err(Error::InvalidSource {
+            path: edit.target.path,
+        });
+    }
+    if !edit.axis_removal {
+        // The shared native engine rewrites a reply-bearing root's text in
+        // place (its replies stay) and clears a root with its direct replies.
+        return commit_shared_root(edit, located);
+    }
+    if edit.after.is_some() && located.comment.is_none() {
+        return comments_create::create_root_comment(
+            edit.source,
+            &located,
+            edit.before,
+            edit.after.ok_or(Error::Verification)?,
+        );
+    }
+    if edit.before.is_some() {
+        let Some(entry) = located.entry.as_ref() else {
+            return Err(Error::InvalidSource {
+                path: edit.target.path,
+            });
+        };
+        if !entry.owner.supports_text_rewrite()
+            || entry.entry.refcount != 1
+            || entry.storage_occurrences != 1
+            || edit.after.is_none()
+        {
+            return Err(Error::Refused(Refusal::UnsupportedDependency {
+                path: edit.target.path,
+            }));
+        }
+        if !matches!(entry.owner, EntryOwner::Root) || located.replies != 0 {
+            return Err(Error::Refused(Refusal::UnsupportedDependency {
+                path: edit.target.path,
+            }));
+        }
+        prove_global_comment_ownership(edit.source, &located)?;
+    }
+    let after = edit.after.clone();
+    let source_cell = located.cell_bytes.clone().ok_or(Error::InvalidSource {
+        path: edit.target.path,
+    })?;
+    let previews = root_preview_deletions(source_catalog)?;
+    let (package, target_cell, touched, deleted_previews) =
+        rewrite_existing(edit.source, &located, after.as_ref())?;
+    let target_cell_for_patch = target_cell.clone();
+    if package.table_cell_comment(
+        SheetSelector::index(edit.target.path.sheet()),
+        TableSelector::index(edit.target.path.table()),
+        cell_position_for_path(edit.target.path)?,
+    )? != after
+    {
+        return Err(Error::Verification);
+    }
+    let target_owner = physical_source(&package)?.source_owner();
+    Ok(Commit {
+        package,
+        patch: Patch {
+            artifacts: OwnedExactArtifacts::new(source_owner, target_owner),
+            path: edit.target.path,
+            before: edit.before,
+            after,
+            source_cell,
+            target_cell: target_cell_for_patch,
+            source_previews: previews.len(),
+            target_previews: previews.len().saturating_sub(deleted_previews),
+            touched_components: touched,
+        },
+        diagnostics: Diagnostics::published(touched, deleted_previews),
+    })
+}
+
+fn rewrite_existing(
+    source: &Package,
+    located: &Located,
+    after: Option<&Comment>,
+) -> Result<(Package, Arc<[u8]>, usize, usize), Error> {
+    let source_catalog = physical_source(source)?;
+    if !source_catalog.source_is_exact() {
+        return Err(Error::Refused(Refusal::UnsupportedSource));
+    }
+    let Some(comment) = after else {
+        // This guard is intentionally duplicated at the transaction boundary
+        // so this private helper can never grow a cell-only clear path by
+        // accident in a later refactor.
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
+            path: located.target.path,
+        }));
+    };
+    let storage = located.storage.ok_or(Error::InvalidSource {
+        path: located.target.path,
+    })?;
+    let original = message_at_route(source, storage, located.target.path)?
+        .data
+        .as_slice();
+    let before = decode_comment_storage(source, original, located.target.path)?.comment;
+    let cell = located.cell_bytes.as_ref().ok_or(Error::InvalidSource {
+        path: located.target.path,
+    })?;
+    // A semantic no-op must include every projected field.  Text-only
+    // comparison would silently discard a future metadata change (or accept
+    // a stale staged snapshot) while the wire rewrite below only owns the
+    // text field.
+    if before == *comment {
+        return Ok((source.snapshot(), Arc::clone(cell), 0, 0));
+    }
+    let data = patch_length_delimited_field_checked(
+        original,
+        1,
+        !before.text.is_empty() || comment_field_present(original, 1)?,
+        Some(comment.text.as_bytes()),
+        located.target.path,
+    )?;
+    let verified = decode_comment_storage(source, &data, located.target.path)?.comment;
+    if verified != *comment {
+        return Err(Error::Verification);
+    }
+    let mut mutations = Vec::new();
+    mutations.try_reserve(1).map_err(|_| Error::Allocation {
+        amount: 1,
+        path: located.target.path,
+    })?;
+    mutations.push(ArchiveMutation::ReplaceMessage {
+        route: storage,
+        data,
+        pruned_object_references: Vec::new(),
+    });
+    let (bytes, touched) = rewrite_archives(source, &mut mutations, located.target.path)?;
+    let deleted = root_preview_deletions(source_catalog)?;
+    let edits = bytes
+        .iter()
+        .map(|(name, data)| EntryEdit::new(name.as_str(), data.as_slice()))
+        .collect::<Vec<_>>();
+    let deleted_names = deleted.iter().map(String::as_str).collect::<Vec<_>>();
+    let output = source_catalog
+        .package()
+        .reassemble_with_deletions_to_bytes(&edits, &deleted_names, source_catalog.limits())
+        .map_err(|_| Error::InvalidSource {
+            path: located.target.path,
+        })?;
+    let package = source
+        .reopen_candidate(output.into())
+        .map_err(|_| Error::Verification)?;
+    Ok((package, Arc::clone(cell), touched, deleted.len()))
+}
+
+/// `list` with `next_list_id` lowered to `key` when it is `key + 1`.
+fn reclaim_last_key(list: Vec<u8>, key: u32) -> Result<Vec<u8>, ()> {
+    let view = litchi_iwa_common::wire::parse_wire_view(&list, WireLimits::DEFAULT)
+        .map_err(|_error| ())?;
+    let next = view
+        .fields()
+        .find(|field| field.number() == 2)
+        .and_then(|field| {
+            litchi_iwa_common::varint::decode_varint_from_bytes(field.payload())
+                .ok()
+                .map(|(value, _)| value)
+        });
+    if next != Some(u64::from(key) + 1) {
+        return Ok(list);
+    }
+    litchi_iwa_common::wire::patch_varint_field(&list, 2, true, Some(u64::from(key)))
+        .map_err(|_error| ())
+}
+
+fn prepare_root_clear(
+    source: &Package,
+    located: &Located,
+    remove_uuid: bool,
+    reclaim: bool,
+) -> Result<PreparedRootClear, Error> {
+    let path = located.target.path;
+    let entry = located
+        .entry
+        .as_ref()
+        .filter(|entry| matches!(entry.owner, EntryOwner::Root))
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let storage = located.storage.ok_or(Error::InvalidSource { path })?;
+    let tile = located.tile.ok_or(Error::InvalidSource { path })?;
+    let key = located.comment_key.ok_or(Error::InvalidSource { path })?;
+    let cell_source = located
+        .cell_bytes
+        .as_deref()
+        .ok_or(Error::InvalidSource { path })?;
+    let limits = crate::cell::wire::limits_for_source(cell_source);
+    let cell = crate::cell::wire::BncCellView::parse(cell_source, &limits)
+        .map_err(|_| Error::InvalidSource { path })?
+        .clear_comment(key, &limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let tile_source = message_at_route(source, tile, path)?.data.as_slice();
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes();
+    let tile_change = super::table_cell_edit::tile::TileChange {
+        row: u32::try_from(located.target.row % located.target.tile_size)
+            .map_err(|_| Error::InvalidSource { path })?,
+        column: u32::try_from(located.target.column).map_err(|_| Error::InvalidSource { path })?,
+        change: super::table_cell_edit::tile::BncChange::CommentClear {
+            expected_identifier: key,
+        },
+    };
+    let tile_output = super::table_cell_edit::tile::rewrite_tile(
+        super::table_cell_edit::tile::TileRewriteRequest {
+            source: tile_source,
+            columns: located.target.native.columns,
+            changes: std::slice::from_ref(&tile_change),
+            limits: super::table_cell_edit::tile::TileLimits::new(
+                maximum_wire,
+                maximum_wire,
+                WireLimits::MAX_FIELDS,
+                u64::try_from(
+                    tile_source
+                        .len()
+                        .saturating_mul(128)
+                        .clamp(1, WireLimits::MAX_REWRITE_WORK),
+                )
+                .unwrap_or(u64::MAX),
+                located.target.tile_size,
+                source.state.options.semantic().max_materialized_cells(),
+            ),
+        },
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    let tile_data = tile_output.payload.ok_or(Error::Verification)?;
+    let transition = tile_output
+        .transitions
+        .as_slice()
+        .first()
+        .filter(|transition| {
+            transition.before_references.comment == Some(key)
+                && transition.after_references.comment.is_none()
+        })
+        .ok_or(Error::Verification)?;
+    let _ = transition;
+    let list_source = message_at_route(source, entry.route, path)?.data.as_slice();
+    let list_data = numbers_table_cell_storage_codec::remove_table_data_list_entry(
+        list_source,
+        numbers_table_cell_storage_codec::TableDataListEntryRemoval::new(
+            key,
+            entry.entry.refcount,
+            entry.entry.storage_id,
+        ),
+        table_cell_decode_options(
+            source,
+            list_source.len(),
+            source.state.options.semantic().max_references(),
+        ),
+    )
+    .map_err(|error| map_table_codec_error(error, path))?;
+    // The released last key goes back to `next_list_id` when the entry
+    // went (an axis removal, as the host's list decrement does).
+    let list_data = if reclaim && entry.entry.refcount <= 1 {
+        reclaim_last_key(list_data, key).map_err(|()| Error::InvalidSource { path })?
+    } else {
+        list_data
+    };
+    let mut mutations = Vec::new();
+    mutations
+        .try_reserve_exact(3)
+        .map_err(|_| Error::Allocation { amount: 3, path })?;
+    mutations.push(ArchiveMutation::ReplaceMessage {
+        route: tile,
+        data: tile_data,
+        pruned_object_references: Vec::new(),
+    });
+    mutations.push(ArchiveMutation::ReplaceMessage {
+        route: entry.route,
+        data: list_data,
+        pruned_object_references: vec![entry.entry.storage_id],
+    });
+    mutations.push(ArchiveMutation::DeleteObject {
+        component_index: storage.component_index,
+        object_identifier: entry.entry.storage_id,
+    });
+    let metadata_entry = if remove_uuid {
+        prepare_metadata_uuid_removal_entry(
+            source,
+            &mutations,
+            storage,
+            entry.entry.storage_id,
+            path,
+        )?
+    } else {
+        prepare_metadata_token_entry(source, &mutations, path)?
+    };
+    Ok(PreparedRootClear {
+        cell,
+        mutations,
+        metadata_entry,
+    })
+}
+
+/// The metadata of a clear that deletes a UUID-registered storage: its
+/// registration is removed and the touched components' save tokens move.
+fn prepare_metadata_uuid_removal_entry(
+    source: &Package,
+    mutations: &[ArchiveMutation],
+    storage: MessageRoute,
+    storage_id: u64,
+    path: Path,
+) -> Result<(String, Vec<u8>), Error> {
+    let options = metadata_inspection_options(source);
+    let registry = super::comments_metadata::inspect(source, options)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let removal = registry
+        .uuid_removal(storage.component_index, storage_id)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let mut components = Vec::new();
+    for mutation in mutations {
+        let index = mutation.component_index();
+        if !components.contains(&index) {
+            components
+                .try_reserve(1)
+                .map_err(|_| Error::Allocation { amount: 1, path })?;
+            components.push(index);
+        }
+    }
+    components.sort_unstable();
+    let selectors = registry
+        .touched_selectors(&components)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let removals = [removal];
+    let batch = litchi_iwa_protos::package_metadata_codec::RemovalSaveTokenBatch::new(
+        litchi_iwa_protos::package_metadata_codec::RemovalBatch::new(
+            registry.last_object_identifier(),
+            &removals,
+            &[],
+            &[],
+        ),
+        SaveTokenBatch::new(&selectors),
+    );
+    let prepared = super::comments_metadata::prepare_removals(&registry, batch, options)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let requirements = prepared.execution_requirements();
+    let payload = prepared
+        .execute(requirements.exact_limits())
+        .map_err(|_| Error::Verification)?
+        .into_bytes();
+    let compressed = comments_create::pack_metadata(source, payload, path)?;
+    Ok((super::metadata::ENTRY_NAME.to_owned(), compressed))
+}
+
+fn prepare_metadata_token_entry(
+    source: &Package,
+    mutations: &[ArchiveMutation],
+    path: Path,
+) -> Result<(String, Vec<u8>), Error> {
+    let route = super::metadata::unique_message_route(source)
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let metadata_component = source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let metadata_message = metadata_component
+        .archive()
+        .objects
+        .get(route.object_index)
+        .and_then(|object| object.messages.get(route.message_index))
+        .filter(|message| message.type_ == super::metadata::MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource { path })?;
+    let mut component_indices = Vec::new();
+    component_indices
+        .try_reserve_exact(mutations.len())
+        .map_err(|_| Error::Allocation {
+            amount: mutations.len(),
+            path,
+        })?;
+    for mutation in mutations {
+        let index = mutation.component_index();
+        if !component_indices.contains(&index) {
+            component_indices.push(index);
+        }
+    }
+    component_indices.sort_unstable();
+    let mut target_locators = Vec::new();
+    target_locators
+        .try_reserve_exact(component_indices.len())
+        .map_err(|_| Error::Allocation {
+            amount: component_indices.len(),
+            path,
+        })?;
+    for index in component_indices {
+        let component = source
+            .state
+            .components
+            .catalog()
+            .get_index(index)
+            .ok_or(Error::InvalidSource { path })?;
+        target_locators.push(super::metadata::normalized_locator(component.name()));
+    }
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    let token_fields = target_locators.len().saturating_add(1).saturating_mul(16);
+    let options = MetadataRewriteOptions::new(
+        metadata_message.data.len().max(1).min(maximum_wire),
+        metadata_message
+            .data
+            .len()
+            .saturating_add(token_fields)
+            .max(1)
+            .min(maximum_wire),
+        metadata_message
+            .data
+            .len()
+            .saturating_mul(8)
+            .clamp(1, WireLimits::MAX_FIELDS),
+        metadata_message
+            .data
+            .len()
+            .saturating_mul(128)
+            .saturating_add(
+                target_locators
+                    .len()
+                    .saturating_mul(metadata_message.data.len()),
+            )
+            .saturating_add(token_fields)
+            .clamp(1, WireLimits::MAX_REWRITE_WORK),
+        COMMENT_MAX_NESTING,
+        source
+            .state
+            .components
+            .catalog()
+            .len()
+            .max(metadata_message.data.len())
+            .max(target_locators.len())
+            .max(1),
+        source.state.options.semantic().max_references().max(1),
+        0,
+    );
+    let mut visitor = super::metadata::ComponentSelectorVisitor::new(&target_locators)
+        .map_err(|amount| Error::Allocation { amount, path })?;
+    inspect_package_metadata_with_visitor(metadata_message.data.as_slice(), options, &mut visitor)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let selectors = visitor.into_selectors().map_err(|amount| {
+        if amount == 0 {
+            Error::Refused(Refusal::UnsupportedDependency { path })
+        } else {
+            Error::Allocation { amount, path }
+        }
+    })?;
+    let rewritten = rewrite_package_metadata_save_tokens(
+        metadata_message.data.as_slice(),
+        SaveTokenBatch::new(&selectors),
+        options,
+    )
+    .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?
+    .into_bytes();
+    let physical = physical_source(source)?;
+    let entry = physical
+        .package()
+        .iter()
+        .find(|entry| entry.name() == super::metadata::ENTRY_NAME)
+        .filter(|entry| !entry.is_opaque())
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let archive_limits = physical
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let snappy_limits = physical
+        .limits()
+        .snappy_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    archive
+        .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    archive
+        .objects
+        .get_mut(route.object_index)
+        .ok_or(Error::InvalidSource { path })?
+        .replace_message_preserving_header(
+            route.message_index,
+            RawMessage {
+                type_: super::metadata::MESSAGE_TYPE,
+                data: rewritten,
+            },
+            archive_limits,
+        )
+        .map_err(|_| Error::InvalidSource { path })?;
+    let bytes = archive
+        .to_bytes(archive_limits)
+        .map_err(|_| Error::InvalidSource { path })?;
+    let compressed = SnappyStream::compress(&bytes, snappy_limits)
+        .map_err(|error| map_core_error(error, path))?;
+    Ok((super::metadata::ENTRY_NAME.to_owned(), compressed))
+}
+
+fn rewrite_archives(
+    source: &Package,
+    mutations: &mut [ArchiveMutation],
+    path: Path,
+) -> Result<(Vec<(String, Vec<u8>)>, usize), Error> {
+    mutations.sort_by_key(ArchiveMutation::ordering_key);
+    let mut outputs = Vec::new();
+    let mut touched = 0usize;
+    let mut mutation_cursor = 0usize;
+    while mutation_cursor < mutations.len() {
+        let component_index = mutations[mutation_cursor].component_index();
+        let component = source
+            .state
+            .components
+            .catalog()
+            .get_index(component_index)
+            .ok_or(Error::InvalidSource { path })?;
+        let name = component.name().to_owned();
+        let entry = physical_source(source)
+            .map_err(|_| Error::Refused(Refusal::UnsupportedSource))?
+            .package()
+            .iter()
+            .find(|entry| entry.name() == name)
+            .ok_or(Error::InvalidSource { path })?;
+        if entry.is_opaque() {
+            return Err(Error::Refused(Refusal::UnsupportedSource));
+        }
+        let physical =
+            physical_source(source).map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
+        let archive_limits = physical
+            .limits()
+            .effective_archive_limits()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let snappy_limits = physical
+            .limits()
+            .snappy_limits()
+            .map_err(|_| Error::InvalidSource { path })?;
+        let stream = SnappyStream::decompress(entry.data(), snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
+        let mut archive = Archive::parse(stream.as_bytes(), archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        archive
+            .validate_canonical_object_framing(stream.as_bytes(), archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        let start_mutations = mutation_cursor;
+        while mutation_cursor < mutations.len()
+            && mutations[mutation_cursor].component_index() == component_index
+        {
+            match &mut mutations[mutation_cursor] {
+                ArchiveMutation::ReplaceMessage {
+                    route,
+                    data,
+                    pruned_object_references,
+                } => {
+                    let object = archive
+                        .objects
+                        .get_mut(route.object_index)
+                        .ok_or(Error::InvalidSource { path })?;
+                    if object.archive_info.identifier.is_none() {
+                        return Err(Error::InvalidSource { path });
+                    }
+                    object
+                        .replace_message_pruning_object_references_preserving_header(
+                            route.message_index,
+                            RawMessage {
+                                type_: route.message_type,
+                                data: std::mem::take(data),
+                            },
+                            pruned_object_references,
+                            archive_limits,
+                        )
+                        .map_err(|_| Error::InvalidSource { path })?;
+                },
+                ArchiveMutation::DeleteObject {
+                    object_identifier, ..
+                } => {
+                    archive
+                        .remove_object_checked(*object_identifier, archive_limits)
+                        .map_err(|_| Error::InvalidSource { path })?;
+                },
+            }
+            mutation_cursor += 1;
+        }
+        if mutation_cursor == start_mutations {
+            return Err(Error::InvalidSource { path });
+        }
+        if archive.objects.is_empty() {
+            return Err(Error::InvalidSource { path });
+        }
+        let rewritten = archive
+            .to_bytes(archive_limits)
+            .map_err(|_| Error::InvalidSource { path })?;
+        let compressed = SnappyStream::compress(&rewritten, snappy_limits)
+            .map_err(|error| map_core_error(error, path))?;
+        outputs.try_reserve(1).map_err(|_| Error::Allocation {
+            amount: outputs.len().saturating_add(1),
+            path,
+        })?;
+        outputs.push((name, compressed));
+        touched += 1;
+    }
+    Ok((outputs, touched))
+}
+
+fn patch_length_delimited_field_checked(
+    source: &[u8],
+    field_number: u32,
+    expected_present: bool,
+    replacement: Option<&[u8]>,
+    path: Path,
+) -> Result<Vec<u8>, Error> {
+    let replacement_bytes = replacement.map_or(0, <[u8]>::len);
+    let _ = wire_limits_for(source.len(), replacement_bytes, path)?;
+    let output = patch_length_delimited_field(source, field_number, expected_present, replacement)
+        .map_err(|error| map_wire_error(error, path))?;
+    if output.len() > WireLimits::MAX_OUTPUT_BYTES {
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: output.len(),
+            maximum: WireLimits::MAX_OUTPUT_BYTES,
+            path,
+        });
+    }
+    Ok(output)
+}
+
+fn wire_limits_for(
+    source_bytes: usize,
+    replacement_bytes: usize,
+    path: Path,
+) -> Result<WireLimits, Error> {
+    let output = source_bytes
+        .checked_add(replacement_bytes)
+        .ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            observed: usize::MAX,
+            maximum: WireLimits::MAX_OUTPUT_BYTES,
+            path,
+        })?;
+    WireLimits::default()
+        .with_input_bytes(source_bytes.clamp(1, WireLimits::MAX_INPUT_BYTES))
+        .and_then(|limits| limits.with_fields(source_bytes.clamp(1, WireLimits::MAX_FIELDS)))
+        .and_then(|limits| limits.with_output_bytes(output.clamp(1, WireLimits::MAX_OUTPUT_BYTES)))
+        .and_then(|limits| limits.with_nesting(WireLimits::MAX_NESTING))
+        .and_then(|limits| {
+            limits.with_rewrite_work(
+                source_bytes
+                    .saturating_add(replacement_bytes)
+                    .saturating_mul(4)
+                    .clamp(1, WireLimits::MAX_REWRITE_WORK),
+            )
+        })
+        .map_err(|error| map_wire_error(error, path))
+}
+
+fn map_wire_error(error: litchi_iwa_common::Error, path: Path) -> Error {
+    match error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::TableRows => LimitKind::TableRows,
+                litchi_iwa_common::LimitKind::TableColumns => LimitKind::TableColumns,
+                litchi_iwa_common::LimitKind::TableCells => LimitKind::TableCells,
+                litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::MaterializedCells,
+            },
+            observed,
+            maximum: limit,
+            path,
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount, path },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+fn map_bnc_error(error: litchi_numbers_wire::Error, path: Path) -> Error {
+    match error {
+        litchi_numbers_wire::Error::LimitExceeded {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_numbers_wire::LimitKind::InputBytes => LimitKind::WireBytes,
+                litchi_numbers_wire::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_numbers_wire::LimitKind::Fields => LimitKind::WireFields,
+                litchi_numbers_wire::LimitKind::TailBytes => LimitKind::WireBytes,
+                litchi_numbers_wire::LimitKind::Items => LimitKind::Items,
+                _ => return Error::InvalidSource { path },
+            },
+            observed,
+            maximum,
+            path,
+        },
+        litchi_numbers_wire::Error::Allocation { requested } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+/// Preserve the physical Snappy resource dimension at the semantic comment
+/// boundary.  Compression limits are distinct from decoded payload bytes:
+/// the former cover the encoded member, while the latter cover the archive
+/// that Snappy exposes to the comment codec.
+pub(super) fn map_core_error(error: litchi_iwa_core::Error, path: Path) -> Error {
+    match error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes => {
+                    LimitKind::CompressedBytes
+                },
+                litchi_iwa_core::LimitKind::ArchiveBytes => LimitKind::CompressedBytes,
+                litchi_iwa_core::LimitKind::Objects => LimitKind::Objects,
+                litchi_iwa_core::LimitKind::Messages => LimitKind::Messages,
+                litchi_iwa_core::LimitKind::MessagesPerObject => LimitKind::MessagesPerObject,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::MetadataItems => LimitKind::MetadataItems,
+                litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::SnappyFrames,
+                litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::MessageBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderMemoryBytes => LimitKind::ScratchBytes,
+            },
+            observed,
+            maximum,
+            path,
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => Error::Allocation {
+            amount: requested,
+            path,
+        },
+        _ => Error::InvalidSource { path },
+    }
+}
+
+// The generated storage decoders charge their own wire work, but the native
+// range and uniqueness scans below run in this adapter. Keep their cost on
+// the same hard ceiling so malformed sparse rows cannot hide an unbounded
+// amount of adapter-side work.
+fn charge_scan_work(work: &mut usize, amount: usize, path: Path) -> Result<(), Error> {
+    let observed = work.checked_add(amount).ok_or(Error::Limit {
+        kind: LimitKind::WireWork,
+        observed: usize::MAX,
+        maximum: WireLimits::MAX_REWRITE_WORK,
+        path,
+    })?;
+    if observed > WireLimits::MAX_REWRITE_WORK {
+        return Err(Error::Limit {
+            kind: LimitKind::WireWork,
+            observed,
+            maximum: WireLimits::MAX_REWRITE_WORK,
+            path,
+        });
+    }
+    *work = observed;
+    Ok(())
+}
+
+fn cell_ranges(
+    offsets: &[u8],
+    storage_length: usize,
+    expected_cells: usize,
+    wide: bool,
+    column_count: usize,
+    path: Path,
+    scan_work: &mut usize,
+) -> Result<Vec<Option<std::ops::Range<usize>>>, Error> {
+    if !offsets.len().is_multiple_of(2)
+        || column_count > offsets.len() / 2
+        || expected_cells > offsets.len() / 2
+        || expected_cells > column_count
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    let slot_count = offsets.len() / 2;
+    // Native producers may pad the offset table beyond the semantic table
+    // width, but those slots must remain missing-column sentinels. Inspect
+    // the complete table so a comment scan cannot silently accept a cell
+    // outside the selected table's declared bounds.
+    charge_scan_work(scan_work, slot_count, path)?;
+    let width = if wide { 4 } else { 1 };
+    let mut populated = 0usize;
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(column_count)
+        .map_err(|_| Error::Allocation {
+            amount: column_count,
+            path,
+        })?;
+    let mut previous = None;
+    for (index, bytes) in offsets.chunks_exact(2).enumerate() {
+        let raw = u16::from_le_bytes([bytes[0], bytes[1]]);
+        if index >= column_count {
+            if raw != u16::MAX {
+                return Err(Error::InvalidSource { path });
+            }
+            continue;
+        }
+        if raw == u16::MAX {
+            ranges.push(None);
+            continue;
+        }
+        populated = populated
+            .checked_add(1)
+            .ok_or(Error::InvalidSource { path })?;
+        let offset = usize::from(raw)
+            .checked_mul(width)
+            .ok_or(Error::InvalidSource { path })?;
+        if offset >= storage_length {
+            return Err(Error::InvalidSource { path });
+        }
+        if let Some((previous_index, previous_offset)) = previous {
+            if previous_offset >= offset {
+                return Err(Error::InvalidSource { path });
+            }
+            ranges[previous_index] = Some(previous_offset..offset);
+        }
+        previous = Some((index, offset));
+        ranges.push(None);
+    }
+    if populated != expected_cells {
+        return Err(Error::InvalidSource { path });
+    }
+    if let Some((previous_index, previous_offset)) = previous {
+        if previous_offset >= storage_length {
+            return Err(Error::InvalidSource { path });
+        }
+        ranges[previous_index] = Some(previous_offset..storage_length);
+    }
+    Ok(ranges)
+}
+
+fn cell_range(
+    offsets: &[u8],
+    storage_length: usize,
+    column: usize,
+    expected_cells: usize,
+    wide: bool,
+    column_count: usize,
+    path: Path,
+) -> Result<Option<std::ops::Range<usize>>, Error> {
+    if column >= column_count {
+        return Err(Error::InvalidSource { path });
+    }
+    let mut scan_work = 0;
+    let ranges = cell_ranges(
+        offsets,
+        storage_length,
+        expected_cells,
+        wide,
+        column_count,
+        path,
+        &mut scan_work,
+    )?;
+    ranges
+        .get(column)
+        .cloned()
+        .ok_or(Error::InvalidSource { path })
+}
+
+fn copy_bytes(bytes: &[u8], path: Path) -> Result<Arc<[u8]>, Error> {
+    let mut retained = Vec::new();
+    retained
+        .try_reserve_exact(bytes.len())
+        .map_err(|_| Error::Allocation {
+            amount: bytes.len(),
+            path,
+        })?;
+    retained.extend_from_slice(bytes);
+    Ok(retained.into())
+}
+
+fn message_at_route(
+    source: &Package,
+    route: MessageRoute,
+    path: Path,
+) -> Result<&RawMessage, Error> {
+    source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .and_then(|component| component.archive().objects.get(route.object_index))
+        .and_then(|object| object.messages.get(route.message_index))
+        .filter(|message| message.type_ == route.message_type)
+        .ok_or(Error::InvalidSource { path })
+}
+
+fn unique_message_index(
+    messages: &[RawMessage],
+    message_type: u32,
+    path: Path,
+) -> Result<usize, Error> {
+    let mut index = None;
+    for (candidate, message) in messages.iter().enumerate() {
+        if message.type_ != message_type {
+            continue;
+        }
+        if index.replace(candidate).is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    index.ok_or(Error::InvalidSource { path })
+}
+
+#[derive(Debug)]
+struct ListProbe {
+    target: u32,
+    target_storage: Option<u64>,
+    target_entry: Option<EntryFact>,
+    target_missing_storage: bool,
+    target_key_occurrences: usize,
+    target_storage_occurrences: usize,
+    segment_ids: Vec<(u64, usize)>,
+    storage_ids: Vec<u64>,
+    entries: Vec<ListEntryFact>,
+    segment_key_min: Option<u32>,
+    segment_key_max: Option<u32>,
+    allocation_failed: Option<usize>,
+}
+
+impl ListProbe {
+    fn new(target: u32, target_storage: Option<u64>) -> Self {
+        Self {
+            target,
+            target_storage,
+            target_entry: None,
+            target_missing_storage: false,
+            target_key_occurrences: 0,
+            target_storage_occurrences: 0,
+            segment_ids: Vec::new(),
+            storage_ids: Vec::new(),
+            entries: Vec::new(),
+            segment_key_min: None,
+            segment_key_max: None,
+            allocation_failed: None,
+        }
+    }
+
+    fn push_bounded<T>(items: &mut Vec<T>, value: T, failed: &mut Option<usize>) {
+        if failed.is_some() {
+            return;
+        }
+        if items.try_reserve(1).is_err() {
+            *failed = Some(items.len().saturating_add(1));
+            return;
+        }
+        items.push(value);
+    }
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for ListProbe {
+    fn visit_list_entry(
+        &mut self,
+        entry: numbers_table_cell_storage_codec::TableDataListEntrySnapshot<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        if self.entries.try_reserve(1).is_err() {
+            self.allocation_failed = Some(self.entries.len().saturating_add(1));
+        } else {
+            self.entries.push(ListEntryFact {
+                key: entry.key(),
+                refcount: entry.ref_count(),
+                storage_id: entry
+                    .comment_storage()
+                    .map(|reference| reference.identifier()),
+            });
+        }
+        match self.segment_key_min {
+            Some(minimum) => self.segment_key_min = Some(minimum.min(entry.key())),
+            None => self.segment_key_min = Some(entry.key()),
+        }
+        match self.segment_key_max {
+            Some(maximum) => self.segment_key_max = Some(maximum.max(entry.key())),
+            None => self.segment_key_max = Some(entry.key()),
+        }
+        if let Some(storage) = entry.comment_storage() {
+            if self.target_storage == Some(storage.identifier()) {
+                self.target_storage_occurrences = self.target_storage_occurrences.saturating_add(1);
+            }
+            Self::push_bounded(
+                &mut self.storage_ids,
+                storage.identifier(),
+                &mut self.allocation_failed,
+            );
+        }
+        if entry.key() != self.target {
+            return Ok(());
+        }
+        self.target_key_occurrences = self.target_key_occurrences.saturating_add(1);
+        if self.target_entry.is_some() {
+            self.target_missing_storage = true;
+            return Ok(());
+        }
+        let Some(storage) = entry.comment_storage() else {
+            self.target_missing_storage = true;
+            return Ok(());
+        };
+        self.target_entry = Some(EntryFact {
+            refcount: entry.ref_count(),
+            storage_id: storage.identifier(),
+        });
+        Ok(())
+    }
+
+    fn visit_list_segment(
+        &mut self,
+        reference: numbers_table_cell_storage_codec::ReferenceRecord<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        let occurrence = self.segment_ids.len();
+        Self::push_bounded(
+            &mut self.segment_ids,
+            (reference.reference().identifier(), occurrence),
+            &mut self.allocation_failed,
+        );
+        Ok(())
+    }
+}
+
+fn list_decode_options(
+    source: &Package,
+    payload_bytes: usize,
+) -> numbers_table_cell_storage_codec::DecodeOptions {
+    table_cell_decode_options(
+        source,
+        payload_bytes,
+        source.state.options.semantic().max_references(),
+    )
+}
+
+fn decode_list_probe(
+    source: &Package,
+    data: &[u8],
+    key: u32,
+    path: Path,
+    segment: bool,
+    target_storage: Option<u64>,
+) -> Result<(ListProbe, i32), Error> {
+    let mut probe = ListProbe::new(key, target_storage);
+    let options = list_decode_options(source, data.len());
+    let (list_type, key_range) = if segment {
+        let (snapshot, _report) =
+            numbers_table_cell_storage_codec::decode_table_data_list_segment_with_visitor(
+                data, options, &mut probe,
+            )
+            .map_err(|error| map_table_codec_error(error, path))?;
+        (
+            snapshot.list_type(),
+            Some((snapshot.key_range_location(), snapshot.key_range_length())),
+        )
+    } else {
+        let (snapshot, _report) =
+            numbers_table_cell_storage_codec::decode_table_data_list_with_visitor(
+                data, options, &mut probe,
+            )
+            .map_err(|error| map_table_codec_error(error, path))?;
+        (snapshot.list_type(), None)
+    };
+    if let Some(amount) = probe.allocation_failed {
+        return Err(Error::Allocation { amount, path });
+    }
+    if let Some((location, length)) = key_range {
+        validate_comment_segment_key_range(
+            location,
+            length,
+            probe.segment_key_min,
+            probe.segment_key_max,
+            path,
+        )?;
+    }
+    Ok((probe, list_type))
+}
+
+/// Validate a segmented comment-list envelope before the requested key is
+/// projected or its storage payload is opened. The min/max pair proves every
+/// entry visited by the strict decoder is inside the half-open key range.
+fn validate_comment_segment_key_range(
+    location: u32,
+    length: u32,
+    minimum: Option<u32>,
+    maximum: Option<u32>,
+    path: Path,
+) -> Result<(), Error> {
+    if length == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    let end = location
+        .checked_add(length)
+        .ok_or(Error::InvalidSource { path })?;
+    match (minimum, maximum) {
+        (Some(minimum), Some(maximum)) => {
+            if minimum > maximum || minimum < location || maximum >= end {
+                return Err(Error::InvalidSource { path });
+            }
+        },
+        (None, None) => {},
+        _ => return Err(Error::InvalidSource { path }),
+    }
+    Ok(())
+}
+
+#[derive(Debug, Clone)]
+struct ListLocation {
+    owner: EntryOwner,
+    segment_id: Option<u64>,
+    route: MessageRoute,
+    entry: EntryFact,
+    storage_id: u64,
+    storage_occurrences: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ListEntryFact {
+    key: u32,
+    refcount: u32,
+    storage_id: Option<u64>,
+}
+
+fn comment_table_entry(
+    source: &Package,
+    resolved: super::Resolved<'_>,
+    key: u32,
+    path: Path,
+) -> Result<ListLocation, Error> {
+    let expected = tst::table_data_list::ListType::CommentStorage as i32;
+    let mut selected: Option<(MessageRoute, ListProbe)> = None;
+    for (message_index, message) in resolved.messages.iter().enumerate() {
+        if !TABLE_DATA_LIST_MESSAGE_TYPES.contains(&message.type_) {
+            continue;
+        }
+        let (probe, list_type) =
+            decode_list_probe(source, message.data.as_slice(), key, path, false, None)?;
+        if list_type != expected {
+            continue;
+        }
+        if selected.is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+        selected = Some((
+            MessageRoute {
+                component_index: resolved.component_index,
+                object_index: resolved.object_index,
+                message_index,
+                message_type: message.type_,
+            },
+            probe,
+        ));
+    }
+    let (table_route, mut root_probe) = selected.ok_or(Error::InvalidSource { path })?;
+    let mut selected_entry = root_probe
+        .target_entry
+        .map(|entry| (entry, EntryOwner::Root, None));
+    let mut storage_ids = std::mem::take(&mut root_probe.storage_ids);
+    for (segment_id, _segment_occurrence) in root_probe.segment_ids {
+        let segment = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, segment_id)
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        let segment_object_id = source
+            .state
+            .components
+            .catalog()
+            .get_index(segment.component_index)
+            .and_then(|component| component.archive().objects.get(segment.object_index))
+            .and_then(|object| object.archive_info.identifier)
+            .ok_or(Error::InvalidSource { path })?;
+        if segment_object_id != segment_id {
+            return Err(Error::InvalidSource { path });
+        }
+        let segment_message_index = unique_message_index(segment.messages, 6_011, path)?;
+        let segment_message = &segment.messages[segment_message_index];
+        let (segment_probe, segment_type) = decode_list_probe(
+            source,
+            segment_message.data.as_slice(),
+            key,
+            path,
+            true,
+            None,
+        )?;
+        if segment_type != expected {
+            return Err(Error::InvalidSource { path });
+        }
+        storage_ids
+            .try_reserve(segment_probe.storage_ids.len())
+            .map_err(|_| Error::Allocation {
+                amount: storage_ids
+                    .len()
+                    .saturating_add(segment_probe.storage_ids.len()),
+                path,
+            })?;
+        storage_ids.extend(segment_probe.storage_ids);
+        if segment_probe.target_missing_storage {
+            return Err(Error::InvalidSource { path });
+        }
+        if let Some(entry) = segment_probe.target_entry {
+            if selected_entry.is_some() {
+                return Err(Error::InvalidSource { path });
+            }
+            selected_entry = Some((entry, EntryOwner::Segment, Some(segment_id)));
+        }
+    }
+    if root_probe.target_missing_storage {
+        return Err(Error::InvalidSource { path });
+    }
+    let (entry, owner, segment_id) = selected_entry.ok_or(Error::InvalidSource { path })?;
+    if entry.refcount == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    let storage_occurrences = storage_ids
+        .into_iter()
+        .filter(|identifier| *identifier == entry.storage_id)
+        .count();
+    if storage_occurrences == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(ListLocation {
+        owner,
+        segment_id,
+        route: table_route,
+        entry,
+        storage_id: entry.storage_id,
+        storage_occurrences,
+    })
+}
+
+#[derive(Debug, Default)]
+struct GlobalTileProbe {
+    tiles: Vec<(u32, u64)>,
+    allocation_failed: Option<usize>,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for GlobalTileProbe {
+    fn visit_tile_reference(
+        &mut self,
+        record: numbers_table_cell_storage_codec::TileReferenceRecord<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        ListProbe::push_bounded(
+            &mut self.tiles,
+            (record.tile_id(), record.reference().identifier()),
+            &mut self.allocation_failed,
+        );
+        Ok(())
+    }
+}
+
+#[derive(Debug, Default)]
+struct GlobalRowProbe {
+    rows: Vec<(u32, usize)>,
+    allocation_failed: Option<usize>,
+}
+
+impl numbers_table_cell_storage_codec::StorageVisitor for GlobalRowProbe {
+    fn visit_tile_row(
+        &mut self,
+        row: numbers_table_cell_storage_codec::TileRowInfoSnapshot<'_>,
+    ) -> Result<(), numbers_table_cell_storage_codec::DecodeError> {
+        let occurrence = self.rows.len();
+        ListProbe::push_bounded(
+            &mut self.rows,
+            (row.tile_row_index(), occurrence),
+            &mut self.allocation_failed,
+        );
+        Ok(())
+    }
+}
+
+fn scan_global_comment_cells(
+    source: &Package,
+    column_count: usize,
+    storage: DecodedTableStorage<'_>,
+    path: Path,
+    scan_work: &mut usize,
+) -> Result<Vec<(usize, u32)>, Error> {
+    let tile_size = usize::try_from(
+        storage
+            .tile_storage
+            .tile_size()
+            .unwrap_or(u32::try_from(DEFAULT_TILE_SIZE).unwrap_or(u32::MAX)),
+    )
+    .map_err(|_| Error::InvalidSource { path })?;
+    if tile_size == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    let options = table_cell_decode_options(
+        source,
+        storage.data_store.tiles().len(),
+        source.state.options.semantic().max_references(),
+    );
+    let mut tiles = GlobalTileProbe::default();
+    let (_, _report) = numbers_table_cell_storage_codec::decode_tile_storage_with_visitor(
+        storage.data_store.tiles(),
+        options,
+        &mut tiles,
+    )
+    .map_err(|error| map_table_codec_error(error, path))?;
+    if let Some(amount) = tiles.allocation_failed {
+        return Err(Error::Allocation { amount, path });
+    }
+    let mut seen_tile_keys = HashSet::new();
+    seen_tile_keys
+        .try_reserve(tiles.tiles.len())
+        .map_err(|_| Error::Allocation {
+            amount: tiles.tiles.len(),
+            path,
+        })?;
+    let mut comment_keys = Vec::new();
+    for (tile_key, tile_id) in tiles.tiles.iter().copied() {
+        charge_scan_work(scan_work, 1, path)?;
+        if tile_id == 0 || !seen_tile_keys.insert(tile_key) {
+            return Err(Error::InvalidSource { path });
+        }
+        let tile_resolved = source
+            .state
+            .index
+            .resolve_ref_id(&source.state.components, tile_id)
+            .map_err(|_| Error::InvalidSource { path })?
+            .ok_or(Error::InvalidSource { path })?;
+        let tile_route = MessageRoute {
+            component_index: tile_resolved.component_index,
+            object_index: tile_resolved.object_index,
+            message_index: unique_message_index(tile_resolved.messages, TILE_MESSAGE_TYPE, path)?,
+            message_type: TILE_MESSAGE_TYPE,
+        };
+        let tile_message = message_at_route(source, tile_route, path)?;
+        let mut rows = GlobalRowProbe::default();
+        let (_, _report) = numbers_table_cell_storage_codec::decode_tile_with_visitor(
+            tile_message.data.as_slice(),
+            table_cell_decode_options(
+                source,
+                tile_message.data.len(),
+                source.state.options.semantic().max_references(),
+            ),
+            &mut rows,
+        )
+        .map_err(|error| map_table_codec_error(error, path))?;
+        if let Some(amount) = rows.allocation_failed {
+            return Err(Error::Allocation { amount, path });
+        }
+        let mut seen_row_keys = HashSet::new();
+        seen_row_keys
+            .try_reserve(rows.rows.len())
+            .map_err(|_| Error::Allocation {
+                amount: rows.rows.len(),
+                path,
+            })?;
+        let tile_view = WireView::parse(
+            tile_message.data.as_slice(),
+            wire_limits_for(tile_message.data.len(), 0, path)?,
+        )
+        .map_err(|error| map_wire_error(error, path))?;
+        for (row_key, row_occurrence) in rows.rows.iter().copied() {
+            charge_scan_work(scan_work, 1, path)?;
+            if !seen_row_keys.insert(row_key) {
+                return Err(Error::InvalidSource { path });
+            }
+            let row_field = tile_view
+                .fields()
+                .filter(|field| field.number() == 5)
+                .nth(row_occurrence)
+                .ok_or(Error::InvalidSource { path })?;
+            let row_info = numbers_table_cell_storage_codec::decode_tile_row_info(
+                row_field.payload(),
+                table_cell_decode_options(
+                    source,
+                    row_field.payload().len(),
+                    source.state.options.semantic().max_references(),
+                ),
+            )
+            .map_err(|error| map_table_codec_error(error, path))?;
+            let (storage_buffer, offsets) =
+                match (row_info.cell_storage_buffer(), row_info.cell_offsets()) {
+                    (Some(storage), Some(offsets)) => (storage, offsets),
+                    _ => (
+                        row_info.cell_storage_buffer_pre_bnc(),
+                        row_info.cell_offsets_pre_bnc(),
+                    ),
+                };
+            let expected_cells = usize::try_from(row_info.cell_count())
+                .map_err(|_| Error::InvalidSource { path })?;
+            let ranges = cell_ranges(
+                offsets,
+                storage_buffer.len(),
+                expected_cells,
+                row_info.has_wide_offsets().unwrap_or(false),
+                column_count,
+                path,
+                scan_work,
+            )?;
+            charge_scan_work(scan_work, expected_cells, path)?;
+            for cell_range in ranges.into_iter().flatten() {
+                let cell_source = storage_buffer
+                    .get(cell_range)
+                    .ok_or(Error::InvalidSource { path })?;
+                // `BncCell::parse` walks the complete encoded cell. Charge
+                // those bytes on the adapter-wide scan budget before the
+                // handwritten parser runs, rather than treating every cell
+                // as one unit regardless of payload size.
+                charge_scan_work(scan_work, cell_source.len(), path)?;
+                let cell = crate::cell::wire::BncCell::parse(
+                    cell_source,
+                    &crate::cell::wire::limits_for_source(cell_source),
+                )
+                .map_err(|error| map_bnc_error(error, path))?;
+                let Some(comment_key) = cell.comment_identifier() else {
+                    continue;
+                };
+                if comment_key == 0 {
+                    return Err(Error::InvalidSource { path });
+                }
+                comment_keys.try_reserve(1).map_err(|_| Error::Allocation {
+                    amount: comment_keys.len().saturating_add(1),
+                    path,
+                })?;
+                comment_keys.push((tile_resolved.component_index, comment_key));
+            }
+        }
+    }
+    Ok(comment_keys)
+}
+
+fn prove_global_comment_ownership(source: &Package, selected: &Located) -> Result<(), Error> {
+    let entry = selected.entry.as_ref().ok_or(Error::InvalidSource {
+        path: selected.target.path,
+    })?;
+    if !entry.owner.supports_text_rewrite()
+        || entry.entry.refcount != 1
+        || entry.storage_occurrences != 1
+        || selected.replies != 0
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
+            path: selected.target.path,
+        }));
+    }
+    let root_list = message_at_route(source, entry.route, selected.target.path)?;
+    if !TABLE_DATA_LIST_MESSAGE_TYPES.contains(&root_list.type_) {
+        return Err(Error::InvalidSource {
+            path: selected.target.path,
+        });
+    }
+    let (root_probe, root_type) = decode_list_probe(
+        source,
+        root_list.data.as_slice(),
+        selected.comment_key.unwrap_or(0),
+        selected.target.path,
+        false,
+        None,
+    )?;
+    if root_type != tst::table_data_list::ListType::CommentStorage as i32
+        || root_probe.target_entry != Some(entry.entry)
+    {
+        return Err(Error::InvalidSource {
+            path: selected.target.path,
+        });
+    }
+    let census = census_comment_ownership(source, selected.target.path)?;
+    let selected_key = selected.comment_key.ok_or(Error::InvalidSource {
+        path: selected.target.path,
+    })?;
+    let selected_table_id = selected.comment_table_id.ok_or(Error::InvalidSource {
+        path: selected.target.path,
+    })?;
+    let selected_storage_id = entry.entry.storage_id;
+    if selected_key == 0 || selected_table_id == 0 || selected_storage_id == 0 {
+        return Err(Error::InvalidSource {
+            path: selected.target.path,
+        });
+    }
+    let selected_list_occurrences = census
+        .list_entries
+        .iter()
+        .filter(|fact| {
+            fact.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                && fact.key == selected_key
+        })
+        .filter(|fact| match entry.owner {
+            EntryOwner::Root => fact.table_id == selected_table_id && fact.root,
+            EntryOwner::Segment => fact.storage_id == Some(selected_storage_id),
+        })
+        .count();
+    if census
+        .table_references
+        .iter()
+        .filter(|identifier| **identifier == selected_table_id)
+        .count()
+        != 1
+        || census
+            .list_entries
+            .iter()
+            .filter(|fact| fact.list_type == tst::table_data_list::ListType::CommentStorage as i32)
+            .filter(|fact| fact.key == selected_key)
+            .count()
+            != 1
+        || selected_list_occurrences != 1
+        || census
+            .list_entries
+            .iter()
+            .filter(|fact| fact.storage_id == Some(selected_storage_id))
+            .count()
+            != 1
+        || census
+            .cell_comment_keys
+            .iter()
+            .filter(|key| **key == selected_key)
+            .count()
+            != 1
+    {
+        return Err(Error::InvalidSource {
+            path: selected.target.path,
+        });
+    }
+    let storage = census
+        .storages
+        .iter()
+        .find(|storage| storage.object_id == selected_storage_id)
+        .ok_or(Error::InvalidSource {
+            path: selected.target.path,
+        })?;
+    if storage.replies != 0
+        || !storage.reply_ids.is_empty()
+        || storage.storage_uuid.is_none()
+        || census
+            .entry_storage_ids
+            .iter()
+            .filter(|identifier| **identifier == selected_storage_id)
+            .count()
+            != 1
+    {
+        return Err(Error::Refused(Refusal::UnsupportedDependency {
+            path: selected.target.path,
+        }));
+    }
+    Ok(())
+}
+
+/// Prove a root clear's ownership; `true` when the deleted storage's own
+/// object-UUID registration goes with it (a storage this crate created),
+/// `false` when metadata does not name it (native storages).
+fn prove_root_clear_ownership(source: &Package, selected: &Located) -> Result<bool, Error> {
+    prove_global_comment_ownership(source, selected)?;
+    let entry = selected.entry.as_ref().ok_or(Error::InvalidSource {
+        path: selected.target.path,
+    })?;
+    let deleted_object = entry.entry.storage_id;
+    prove_archive_reference_ownership(source, deleted_object, entry.route, selected.target.path)?;
+    if prove_metadata_ownership(source, deleted_object, selected.target.path).is_ok() {
+        return Ok(false);
+    }
+    let path = selected.target.path;
+    let storage = selected.storage.ok_or(Error::InvalidSource { path })?;
+    let registry = super::comments_metadata::inspect(source, metadata_inspection_options(source))
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    match registry.current_uuid_if_registered(storage.component_index, deleted_object) {
+        Ok(Some(_)) => Ok(true),
+        _ => Err(Error::Refused(Refusal::UnsupportedDependency { path })),
+    }
+}
+
+/// Metadata inspection options sized to the source's metadata payload, for
+/// a batch of one registry change.
+fn metadata_inspection_options(source: &Package) -> MetadataRewriteOptions {
+    let length = super::metadata::unique_message_route(source)
+        .and_then(|route| {
+            source
+                .state
+                .components
+                .catalog()
+                .get_index(route.component_index)
+                .and_then(|component| component.archive().objects.get(route.object_index))
+                .and_then(|object| object.messages.get(route.message_index))
+                .map(|message| message.data.len())
+        })
+        .unwrap_or(0);
+    comments_create::metadata_options(length, 1)
+}
+
+fn prove_metadata_ownership(
+    source: &Package,
+    deleted_object: u64,
+    path: Path,
+) -> Result<(), Error> {
+    let route = super::metadata::unique_message_route(source)
+        .ok_or(Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    let message = source
+        .state
+        .components
+        .catalog()
+        .get_index(route.component_index)
+        .and_then(|component| component.archive().objects.get(route.object_index))
+        .and_then(|object| object.messages.get(route.message_index))
+        .filter(|message| message.type_ == super::metadata::MESSAGE_TYPE)
+        .ok_or(Error::InvalidSource { path })?;
+    let maximum_wire = source.state.options.archive().max_iwa_stream_bytes().min(
+        source
+            .state
+            .options
+            .archive()
+            .archive_limits()
+            .max_archive_bytes(),
+    );
+    if message.data.is_empty() || message.data.len() > maximum_wire {
+        return Err(Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: message.data.len(),
+            maximum: maximum_wire,
+            path,
+        });
+    }
+    let fields = message
+        .data
+        .len()
+        .saturating_mul(8)
+        .clamp(1, WireLimits::MAX_FIELDS);
+    let work = message
+        .data
+        .len()
+        .saturating_mul(128)
+        .clamp(1, WireLimits::MAX_REWRITE_WORK);
+    let components = source
+        .state
+        .components
+        .catalog()
+        .len()
+        .max(message.data.len())
+        .max(1);
+    let references = source.state.options.semantic().max_references().max(1);
+    let options = MetadataRewriteOptions::new(
+        maximum_wire,
+        maximum_wire,
+        fields,
+        work,
+        COMMENT_MAX_NESTING,
+        components,
+        references,
+        0,
+    );
+    let mut census = super::metadata::ObjectOwnershipVisitor::new(deleted_object);
+    inspect_package_metadata_with_visitor(message.data.as_slice(), options, &mut census)
+        .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+    if census.is_owned() {
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
+    }
+    Ok(())
+}
+
+struct DeletedObjectReferenceCensus {
+    deleted: u64,
+    expected_object: u64,
+    expected_message: usize,
+    occurrences: usize,
+    unexpected: bool,
+}
+
+impl ArchiveReferenceVisitor for DeletedObjectReferenceCensus {
+    fn visit_reference(
+        &mut self,
+        occurrence: ArchiveReferenceOccurrence,
+    ) -> litchi_iwa_core::Result<()> {
+        if occurrence.kind == ArchiveReferenceKind::Object
+            && occurrence.referenced_identifier == self.deleted
+        {
+            self.occurrences = self.occurrences.saturating_add(1);
+            self.unexpected |= occurrence.object_identifier != self.expected_object
+                || occurrence.message_index != self.expected_message;
+        }
+        Ok(())
+    }
+}
+
+fn prove_archive_reference_ownership(
+    source: &Package,
+    deleted_object: u64,
+    allowed_route: MessageRoute,
+    path: Path,
+) -> Result<(), Error> {
+    let physical =
+        physical_source(source).map_err(|_| Error::Refused(Refusal::UnsupportedSource))?;
+    let limits = physical
+        .limits()
+        .effective_archive_limits()
+        .map_err(|_| Error::InvalidSource { path })?;
+    let mut census = DeletedObjectReferenceCensus {
+        deleted: deleted_object,
+        expected_object: source
+            .state
+            .components
+            .catalog()
+            .get_index(allowed_route.component_index)
+            .and_then(|component| component.archive().objects.get(allowed_route.object_index))
+            .and_then(|object| object.archive_info.identifier)
+            .ok_or(Error::InvalidSource { path })?,
+        expected_message: allowed_route.message_index,
+        occurrences: 0,
+        unexpected: false,
+    };
+    let maximum_references = source.state.options.semantic().max_references();
+    let mut inspected_references = 0usize;
+    let mut inspection_work = 0usize;
+    for component in source.state.components.catalog().iter() {
+        for object in &component.archive().objects {
+            let header_bytes =
+                usize::try_from(object.header_length).map_err(|_| Error::InvalidSource { path })?;
+            // The core inspection seam canonically projects, preflights, and
+            // decodes each source header. Keep a conservative aggregate
+            // charge across every component instead of resetting that work
+            // at each object boundary.
+            charge_scan_work(&mut inspection_work, header_bytes.saturating_mul(4), path)?;
+            let occurrences = object
+                .inspect_references_with_policy(
+                    &mut census,
+                    ArchiveReferencePolicy::RejectUnknownMetadata,
+                    limits,
+                )
+                .map_err(|_| Error::Refused(Refusal::UnsupportedDependency { path }))?;
+            inspected_references =
+                inspected_references
+                    .checked_add(occurrences)
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::References,
+                        observed: usize::MAX,
+                        maximum: maximum_references,
+                        path,
+                    })?;
+            if inspected_references > maximum_references {
+                return Err(Error::Limit {
+                    kind: LimitKind::References,
+                    observed: inspected_references,
+                    maximum: maximum_references,
+                    path,
+                });
+            }
+        }
+    }
+    // ArchiveInfo may encode one logical edge in both the aggregate and its
+    // exact FieldInfo path. The message-metadata validator proves those two
+    // views agree; this package-wide census only needs at least one occurrence
+    // and no occurrence owned by another object/message route.
+    if census.occurrences == 0 || census.unexpected {
+        return Err(Error::Refused(Refusal::UnsupportedDependency { path }));
+    }
+    Ok(())
+}
+
+fn census_comment_ownership(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
+    census_comment_ownership_with_mode(source, path, CommentCensusMode::Mutation)
+}
+
+fn census_comment_read(source: &Package, path: Path) -> Result<CommentOwnershipCensus, Error> {
+    census_comment_ownership_with_mode(source, path, CommentCensusMode::Read)
+}
+
+fn census_comment_ownership_with_mode(
+    source: &Package,
+    path: Path,
+    mode: CommentCensusMode,
+) -> Result<CommentOwnershipCensus, Error> {
+    let mut census = CommentOwnershipCensus::default();
+    let mut budget = CensusBudget::new(source.state.options.semantic().max_references());
+    let mut storage_ids = HashSet::new();
+    for (component_index, component) in source.state.components.catalog().iter().enumerate() {
+        for (object_index, object) in component.archive().objects.iter().enumerate() {
+            let object_id = object
+                .archive_info
+                .identifier
+                .ok_or(Error::InvalidSource { path })?;
+            if object_id == 0 {
+                return Err(Error::InvalidSource { path });
+            }
+            for (message_index, message) in object.messages.iter().enumerate() {
+                let route = MessageRoute {
+                    component_index,
+                    object_index,
+                    message_index,
+                    message_type: message.type_,
+                };
+                match message.type_ {
+                    6_005 | 6_201 => {
+                        let (probe, list_type) = decode_list_probe(
+                            source,
+                            message.data.as_slice(),
+                            u32::MAX,
+                            path,
+                            false,
+                            None,
+                        )?;
+                        let is_comment =
+                            list_type == tst::table_data_list::ListType::CommentStorage as i32;
+                        if is_comment {
+                            let mut expected = probe.storage_ids.clone();
+                            expected.extend(
+                                probe.segment_ids.iter().map(|(identifier, _)| *identifier),
+                            );
+                            validate_comment_message_metadata(
+                                object,
+                                message_index,
+                                &expected,
+                                mode.requires_field_infos(),
+                                path,
+                            )?;
+                        } else {
+                            validate_comment_message_metadata(
+                                object,
+                                message_index,
+                                &[],
+                                mode.requires_field_infos(),
+                                path,
+                            )?;
+                        }
+                        if is_comment {
+                            if census.comment_list_ids.contains(&object_id) {
+                                return Err(Error::InvalidSource { path });
+                            }
+                            push_nonzero(
+                                &mut census.comment_list_ids,
+                                object_id,
+                                &mut budget,
+                                path,
+                            )?;
+                        }
+                        append_list_facts(
+                            &mut census,
+                            &mut budget,
+                            component_index,
+                            object_id,
+                            list_type,
+                            &probe,
+                            true,
+                            path,
+                        )?;
+                        for (segment_position, (segment_id, _)) in
+                            probe.segment_ids.iter().copied().enumerate()
+                        {
+                            if segment_id == 0
+                                || (is_comment
+                                    && (segment_id == object_id
+                                        || probe.segment_ids[..segment_position]
+                                            .iter()
+                                            .any(|(prior, _)| *prior == segment_id)))
+                            {
+                                return Err(Error::InvalidSource { path });
+                            }
+                            let segment = source
+                                .state
+                                .index
+                                .resolve_ref_id(&source.state.components, segment_id)
+                                .map_err(|_| Error::InvalidSource { path })?
+                                .ok_or(Error::InvalidSource { path })?;
+                            let segment_message_index =
+                                unique_message_index(segment.messages, 6_011, path)?;
+                            let segment_message = message_at_route(
+                                source,
+                                MessageRoute {
+                                    component_index: segment.component_index,
+                                    object_index: segment.object_index,
+                                    message_index: segment_message_index,
+                                    message_type: 6_011,
+                                },
+                                path,
+                            )?;
+                            let segment_object = source
+                                .state
+                                .components
+                                .catalog()
+                                .get_index(segment.component_index)
+                                .and_then(|component| {
+                                    component.archive().objects.get(segment.object_index)
+                                })
+                                .ok_or(Error::InvalidSource { path })?;
+                            if is_comment {
+                                let segment_object_id = segment_object
+                                    .archive_info
+                                    .identifier
+                                    .ok_or(Error::InvalidSource { path })?;
+                                if segment_object_id == 0
+                                    || segment_object_id != segment_id
+                                    || (matches!(mode, CommentCensusMode::Mutation)
+                                        && census.rooted_segment_ids.contains(&segment_object_id))
+                                {
+                                    return Err(Error::InvalidSource { path });
+                                }
+                                push_nonzero(
+                                    &mut census.rooted_segment_ids,
+                                    segment_object_id,
+                                    &mut budget,
+                                    path,
+                                )?;
+                                budget.charge(1, path)?;
+                                census
+                                    .segment_edges
+                                    .try_reserve(1)
+                                    .map_err(|_| Error::Allocation { amount: 1, path })?;
+                                census.segment_edges.push(CommentSegmentFact {
+                                    root_id: object_id,
+                                    segment_id,
+                                    root_component_index: component_index,
+                                    segment_component_index: segment.component_index,
+                                });
+                            }
+                            let (segment_probe, segment_type) = decode_list_probe(
+                                source,
+                                segment_message.data.as_slice(),
+                                u32::MAX,
+                                path,
+                                true,
+                                None,
+                            )?;
+                            if segment_type != list_type {
+                                return Err(Error::InvalidSource { path });
+                            }
+                            let expected = segment_probe.storage_ids.clone();
+                            validate_comment_message_metadata(
+                                segment_object,
+                                segment_message_index,
+                                &expected,
+                                mode.requires_field_infos(),
+                                path,
+                            )?;
+                        }
+                        let _ = route;
+                    },
+                    6_011 => {
+                        if unique_message_index(object.messages.as_slice(), 6_011, path)?
+                            != message_index
+                        {
+                            return Err(Error::InvalidSource { path });
+                        }
+                        let (probe, list_type) = decode_list_probe(
+                            source,
+                            message.data.as_slice(),
+                            u32::MAX,
+                            path,
+                            true,
+                            None,
+                        )?;
+                        let expected = probe.storage_ids.clone();
+                        validate_comment_message_metadata(
+                            object,
+                            message_index,
+                            &expected,
+                            mode.requires_field_infos(),
+                            path,
+                        )?;
+                        append_list_facts(
+                            &mut census,
+                            &mut budget,
+                            component_index,
+                            object_id,
+                            list_type,
+                            &probe,
+                            false,
+                            path,
+                        )?;
+                    },
+                    COMMENT_STORAGE_MESSAGE_TYPE => {
+                        let details =
+                            decode_comment_storage_graph(source, message.data.as_slice(), path)?;
+                        // A reply may be shared by multiple roots, but one
+                        // root must never list the same direct leaf twice.
+                        // The read census permits cross-root sharing and this
+                        // local check preserves ordinal unambiguity.
+                        let mut direct_reply_ids = HashSet::new();
+                        direct_reply_ids
+                            .try_reserve(details.reply_ids.len())
+                            .map_err(|_| Error::Allocation {
+                                amount: details.reply_ids.len(),
+                                path,
+                            })?;
+                        for reply_id in &details.reply_ids {
+                            if !direct_reply_ids.insert(*reply_id) {
+                                return Err(Error::InvalidSource { path });
+                            }
+                        }
+                        let mut expected = Vec::new();
+                        expected
+                            .try_reserve(
+                                details
+                                    .reply_ids
+                                    .len()
+                                    .saturating_add(usize::from(details.author_id.is_some())),
+                            )
+                            .map_err(|_| Error::Allocation {
+                                amount: details
+                                    .reply_ids
+                                    .len()
+                                    .saturating_add(usize::from(details.author_id.is_some())),
+                                path,
+                            })?;
+                        if let Some(author) = details.author_id {
+                            expected.push(author);
+                        }
+                        expected.extend(details.reply_ids.iter().copied());
+                        validate_comment_message_metadata(
+                            object,
+                            message_index,
+                            &expected,
+                            mode.requires_field_infos(),
+                            path,
+                        )?;
+                        let fact = CommentStorageFact {
+                            object_id,
+                            author_id: details.author_id,
+                            replies: details.replies,
+                            reply_ids: details.reply_ids.clone(),
+                            storage_uuid: details.storage_uuid,
+                        };
+                        if details.author_id == Some(0) || details.storage_uuid == Some((0, 0)) {
+                            return Err(Error::InvalidSource { path });
+                        }
+                        if storage_ids.contains(&object_id) {
+                            return Err(Error::InvalidSource { path });
+                        }
+                        budget.charge(1, path)?;
+                        storage_ids
+                            .try_reserve(1)
+                            .map_err(|_| Error::Allocation { amount: 1, path })?;
+                        storage_ids.insert(object_id);
+                        census
+                            .storages
+                            .try_reserve(1)
+                            .map_err(|_| Error::Allocation { amount: 1, path })?;
+                        census.storages.push(fact);
+                        if let Some(author) = details.author_id {
+                            if author == object_id {
+                                return Err(Error::InvalidSource { path });
+                            }
+                            push_nonzero(&mut census.author_ids, author, &mut budget, path)?;
+                        }
+                        for reply in &details.reply_ids {
+                            if *reply == object_id {
+                                return Err(Error::InvalidSource { path });
+                            }
+                            push_nonzero(&mut census.reply_ids, *reply, &mut budget, path)?;
+                        }
+                        if let Some(uuid) = details.storage_uuid {
+                            budget.charge(1, path)?;
+                            census
+                                .uuids
+                                .try_reserve(1)
+                                .map_err(|_| Error::Allocation { amount: 1, path })?;
+                            census.uuids.push(uuid);
+                        }
+                        let _ = route;
+                    },
+                    _ => {},
+                }
+            }
+        }
+    }
+    census_models_and_cells(
+        source,
+        &mut census,
+        &mut budget,
+        mode.requires_field_infos(),
+        path,
+    )?;
+    census_alias_checks(
+        &census,
+        source.state.options.semantic().max_references(),
+        mode.allows_shared_replies(),
+        path,
+    )?;
+    Ok(census)
+}
+
+fn append_list_facts(
+    census: &mut CommentOwnershipCensus,
+    budget: &mut CensusBudget,
+    component_index: usize,
+    table_id: u64,
+    list_type: i32,
+    probe: &ListProbe,
+    root: bool,
+    path: Path,
+) -> Result<(), Error> {
+    if table_id == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    for entry in &probe.entries {
+        if list_type == tst::table_data_list::ListType::CommentStorage as i32 && entry.key == 0 {
+            return Err(Error::InvalidSource { path });
+        }
+        if list_type == tst::table_data_list::ListType::CommentStorage as i32 && entry.refcount == 0
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        if list_type == tst::table_data_list::ListType::CommentStorage as i32
+            && entry.storage_id.is_none()
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        if let Some(storage_id) = entry.storage_id {
+            push_nonzero(&mut census.entry_storage_ids, storage_id, budget, path)?;
+        }
+        budget.charge(1, path)?;
+        census
+            .list_entries
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation { amount: 1, path })?;
+        census.list_entries.push(CommentListFact {
+            component_index,
+            table_id,
+            list_type,
+            key: entry.key,
+            storage_id: entry.storage_id,
+            refcount: entry.refcount,
+            root,
+        });
+    }
+    Ok(())
+}
+
+fn push_nonzero(
+    values: &mut Vec<u64>,
+    value: u64,
+    budget: &mut CensusBudget,
+    path: Path,
+) -> Result<(), Error> {
+    if value == 0 {
+        return Err(Error::InvalidSource { path });
+    }
+    budget.charge(1, path)?;
+    values.try_reserve(1).map_err(|_| Error::Allocation {
+        amount: values.len().saturating_add(1),
+        path,
+    })?;
+    values.push(value);
+    Ok(())
+}
+
+fn census_alias_checks(
+    census: &CommentOwnershipCensus,
+    maximum_references: usize,
+    allow_shared_replies: bool,
+    path: Path,
+) -> Result<(), Error> {
+    let observed = [
+        census.comment_list_ids.len(),
+        census.rooted_segment_ids.len(),
+        census.segment_edges.len(),
+        census.list_entries.len(),
+        census.entry_storage_ids.len(),
+        census.table_references.len(),
+        census.cell_comment_keys.len(),
+        census.cell_comment_owners.len(),
+        census.cell_comments.len(),
+        census.storages.len(),
+        census.author_ids.len(),
+        census.reply_ids.len(),
+        census.uuids.len(),
+    ]
+    .into_iter()
+    .try_fold(0usize, usize::checked_add)
+    .ok_or(Error::Limit {
+        kind: LimitKind::References,
+        observed: usize::MAX,
+        maximum: maximum_references,
+        path,
+    })?;
+    if observed > maximum_references {
+        return Err(Error::Limit {
+            kind: LimitKind::References,
+            observed,
+            maximum: maximum_references,
+            path,
+        });
+    }
+
+    let mut storage_indices = HashMap::new();
+    storage_indices
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+    for (index, storage) in census.storages.iter().enumerate() {
+        if storage_indices.insert(storage.object_id, index).is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+
+    let mut reply_ids = HashSet::new();
+    reply_ids
+        .try_reserve(census.reply_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.reply_ids.len(),
+            path,
+        })?;
+    for reply in &census.reply_ids {
+        if !reply_ids.insert(*reply) && !allow_shared_replies {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+
+    let mut entry_storage_ids = HashSet::new();
+    entry_storage_ids
+        .try_reserve(census.entry_storage_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.entry_storage_ids.len(),
+            path,
+        })?;
+    entry_storage_ids.extend(census.entry_storage_ids.iter().copied());
+
+    let mut comment_list_ids = HashSet::new();
+    comment_list_ids
+        .try_reserve(census.comment_list_ids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.comment_list_ids.len(),
+            path,
+        })?;
+    comment_list_ids.extend(census.comment_list_ids.iter().copied());
+
+    let mut comment_entry_keys = HashSet::new();
+    comment_entry_keys
+        .try_reserve(census.list_entries.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.list_entries.len(),
+            path,
+        })?;
+    comment_entry_keys.extend(census.list_entries.iter().filter_map(|entry| {
+        (entry.list_type == tst::table_data_list::ListType::CommentStorage as i32)
+            .then_some(entry.key)
+    }));
+
+    for author in &census.author_ids {
+        if reply_ids.contains(author)
+            || entry_storage_ids.contains(author)
+            || storage_indices.contains_key(author)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for table in &census.table_references {
+        if !comment_list_ids.contains(table) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for storage in &census.entry_storage_ids {
+        if !storage_indices.contains_key(storage) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for storage in &census.storages {
+        if storage.author_id == Some(storage.object_id)
+            || storage
+                .author_id
+                .is_some_and(|author| reply_ids.contains(&author))
+            || storage.reply_ids.contains(&storage.object_id)
+            || storage.replies != storage.reply_ids.len()
+        {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for key in &census.cell_comment_keys {
+        if !comment_entry_keys.contains(key) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for cell in &census.cell_comments {
+        let root_entry = census.list_entries.iter().any(|entry| {
+            entry.root
+                && entry.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                && entry.table_id == cell.table_id
+                && entry.key == cell.key
+        });
+        let segment_entry = census.segment_edges.iter().any(|edge| {
+            edge.root_id == cell.table_id
+                && census.list_entries.iter().any(|entry| {
+                    !entry.root
+                        && entry.list_type == tst::table_data_list::ListType::CommentStorage as i32
+                        && entry.table_id == edge.segment_id
+                        && entry.key == cell.key
+                })
+        });
+        if !root_entry && !segment_entry {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    for reply in &census.reply_ids {
+        let reply_storage = storage_indices
+            .get(reply)
+            .and_then(|index| census.storages.get(*index));
+        if entry_storage_ids.contains(reply)
+            || reply_storage.is_none()
+            || reply_storage.is_some_and(|storage| !storage.reply_ids.is_empty())
+        {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    let mut uuids = HashSet::new();
+    uuids
+        .try_reserve(census.uuids.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.uuids.len(),
+            path,
+        })?;
+    for uuid in &census.uuids {
+        if *uuid == (0, 0) || !uuids.insert(*uuid) {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    reject_comment_reply_cycles(census, path)?;
+    Ok(())
+}
+
+/// Reject cycles in the complete comment-storage reply graph.
+///
+/// Reply references are validated package-wide rather than only from the
+/// selected cell. This keeps a detached cycle from being mistaken for a
+/// harmless unrelated object and prevents any future reply projection from
+/// relying on an ambiguous ownership graph.
+fn reject_comment_reply_cycles(census: &CommentOwnershipCensus, path: Path) -> Result<(), Error> {
+    let mut storage_indices = HashMap::new();
+    storage_indices
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+    for (index, storage) in census.storages.iter().enumerate() {
+        if storage_indices.insert(storage.object_id, index).is_some() {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+
+    let mut visited = HashSet::new();
+    visited
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+    let mut active = HashSet::new();
+    active
+        .try_reserve(census.storages.len())
+        .map_err(|_| Error::Allocation {
+            amount: census.storages.len(),
+            path,
+        })?;
+
+    let mut stack = Vec::new();
+    stack
+        .try_reserve(1)
+        .map_err(|_| Error::Allocation { amount: 1, path })?;
+    for storage in &census.storages {
+        if visited.contains(&storage.object_id) {
+            continue;
+        }
+        stack.push((storage.object_id, false));
+        while let Some((object_id, leaving)) = stack.pop() {
+            if leaving {
+                active.remove(&object_id);
+                visited.insert(object_id);
+                continue;
+            }
+            if visited.contains(&object_id) {
+                continue;
+            }
+            if !active.insert(object_id) {
+                return Err(Error::InvalidSource { path });
+            }
+            stack.try_reserve(1).map_err(|_| Error::Allocation {
+                amount: stack.len().saturating_add(1),
+                path,
+            })?;
+            stack.push((object_id, true));
+            let index = storage_indices
+                .get(&object_id)
+                .copied()
+                .ok_or(Error::InvalidSource { path })?;
+            let replies = &census.storages[index].reply_ids;
+            stack
+                .try_reserve(replies.len())
+                .map_err(|_| Error::Allocation {
+                    amount: stack.len().saturating_add(replies.len()),
+                    path,
+                })?;
+            for reply_id in replies.iter().rev().copied() {
+                if !storage_indices.contains_key(&reply_id) {
+                    return Err(Error::InvalidSource { path });
+                }
+                if active.contains(&reply_id) {
+                    return Err(Error::InvalidSource { path });
+                }
+                if !visited.contains(&reply_id) {
+                    stack.push((reply_id, false));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn validate_comment_message_metadata(
+    object: &litchi_iwa_core::ArchiveObject,
+    message_index: usize,
+    expected: &[u64],
+    require_field_infos: bool,
+    path: Path,
+) -> Result<(), Error> {
+    if object.archive_info.message_infos.len() != object.messages.len() {
+        return Err(Error::InvalidSource { path });
+    }
+    let info = object
+        .archive_info
+        .message_infos
+        .get(message_index)
+        .ok_or(Error::InvalidSource { path })?;
+    let message = object
+        .messages
+        .get(message_index)
+        .ok_or(Error::InvalidSource { path })?;
+    if info.type_ != message.type_
+        || object.archive_info.should_merge == Some(true)
+        || info.base_message_index.is_some()
+        || !info.diff_merge_version.is_empty()
+        || info.diff_field_path.is_some()
+        || !info.fields_to_remove.is_empty()
+        || !info.diff_read_version.is_empty()
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    if !info.object_references.is_empty() {
+        for reference in &info.object_references {
+            if *reference == 0
+                || info
+                    .object_references
+                    .iter()
+                    .filter(|candidate| *candidate == reference)
+                    .count()
+                    != 1
+                || (!expected.is_empty() && !expected.contains(reference))
+            {
+                return Err(Error::InvalidSource { path });
+            }
+        }
+        if !expected.is_empty()
+            && expected
+                .iter()
+                .any(|reference| !info.object_references.contains(reference))
+        {
+            return Err(Error::InvalidSource { path });
+        }
+    }
+    if !expected.is_empty() && info.object_references != expected {
+        return Err(Error::InvalidSource { path });
+    }
+    let mut field_reference_index = 0usize;
+    for (field_index, field) in info.field_infos.iter().enumerate() {
+        if !expected.is_empty()
+            && info.field_infos[..field_index]
+                .iter()
+                .any(|prior| prior.path == field.path)
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        if !expected.is_empty()
+            && !field.object_references.is_empty()
+            && (field.path.path.is_empty()
+                || field.r#type != Some(litchi_iwa_core::FieldType::ObjectReference))
+        {
+            return Err(Error::InvalidSource { path });
+        }
+        for reference in &field.object_references {
+            if *reference == 0
+                || (!expected.is_empty() && !expected.contains(reference))
+                || (!info.object_references.is_empty()
+                    && !info.object_references.contains(reference))
+                || (!expected.is_empty() && expected.get(field_reference_index) != Some(reference))
+            {
+                return Err(Error::InvalidSource { path });
+            }
+            if !expected.is_empty() {
+                field_reference_index = field_reference_index
+                    .checked_add(1)
+                    .ok_or(Error::InvalidSource { path })?;
+            }
+        }
+    }
+    // Native Numbers keeps the aggregate ArchiveInfo edge of a comment list
+    // and omits the FieldInfo mirror (every natively commented corpus
+    // workbook does). The aggregate is checked against the payload's
+    // references above in both modes; a present FieldInfo sequence is
+    // still checked in full, and the writers keep whichever
+    // representation the message has.
+    let _ = require_field_infos;
+    if !expected.is_empty()
+        && !info.field_infos.is_empty()
+        && field_reference_index != expected.len()
+    {
+        return Err(Error::InvalidSource { path });
+    }
+    Ok(())
+}
+
+fn census_models_and_cells(
+    source: &Package,
+    census: &mut CommentOwnershipCensus,
+    budget: &mut CensusBudget,
+    require_field_infos: bool,
+    path: Path,
+) -> Result<(), Error> {
+    let mut scan_work = 0;
+    let mut model_count = 0usize;
+    let maximum_models = source.state.options.semantic().max_tables();
+    for component in source.state.components.catalog().iter() {
+        for object in component.archive().objects.iter() {
+            for (message_index, message) in object.messages.iter().enumerate() {
+                if !matches!(message.type_, 6_000 | 6_001) {
+                    continue;
+                }
+                if message.type_ == 6_001
+                    && unique_message_index(object.messages.as_slice(), 6_001, path)?
+                        != message_index
+                {
+                    return Err(Error::InvalidSource { path });
+                }
+                validate_comment_message_metadata(
+                    object,
+                    message_index,
+                    &[],
+                    require_field_infos,
+                    path,
+                )?;
+                let options = table_cell_decode_options(
+                    source,
+                    message.data.len(),
+                    source.state.options.semantic().max_references(),
+                );
+                let Some((model, model_mode)) = decode_comment_table_model(
+                    message.data.as_slice(),
+                    message.type_,
+                    options,
+                    path,
+                )?
+                else {
+                    continue;
+                };
+                model_count = model_count.checked_add(1).ok_or(Error::Limit {
+                    kind: LimitKind::References,
+                    observed: usize::MAX,
+                    maximum: maximum_models,
+                    path,
+                })?;
+                if model_count > maximum_models {
+                    return Err(Error::Limit {
+                        kind: LimitKind::References,
+                        observed: model_count,
+                        maximum: maximum_models,
+                        path,
+                    });
+                }
+                let data_options = table_cell_decode_options(
+                    source,
+                    model.base_data_store().len(),
+                    source.state.options.semantic().max_references(),
+                );
+                let store = decode_comment_data_store(
+                    model.base_data_store(),
+                    data_options,
+                    model_mode,
+                    true,
+                    path,
+                )?;
+                let comment_table = store.comment_storage_table();
+                if let Some(reference) = comment_table {
+                    push_nonzero(
+                        &mut census.table_references,
+                        reference.identifier(),
+                        budget,
+                        path,
+                    )?;
+                }
+                let decoded = DecodedTableStorage {
+                    data_store: store,
+                    tile_storage:
+                        numbers_table_cell_storage_codec::decode_tile_storage_with_report(
+                            store.tiles(),
+                            data_options,
+                        )
+                        .map_err(|_| Error::InvalidSource { path })?
+                        .0,
+                };
+                let keys = scan_global_comment_cells(
+                    source,
+                    usize::try_from(model.number_of_columns())
+                        .map_err(|_| Error::InvalidSource { path })?,
+                    decoded,
+                    path,
+                    &mut scan_work,
+                )?;
+                if comment_table.is_none() && !keys.is_empty() {
+                    return Err(Error::InvalidSource { path });
+                }
+                let key_count = keys.len();
+                if comment_table.is_none() && key_count != 0 {
+                    return Err(Error::InvalidSource { path });
+                }
+                budget.charge(key_count, path)?;
+                budget.charge(key_count, path)?;
+                budget.charge(key_count, path)?;
+                census
+                    .cell_comment_keys
+                    .try_reserve(key_count)
+                    .map_err(|_| Error::Allocation {
+                        amount: key_count,
+                        path,
+                    })?;
+                census
+                    .cell_comment_owners
+                    .try_reserve(key_count)
+                    .map_err(|_| Error::Allocation {
+                        amount: key_count,
+                        path,
+                    })?;
+                census
+                    .cell_comments
+                    .try_reserve(key_count)
+                    .map_err(|_| Error::Allocation {
+                        amount: key_count,
+                        path,
+                    })?;
+                census
+                    .cell_comment_keys
+                    .extend(keys.iter().map(|(_, key)| *key));
+                census.cell_comment_owners.extend(keys.iter().copied());
+                if let Some(table) = comment_table {
+                    census
+                        .cell_comments
+                        .extend(keys.iter().map(|(_, key)| CommentCellFact {
+                            table_id: table.identifier(),
+                            key: *key,
+                        }));
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+fn comment_field_present(source: &[u8], field_number: u32) -> Result<bool, Error> {
+    let view = WireView::parse(source, wire_limits_for(source.len(), 0, Path::Package)?)
+        .map_err(|error| map_wire_error(error, Path::Package))?;
+    let count = view
+        .fields()
+        .filter(|field| field.number() == field_number)
+        .count();
+    if count > 1 {
+        return Err(Error::InvalidSource {
+            path: Path::Package,
+        });
+    }
+    Ok(count == 1)
+}
+
+fn physical_source(source: &Package) -> Result<&SourceCatalog, Error> {
+    source
+        .state
+        .components
+        .physical()
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))
+}
+
+fn root_preview_deletions(source: &SourceCatalog) -> Result<Vec<String>, Error> {
+    let mut deletions = Vec::new();
+    for name in ROOT_PREVIEWS {
+        let count = source
+            .package()
+            .iter()
+            .filter(|entry| entry.name() == name)
+            .count();
+        match count {
+            0 => {},
+            1 => {
+                deletions.try_reserve(1).map_err(|_| Error::Allocation {
+                    amount: deletions.len().saturating_add(1),
+                    path: Path::Package,
+                })?;
+                deletions.push(name.to_owned());
+            },
+            _ => {
+                // Preview names are root-owned singleton entries. Treat a
+                // duplicate as an ambiguous source rather than deleting an
+                // arbitrary matching entry during publication.
+                return Err(Error::InvalidSource {
+                    path: Path::Package,
+                });
+            },
+        }
+    }
+    Ok(deletions)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{
+        ArchiveMutation, CensusBudget, Comment, CommentAuthor, CommentOwnershipCensus,
+        CommentReply, CommentStorageFact, CommentTimestamp, Error, LimitKind, MessageRoute, Path,
+        WireLimits, cell_ranges, census_alias_checks, map_core_error,
+    };
+
+    #[test]
+    fn archive_mutations_order_replacements_before_object_deletion() {
+        let route = MessageRoute {
+            component_index: 2,
+            object_index: 4,
+            message_index: 1,
+            message_type: 6_005,
+        };
+        let mut mutations = [
+            ArchiveMutation::DeleteObject {
+                component_index: 2,
+                object_identifier: 51,
+            },
+            ArchiveMutation::ReplaceMessage {
+                route,
+                data: vec![1],
+                pruned_object_references: vec![51],
+            },
+        ];
+        mutations.sort_by_key(ArchiveMutation::ordering_key);
+
+        assert!(matches!(
+            mutations[0],
+            ArchiveMutation::ReplaceMessage { .. }
+        ));
+        assert!(matches!(mutations[1], ArchiveMutation::DeleteObject { .. }));
+    }
+
+    #[test]
+    fn cell_ranges_precompute_sparse_offsets_in_one_pass() {
+        let offsets = [0, 0, u8::MAX, u8::MAX, 3, 0, u8::MAX, u8::MAX];
+        let mut scan_work = 0;
+        let ranges = cell_ranges(&offsets, 8, 2, false, 4, Path::Package, &mut scan_work)
+            .expect("sparse offsets should decode");
+
+        assert_eq!(scan_work, 4);
+        assert_eq!(ranges, vec![Some(0..3), None, Some(3..8), None]);
+    }
+
+    #[test]
+    fn snappy_failures_keep_compressed_and_allocation_kinds() {
+        assert_eq!(
+            map_core_error(
+                litchi_iwa_core::Error::Limit {
+                    kind: litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes,
+                    observed: 9,
+                    maximum: 8,
+                },
+                Path::Package,
+            ),
+            Error::Limit {
+                kind: LimitKind::CompressedBytes,
+                observed: 9,
+                maximum: 8,
+                path: Path::Package,
+            }
+        );
+        assert_eq!(
+            map_core_error(
+                litchi_iwa_core::Error::Allocation {
+                    resource: "test",
+                    requested: 12,
+                },
+                Path::Package,
+            ),
+            Error::Allocation {
+                amount: 12,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn cell_ranges_charges_offset_scan_work() {
+        let mut scan_work = WireLimits::MAX_REWRITE_WORK - 3;
+        let error = cell_ranges(
+            &[0, 0, 1, 0, 2, 0, 3, 0],
+            4,
+            4,
+            false,
+            4,
+            Path::Package,
+            &mut scan_work,
+        )
+        .expect_err("range scan should charge its work");
+
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind: LimitKind::WireWork,
+                observed: WireLimits::MAX_REWRITE_WORK + 1,
+                maximum: WireLimits::MAX_REWRITE_WORK,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn cell_ranges_reject_descending_offsets() {
+        let mut scan_work = 0;
+        let error = cell_ranges(&[3, 0, 1, 0], 4, 2, false, 2, Path::Package, &mut scan_work)
+            .expect_err("offsets must be strictly increasing");
+
+        assert!(matches!(
+            error,
+            Error::InvalidSource {
+                path: Path::Package
+            }
+        ));
+    }
+
+    #[test]
+    fn cell_ranges_reject_non_sentinel_padding() {
+        let mut scan_work = 0;
+        let error = cell_ranges(
+            &[0, 0, u8::MAX, u8::MAX, 1, 0],
+            4,
+            1,
+            false,
+            2,
+            Path::Package,
+            &mut scan_work,
+        )
+        .expect_err("padded slots must remain missing-column sentinels");
+
+        assert!(matches!(
+            error,
+            Error::InvalidSource {
+                path: Path::Package
+            }
+        ));
+        assert_eq!(scan_work, 3);
+    }
+
+    #[test]
+    fn cell_ranges_accept_sentinel_padding() {
+        let mut scan_work = 0;
+        let ranges = cell_ranges(
+            &[0, 0, 3, 0, u8::MAX, u8::MAX, u8::MAX, u8::MAX],
+            8,
+            2,
+            false,
+            2,
+            Path::Package,
+            &mut scan_work,
+        )
+        .expect("sentinel padding should be accepted");
+
+        assert_eq!(ranges, vec![Some(0..3), Some(3..8)]);
+        assert_eq!(scan_work, 4);
+    }
+
+    #[test]
+    fn comment_census_enforces_one_aggregate_reference_limit() {
+        let census = CommentOwnershipCensus {
+            comment_list_ids: vec![10],
+            rooted_segment_ids: vec![11],
+            ..CommentOwnershipCensus::default()
+        };
+
+        let error = census_alias_checks(&census, 1, false, Path::Package)
+            .expect_err("the complete census must share one reference ceiling");
+
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind: LimitKind::References,
+                observed: 2,
+                maximum: 1,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn census_budget_accepts_exact_reference_limit() {
+        let mut budget = CensusBudget::new(2);
+        budget
+            .charge(1, Path::Package)
+            .expect("first retained fact should fit");
+        budget
+            .charge(1, Path::Package)
+            .expect("the inclusive reference boundary should fit");
+        assert_eq!(budget.observed, 2);
+    }
+
+    #[test]
+    fn census_budget_rejects_overflow_without_advancing() {
+        let mut budget = CensusBudget::new(usize::MAX);
+        budget
+            .charge(usize::MAX, Path::Package)
+            .expect("the maximum representable charge should fit");
+        let error = budget
+            .charge(1, Path::Package)
+            .expect_err("a checked reference charge must reject arithmetic overflow");
+
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind: LimitKind::References,
+                observed: usize::MAX,
+                maximum: usize::MAX,
+                path: Path::Package,
+            }
+        );
+        assert_eq!(budget.observed, usize::MAX);
+    }
+
+    #[test]
+    fn comment_census_rejects_duplicate_reply_and_uuid_aliases() {
+        let duplicate_reply = CommentOwnershipCensus {
+            storages: vec![CommentStorageFact {
+                object_id: 20,
+                author_id: None,
+                replies: 0,
+                reply_ids: Vec::new(),
+                storage_uuid: None,
+            }],
+            reply_ids: vec![20, 20],
+            ..CommentOwnershipCensus::default()
+        };
+        assert!(matches!(
+            census_alias_checks(&duplicate_reply, 16, false, Path::Package),
+            Err(Error::InvalidSource {
+                path: Path::Package
+            })
+        ));
+
+        let duplicate_uuid = CommentOwnershipCensus {
+            uuids: vec![(1, 2), (1, 2)],
+            ..CommentOwnershipCensus::default()
+        };
+        assert!(matches!(
+            census_alias_checks(&duplicate_uuid, 16, false, Path::Package),
+            Err(Error::InvalidSource {
+                path: Path::Package
+            })
+        ));
+    }
+
+    #[test]
+    fn comment_clone_shares_arc_backed_text() {
+        let original = Comment::new("shared text");
+        let cloned = original.clone();
+
+        assert!(std::sync::Arc::ptr_eq(&original.text, &cloned.text));
+        assert_eq!(cloned.text(), "shared text");
+    }
+
+    #[test]
+    fn comment_try_new_copies_bounded_text() {
+        let comment = Comment::try_new("fallible text").expect("bounded comment allocation");
+
+        assert_eq!(comment.text(), "fallible text");
+    }
+
+    #[test]
+    fn comment_try_from_text_rejects_selected_limit_before_allocation() {
+        let error = Comment::try_from_text("too long", 3, Path::Package)
+            .expect_err("the selected text ceiling must be enforced");
+
+        assert_eq!(
+            error,
+            Error::Limit {
+                kind: LimitKind::TextBytes,
+                observed: 8,
+                maximum: 3,
+                path: Path::Package,
+            }
+        );
+    }
+
+    #[test]
+    fn comment_metadata_rejects_non_finite_timestamps_and_canonicalizes_zero() {
+        assert_eq!(CommentTimestamp::new(f64::NAN), None);
+        assert_eq!(CommentTimestamp::new(f64::INFINITY), None);
+        assert_eq!(CommentTimestamp::new(f64::NEG_INFINITY), None);
+        assert_eq!(CommentTimestamp::new(-0.0), CommentTimestamp::new(0.0));
+        assert_eq!(
+            CommentTimestamp::new(-42.5).map(CommentTimestamp::as_f64),
+            Some(-42.5)
+        );
+    }
+
+    #[test]
+    fn comment_metadata_is_archive_free_and_debug_redacted() {
+        let author = CommentAuthor::new(Some("Ada Lovelace".into()), Some("public-42".into()));
+        let comment = Comment::with_metadata(
+            "authored text",
+            CommentTimestamp::new(42.5),
+            Some(author.clone()),
+        );
+        let reply = CommentReply::with_metadata("reply text", None, Some(author));
+
+        assert_eq!(comment.text(), "authored text");
+        assert_ne!(Comment::new("authored text"), comment);
+        assert_eq!(
+            comment.timestamp().map(CommentTimestamp::as_f64),
+            Some(42.5)
+        );
+        assert_eq!(
+            comment.author().and_then(CommentAuthor::display_name),
+            Some("Ada Lovelace")
+        );
+        assert_eq!(
+            comment.author().and_then(CommentAuthor::public_id),
+            Some("public-42")
+        );
+        assert_eq!(reply.text(), "reply text");
+        let debug = format!("{comment:?} {reply:?}");
+        assert!(!debug.contains("authored text"));
+        assert!(!debug.contains("reply text"));
+        assert!(!debug.contains("Ada Lovelace"));
+        assert!(!debug.contains("public-42"));
+    }
+}

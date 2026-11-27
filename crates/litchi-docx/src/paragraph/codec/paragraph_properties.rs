@@ -1,0 +1,558 @@
+#![expect(
+    clippy::option_option,
+    reason = "nested options distinguish omitted, present-empty, and present-valued XML"
+)]
+#![expect(
+    clippy::ref_option,
+    reason = "the public API shape is retained for compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Typed paragraph-property decoding.
+
+use crate::error::{Error, Result};
+use crate::namespace::{direct_word_property_value, normalize_xml_integer};
+use quick_xml::encoding::Decoder;
+use quick_xml::events::Event;
+use quick_xml::name::{NamespaceResolver, ResolveResult};
+use quick_xml::reader::NsReader;
+
+use super::super::model::{LineSpacingRule, Paragraph, ParagraphSpacing};
+use super::xml::{
+    element_prefix, is_fragment_word_name, paragraph_attribute, same_word_prefix,
+    same_word_prefix_end, set_paragraph_property, word_attribute_value,
+};
+
+impl Paragraph {
+    /// Return direct paragraph numbering properties, including `numId=0` cancellation.
+    ///
+    /// A `w:numPr` without `w:numId` (for example only a `w:ilvl` level
+    /// override, which ECMA-376 `CT_NumPr` permits) names no numbering
+    /// instance of its own: the paragraph's numbering comes from its style,
+    /// so this returns `None`. List resolution applies the `w:ilvl` override
+    /// to the style-inherited numbering and records
+    /// [`crate::leniency::NumberingDefect::NumPrMissingNumId`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn numbering(&self) -> Result<Option<crate::numbering::Paragraph>> {
+        Ok(self.list_properties()?.numbering?.direct)
+    }
+
+    /// Return the paragraph style identifier from `<w:pPr>`.
+    ///
+    /// A malformed numbering property never affects the style identifier;
+    /// only XML that is not well-formed fails both.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn style_id(&self) -> Result<Option<String>> {
+        self.list_properties()?.style_id
+    }
+
+    /// Return the direct numbering together with a `w:ilvl` that applies to
+    /// style-inherited numbering because the `w:numPr` has no `w:numId`.
+    pub(crate) fn numbering_with_level_override(&self) -> Result<DirectNumbering> {
+        self.list_properties()?.numbering
+    }
+
+    /// Scan `w:pPr` once for numbering and style, keeping each property's
+    /// failure to itself so one malformed property cannot poison the other.
+    /// Only XML errors fail the whole scan.
+    fn list_properties(&self) -> Result<ListProperties> {
+        let _parser_admission = self.parser_admission()?;
+        let mut reader = NsReader::from_reader(self.xml_bytes());
+        let mut depth = 0usize;
+        let mut word_prefix: Option<Vec<u8>> = None;
+        let mut ppr_depth = None;
+        let mut numpr_depth = None;
+        let mut saw_numpr = false;
+        let mut num_id = None;
+        let mut level = None;
+        let mut level_clamped = false;
+        let mut style_id = None;
+        let mut numbering_error = None;
+        let mut style_error = None;
+
+        loop {
+            let decoder = reader.decoder();
+            let event = reader
+                .read_event()
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .into_owned();
+            let (element, child_depth) = match event {
+                Event::Start(element) => {
+                    depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("paragraph XML nesting is too deep".to_owned())
+                    })?;
+                    if depth == 1 && element.local_name().as_ref() == b"p" {
+                        word_prefix = Some(element_prefix(&element));
+                    }
+                    if !same_word_prefix(&element, word_prefix.as_deref()) {
+                        continue;
+                    }
+                    if element.local_name().as_ref() == b"pPr" && depth == 2 {
+                        ppr_depth = Some(depth);
+                        continue;
+                    }
+                    if element.local_name().as_ref() == b"numPr"
+                        && ppr_depth.is_some_and(|value| depth == value + 1)
+                    {
+                        if saw_numpr {
+                            numbering_error.get_or_insert_with(|| {
+                                Error::InvalidFormat("paragraph has duplicate numPr".to_owned())
+                            });
+                        }
+                        saw_numpr = true;
+                        numpr_depth = Some(depth);
+                        continue;
+                    }
+                    (element, depth)
+                },
+                Event::Empty(element) => {
+                    let child_depth = depth.checked_add(1).ok_or_else(|| {
+                        Error::InvalidFormat("paragraph XML nesting is too deep".to_owned())
+                    })?;
+                    if !same_word_prefix(&element, word_prefix.as_deref()) {
+                        continue;
+                    }
+                    if element.local_name().as_ref() == b"numPr"
+                        && ppr_depth.is_some_and(|value| child_depth == value + 1)
+                    {
+                        // An empty `w:numPr` carries neither numId nor ilvl.
+                        if saw_numpr {
+                            numbering_error.get_or_insert_with(|| {
+                                Error::InvalidFormat("paragraph has duplicate numPr".to_owned())
+                            });
+                        }
+                        saw_numpr = true;
+                        continue;
+                    }
+                    (element, child_depth)
+                },
+                Event::End(element) => {
+                    if same_word_prefix_end(&element, word_prefix.as_deref()) {
+                        match element.local_name().as_ref() {
+                            b"numPr" if numpr_depth == Some(depth) => numpr_depth = None,
+                            b"pPr" if ppr_depth == Some(depth) => ppr_depth = None,
+                            _ => {},
+                        }
+                    }
+                    depth = depth.checked_sub(1).ok_or_else(|| {
+                        Error::InvalidFormat("invalid paragraph XML nesting".to_owned())
+                    })?;
+                    continue;
+                },
+                Event::Eof => break,
+                Event::Text(_)
+                | Event::CData(_)
+                | Event::Comment(_)
+                | Event::Decl(_)
+                | Event::PI(_)
+                | Event::DocType(_)
+                | Event::GeneralRef(_) => continue,
+            };
+            match element.local_name().as_ref() {
+                b"pStyle" if ppr_depth.is_some_and(|value| child_depth == value + 1) => {
+                    if let Err(error) = paragraph_attribute(&element, b"val", decoder)
+                        .and_then(|value| set_paragraph_property(&mut style_id, value, "pStyle"))
+                    {
+                        style_error.get_or_insert(error);
+                    }
+                },
+                b"numId" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
+                    let parsed = paragraph_attribute(&element, b"val", decoder).and_then(|raw| {
+                        raw.parse::<u32>().map_err(|_source_error| {
+                            Error::InvalidFormat(format!("invalid paragraph numId '{raw}'"))
+                        })
+                    });
+                    if let Err(error) =
+                        parsed.and_then(|value| set_paragraph_property(&mut num_id, value, "numId"))
+                    {
+                        numbering_error.get_or_insert(error);
+                    }
+                },
+                b"ilvl" if numpr_depth.is_some_and(|value| child_depth == value + 1) => {
+                    let parsed = paragraph_attribute(&element, b"val", decoder).and_then(|raw| {
+                        crate::numbering::parse_list_level(&raw).ok_or_else(|| {
+                            Error::InvalidFormat(format!("invalid paragraph ilvl '{raw}'"))
+                        })
+                    });
+                    match parsed.and_then(|(value, clamped)| {
+                        set_paragraph_property(&mut level, value, "ilvl").map(|()| clamped)
+                    }) {
+                        Ok(clamped) => level_clamped |= clamped,
+                        Err(error) => {
+                            numbering_error.get_or_insert(error);
+                        },
+                    }
+                },
+                _ => {},
+            }
+        }
+        let numbering = match numbering_error {
+            Some(error) => Err(error),
+            None => Ok(DirectNumbering {
+                direct: num_id.map(|num_id| crate::numbering::Paragraph {
+                    num_id,
+                    level: level.unwrap_or(0),
+                }),
+                level_override: if saw_numpr && num_id.is_none() {
+                    Some(level)
+                } else {
+                    None
+                },
+                level_clamped,
+            }),
+        };
+        let style_id = match style_error {
+            Some(error) => Err(error),
+            None => Ok(style_id),
+        };
+        Ok(ListProperties {
+            numbering,
+            style_id,
+        })
+    }
+}
+
+/// The per-property results of one `w:pPr` scan.
+struct ListProperties {
+    numbering: Result<DirectNumbering>,
+    style_id: Result<Option<String>>,
+}
+
+/// Direct paragraph numbering as authored.
+pub(crate) struct DirectNumbering {
+    /// The direct numbering, when `w:numPr` names a `w:numId`.
+    pub(crate) direct: Option<crate::numbering::Paragraph>,
+    /// Set when a `w:numPr` is present without `w:numId`: the authored
+    /// `w:ilvl` (if any), which overrides the level of the style-inherited
+    /// numbering.
+    pub(crate) level_override: Option<Option<u8>>,
+    /// Set when the authored `w:ilvl` exceeded 8 and was clamped to 8
+    /// ([`crate::leniency::NumberingDefect::LevelOutOfRange`]).
+    pub(crate) level_clamped: bool,
+}
+
+impl Paragraph {
+    /// Return the HTML division ID referenced by this paragraph, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn division_id(&self) -> Result<Option<String>> {
+        let _parser_admission = self.parser_admission()?;
+        direct_word_property_value(self.xml_bytes(), b"p", b"pPr", b"divId")?
+            .map(|value| normalize_xml_integer(value, "Word paragraph division ID"))
+            .transpose()
+    }
+
+    /// Return the direct spacing properties of this paragraph.
+    ///
+    /// The returned values are validated against the `WordprocessingML` types
+    /// used by `CT_Spacing`: before/after are non-negative twips, line is a
+    /// signed value, and lineRule is one of the schema-defined tokens.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn spacing(&self) -> Result<Option<ParagraphSpacing>> {
+        let _parser_admission = self.parser_admission()?;
+        parse_spacing(self.xml_bytes())
+    }
+
+    /// Read this paragraph's direct (local) properties, the children of its
+    /// own `w:pPr`, as typed values, including the paragraph mark's run
+    /// properties.
+    ///
+    /// This reads every property in one pass, resolves names by namespace,
+    /// and never reports a property it cannot type: see the
+    /// [`crate::properties`] module for the rules.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for XML that is not well-formed, a root that is not
+    /// a WordprocessingML `w:p`, a second `w:pPr`, or an execution limit of
+    /// a source-backed paragraph.
+    pub fn direct_properties(&self) -> Result<crate::properties::Paragraph> {
+        let _parser_admission = self.parser_admission()?;
+        crate::properties::parse_paragraph(self.xml_bytes(), &self.xml_data.inherited_namespaces()?)
+    }
+}
+
+fn parse_spacing(xml_bytes: &[u8]) -> Result<Option<ParagraphSpacing>> {
+    let mut reader = NsReader::from_reader(xml_bytes);
+    let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut ppr_depth = None;
+    let mut saw_ppr = false;
+    let mut spacing = None;
+
+    loop {
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("paragraph XML nesting is too deep".to_owned())
+                })?;
+
+                if depth == 1 {
+                    if !matches!(namespace, ResolveResult::Bound(_)) {
+                        fragment_prefix = Some(
+                            element
+                                .name()
+                                .prefix()
+                                .map(|prefix| prefix.into_inner().to_vec()),
+                        );
+                    }
+                    if saw_root
+                        || element.local_name().as_ref() != b"p"
+                        || !is_fragment_word_name(
+                            &namespace,
+                            element.name(),
+                            b"p",
+                            &fragment_prefix,
+                        )
+                    {
+                        return Err(Error::InvalidFormat(
+                            "paragraph spacing XML has an invalid root".to_owned(),
+                        ));
+                    }
+                    saw_root = true;
+                }
+
+                let is_word = is_fragment_word_name(
+                    &namespace,
+                    element.name(),
+                    element.local_name().as_ref(),
+                    &fragment_prefix,
+                );
+                if depth == 2 && is_word && element.local_name().as_ref() == b"pPr" {
+                    if saw_ppr {
+                        return Err(Error::InvalidFormat(
+                            "paragraph has duplicate pPr".to_owned(),
+                        ));
+                    }
+                    saw_ppr = true;
+                    ppr_depth = Some(depth);
+                } else if depth == 3
+                    && ppr_depth == Some(2)
+                    && is_word
+                    && element.local_name().as_ref() == b"spacing"
+                {
+                    if spacing.is_some() {
+                        return Err(Error::InvalidFormat(
+                            "paragraph has duplicate spacing".to_owned(),
+                        ));
+                    }
+                    spacing = Some(parse_spacing_element(
+                        &element,
+                        decoder,
+                        resolver,
+                        &fragment_prefix,
+                    )?);
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or_else(|| {
+                    Error::InvalidFormat("paragraph XML nesting is too deep".to_owned())
+                })?;
+
+                if child_depth == 1 {
+                    if !matches!(namespace, ResolveResult::Bound(_)) {
+                        fragment_prefix = Some(
+                            element
+                                .name()
+                                .prefix()
+                                .map(|prefix| prefix.into_inner().to_vec()),
+                        );
+                    }
+                    if saw_root
+                        || element.local_name().as_ref() != b"p"
+                        || !is_fragment_word_name(
+                            &namespace,
+                            element.name(),
+                            b"p",
+                            &fragment_prefix,
+                        )
+                    {
+                        return Err(Error::InvalidFormat(
+                            "paragraph spacing XML has an invalid root".to_owned(),
+                        ));
+                    }
+                    saw_root = true;
+                } else {
+                    let is_word = is_fragment_word_name(
+                        &namespace,
+                        element.name(),
+                        element.local_name().as_ref(),
+                        &fragment_prefix,
+                    );
+                    if child_depth == 2 && is_word && element.local_name().as_ref() == b"pPr" {
+                        if saw_ppr {
+                            return Err(Error::InvalidFormat(
+                                "paragraph has duplicate pPr".to_owned(),
+                            ));
+                        }
+                        saw_ppr = true;
+                    } else if child_depth == 3
+                        && ppr_depth == Some(2)
+                        && is_word
+                        && element.local_name().as_ref() == b"spacing"
+                    {
+                        if spacing.is_some() {
+                            return Err(Error::InvalidFormat(
+                                "paragraph has duplicate spacing".to_owned(),
+                            ));
+                        }
+                        spacing = Some(parse_spacing_element(
+                            &element,
+                            decoder,
+                            resolver,
+                            &fragment_prefix,
+                        )?);
+                    }
+                }
+            },
+            Event::End(_) => {
+                if ppr_depth == Some(depth) {
+                    ppr_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or_else(|| {
+                    Error::InvalidFormat("invalid paragraph XML nesting".to_owned())
+                })?;
+            },
+            Event::Eof if depth != 0 => {
+                return Err(Error::InvalidFormat(
+                    "unterminated paragraph spacing XML".to_owned(),
+                ));
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::PI(_)
+            | Event::DocType(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+
+    if !saw_root {
+        return Err(Error::InvalidFormat(
+            "paragraph spacing XML has no root".to_owned(),
+        ));
+    }
+    Ok(spacing)
+}
+
+fn parse_spacing_element(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Result<ParagraphSpacing> {
+    let before = parse_u64(
+        word_attribute_value(element, b"before", decoder, resolver, fragment_prefix)?,
+        "paragraph spacing before",
+    )?;
+    let before_lines = parse_i32(
+        word_attribute_value(element, b"beforeLines", decoder, resolver, fragment_prefix)?,
+        "paragraph spacing beforeLines",
+    )?;
+    let before_auto_spacing = parse_on_off(
+        word_attribute_value(
+            element,
+            b"beforeAutospacing",
+            decoder,
+            resolver,
+            fragment_prefix,
+        )?,
+        "paragraph spacing beforeAutospacing",
+    )?;
+    let after = parse_u64(
+        word_attribute_value(element, b"after", decoder, resolver, fragment_prefix)?,
+        "paragraph spacing after",
+    )?;
+    let after_lines = parse_i32(
+        word_attribute_value(element, b"afterLines", decoder, resolver, fragment_prefix)?,
+        "paragraph spacing afterLines",
+    )?;
+    let after_auto_spacing = parse_on_off(
+        word_attribute_value(
+            element,
+            b"afterAutospacing",
+            decoder,
+            resolver,
+            fragment_prefix,
+        )?,
+        "paragraph spacing afterAutospacing",
+    )?;
+    let line = parse_i32(
+        word_attribute_value(element, b"line", decoder, resolver, fragment_prefix)?,
+        "paragraph spacing line",
+    )?;
+    let line_rule = word_attribute_value(element, b"lineRule", decoder, resolver, fragment_prefix)?
+        .map(|value| {
+            LineSpacingRule::from_xml(&value).ok_or_else(|| {
+                Error::InvalidFormat(format!("invalid paragraph spacing lineRule '{value}'"))
+            })
+        })
+        .transpose()?;
+
+    Ok(ParagraphSpacing {
+        before,
+        before_lines,
+        before_auto_spacing,
+        after,
+        after_lines,
+        after_auto_spacing,
+        line,
+        line_rule,
+    })
+}
+
+fn parse_u64(value: Option<String>, name: &str) -> Result<Option<u64>> {
+    value
+        .map(|value| {
+            value.parse::<u64>().map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid {name} value '{value}'"))
+            })
+        })
+        .transpose()
+}
+
+fn parse_i32(value: Option<String>, name: &str) -> Result<Option<i32>> {
+    value
+        .map(|value| {
+            value.parse::<i32>().map_err(|_source_error| {
+                Error::InvalidFormat(format!("invalid {name} value '{value}'"))
+            })
+        })
+        .transpose()
+}
+
+fn parse_on_off(value: Option<String>, name: &str) -> Result<Option<bool>> {
+    value
+        .map(|value| match value.as_str() {
+            "true" | "1" | "on" => Ok(true),
+            "false" | "0" | "off" => Ok(false),
+            _ => Err(Error::InvalidFormat(format!(
+                "invalid {name} value '{value}'"
+            ))),
+        })
+        .transpose()
+}

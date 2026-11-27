@@ -8,12 +8,28 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = []
+sign = ["dep:litchi-sign"]
+# Runtime-neutral, caller-owned cache/flight lock-boundary callbacks.
+performance-diagnostics = []
+
 [dependencies]
 atoi_simd     = { workspace = true }
 itoa          = { workspace = true }
 litchi-core   = { workspace = true }
+litchi-sign   = { workspace = true, optional = true }
 memchr        = { workspace = true }
 quick-xml     = { workspace = true }
+sha2          = { workspace = true }
 smallvec      = { workspace = true }
 soapberry-zip = { workspace = true }
+tempfile      = { workspace = true }
 thiserror     = { workspace = true }
+xml-minifier  = { workspace = true }
+
+[dev-dependencies]
+p256 = { workspace = true }
+
+[lints]
+workspace = true

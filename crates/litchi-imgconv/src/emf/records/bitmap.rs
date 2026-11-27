@@ -33,8 +33,6 @@ pub mod rop {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrBitBltHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub x_dest: i32,
     pub y_dest: i32,
@@ -57,8 +55,6 @@ pub struct EmrBitBltHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrStretchBltHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub x_dest: i32,
     pub y_dest: i32,
@@ -83,8 +79,6 @@ pub struct EmrStretchBltHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrAlphaBlendHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub x_dest: i32,
     pub y_dest: i32,
@@ -119,8 +113,6 @@ pub struct BlendFunction {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrTransparentBltHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub x_dest: i32,
     pub y_dest: i32,
@@ -145,8 +137,6 @@ pub struct EmrTransparentBltHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrStretchDiBitsHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub x_dest: i32,
     pub y_dest: i32,
@@ -169,8 +159,6 @@ pub struct EmrStretchDiBitsHeader {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetDiBitsToDeviceHeader {
-    pub record_type: u32,
-    pub record_size: u32,
     pub bounds: RectL,
     pub x_dest: i32,
     pub y_dest: i32,

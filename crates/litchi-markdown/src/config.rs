@@ -27,7 +27,7 @@
 /// making it cheap to pass around without cloning overhead.
 #[derive(Debug, Copy, Clone)]
 pub struct MarkdownOptions {
-    /// Whether to include text styles (bold, italic, underline, etc.)
+    /// Whether to include text styles (bold, italic, underline, strikethrough, super/subscript)
     pub include_styles: bool,
     /// Whether to include document metadata at the beginning
     pub include_metadata: bool,
@@ -35,19 +35,19 @@ pub struct MarkdownOptions {
     pub table_style: TableStyle,
     /// Indentation for HTML tables (spaces)
     pub html_table_indent: usize,
-    /// How to render mathematical formulas
-    pub formula_style: FormulaStyle,
+    /// How to render math equations
+    pub equation_style: EquationStyle,
     /// Number of spaces for list indentation (default: 2)
     pub list_indent: usize,
     /// How to render superscript and subscript
     pub script_style: ScriptStyle,
     /// How to render strikethrough text
     pub strikethrough_style: StrikethroughStyle,
-    /// Whether to use parallel processing for large documents (default: true)
+    /// Compatibility hint for parallel Markdown rendering (default: `true`).
     ///
-    /// When enabled, uses rayon to process paragraphs in parallel for documents
-    /// with 50+ paragraphs. Automatically uses sequential processing for smaller
-    /// documents to avoid parallelization overhead.
+    /// The ordinary Litchi renderer executes serially and does not inspect this
+    /// value. It is retained for source compatibility; a future explicit
+    /// caller-owned execution API may consume it.
     pub use_parallel: bool,
 }
 
@@ -58,11 +58,11 @@ impl Default for MarkdownOptions {
             include_metadata: false,
             table_style: TableStyle::Markdown,
             html_table_indent: 2,
-            formula_style: FormulaStyle::LaTeX,
+            equation_style: EquationStyle::LaTeX,
             list_indent: 2,
             script_style: ScriptStyle::Html,
             strikethrough_style: StrikethroughStyle::Markdown,
-            use_parallel: true, // Enable parallel processing by default
+            use_parallel: true,
         }
     }
 }
@@ -77,6 +77,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new();
     /// ```
+    #[must_use]
     #[inline]
     pub fn new() -> Self {
         Self::default()
@@ -94,6 +95,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_styles(true);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_styles(mut self, include: bool) -> Self {
         self.include_styles = include;
@@ -112,6 +114,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_metadata(true);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_metadata(mut self, include: bool) -> Self {
         self.include_metadata = include;
@@ -128,6 +131,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_table_style(TableStyle::MinimalHtml);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_table_style(mut self, style: TableStyle) -> Self {
         self.table_style = style;
@@ -145,25 +149,27 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_html_table_indent(4);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_html_table_indent(mut self, indent: usize) -> Self {
         self.html_table_indent = indent;
         self
     }
 
-    /// Set the formula rendering style.
+    /// Set the equation rendering style.
     ///
     /// # Examples
     ///
     /// ```rust
-    /// use litchi_markdown::{MarkdownOptions, FormulaStyle};
+    /// use litchi_markdown::{MarkdownOptions, EquationStyle};
     ///
     /// let options = MarkdownOptions::new()
-    ///     .with_formula_style(FormulaStyle::Dollar);
+    ///     .with_equation_style(EquationStyle::Dollar);
     /// ```
+    #[must_use]
     #[inline]
-    pub fn with_formula_style(mut self, style: FormulaStyle) -> Self {
-        self.formula_style = style;
+    pub fn with_equation_style(mut self, style: EquationStyle) -> Self {
+        self.equation_style = style;
         self
     }
 
@@ -178,6 +184,7 @@ impl MarkdownOptions {
     ///
     /// let options = MarkdownOptions::new().with_list_indent(4);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_list_indent(mut self, indent: usize) -> Self {
         self.list_indent = indent;
@@ -194,6 +201,7 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_script_style(ScriptStyle::Unicode);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_script_style(mut self, style: ScriptStyle) -> Self {
         self.script_style = style;
@@ -210,31 +218,34 @@ impl MarkdownOptions {
     /// let options = MarkdownOptions::new()
     ///     .with_strikethrough_style(StrikethroughStyle::Html);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_strikethrough_style(mut self, style: StrikethroughStyle) -> Self {
         self.strikethrough_style = style;
         self
     }
 
-    /// Set whether to use parallel processing.
+    /// Set the parallel-rendering compatibility hint.
     ///
-    /// When enabled, uses rayon to process paragraphs in parallel for large documents.
-    /// Automatically uses sequential processing for small documents (< 50 paragraphs)
-    /// to avoid parallelization overhead.
+    /// The ordinary Litchi renderer remains serial regardless of this value.
+    /// This builder and the public field remain available for source
+    /// compatibility. A future explicit caller-owned execution API may choose
+    /// to interpret the hint.
     ///
     /// # Examples
     ///
     /// ```rust
     /// use litchi_markdown::MarkdownOptions;
     ///
-    /// // Enable parallel processing (default)
+    /// // Preserve the compatibility hint (the ordinary renderer remains serial).
     /// let options = MarkdownOptions::new()
     ///     .with_parallel(true);
     ///
-    /// // Disable for deterministic single-threaded execution
+    /// // Clear the compatibility hint.
     /// let options = MarkdownOptions::new()
     ///     .with_parallel(false);
     /// ```
+    #[must_use]
     #[inline]
     pub fn with_parallel(mut self, use_parallel: bool) -> Self {
         self.use_parallel = use_parallel;
@@ -252,7 +263,7 @@ impl MarkdownOptions {
 pub enum TableStyle {
     /// Use Markdown tables (only when no merged cells exist).
     ///
-    /// If merged cells are detected, falls back to MinimalHtml.
+    /// If merged cells are detected, falls back to `MinimalHtml`.
     ///
     /// Example:
     /// ```markdown
@@ -264,7 +275,7 @@ pub enum TableStyle {
 
     /// Use minimal HTML tables (no indentation, no line feeds).
     ///
-    /// Note: If the TableStyle is set to MinimalHtml, the indentation config will be ignored.
+    /// Note: If the `TableStyle` is set to `MinimalHtml`, the indentation config will be ignored.
     ///
     /// Example:
     /// ```html
@@ -288,11 +299,11 @@ pub enum TableStyle {
     StyledHtml,
 }
 
-/// Formula rendering styles for Markdown conversion.
+/// Equation rendering styles for Markdown conversion.
 ///
-/// Determines how mathematical formulas are rendered in the output.
+/// Determines how math equations are rendered in the output.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormulaStyle {
+pub enum EquationStyle {
     /// Use LaTeX delimiters: inline \(\) and display \[\].
     ///
     /// Examples:
@@ -313,11 +324,11 @@ pub enum FormulaStyle {
 /// Determines how superscript and subscript text is rendered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ScriptStyle {
-    /// Use HTML tags: <sup> and <sub>.
+    /// Use HTML tags: `<sup>` and `<sub>`.
     ///
     /// Examples:
-    /// - Superscript: x<sup>2</sup>
-    /// - Subscript: H<sub>2</sub>O
+    /// - Superscript: `x<sup>2</sup>`
+    /// - Subscript: `H<sub>2</sub>O`
     Html,
 
     /// Use Unicode superscript/subscript characters where possible.
@@ -357,7 +368,7 @@ mod tests {
             .with_metadata(false)
             .with_table_style(TableStyle::MinimalHtml)
             .with_html_table_indent(4)
-            .with_formula_style(FormulaStyle::Dollar)
+            .with_equation_style(EquationStyle::Dollar)
             .with_list_indent(4)
             .with_script_style(ScriptStyle::Unicode)
             .with_strikethrough_style(StrikethroughStyle::Html);
@@ -366,7 +377,7 @@ mod tests {
         assert!(!options.include_metadata);
         assert_eq!(options.table_style, TableStyle::MinimalHtml);
         assert_eq!(options.html_table_indent, 4);
-        assert_eq!(options.formula_style, FormulaStyle::Dollar);
+        assert_eq!(options.equation_style, EquationStyle::Dollar);
         assert_eq!(options.list_indent, 4);
         assert_eq!(options.script_style, ScriptStyle::Unicode);
         assert_eq!(options.strikethrough_style, StrikethroughStyle::Html);
@@ -379,7 +390,7 @@ mod tests {
         assert!(!options.include_metadata);
         assert_eq!(options.table_style, TableStyle::Markdown);
         assert_eq!(options.html_table_indent, 2);
-        assert_eq!(options.formula_style, FormulaStyle::LaTeX);
+        assert_eq!(options.equation_style, EquationStyle::LaTeX);
         assert_eq!(options.list_indent, 2);
         assert_eq!(options.script_style, ScriptStyle::Html);
         assert_eq!(options.strikethrough_style, StrikethroughStyle::Markdown);

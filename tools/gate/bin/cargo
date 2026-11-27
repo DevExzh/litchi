@@ -1,0 +1,34 @@
+#!/bin/bash
+# OOM-isolation cargo shim for the coordinator gate (tools/gate/run_gate.sh).
+#
+# Runs every cargo command in its own transient systemd user scope capped at
+# LITCHI_MEM_MAX (default 26G, no swap), so an out-of-memory rustc or test
+# kills only that command and never the caller's scope (a session scope with
+# OOMPolicy=stop dies with any OOM-killed child). Nested cargo calls (build
+# scripts, cargo-invoking tests) run inside the outer scope directly.
+#
+# The real cargo is LITCHI_REAL_CARGO, else $CARGO_HOME/bin/cargo, else
+# $HOME/.cargo/bin/cargo. The shim never resolves cargo through PATH, so it
+# cannot recurse into itself.
+home=${HOME:-$(getent passwd "$(id -u)" | cut -d: -f6)}
+real=${LITCHI_REAL_CARGO:-${CARGO_HOME:-$home/.cargo}/bin/cargo}
+if [ ! -x "$real" ]; then
+    echo "gate cargo shim: real cargo not found at $real" >&2
+    exit 127
+fi
+if [ -n "${LITCHI_CAPPED:-}" ] || [ -n "${LITCHI_GATE_NO_SCOPE:-}" ] || ! command -v systemd-run >/dev/null; then
+    exec "$real" "$@"
+fi
+# A plain shell (ssh, cron, tmux without a login environment) may lack
+# XDG_RUNTIME_DIR; systemd-run --user needs it to reach the user manager.
+if [ -z "${XDG_RUNTIME_DIR:-}" ] && [ -d "/run/user/$(id -u)" ]; then
+    export XDG_RUNTIME_DIR=/run/user/$(id -u)
+fi
+if [ ! -S "${XDG_RUNTIME_DIR:-/nonexistent}/bus" ] && [ ! -S "${XDG_RUNTIME_DIR:-/nonexistent}/systemd/private" ]; then
+    echo "gate cargo shim: no systemd user manager reachable; running uncapped" >&2
+    exec "$real" "$@"
+fi
+export LITCHI_CAPPED=1
+exec systemd-run --user --scope --quiet --collect -p OOMPolicy=continue \
+    -p MemoryMax="${LITCHI_MEM_MAX:-26G}" -p MemorySwapMax=0 \
+    --setenv=LITCHI_CAPPED=1 -- "$real" "$@"

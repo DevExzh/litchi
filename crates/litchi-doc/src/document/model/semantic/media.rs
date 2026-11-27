@@ -1,0 +1,265 @@
+use super::prelude::*;
+
+impl Document {
+    /// Get image binary data for an embedded image.
+    ///
+    /// Inline images use their Data-stream PICF; floating pictures resolve
+    /// through their story's shape identity and OfficeArt image store. The
+    /// returned view retains stored BLIP bytes, including metafile compression.
+    ///
+    /// # Arguments
+    ///
+    /// * `image` - Reference to an Image obtained from `Run::image()`
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// for para in doc.paragraphs()? {
+    ///     for run in para.runs()? {
+    ///         if let Some(img) = run.image() {
+    ///             let data = doc.image_data(img)?;
+    ///             let pic_type = data.kind();
+    ///             // Process image data...
+    ///         }
+    ///     }
+    /// }
+    /// ```
+    pub fn image_data(
+        &self,
+        image: &crate::image::Image,
+    ) -> std::result::Result<litchi_odraw::image::File<'_>, crate::image::ImageError> {
+        if let Some((header, shape_id)) = image.drawing_reference() {
+            return self
+                .0
+                .drawing_images
+                .data(header, shape_id, self.word_document());
+        }
+        // Use the appropriate stream based on pic_offset
+        let data_stream = self.get_data_stream(image.pic_offset()).ok_or(
+            crate::image::ImageError::InvalidPicOffset(image.pic_offset()),
+        )?;
+        let word_document = self.word_document();
+        image.data(data_stream, word_document)
+    }
+
+    pub(super) fn floating_image_at(
+        &self,
+        cp: u32,
+        hint: u32,
+    ) -> Result<Option<crate::image::Image>> {
+        let Some((header, relative, anchors)) = self.floating_anchor_story(cp) else {
+            return Ok(None);
+        };
+        self.0
+            .drawing_images
+            .at_anchor(header, relative, hint, anchors)
+            .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
+    }
+
+    /// Every picture shown by the floating-shape anchor character at the
+    /// document CP `cp`: the anchored picture itself, or each picture inside
+    /// an anchored group, in drawing order.
+    ///
+    /// [`crate::Run::image`] covers a run that holds exactly one anchor of a
+    /// single picture. Consecutive anchors with the same character
+    /// properties share one run, and a group anchor shows several pictures;
+    /// this resolves each anchor character of such a run. A CP that is not a
+    /// floating-shape anchor shows no picture.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the document's drawing data is malformed or the
+    /// anchor names a shape the drawing does not contain.
+    pub fn floating_images_at(&self, cp: u32) -> Result<Vec<crate::image::Image>> {
+        let Some((header, relative, anchors)) = self.floating_anchor_story(cp) else {
+            return Ok(Vec::new());
+        };
+        self.0
+            .drawing_images
+            .pictures_at_anchor(header, relative, 0, anchors)
+            .map_err(|error| crate::Error::InvalidFormat(error.to_string()))
+    }
+
+    /// The story (header or main), story-relative CP, and anchors for `cp`.
+    fn floating_anchor_story(
+        &self,
+        cp: u32,
+    ) -> Option<(bool, u32, &[crate::parts::spa::ShapeAnchor])> {
+        if cp < self.0.fib.get_main_doc_range().1 {
+            Some((false, cp, self.shape_positions()))
+        } else {
+            self.0
+                .fib
+                .get_header_range()
+                .filter(|(start, end)| cp >= *start && cp < *end)
+                .map(|(start, _)| (true, cp - start, self.header_shape_positions()))
+        }
+    }
+
+    /// Get a reference to the `WordDocument` stream.
+    ///
+    /// This is useful for low-level image operations.
+    #[inline]
+    #[must_use]
+    pub fn word_document(&self) -> &[u8] {
+        &self.0.word_document
+    }
+
+    /// Get the appropriate stream for picture data based on `pic_offset`.
+    ///
+    /// PICF offsets in the supported Word 97+ layout address the Data stream.
+    /// Floating anchors are resolved separately; their inherited CPicLocation
+    /// must not be reinterpreted as another inline picture's data address.
+    pub(super) fn get_data_stream(&self, offset: u32) -> Option<&[u8]> {
+        if let Some(data_stream) = &self.0.data_stream
+            && (offset as usize) < data_stream.len()
+        {
+            return Some(data_stream.as_slice());
+        }
+        None
+    }
+
+    /// Get a reference to the Data stream (if available).
+    ///
+    /// The Data stream contains embedded pictures and OLE objects.
+    #[inline]
+    #[must_use]
+    pub fn data_stream(&self) -> Option<&[u8]> {
+        self.0.data_stream.as_deref()
+    }
+
+    /// Get the floating-shape anchors of the Main Document.
+    ///
+    /// Each entry maps the character position of a 0x0008 floating-shape
+    /// anchor character to its positioning attributes ([MS-DOC] Spa): the
+    /// shape id (which matches the `spid` of the shape's `OfficeArtFSP`), the
+    /// position rectangle in twips, the position origins, and the
+    /// text-wrapping style. Returns an empty slice when the document has no
+    /// floating shapes in the main story.
+    #[inline]
+    #[must_use]
+    pub fn shape_positions(&self) -> &[crate::parts::spa::ShapeAnchor] {
+        &self.0.shape_anchors
+    }
+
+    /// Get the floating-shape anchors of the Header Document.
+    ///
+    /// Like [`Self::shape_positions`], but for shapes anchored in the
+    /// header/footer story (positions from the `PlcfSpaHdr`). Returns an empty
+    /// slice when the document has no floating shapes in the header story.
+    #[inline]
+    #[must_use]
+    pub fn header_shape_positions(&self) -> &[crate::parts::spa::ShapeAnchor] {
+        &self.0.header_shape_anchors
+    }
+
+    /// Map a header-story-relative character position to the header it
+    /// belongs to.
+    fn header_kind_at_cp(
+        &self,
+        story_relative_cp: u32,
+    ) -> Option<crate::parts::headers::HeaderFooterType> {
+        let (story_base, _) = self.0.fib.get_header_range()?;
+        let absolute_cp = story_base.checked_add(story_relative_cp)?;
+        self.0.headers_table.as_ref().and_then(|table| {
+            table
+                .stories()
+                .iter()
+                .find(|story| {
+                    story.story_type.is_header()
+                        && absolute_cp >= story.start_cp
+                        && absolute_cp < story.end_cp
+                })
+                .map(|story| story.story_type)
+        })
+    }
+
+    /// Get the header type containing a header-story character position.
+    ///
+    /// Floating-shape anchors in the Header Document carry CPs relative to
+    /// the start of the header story (see [`Self::header_shape_positions`]);
+    /// this maps such a CP to the header (odd, even, or first-page) whose
+    /// story range contains it. Returns `None` when the document has no
+    /// matching header story.
+    #[must_use]
+    pub fn header_story_kind_at_cp(
+        &self,
+        cp: u32,
+    ) -> Option<crate::parts::headers::HeaderFooterType> {
+        self.header_kind_at_cp(cp)
+    }
+
+    /// Resolve text box entries against a textbox story range.
+    ///
+    /// For header-story text boxes, the header kind is resolved through the
+    /// box's shape: its Spa anchor CP lives in the header story (the textbox
+    /// story has its own CP space), and the header owning that CP answers
+    /// the kind.
+    fn resolve_text_boxes(
+        &self,
+        entries: &[crate::parts::textbox::TextBoxEntry],
+        story_range: Option<(u32, u32)>,
+        in_header_story: bool,
+    ) -> Vec<crate::parts::textbox::TextBox> {
+        let Some((story_start, _)) = story_range else {
+            return Vec::new();
+        };
+        entries
+            .iter()
+            .map(|entry| {
+                let raw = self
+                    .0
+                    .text_extractor
+                    .text_at_range(story_start + entry.start_cp, story_start + entry.end_cp);
+                // The range of each text box ends with a trailing CR.
+                let text = raw.strip_suffix('\r').unwrap_or(raw);
+                let header_kind = if in_header_story {
+                    self.0
+                        .header_shape_anchors
+                        .iter()
+                        .find(|anchor| anchor.spa.shape_id == entry.shape_id)
+                        .and_then(|anchor| self.header_kind_at_cp(anchor.cp))
+                } else {
+                    None
+                };
+                crate::parts::textbox::TextBox {
+                    shape_id: entry.shape_id,
+                    text: text.to_string(),
+                    header_kind,
+                }
+            })
+            .collect()
+    }
+
+    /// Get the text boxes of the document with their plain-text content.
+    ///
+    /// The text comes from the textbox story (the subdocument counted by
+    /// ccpTxbx); each entry's `shape_id` matches the `spid` of the shape's
+    /// `OfficeArtFSP` record in the drawing layer and the `lid` of its Spa.
+    /// Paragraphs within a text box are separated by '\r'. Returns an empty
+    /// vector when the document has no textbox story.
+    #[must_use]
+    pub fn text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
+        self.resolve_text_boxes(
+            &self.0.textbox_entries,
+            self.0.fib.get_textbox_range(),
+            false,
+        )
+    }
+
+    /// Get the text boxes anchored in the header/footer story.
+    ///
+    /// Like [`Self::text_boxes`], but for the header textbox story (counted
+    /// by ccpHdrTxbx, linked through `PlcfHdrtxbxTxt`). Each entry's
+    /// `header_kind` reports the header (odd, even, or first-page) the box is
+    /// anchored in. Returns an empty vector when the document has no header
+    /// textbox story.
+    #[must_use]
+    pub fn header_text_boxes(&self) -> Vec<crate::parts::textbox::TextBox> {
+        self.resolve_text_boxes(
+            &self.0.header_textbox_entries,
+            self.0.fib.get_header_textbox_range(),
+            true,
+        )
+    }
+}

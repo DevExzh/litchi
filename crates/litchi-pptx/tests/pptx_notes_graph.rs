@@ -1,0 +1,27 @@
+use litchi_pptx::Package;
+use tempfile::NamedTempFile;
+
+#[test]
+fn presentation_exposes_the_default_notes_graph() {
+    let package = Package::new().unwrap();
+    let notes = package.presentation().unwrap().notes().unwrap().unwrap();
+
+    assert_eq!(notes.master().part(), "/ppt/notesMasters/notesMaster1.xml");
+    assert_eq!(notes.master().theme().part(), "/ppt/theme/theme2.xml");
+    assert!(notes.slides().is_empty());
+}
+
+#[test]
+fn default_notes_graph_survives_save_and_reopen() {
+    let output = NamedTempFile::with_suffix(".pptx")
+        .unwrap()
+        .into_temp_path();
+    let package = Package::new().unwrap();
+    package.save(&output).unwrap();
+
+    let reopened = Package::open(&output).unwrap();
+    let notes = reopened.presentation().unwrap().notes().unwrap().unwrap();
+    assert_eq!(notes.master().part(), "/ppt/notesMasters/notesMaster1.xml");
+    assert_eq!(notes.master().theme().part(), "/ppt/theme/theme2.xml");
+    assert!(notes.slides().is_empty());
+}

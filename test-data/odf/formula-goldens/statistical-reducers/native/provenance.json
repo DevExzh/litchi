@@ -1,0 +1,218 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/statistical/fods/average.fods": "14b8e0b64cdc914f0ad31730bbcfb7e425ab44bdd5c4e13b04209ff6093eaeab",
+    "sc/qa/unit/data/functions/statistical/fods/averagea.fods": "acfad698e620f1e34c478f8c5b5552e904709d005516e9a2e7ef278497588e83",
+    "sc/qa/unit/data/functions/statistical/fods/count.fods": "414748e73b9bb8e8ae48fe59d4879610ebf8e123137fb595c44fd0e8efa0013c",
+    "sc/qa/unit/data/functions/statistical/fods/counta.fods": "5fc161afcce7413ce3f0553a61b7ac905a31d673853169962ba24e16d6c28983",
+    "sc/qa/unit/data/functions/statistical/fods/countblank.fods": "f9d0a4aa7579c98e0fc5a658ad16c7074ac16c321dc79230b64505bc0e31528a",
+    "sc/qa/unit/data/functions/statistical/fods/max.fods": "910d02f4544333b712fed75b156a10f046c8ab5e8b28c64ea8b88867f5859ca3",
+    "sc/qa/unit/data/functions/statistical/fods/maxa.fods": "50a03b8a42d4a547d503e23de6e2febc12d47fbe067b99408cc2e893a4ac658c",
+    "sc/qa/unit/data/functions/statistical/fods/min.fods": "fe1848ef5dbd58aba2a67300ee866fca01d7d266c4517b2e5124e7f1dd8ac8a8",
+    "sc/qa/unit/data/functions/statistical/fods/mina.fods": "25c12b5dddba25405909af4868381dfd4627f76f6ce415704220392f9da3f64a"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 54,
+  "selected_functions": [
+    "AVERAGE",
+    "AVERAGEA",
+    "COUNT",
+    "COUNTA",
+    "COUNTBLANK",
+    "MAX",
+    "MAXA",
+    "MIN",
+    "MINA"
+  ],
+  "selected_modes": [
+    "scalar",
+    "matrix"
+  ],
+  "excluded_profile_variances": [
+    {
+      "function": "COUNT",
+      "source": "sc/qa/unit/data/functions/statistical/fods/count.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=COUNT([.K2:.K7])",
+      "cached": "4",
+      "kind": "date_and_error_closure",
+      "reason": "The source closure contains a date and a formula error text cell; the bounded native resolver retains only the supported literal types and does not infer date/error coercions from a cache."
+    },
+    {
+      "function": "COUNT",
+      "source": "sc/qa/unit/data/functions/statistical/fods/count.fods",
+      "sheet": "Sheet2",
+      "row": 12,
+      "column": 1,
+      "formula": "of:=COUNT([.I12:.I13])",
+      "cached": "1",
+      "kind": "formula_closure",
+      "reason": "I12 is an upstream formula cell (of:=1/0); the native receipt refuses formula dependencies rather than importing its cached error."
+    },
+    {
+      "function": "COUNTA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/counta.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=COUNTA([.K2:.K7])",
+      "cached": "5",
+      "kind": "date_and_error_closure",
+      "reason": "The source closure contains a date and a formula error text cell; the bounded native resolver retains only supported literal types."
+    },
+    {
+      "function": "COUNTA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/counta.fods",
+      "sheet": "Sheet2",
+      "row": 12,
+      "column": 1,
+      "formula": "of:=COUNTA([.I12:.I13])",
+      "cached": "2",
+      "kind": "formula_closure",
+      "reason": "I12 is an upstream formula cell; its cached error is not imported as a literal native input."
+    },
+    {
+      "function": "COUNTBLANK",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countblank.fods",
+      "sheet": "Sheet2",
+      "row": 3,
+      "column": 1,
+      "formula": "of:=COUNTBLANK([.I1:.I6]~[.I11:.I15])",
+      "cached": "2",
+      "kind": "formula_closure",
+      "reason": "The second area includes I12, an upstream formula cell; the selected receipt keeps the single bounded literal-area observation and excludes the formula-dependent multi-area cache."
+    },
+    {
+      "function": "COUNTBLANK",
+      "source": "sc/qa/unit/data/functions/statistical/fods/countblank.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 1,
+      "formula": "of:=COUNTBLANK(range)",
+      "cached": "1",
+      "kind": "named_range_unmaterialized",
+      "reason": "The named range is not a literal worksheet closure in the FODS table; no inferred source cells are promoted."
+    },
+    {
+      "function": "AVERAGE",
+      "source": "sc/qa/unit/data/functions/statistical/fods/average.fods",
+      "sheet": "Sheet2",
+      "row": 5,
+      "column": 1,
+      "formula": "of:=AVERAGE([.I1:.I7])",
+      "cached": "-4.85714285714286",
+      "kind": "formula_closure",
+      "reason": "The I-column source cells are formulas derived from H; the native receipt refuses the upstream formula closure rather than using cached intermediates."
+    },
+    {
+      "function": "AVERAGEA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/averagea.fods",
+      "sheet": "Sheet2",
+      "row": 5,
+      "column": 1,
+      "formula": "of:=AVERAGEA([.I1:.I7])",
+      "cached": "-4.85714285714286",
+      "kind": "formula_closure",
+      "reason": "The I-column source cells are formulas derived from H; cached intermediates are not imported into the bounded native fixture."
+    },
+    {
+      "function": "MIN",
+      "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=MIN(1;2;3;RangeName)",
+      "cached": "1",
+      "kind": "named_range_unmaterialized",
+      "reason": "RangeName has no bounded literal closure in the FODS table; the host cache is retained only as an explicit source observation."
+    },
+    {
+      "function": "MAX",
+      "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=MAX(1;2;3;RangeName)",
+      "cached": "4",
+      "kind": "named_range_unmaterialized",
+      "reason": "RangeName has no bounded literal closure in the FODS table; no named-range cache is promoted."
+    },
+    {
+      "function": "MINA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=MINA(1;2;3;RangeName)",
+      "cached": "1",
+      "kind": "named_range_unmaterialized",
+      "reason": "RangeName has no bounded literal closure in the FODS table; no named-range cache is promoted."
+    },
+    {
+      "function": "MAXA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+      "sheet": "Sheet2",
+      "row": 7,
+      "column": 1,
+      "formula": "of:=MAXA(1;2;3;RangeName)",
+      "cached": "4",
+      "kind": "named_range_unmaterialized",
+      "reason": "RangeName has no bounded literal closure in the FODS table; no named-range cache is promoted."
+    },
+    {
+      "function": "MIN",
+      "source": "sc/qa/unit/data/functions/statistical/fods/min.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=MIN(IF(MONTH([.J$14:.J$23])=5;[.K$14:.K$23];0))",
+      "cached": "0",
+      "kind": "nested_formula_closure",
+      "reason": "The selected native corpus does not evaluate nested IF/MONTH source expressions; the cache is not used as a reducer golden."
+    },
+    {
+      "function": "MAX",
+      "source": "sc/qa/unit/data/functions/statistical/fods/max.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=MAX(IF(MONTH([.J$14:.J$23])=5;[.K$14:.K$23];0))",
+      "cached": "51",
+      "kind": "nested_formula_closure",
+      "reason": "The selected native corpus does not evaluate nested IF/MONTH source expressions; the cache is not used as a reducer golden."
+    },
+    {
+      "function": "MINA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/mina.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=MINA(IF(MONTH([.J$14:.J$23])=5;[.K$14:.K$23];0))",
+      "cached": "0",
+      "kind": "nested_formula_closure",
+      "reason": "The selected native corpus does not evaluate nested IF/MONTH source expressions; the cache is not used as a reducer golden."
+    },
+    {
+      "function": "MAXA",
+      "source": "sc/qa/unit/data/functions/statistical/fods/maxa.fods",
+      "sheet": "Sheet2",
+      "row": 9,
+      "column": 1,
+      "formula": "of:=MAXA(IF(MONTH([.J$14:.J$23])=5;[.K$14:.K$23];0))",
+      "cached": "51",
+      "kind": "nested_formula_closure",
+      "reason": "The selected native corpus does not evaluate nested IF/MONTH source expressions; the cache is not used as a reducer golden."
+    }
+  ],
+  "coverage_notes": {
+    "source_format": "All selected sources are upstream FODS fixtures; no conversion tool or recalculation step is used.",
+    "closure": "Each selected reference closure contains only literal number, logical, text, or empty cells. Formula cells, dates, named ranges, and nested formula dependencies remain explicit exclusions.",
+    "cache": "The retained cached value is used only as an upstream observation. The Rust test reconstructs the literal closure and evaluates the formula in both scalar and matrix modes.",
+    "profile": "Host-specific date/error coercions and unsupported named-range or nested-expression behavior are not silently promoted to the evaluator contract."
+  }
+}

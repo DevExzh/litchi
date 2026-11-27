@@ -13,6 +13,7 @@
 //! These optimizations reduce allocations by ~98% compared to using `format!` macros.
 
 use std::fmt::Write;
+use std::ops::Range;
 
 /// Fast number formatter that writes directly to a string buffer.
 /// Uses itoa for integers and ryu for floats to minimize allocations.
@@ -55,7 +56,6 @@ pub fn write_num(buf: &mut String, n: f64) {
 /// **Note**: This function is kept for backward compatibility.
 /// For better performance, prefer using `write_num` directly which writes
 /// to an existing buffer without allocating a new String.
-#[allow(dead_code)]
 #[inline]
 pub fn fmt_num(n: f64) -> String {
     let mut s = String::with_capacity(16);
@@ -112,7 +112,15 @@ pub fn write_xml_escaped(buf: &mut String, text: &str) {
             '>' => buf.push_str("&gt;"),
             '"' => buf.push_str("&quot;"),
             '\'' => buf.push_str("&apos;"),
-            _ => buf.push(ch),
+            '\u{9}'
+            | '\u{a}'
+            | '\u{d}'
+            | '\u{20}'..='\u{d7ff}'
+            | '\u{e000}'..='\u{fffd}'
+            | '\u{10000}'..='\u{10ffff}' => {
+                buf.push(ch);
+            },
+            _ => buf.push('\u{fffd}'),
         }
     }
 }
@@ -219,6 +227,120 @@ pub fn write_stroke_attrs(buf: &mut String, color: u32, width: f64, style: u16) 
     }
 }
 
+/// Moves the clip reference shared by consecutive drawing elements onto one
+/// enclosing `<g clip-path="...">`.
+///
+/// A rasterizer renders every clipped element into its own layer and builds a
+/// clip mask over that layer, so thousands of individually clipped shapes cost
+/// thousands of masks. The same shapes inside one clipped group cost one layer
+/// and one mask and paint the same picture. A lone clipped element keeps its
+/// attribute, and so does an element whose start tag carries a `transform`:
+/// its clip is read in the transformed user space and cannot move outward.
+pub(crate) struct ClipGrouper {
+    /// Clipped element held back until the next element shows whether a
+    /// group pays off, with the byte range of its clip attribute.
+    pending: Option<(String, Range<usize>)>,
+    /// Clip fragment identifier of the open group.
+    open: Option<String>,
+    /// Groups opened so far.
+    groups: usize,
+}
+
+impl ClipGrouper {
+    pub(crate) const fn new() -> Self {
+        Self {
+            pending: None,
+            open: None,
+            groups: 0,
+        }
+    }
+
+    /// Number of `<g>` elements the grouper has added to the output.
+    pub(crate) const fn groups(&self) -> usize {
+        self.groups
+    }
+
+    /// Appends one serialized drawing element to `output`.
+    pub(crate) fn push(&mut self, output: &mut String, element: &str) {
+        let Some(attribute) = movable_clip_attribute(element) else {
+            self.finish(output);
+            output.push_str(element);
+            return;
+        };
+        let id = clip_fragment(&element[attribute.clone()]);
+        if self.open.as_deref() == Some(id) {
+            push_without(output, element, attribute);
+            return;
+        }
+        self.close(output);
+        match self.pending.take() {
+            Some((pending, pending_attribute))
+                if clip_fragment(&pending[pending_attribute.clone()]) == id =>
+            {
+                output.push_str("<g");
+                output.push_str(&element[attribute.clone()]);
+                output.push('>');
+                push_without(output, &pending, pending_attribute);
+                push_without(output, element, attribute);
+                self.open = Some(id.to_owned());
+                self.groups += 1;
+            },
+            previous => {
+                if let Some((pending, _)) = previous {
+                    output.push_str(&pending);
+                }
+                self.pending = Some((element.to_owned(), attribute));
+            },
+        }
+    }
+
+    /// Writes the held-back element and closes the open group.
+    pub(crate) fn finish(&mut self, output: &mut String) {
+        if let Some((pending, _)) = self.pending.take() {
+            output.push_str(&pending);
+        }
+        self.close(output);
+    }
+
+    fn close(&mut self, output: &mut String) {
+        if self.open.take().is_some() {
+            output.push_str("</g>");
+        }
+    }
+}
+
+/// Prefix of the clip attribute the metafile renderers emit.
+const CLIP_ATTRIBUTE: &str = " clip-path=\"url(#";
+
+/// Byte range of the ` clip-path="url(#id)"` attribute in the start tag of
+/// `element`, when the start tag has no `transform` and the clip can move to
+/// an enclosing group.
+fn movable_clip_attribute(element: &str) -> Option<Range<usize>> {
+    let start_tag = &element[..element.find('>')?];
+    if start_tag.contains(" transform=") {
+        return None;
+    }
+    let start = start_tag.find(CLIP_ATTRIBUTE)?;
+    let id_start = start + CLIP_ATTRIBUTE.len();
+    let id_len = start_tag[id_start..].find(")\"")?;
+    let id = &start_tag[id_start..id_start + id_len];
+    let plain = !id.is_empty()
+        && id
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_'));
+    plain.then_some(start..id_start + id_len + 2)
+}
+
+/// Fragment identifier of a ` clip-path="url(#id)"` attribute.
+fn clip_fragment(attribute: &str) -> &str {
+    &attribute[CLIP_ATTRIBUTE.len()..attribute.len() - 2]
+}
+
+fn push_without(output: &mut String, element: &str, attribute: Range<usize>) {
+    output.push_str(&element[..attribute.start]);
+    output.push_str(&element[attribute.end..]);
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -262,5 +384,84 @@ mod tests {
         let mut buf = String::new();
         write_xml_escaped(&mut buf, "Hello <world> & \"friends\"");
         assert_eq!(buf, "Hello &lt;world&gt; &amp; &quot;friends&quot;");
+    }
+
+    #[test]
+    fn xml_escaping_replaces_forbidden_control_characters() {
+        let mut buf = String::new();
+        write_xml_escaped(&mut buf, "a\0b\u{8}c\t\nd");
+        assert_eq!(buf, "a\u{fffd}b\u{fffd}c\t\nd");
+    }
+
+    #[test]
+    fn xml_escaping_replaces_the_noncharacters_xml_forbids() {
+        let mut buf = String::new();
+        write_xml_escaped(&mut buf, "a\u{fffe}b\u{ffff}c\u{fffd}d\u{10ffff}e\u{10000}");
+        assert_eq!(buf, "a\u{fffd}b\u{fffd}c\u{fffd}d\u{10ffff}e\u{10000}");
+    }
+
+    fn grouped(elements: &[&str]) -> (String, usize) {
+        let mut grouper = ClipGrouper::new();
+        let mut output = String::new();
+        for element in elements {
+            grouper.push(&mut output, element);
+        }
+        grouper.finish(&mut output);
+        (output, grouper.groups())
+    }
+
+    #[test]
+    fn clip_grouper_moves_a_shared_clip_onto_one_group() {
+        let (output, groups) = grouped(&[
+            r##"<path d="M0 0" fill="#000000" clip-path="url(#a)"/>"##,
+            r##"<path d="M1 1" clip-path="url(#a)" fill="#000000"/>"##,
+            r##"<g clip-path="url(#a)"><text>x</text></g>"##,
+        ]);
+
+        assert_eq!(
+            output,
+            concat!(
+                r##"<g clip-path="url(#a)"><path d="M0 0" fill="#000000"/>"##,
+                r##"<path d="M1 1" fill="#000000"/><g><text>x</text></g></g>"##,
+            )
+        );
+        assert_eq!(groups, 1);
+    }
+
+    #[test]
+    fn clip_grouper_keeps_lone_unclipped_and_transformed_elements() {
+        let elements = [
+            r##"<path d="M0 0" clip-path="url(#a)"/>"##,
+            r##"<path d="M1 1"/>"##,
+            r##"<path d="M2 2" clip-path="url(#a)"/>"##,
+            r##"<text transform="rotate(9)" clip-path="url(#a)">t</text>"##,
+            r##"<path d="M3 3" clip-path="url(#a)"/>"##,
+            r##"<g><path d="M4 4" clip-path="url(#a)"/></g>"##,
+        ];
+        let (output, groups) = grouped(&elements);
+
+        assert_eq!(output, elements.concat());
+        assert_eq!(groups, 0);
+    }
+
+    #[test]
+    fn clip_grouper_never_mixes_two_clips() {
+        let (output, groups) = grouped(&[
+            r##"<path d="M0 0" clip-path="url(#a)"/>"##,
+            r##"<path d="M1 1" clip-path="url(#a)"/>"##,
+            r##"<path d="M2 2" clip-path="url(#b)"/>"##,
+            r##"<path d="M3 3" clip-path="url(#b)"/>"##,
+            r##"<path d="M4 4" clip-path="url(#a)"/>"##,
+        ]);
+
+        assert_eq!(
+            output,
+            concat!(
+                r##"<g clip-path="url(#a)"><path d="M0 0"/><path d="M1 1"/></g>"##,
+                r##"<g clip-path="url(#b)"><path d="M2 2"/><path d="M3 3"/></g>"##,
+                r##"<path d="M4 4" clip-path="url(#a)"/>"##,
+            )
+        );
+        assert_eq!(groups, 2);
     }
 }

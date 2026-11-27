@@ -1,0 +1,1 @@
+[{"command":"remove","path":"/body/p[2]"},{"command":"move","path":"/body/p[1]","to":"/body","index":0},{"command":"swap","path":"/body/p[1]","path2":"/body/p[2]"}]

@@ -1,0 +1,959 @@
+//! Office Binary Document RC4 `CryptoAPI` handling for legacy `PowerPoint` files.
+
+use super::current_user::CurrentUser;
+use super::package::{EncryptionKind, Error, Result, SourceLimits};
+use litchi_crypto::rc4 as office_rc4;
+use litchi_crypto::rc4::{Context, Error as CryptoError, Flags};
+use rand::{TryRng, rngs::SysRng};
+use zeroize::Zeroizing;
+
+const USER_EDIT_TYPE: u16 = 4085;
+const CRYPT_SESSION_TYPE: u16 = 12052;
+const CRYPTO_API_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
+
+/// Password-to-open encryption profile for binary `PowerPoint` presentations.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EncryptionProfile {
+    /// Office Binary Document `CryptoAPI` RC4/SHA-1 encryption.
+    CryptoApiRc4 {
+        /// RC4 key size in bits. Supported values are 40 through 128 in steps of eight.
+        key_bits: u16,
+    },
+}
+
+/// Caller-owned entropy for one PPT CryptoAPI RC4 authoring attempt.
+///
+/// A canonical [`crate::Builder`] never obtains encryption salt or verifier
+/// bytes from an ambient random source. Supply one token for each encrypted
+/// build or low-level [`crate::raw::encode`] attempt. The token is consumed
+/// even when the attempt later fails, so a caller must provide a fresh token
+/// for the next attempt.
+///
+/// [`generate`](Self::generate) is the explicit convenience constructor for
+/// operating-system randomness. [`from_bytes`](Self::from_bytes) is useful for
+/// deterministic tests and reproducible pipelines.
+pub struct EncryptionEntropy {
+    salt: Zeroizing<[u8; 16]>,
+    verifier: Zeroizing<[u8; 16]>,
+}
+
+impl EncryptionEntropy {
+    /// Generate fresh salt and verifier bytes using the operating-system RNG.
+    pub fn generate() -> Result<Self> {
+        Ok(Self {
+            salt: random_16("PPT CryptoAPI salt")?,
+            verifier: random_16("PPT CryptoAPI verifier")?,
+        })
+    }
+
+    /// Construct deterministic entropy from caller-provided bytes.
+    ///
+    /// Reusing salt and verifier bytes with the same password is unsafe for
+    /// distinct encrypted documents. Production callers should normally use
+    /// [`Self::generate`] for every attempt.
+    #[must_use]
+    pub fn from_bytes(salt: [u8; 16], verifier: [u8; 16]) -> Self {
+        Self {
+            salt: Zeroizing::new(salt),
+            verifier: Zeroizing::new(verifier),
+        }
+    }
+}
+
+fn random_16(label: &str) -> Result<Zeroizing<[u8; 16]>> {
+    let mut bytes = Zeroizing::new([0_u8; 16]);
+    SysRng.try_fill_bytes(bytes.as_mut()).map_err(|_error| {
+        Error::Io(std::io::Error::other(format!(
+            "operating-system randomness unavailable for {label}"
+        )))
+    })?;
+    Ok(bytes)
+}
+
+impl EncryptionProfile {
+    pub(crate) fn validate(self) -> std::result::Result<(), String> {
+        let Self::CryptoApiRc4 { key_bits } = self;
+        if !(40..=128).contains(&key_bits) || key_bits % 8 != 0 {
+            return Err(format!(
+                "PPT CryptoAPI RC4 key size {key_bits} is not a byte-aligned value in 40..=128"
+            ));
+        }
+        Ok(())
+    }
+}
+
+pub(crate) struct WriterEncryptionMaterial {
+    pub session_record: Vec<u8>,
+    pub crypto: Context,
+}
+
+pub(crate) fn validate_writer_password(
+    profile: EncryptionProfile,
+    password: &str,
+) -> std::result::Result<(), String> {
+    profile.validate()?;
+    let units = password.encode_utf16().count();
+    if units == 0 {
+        return Err("PPT password-to-open password must not be empty".to_string());
+    }
+    if units > 255 {
+        return Err(format!(
+            "PPT password contains {units} UTF-16 code units and exceeds the 255-unit limit"
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn prepare_writer_encryption(
+    profile: EncryptionProfile,
+    password: &str,
+    entropy: &EncryptionEntropy,
+) -> std::result::Result<WriterEncryptionMaterial, String> {
+    validate_writer_password(profile, password)?;
+    let EncryptionProfile::CryptoApiRc4 { key_bits } = profile;
+    let (encryption_info, crypto) = office_rc4::build_header(
+        password,
+        usize::from(key_bits),
+        Flags::CRYPTO_API | Flags::DOC_PROPERTIES,
+        CRYPTO_API_PROVIDER,
+        &entropy.salt,
+        &entropy.verifier,
+    )
+    .map_err(|error| map_crypto_error(error).to_string())?;
+    let data_len = u32::try_from(encryption_info.len())
+        .map_err(|_err| "PPT CryptoAPI EncryptionInfo is too large".to_string())?;
+    let mut session_record = Vec::with_capacity(8 + encryption_info.len());
+    session_record.extend_from_slice(&0x000fu16.to_le_bytes());
+    session_record.extend_from_slice(&CRYPT_SESSION_TYPE.to_le_bytes());
+    session_record.extend_from_slice(&data_len.to_le_bytes());
+    session_record.extend_from_slice(&encryption_info);
+    Ok(WriterEncryptionMaterial {
+        session_record,
+        crypto,
+    })
+}
+
+pub(crate) fn encrypt_powerpoint_document_for_write(
+    document: &mut [u8],
+    directory_offset: usize,
+    user_edit_offset: usize,
+    session_id: u32,
+    crypto: &Context,
+) -> std::result::Result<(), String> {
+    if directory_offset >= user_edit_offset || user_edit_offset >= document.len() {
+        return Err("PPT encrypted bootstrap offsets are out of order".to_string());
+    }
+    let user_edit = record_header(document, user_edit_offset).map_err(|error| error.to_string())?;
+    if user_edit.record_type != USER_EDIT_TYPE
+        || user_edit.version != 0
+        || user_edit.instance != 0
+        || user_edit.data_len != 32
+    {
+        return Err("PPT encrypted output requires one 32-byte UserEditAtom".to_string());
+    }
+    let user_end = user_edit_offset
+        .checked_add(8 + user_edit.data_len)
+        .ok_or_else(|| "PPT UserEditAtom range overflow".to_string())?;
+    if user_end != document.len() {
+        return Err("PPT encrypted output contains data after its single UserEditAtom".to_string());
+    }
+    let user_data = document
+        .get(user_edit_offset + 8..user_end)
+        .ok_or_else(|| "PPT UserEditAtom is truncated".to_string())?;
+    if le_u32(user_data, 8).map_err(|error| error.to_string())? != 0
+        || usize::try_from(le_u32(user_data, 12).map_err(|error| error.to_string())?)
+            != Ok(directory_offset)
+        || le_u32(user_data, 16).map_err(|error| error.to_string())? != 1
+        || le_u32(user_data, 28).map_err(|error| error.to_string())? != session_id
+    {
+        return Err("PPT encrypted UserEditAtom bootstrap fields are inconsistent".to_string());
+    }
+    let directory = record_header(document, directory_offset).map_err(|error| error.to_string())?;
+    let directory_end = directory_offset
+        .checked_add(8 + directory.data_len)
+        .ok_or_else(|| "PPT persist directory range overflow".to_string())?;
+    if directory_end != user_edit_offset {
+        return Err("PPT persist directory is not immediately before UserEditAtom".to_string());
+    }
+    let mappings =
+        parse_persist_directory(document, directory_offset).map_err(|error| error.to_string())?;
+    let session_offset = usize::try_from(
+        mappings
+            .iter()
+            .find_map(|&(id, offset)| (id == session_id).then_some(offset))
+            .ok_or_else(|| "PPT encryption session has no persist mapping".to_string())?,
+    )
+    .map_err(|_err| "PPT encryption session offset does not fit in memory".to_string())?;
+
+    let mut ranges = Vec::with_capacity(mappings.len());
+    for &(persist_id, raw_offset) in &mappings {
+        let offset = usize::try_from(raw_offset)
+            .map_err(|_err| format!("PPT persist object {persist_id} offset is too large"))?;
+        let header = record_header(document, offset).map_err(|error| error.to_string())?;
+        let end = offset
+            .checked_add(8 + header.data_len)
+            .ok_or_else(|| format!("PPT persist object {persist_id} range overflow"))?;
+        if end > directory_offset {
+            return Err(format!(
+                "PPT persist object {persist_id} extends into the bootstrap records"
+            ));
+        }
+        if persist_id == session_id
+            && (offset != session_offset
+                || header.record_type != CRYPT_SESSION_TYPE
+                || header.version != 0x0f
+                || header.instance != 0)
+        {
+            return Err("PPT encryption session persist object is malformed".to_string());
+        }
+        ranges.push((offset, end, persist_id));
+    }
+    ranges.sort_unstable_by_key(|range| range.0);
+    let mut cursor = 0usize;
+    for &(start, end, persist_id) in &ranges {
+        if start != cursor {
+            return Err(format!(
+                "PPT persist object {persist_id} leaves a gap or overlap before offset {start}"
+            ));
+        }
+        cursor = end;
+    }
+    if cursor != directory_offset {
+        return Err("PPT persist objects do not cover the complete encrypted region".to_string());
+    }
+    for &(start, end, persist_id) in &ranges {
+        if persist_id != session_id {
+            office_rc4::apply(crypto, persist_id, &mut document[start..end])
+                .map_err(|error| map_crypto_error(error).to_string())?;
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn encrypt_pictures_for_write(
+    data: &mut [u8],
+    crypto: &Context,
+) -> std::result::Result<(), String> {
+    let segments = clear_picture_segments(data)?;
+    for (offset, len) in segments {
+        office_rc4::apply(crypto, 0, &mut data[offset..offset + len])
+            .map_err(|error| map_crypto_error(error).to_string())?;
+    }
+    Ok(())
+}
+
+fn clear_picture_segments(data: &[u8]) -> std::result::Result<Vec<(usize, usize)>, String> {
+    let mut segments = Vec::new();
+    let mut record_offset = 0usize;
+    while record_offset < data.len() {
+        let header = record_header(data, record_offset).map_err(|error| error.to_string())?;
+        let end = record_offset
+            .checked_add(8)
+            .and_then(|value| value.checked_add(header.data_len))
+            .ok_or_else(|| "PPT picture record range overflow".to_string())?;
+        if end > data.len() {
+            return Err("PPT picture record extends beyond the Pictures stream".to_string());
+        }
+        segments.push((record_offset, 8));
+        let mut offset = record_offset + 8;
+        let mut record_type = header.record_type;
+        let mut instance = header.instance;
+        if record_type == 0xf007 {
+            for len in [1usize, 1, 16, 2, 4, 4, 4, 1, 1, 1, 1] {
+                checked_picture_segment(offset, len, end)?;
+                segments.push((offset, len));
+                offset += len;
+            }
+            let name_len = usize::from(data[offset - 3]);
+            if name_len != 0 {
+                checked_picture_segment(offset, name_len, end)?;
+                segments.push((offset, name_len));
+                offset += name_len;
+            }
+            if offset == end {
+                record_offset = end;
+                continue;
+            }
+            checked_picture_segment(offset, 8, end)?;
+            segments.push((offset, 8));
+            let embedded = record_header(data, offset).map_err(|error| error.to_string())?;
+            record_type = embedded.record_type;
+            instance = embedded.instance;
+            offset += 8;
+        }
+        let uid_count = if matches!(
+            instance,
+            0x217 | 0x3d5 | 0x46b | 0x543 | 0x6e1 | 0x6e3 | 0x6e5 | 0x7a9
+        ) {
+            2
+        } else {
+            1
+        };
+        for _ in 0..uid_count {
+            checked_picture_segment(offset, 16, end)?;
+            segments.push((offset, 16));
+            offset += 16;
+        }
+        let metadata_len = if matches!(record_type, 0xf01a..=0xf01c) {
+            34
+        } else {
+            1
+        };
+        checked_picture_segment(offset, metadata_len, end)?;
+        segments.push((offset, metadata_len));
+        offset += metadata_len;
+        checked_picture_segment(offset, end - offset, end)?;
+        if offset != end {
+            segments.push((offset, end - offset));
+        }
+        record_offset = end;
+    }
+    Ok(segments)
+}
+
+pub(super) struct EncryptedPresentation {
+    pub live_offsets: Vec<usize>,
+    pub mappings: Vec<(u32, u32)>,
+    pub crypto: Context,
+    pub profile: EncryptionProfile,
+}
+
+#[derive(Clone, Copy)]
+struct RecordHeader {
+    version: u16,
+    instance: u16,
+    record_type: u16,
+    data_len: usize,
+}
+
+fn checked_picture_segment(
+    offset: usize,
+    len: usize,
+    record_end: usize,
+) -> std::result::Result<(), String> {
+    if offset.checked_add(len).is_none_or(|end| end > record_end) {
+        return Err("PPT picture fields exceed their record".to_string());
+    }
+    Ok(())
+}
+pub(super) fn decrypt_powerpoint_document(
+    document: &mut Vec<u8>,
+    current_user_data: Option<&[u8]>,
+    password: Option<&str>,
+    limits: SourceLimits,
+) -> Result<Option<EncryptedPresentation>> {
+    let Some(current_user_bytes) = current_user_data else {
+        return Ok(None);
+    };
+    let current_user = CurrentUser::parse_with_limits(current_user_bytes, limits)?;
+    let user_edit_offset = usize::try_from(current_user.current_edit_offset()).map_err(|_err| {
+        Error::MalformedEncryptionHeader("current edit offset does not fit in memory".to_string())
+    })?;
+    let user_edit = record_header(document, user_edit_offset)?;
+    if user_edit.record_type != USER_EDIT_TYPE || user_edit.version != 0 || user_edit.instance != 0
+    {
+        if current_user.is_encrypted() {
+            return Err(Error::MalformedEncryptionHeader(
+                "CurrentUser does not reference a valid UserEditAtom".to_string(),
+            ));
+        }
+        return Ok(None);
+    }
+    if !matches!(user_edit.data_len, 28 | 32) {
+        // A nonconforming length is never accepted for an encrypted
+        // presentation. An unencrypted one is left to the plaintext read
+        // path, which accepts any length of at least 28 bytes — unless the atom
+        // names an encryption session.
+        if current_user.is_encrypted() || user_edit.data_len < 28 {
+            return Err(Error::MalformedEncryptionHeader(format!(
+                "UserEditAtom has invalid length {}",
+                user_edit.data_len
+            )));
+        }
+        let user_data = checked_slice(
+            document,
+            user_edit_offset + 8,
+            user_edit.data_len,
+            "UserEditAtom",
+        )?;
+        let session = (user_edit.data_len >= 32)
+            .then(|| le_u32(user_data, 28))
+            .transpose()?
+            .filter(|id| *id != u32::MAX && *id != 0);
+        if session.is_some() {
+            return Err(Error::MalformedEncryptionHeader(format!(
+                "UserEditAtom has invalid length {}",
+                user_edit.data_len
+            )));
+        }
+        return Ok(None);
+    }
+    let user_data = checked_slice(
+        document,
+        user_edit_offset + 8,
+        user_edit.data_len,
+        "UserEditAtom",
+    )?;
+    let session_id_field = (user_edit.data_len == 32)
+        .then(|| le_u32(user_data, 28))
+        .transpose()?
+        .filter(|id| *id != u32::MAX && *id != 0);
+    let Some(session_id) = session_id_field else {
+        if current_user.is_encrypted() {
+            return Err(Error::MalformedEncryptionHeader(
+                "encrypted CurrentUser has no encryption-session persist reference".to_string(),
+            ));
+        }
+        return Ok(None);
+    };
+    if le_u32(user_data, 8)? != 0 {
+        return Err(Error::MalformedEncryptionHeader(
+            "encrypted presentation contains more than one UserEditAtom".to_string(),
+        ));
+    }
+    if le_u32(user_data, 16)? != 1 {
+        return Err(Error::MalformedEncryptionHeader(
+            "encrypted UserEditAtom has an invalid document persist identifier".to_string(),
+        ));
+    }
+    let directory_offset = usize::try_from(le_u32(user_data, 12)?).map_err(|_err| {
+        Error::MalformedEncryptionHeader(
+            "persist directory offset does not fit in memory".to_string(),
+        )
+    })?;
+    if directory_offset >= user_edit_offset {
+        return Err(Error::MalformedEncryptionHeader(
+            "persist directory does not precede UserEditAtom".to_string(),
+        ));
+    }
+    let mappings = parse_persist_directory_with_limits(document, directory_offset, limits)?;
+    let session_offset_raw = mappings
+        .iter()
+        .find_map(|&(id, offset)| (id == session_id).then_some(offset))
+        .ok_or_else(|| {
+            Error::MalformedEncryptionHeader(
+                "encryption-session persist identifier is absent from the directory".to_string(),
+            )
+        })?;
+    let session_offset = usize::try_from(session_offset_raw).map_err(|_err| {
+        Error::MalformedEncryptionHeader(
+            "encryption-session offset does not fit in memory".to_string(),
+        )
+    })?;
+    let session_header = record_header(document, session_offset)?;
+    if session_header.record_type != CRYPT_SESSION_TYPE
+        || session_header.version != 0x0f
+        || session_header.instance != 0
+    {
+        return Err(Error::MalformedEncryptionHeader(
+            "session persist object is not a CryptSession10Container".to_string(),
+        ));
+    }
+    let session_data = checked_slice(
+        document,
+        session_offset + 8,
+        session_header.data_len,
+        "CryptSession10Container",
+    )?;
+    let header = office_rc4::parse_header(session_data).map_err(map_crypto_error)?;
+    let key_bits = u16::try_from(header.key_bits()).map_err(|_error| {
+        Error::MalformedEncryptionHeader(
+            "CryptoAPI RC4 key size does not fit in profile".to_string(),
+        )
+    })?;
+    let profile = EncryptionProfile::CryptoApiRc4 { key_bits };
+    profile
+        .validate()
+        .map_err(Error::MalformedEncryptionHeader)?;
+    let verified_password = password.ok_or(Error::PasswordRequired)?;
+    let crypto = office_rc4::verify(&header, verified_password)
+        .map_err(map_crypto_error)?
+        .ok_or(Error::InvalidPassword)?;
+
+    let mut decrypted = Vec::new();
+    decrypted
+        .try_reserve_exact(document.len())
+        .map_err(|_err| Error::AllocationFailed("decrypted PowerPoint Document stream"))?;
+    decrypted.extend_from_slice(document);
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(mappings.len())
+        .map_err(|_err| Error::AllocationFailed("encrypted persist ranges"))?;
+    for &(persist_id, raw_offset) in &mappings {
+        if persist_id == session_id {
+            continue;
+        }
+        let offset = usize::try_from(raw_offset).map_err(|_err| {
+            Error::Corrupted("persist object offset does not fit in memory".to_string())
+        })?;
+        if offset == user_edit_offset || offset == directory_offset {
+            continue;
+        }
+        let encrypted_header = checked_slice(document, offset, 8, "encrypted persist header")?;
+        let mut clear_header: [u8; 8] = encrypted_header.try_into().map_err(|_err| {
+            Error::MalformedEncryptionHeader("encrypted persist header is truncated".to_string())
+        })?;
+        office_rc4::apply(&crypto, persist_id, &mut clear_header).map_err(map_crypto_error)?;
+        let record_data_len = u32::from_le_bytes([
+            clear_header[4],
+            clear_header[5],
+            clear_header[6],
+            clear_header[7],
+        ]);
+        let data_len = usize::try_from(record_data_len).map_err(|_err| {
+            Error::Corrupted("persist record length does not fit in memory".to_string())
+        })?;
+        let total = 8usize
+            .checked_add(data_len)
+            .ok_or_else(|| Error::Corrupted("persist record length overflow".to_string()))?;
+        if data_len > limits.max_record_payload_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: data_len,
+                maximum: limits.max_record_payload_bytes,
+            });
+        }
+        if total > limits.max_record_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: total,
+                maximum: limits.max_record_bytes,
+            });
+        }
+        let end = offset
+            .checked_add(total)
+            .ok_or_else(|| Error::Corrupted("persist record range overflow".to_string()))?;
+        if end > directory_offset || end > document.len() {
+            return Err(Error::Corrupted(format!(
+                "persist object {persist_id} extends beyond the encrypted object region"
+            )));
+        }
+        ranges.push((offset, end, persist_id));
+    }
+    ranges.sort_unstable_by_key(|range| range.0);
+    for pair in ranges.windows(2) {
+        if pair[0].1 > pair[1].0 {
+            return Err(Error::Corrupted(
+                "encrypted persist object ranges overlap".to_string(),
+            ));
+        }
+    }
+    for &(start, end, persist_id) in &ranges {
+        office_rc4::apply(&crypto, persist_id, &mut decrypted[start..end])
+            .map_err(map_crypto_error)?;
+    }
+    *document = decrypted;
+
+    let mut live_offsets = Vec::new();
+    live_offsets
+        .try_reserve_exact(ranges.len())
+        .map_err(|_err| Error::AllocationFailed("encrypted live-offset table"))?;
+    live_offsets.extend(ranges.into_iter().map(|range| range.0));
+    Ok(Some(EncryptedPresentation {
+        live_offsets,
+        mappings,
+        crypto,
+        profile,
+    }))
+}
+
+pub(super) fn decrypt_pictures(
+    data: &mut Vec<u8>,
+    crypto: &Context,
+    limits: SourceLimits,
+) -> Result<()> {
+    let mut clear = Vec::new();
+    clear
+        .try_reserve_exact(data.len())
+        .map_err(|_err| Error::AllocationFailed("decrypted Pictures stream"))?;
+    clear.extend_from_slice(data);
+    let mut record_offset = 0usize;
+    let mut record_count = 0usize;
+    while record_offset < clear.len() {
+        record_count = record_count.checked_add(1).ok_or(Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            observed: usize::MAX,
+            maximum: limits.max_records,
+        })?;
+        if record_count > limits.max_records {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: record_count,
+                maximum: limits.max_records,
+            });
+        }
+        decrypt_picture_segment(&mut clear, record_offset, 8, crypto)?;
+        let header = record_header(&clear, record_offset)?;
+        let end = record_offset
+            .checked_add(8)
+            .and_then(|value| value.checked_add(header.data_len))
+            .ok_or_else(|| Error::Corrupted("picture record range overflow".to_string()))?;
+        let total = end - record_offset;
+        if header.data_len > limits.max_record_payload_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: header.data_len,
+                maximum: limits.max_record_payload_bytes,
+            });
+        }
+        if total > limits.max_record_bytes {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: total,
+                maximum: limits.max_record_bytes,
+            });
+        }
+        if end > clear.len() {
+            return Err(Error::Corrupted(
+                "encrypted picture record extends beyond Pictures stream".to_string(),
+            ));
+        }
+        let mut offset = record_offset + 8;
+        let mut record_type = header.record_type;
+        let mut instance = header.instance;
+        if record_type == 0xf007 {
+            const PARTS: [usize; 11] = [1, 1, 16, 2, 4, 4, 4, 1, 1, 1, 1];
+            for part in PARTS {
+                decrypt_picture_segment(&mut clear, offset, part, crypto)?;
+                offset += part;
+            }
+            let name_len = usize::from(clear[offset - 3]);
+            if name_len != 0 {
+                decrypt_picture_segment(&mut clear, offset, name_len, crypto)?;
+                offset += name_len;
+            }
+            if offset == end {
+                record_offset = end;
+                continue;
+            }
+            decrypt_picture_segment(&mut clear, offset, 8, crypto)?;
+            let embedded = record_header(&clear, offset)?;
+            record_type = embedded.record_type;
+            instance = embedded.instance;
+            offset += 8;
+        }
+        let uid_count = if matches!(
+            instance,
+            0x217 | 0x3d5 | 0x46b | 0x543 | 0x6e1 | 0x6e3 | 0x6e5 | 0x7a9
+        ) {
+            2
+        } else {
+            1
+        };
+        for _ in 0..uid_count {
+            decrypt_picture_segment(&mut clear, offset, 16, crypto)?;
+            offset += 16;
+        }
+        let metadata_len = if matches!(record_type, 0xf01a..=0xf01c) {
+            34
+        } else {
+            1
+        };
+        decrypt_picture_segment(&mut clear, offset, metadata_len, crypto)?;
+        offset += metadata_len;
+        if offset > end {
+            return Err(Error::Corrupted(
+                "encrypted picture fields exceed their record".to_string(),
+            ));
+        }
+        decrypt_picture_segment(&mut clear, offset, end - offset, crypto)?;
+        record_offset = end;
+    }
+    *data = clear;
+    Ok(())
+}
+
+fn parse_persist_directory(data: &[u8], offset: usize) -> Result<Vec<(u32, u32)>> {
+    parse_persist_directory_with_limits(data, offset, SourceLimits::default())
+}
+
+fn parse_persist_directory_with_limits(
+    data: &[u8],
+    offset: usize,
+    limits: SourceLimits,
+) -> Result<Vec<(u32, u32)>> {
+    let header = record_header(data, offset)?;
+    if !matches!(header.record_type, 6001 | 6002) || header.version != 0 {
+        return Err(Error::MalformedEncryptionHeader(
+            "UserEditAtom does not reference a valid PersistDirectoryAtom".to_string(),
+        ));
+    }
+    let payload = checked_slice(data, offset + 8, header.data_len, "PersistDirectoryAtom")?;
+    if payload.len() % 4 != 0 {
+        return Err(Error::MalformedEncryptionHeader(
+            "persist directory is not aligned to 4 bytes".to_string(),
+        ));
+    }
+    let mut mappings = Vec::new();
+    mappings
+        .try_reserve((payload.len() / 4).min(limits.max_records))
+        .map_err(|_err| Error::AllocationFailed("PPT persist directory"))?;
+    let mut cursor = 0usize;
+    while cursor < payload.len() {
+        let info = le_u32(payload, cursor)?;
+        cursor += 4;
+        let base = info & 0x000f_ffff;
+        let count = info >> 20;
+        if count == 0 {
+            return Err(Error::MalformedEncryptionHeader(
+                "persist directory entry has a zero count".to_string(),
+            ));
+        }
+        for index in 0..count {
+            if mappings.len() >= limits.max_records {
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::Events,
+                    observed: mappings.len().saturating_add(1),
+                    maximum: limits.max_records,
+                });
+            }
+            let persist_offset = le_u32(payload, cursor)?;
+            cursor += 4;
+            let id = base.checked_add(index).ok_or_else(|| {
+                Error::MalformedEncryptionHeader("persist identifier overflow".to_string())
+            })?;
+            if usize::try_from(persist_offset).map_or(true, |value| value >= offset) {
+                return Err(Error::MalformedEncryptionHeader(format!(
+                    "persist object {id} does not precede its directory"
+                )));
+            }
+            mappings.push((id, persist_offset));
+        }
+    }
+    mappings.sort_unstable_by_key(|&(id, _)| id);
+    if let Some(id) = mappings
+        .windows(2)
+        .find_map(|pair| (pair[0].0 == pair[1].0).then_some(pair[0].0))
+    {
+        return Err(Error::MalformedEncryptionHeader(format!(
+            "duplicate persist identifier {id}"
+        )));
+    }
+    Ok(mappings)
+}
+
+fn map_crypto_error(error: CryptoError) -> Error {
+    match error {
+        CryptoError::Malformed(message) => Error::MalformedEncryptionHeader(message),
+        CryptoError::UnsupportedVersion { major, minor } => {
+            Error::UnsupportedEncryption(EncryptionKind::Unknown { major, minor })
+        },
+        CryptoError::UnsupportedAlgorithm => {
+            Error::UnsupportedEncryption(EncryptionKind::CryptoApi)
+        },
+        _ => Error::MalformedEncryptionHeader("CryptoAPI RC4 error".to_string()),
+    }
+}
+
+fn decrypt_picture_segment(
+    data: &mut [u8],
+    offset: usize,
+    len: usize,
+    crypto: &Context,
+) -> Result<()> {
+    let segment = checked_slice_mut(data, offset, len, "encrypted picture field")?;
+    office_rc4::apply(crypto, 0, segment).map_err(map_crypto_error)
+}
+
+fn record_header(data: &[u8], offset: usize) -> Result<RecordHeader> {
+    let bytes = checked_slice(data, offset, 8, "PPT record header")?;
+    let version_instance = u16::from_le_bytes([bytes[0], bytes[1]]);
+    let data_len_raw = u32::from_le_bytes([bytes[4], bytes[5], bytes[6], bytes[7]]);
+    Ok(RecordHeader {
+        version: version_instance & 0x000f,
+        instance: version_instance >> 4,
+        record_type: u16::from_le_bytes([bytes[2], bytes[3]]),
+        data_len: usize::try_from(data_len_raw).map_err(|_err| {
+            Error::Corrupted("PPT record length does not fit in memory".to_string())
+        })?,
+    })
+}
+
+fn le_u32(data: &[u8], offset: usize) -> Result<u32> {
+    let bytes = checked_slice(data, offset, 4, "32-bit encryption field")?;
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn checked_slice<'a>(data: &'a [u8], offset: usize, len: usize, field: &str) -> Result<&'a [u8]> {
+    let end = offset
+        .checked_add(len)
+        .ok_or_else(|| Error::MalformedEncryptionHeader(format!("{field} range overflow")))?;
+    data.get(offset..end)
+        .ok_or_else(|| Error::MalformedEncryptionHeader(format!("{field} is truncated")))
+}
+
+fn checked_slice_mut<'a>(
+    data: &'a mut [u8],
+    offset: usize,
+    len: usize,
+    field: &str,
+) -> Result<&'a mut [u8]> {
+    let end = offset
+        .checked_add(len)
+        .ok_or_else(|| Error::MalformedEncryptionHeader(format!("{field} range overflow")))?;
+    data.get_mut(offset..end)
+        .ok_or_else(|| Error::MalformedEncryptionHeader(format!("{field} is truncated")))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{OpenOptions, raw::Reader};
+    use std::path::{Path, PathBuf};
+
+    fn poi_fixture(name: &str) -> PathBuf {
+        Path::new(env!("CARGO_MANIFEST_DIR"))
+            .parent()
+            .unwrap()
+            .parent()
+            .unwrap()
+            .join("test-data")
+            .join("poi")
+            .join("test-data")
+            .join("slideshow")
+            .join(name)
+    }
+
+    #[test]
+    fn encrypted_presentation_requires_password() {
+        let mut package = Reader::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
+        assert!(matches!(
+            package.presentation(),
+            Err(Error::PasswordRequired)
+        ));
+    }
+
+    #[test]
+    fn encrypted_presentation_rejects_wrong_password() {
+        let mut package = Reader::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
+        assert!(matches!(
+            package.presentation_with_options(OpenOptions {
+                source_limits: SourceLimits::default(),
+                source_limits_explicit: false,
+                password: Some("wrong"),
+                ..Default::default()
+            }),
+            Err(Error::InvalidPassword)
+        ));
+    }
+
+    #[test]
+    fn opens_poi_cryptoapi_key_variants() {
+        for name in [
+            "Password_Protected-hello.ppt",
+            "Password_Protected-56-hello.ppt",
+            "Password_Protected-np-hello.ppt",
+        ] {
+            let mut package = Reader::open(poi_fixture(name)).unwrap();
+            let presentation = package
+                .presentation_with_options(OpenOptions {
+                    source_limits: SourceLimits::default(),
+                    source_limits_explicit: false,
+                    password: Some("hello"),
+                    ..Default::default()
+                })
+                .unwrap();
+            assert!(presentation.slide_count() > 0, "fixture {name}");
+        }
+    }
+
+    #[test]
+    fn opens_poi_cryptoapi_content_oracle() {
+        let mut package = Reader::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap();
+        let presentation = package
+            .presentation_with_options(OpenOptions {
+                source_limits: SourceLimits::default(),
+                source_limits_explicit: false,
+                password: Some("crypto"),
+                ..Default::default()
+            })
+            .unwrap();
+        assert!(presentation.text().unwrap().contains("Dominic Salemno"));
+    }
+
+    #[test]
+    fn decrypts_poi_encrypted_pictures_stream() {
+        use litchi_cfb::OleFile;
+        use sha1::{Digest, Sha1};
+        use std::fs::File;
+
+        let mut encrypted_ole = OleFile::open(
+            File::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap(),
+            litchi_cfb::OleFileLimits::default(),
+        )
+        .unwrap();
+        let mut document = encrypted_ole.open_stream(&["PowerPoint Document"]).unwrap();
+        let current_user = encrypted_ole.open_stream(&["Current User"]).unwrap();
+        let state = decrypt_powerpoint_document(
+            &mut document,
+            Some(&current_user),
+            Some("crypto"),
+            SourceLimits::default(),
+        )
+        .unwrap()
+        .unwrap();
+        let mut encrypted_pictures = encrypted_ole.open_stream(&["Pictures"]).unwrap();
+        decrypt_pictures(
+            &mut encrypted_pictures,
+            &state.crypto,
+            SourceLimits::default(),
+        )
+        .unwrap();
+        let images =
+            litchi_odraw::image::delay(&encrypted_pictures, litchi_odraw::image::Limits::default())
+                .unwrap();
+        let hashes: Vec<String> = images
+            .iter()
+            .map(|image| {
+                use std::fmt::Write as _;
+                Sha1::digest(image.data().unwrap())
+                    .iter()
+                    .fold(String::new(), |mut hex, byte| {
+                        write!(hex, "{byte:02x}").unwrap();
+                        hex
+                    })
+            })
+            .collect();
+        assert_eq!(
+            hashes,
+            [
+                "9cab034caab14c247c2c591555694ff46493bd9d",
+                "4ae34e47ef55d54558648a1e0fae65dd54da2e87",
+                "425dc81abaf86cdab4ed94e9e623e0edbfa9bdaf",
+                "f2976cb7d36304649f59ecd2644f3e69584845ed",
+                "828eb1a96ee5be40ad94e3b9b582e231f6f8a31c",
+                "81950cf18a9134be6418d7f2c98bc411eae7bc27",
+                "08d5368a2a941409e4dd30d7b175758a11fd7913",
+            ]
+        );
+    }
+
+    #[test]
+    fn persist_directory_count_is_bounded_before_growth() {
+        let offset = 16usize;
+        let mut data = vec![0u8; offset];
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&6001u16.to_le_bytes());
+        data.extend_from_slice(&12u32.to_le_bytes());
+        data.extend_from_slice(&((2u32 << 20) | 1).to_le_bytes());
+        data.extend_from_slice(&0u32.to_le_bytes());
+        data.extend_from_slice(&4u32.to_le_bytes());
+
+        let error = parse_persist_directory_with_limits(
+            &data,
+            offset,
+            SourceLimits {
+                max_records: 1,
+                ..SourceLimits::default()
+            },
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            }
+        ));
+    }
+}

@@ -1,0 +1,22 @@
+[package]
+name        = "litchi-iwa-core"
+description = "Bounded physical archive and Snappy framing primitives for Apple iWork IWA files."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+litchi-iwa-common = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+smallvec          = { workspace = true, features = ["union"] }
+snap              = { workspace = true }
+thiserror         = { workspace = true }
+
+[dev-dependencies]
+prost = { workspace = true }
+
+[lints]
+workspace = true

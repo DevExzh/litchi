@@ -1,0 +1,14 @@
+// Wire-only projection derived from `TSWPArchives.proto`:
+// `TextualAttachmentArchive`.
+//
+// The Pages footnote marker adapter reads the optional string-equivalent and
+// kind fields only. Caller-owned IWA bytes remain the preservation authority;
+// this projection intentionally has no generated encoding path.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message TextualAttachmentArchive {
+  optional string string_equivalent = 1;
+  optional int32 kind = 2;
+}

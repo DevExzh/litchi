@@ -1,0 +1,16 @@
+[package]
+name        = "litchi-iwa-common"
+description = "Shared low-level primitives for Litchi iWork format crates."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+chrono = { workspace = true }
+thiserror = { workspace = true }
+
+[lints]
+workspace = true

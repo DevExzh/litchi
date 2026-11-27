@@ -1,0 +1,24 @@
+[package]
+name        = "litchi-iwa-protos"
+description = "Generated raw Protocol Buffer schemas for Apple iWork IWA archives."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[dependencies]
+# build.rs verifies the generated projection sizes and source digests for this
+# exact compiler/runtime pair. Upgrade them with the projection review.
+buffa = "=0.9.1"
+prost = { workspace = true }
+ryu = { workspace = true }
+
+[build-dependencies]
+buffa-build = "=0.9.1"
+prost-build = { workspace = true }
+sha2 = { workspace = true }
+
+[lints]
+workspace = true

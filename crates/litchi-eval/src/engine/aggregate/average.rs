@@ -3,7 +3,7 @@ use litchi_core::sheet::{CellValue, Result};
 
 use super::super::{EvalCtx, for_each_value_in_expr, to_number};
 
-pub(crate) async fn eval_average(
+pub(crate) fn eval_average(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -17,8 +17,7 @@ pub(crate) async fn eval_average(
                 count += 1;
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
     if count == 0 {
         return Ok(CellValue::Error("AVERAGE of empty set".to_string()));
@@ -26,7 +25,7 @@ pub(crate) async fn eval_average(
     Ok(CellValue::Float(total / count as f64))
 }
 
-pub(crate) async fn eval_averagea(
+pub(crate) fn eval_averagea(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -93,8 +92,7 @@ pub(crate) async fn eval_averagea(
                 },
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
     if count == 0 {
         return Ok(CellValue::Error("AVERAGEA of empty set".to_string()));
@@ -102,7 +100,7 @@ pub(crate) async fn eval_averagea(
     Ok(CellValue::Float(total / count as f64))
 }
 
-pub(crate) async fn eval_avedev(
+pub(crate) fn eval_avedev(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -114,8 +112,7 @@ pub(crate) async fn eval_avedev(
                 values.push(n);
             }
             Ok(())
-        })
-        .await?;
+        })?;
     }
 
     if values.is_empty() {
@@ -135,8 +132,8 @@ mod tests {
     use crate::engine::test_helpers::TestEngine;
     use crate::parser::Expr;
 
-    #[tokio::test]
-    async fn test_eval_average_basic() {
+    #[test]
+    fn test_eval_average_basic() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(10));
@@ -150,24 +147,24 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_average(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_average(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 20.0).abs() < 1e-9),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_average_empty() {
+    #[test]
+    fn test_eval_average_empty() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_average(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_average(ctx, "Sheet1", &args).unwrap();
         assert!(matches!(result, CellValue::Error(_)));
     }
 
-    #[tokio::test]
-    async fn test_eval_average_ignores_non_numeric() {
+    #[test]
+    fn test_eval_average_ignores_non_numeric() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(10));
@@ -181,15 +178,15 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_average(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_average(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 20.0).abs() < 1e-9),
             _ => panic!("Expected Float, got {:?}", result),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_averagea_includes_bool_and_text() {
+    #[test]
+    fn test_eval_averagea_includes_bool_and_text() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(10));
@@ -203,7 +200,7 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_averagea(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_averagea(ctx, "Sheet1", &args).unwrap();
         // (10 + 1 + 0) / 3 = 3.666...
         match result {
             CellValue::Float(v) => assert!((v - 3.6666667).abs() < 0.001),
@@ -211,8 +208,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_averagea_bool_false() {
+    #[test]
+    fn test_eval_averagea_bool_false() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Bool(false));
@@ -225,7 +222,7 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_averagea(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_averagea(ctx, "Sheet1", &args).unwrap();
         // (0 + 10) / 2 = 5
         match result {
             CellValue::Float(v) => assert!((v - 5.0).abs() < 1e-9),
@@ -233,8 +230,8 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_avedev() {
+    #[test]
+    fn test_eval_avedev() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         engine.set_cell("Sheet1", 0, 0, CellValue::Int(4));
@@ -250,7 +247,7 @@ mod tests {
             end_col: 0,
         });
         let args = vec![range];
-        let result = eval_avedev(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_avedev(ctx, "Sheet1", &args).unwrap();
         // Mean = 5.4, AVEDEV = (|4-5.4| + |5-5.4| + |6-5.4| + |7-5.4| + |5-5.4|) / 5 = 0.88
         match result {
             CellValue::Float(v) => assert!((v - 0.88).abs() < 0.01),
@@ -258,12 +255,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_avedev_empty() {
+    #[test]
+    fn test_eval_avedev_empty() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
         let args: Vec<Expr> = vec![];
-        let result = eval_avedev(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_avedev(ctx, "Sheet1", &args).unwrap();
         assert!(matches!(result, CellValue::Error(_)));
     }
 }

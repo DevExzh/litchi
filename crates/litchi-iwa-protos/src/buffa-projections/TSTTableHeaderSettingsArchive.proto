@@ -1,0 +1,22 @@
+// Wire-only Buffa projection derived from `TSTArchives.proto`:
+// `TST.TableModelArchive` dimensions (fields 6 and 7) and table header/footer
+// settings (fields 9--13, 29, and 32).
+//
+// This read-only scalar view deliberately omits the table's required style and
+// data-store references, as well as every repeated field. The Numbers adapter
+// preserves caller-owned IWA bytes as the sole authoritative representation.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message NumbersTableHeaderSettingsArchive {
+  required uint32 number_of_rows = 6;
+  required uint32 number_of_columns = 7;
+  optional uint32 number_of_header_rows = 9;
+  optional uint32 number_of_header_columns = 10;
+  optional uint32 number_of_footer_rows = 11;
+  optional bool header_rows_frozen = 12;
+  optional bool header_columns_frozen = 13;
+  optional bool repeating_header_rows_enabled = 29;
+  optional bool repeating_header_columns_enabled = 32;
+}
