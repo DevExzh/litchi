@@ -1,0 +1,52 @@
+use crate::Result;
+use std::io::Write;
+
+use super::write_record_header;
+
+const XFEXT_RECORD_ID: u16 = 0x087D;
+const FRT_RESERVED: u16 = 0;
+const XFEXT_RESERVED: [u8; 10] = [0; 10];
+const XFEXT_PROPERTY_COUNT: u16 = 0x0002;
+const XFEXT_PROPERTY_KIND: u16 = 0x000D;
+const XFEXT_PROPERTY_SIZE: u16 = 0x0014;
+const XFEXT_PROPERTY_FLAGS: u32 = 0x0000_0003;
+const XFEXT_FORMAT_KIND: u16 = 0x000E;
+const XFEXT_FORMAT_SIZE: u16 = 0x0005;
+const XFEXT_FORMAT_GRBIT: u8 = 0x02;
+const PIVOT_XF_FORMAT_CODE: &[u8; 8] = b"00_ ;_ *";
+
+fn write_frt_header<W: Write>(writer: &mut W, record_id: u16) -> Result<()> {
+    writer.write_all(&record_id.to_le_bytes())?;
+    writer.write_all(&FRT_RESERVED.to_le_bytes())?;
+    Ok(())
+}
+
+fn write_xfext<W: Write>(writer: &mut W, xf_index: u16) -> Result<()> {
+    write_record_header(writer, XFEXT_RECORD_ID, 45)?;
+    write_frt_header(writer, XFEXT_RECORD_ID)?;
+    writer.write_all(&XFEXT_RESERVED)?;
+    writer.write_all(&xf_index.to_le_bytes())?;
+    writer.write_all(&FRT_RESERVED.to_le_bytes())?;
+    writer.write_all(&XFEXT_PROPERTY_COUNT.to_le_bytes())?;
+    writer.write_all(&XFEXT_PROPERTY_KIND.to_le_bytes())?;
+    writer.write_all(&XFEXT_PROPERTY_SIZE.to_le_bytes())?;
+    writer.write_all(&XFEXT_PROPERTY_FLAGS.to_le_bytes())?;
+    writer.write_all(&1u32.to_le_bytes())?;
+    writer.write_all(PIVOT_XF_FORMAT_CODE)?;
+    writer.write_all(&XFEXT_FORMAT_KIND.to_le_bytes())?;
+    writer.write_all(&XFEXT_FORMAT_SIZE.to_le_bytes())?;
+    writer.write_all(&[XFEXT_FORMAT_GRBIT])?;
+    Ok(())
+}
+
+/// Write the `XFExt` records of the three pivot-table XFs, which follow the
+/// workbook's single `XFCRC` record.
+pub(crate) fn write_pivot_xf_extensions<W: Write>(
+    writer: &mut W,
+    indices: crate::writer::formatting::PivotXfIndices,
+) -> Result<()> {
+    for xf_index in [indices.header_accent, indices.row_label, indices.value] {
+        write_xfext(writer, xf_index)?;
+    }
+    Ok(())
+}

@@ -1,7 +1,8 @@
 //! Read an OpenDocument Text (`.odt`) file and print its text content.
 //!
 //! If a path argument is supplied, that file is opened. Otherwise the example
-//! creates a small ODT in a tempfile via [`DocumentBuilder`] and reads it back.
+//! creates a small ODT in a tempfile via the umbrella's
+//! [`litchi_odf::odt::Builder`] and reads it back.
 //!
 //! Run with:
 //! ```bash
@@ -11,7 +12,7 @@
 
 use std::path::PathBuf;
 
-use litchi_odf::{Document, DocumentBuilder};
+use litchi_odf::odt;
 use tempfile::NamedTempFile;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,24 +20,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let (path, _tempfile_guard): (PathBuf, Option<NamedTempFile>) = match std::env::args().nth(1) {
         Some(arg) => (PathBuf::from(arg), None),
         None => {
-            println!("No path provided; creating a fresh ODT via DocumentBuilder...");
+            println!("No path provided; creating a fresh ODT via litchi_odf::odt::Builder...");
             let tmp = NamedTempFile::with_suffix(".odt")?;
-            let mut builder = DocumentBuilder::new();
+            let mut builder = odt::Builder::new();
             builder.add_heading("litchi-odf example", 1)?;
             builder.add_paragraph("This document was created by the read_odt example.")?;
             builder.add_paragraph("It demonstrates a simple build-then-read round trip.")?;
             builder.add_bulleted_list(vec!["First bullet", "Second bullet", "Third bullet"])?;
             builder.add_heading("Conclusion", 2)?;
             builder.add_paragraph("Reading round-trips text content successfully.")?;
-            // `save` consumes the builder, so use the tempfile path explicitly.
+            // `build` returns the immutable package; `save` publishes it
+            // atomically to the tempfile path.
             let path = tmp.path().to_path_buf();
-            builder.save(&path)?;
+            builder.build()?.save(&path)?;
             (path, Some(tmp))
         },
     };
 
     println!("Opening: {}", path.display());
-    let doc = Document::open(&path)?;
+    let doc = odt::Package::open(&path)?.document()?;
 
     // Full text extraction.
     let text = doc.text()?;

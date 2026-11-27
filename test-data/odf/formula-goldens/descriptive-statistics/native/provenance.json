@@ -1,0 +1,93 @@
+{
+  "upstream": "https://github.com/LibreOffice/core",
+  "raw_url": "https://raw.githubusercontent.com/LibreOffice/core/d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "commit": "d804d6aff49054bad1719ec3c2d136b545bbc7e7",
+  "inputs": {
+    "sc/qa/unit/data/functions/statistical/fods/avedev.fods": "95943d790cda91c4abd4a0c91ed90beefaef2dfbe03c1801409112b60fe3e827",
+    "sc/qa/unit/data/functions/statistical/fods/devsq.fods": "3944527ddc50717f24ea6559b73f6bfd0ec9cf1a62f3ec856315a09a0b3ef5de",
+    "sc/qa/unit/data/functions/statistical/fods/geomean.fods": "e1ea90746c30831b31feb924412daf8a502706e21169787b17ccd4669fab13aa",
+    "sc/qa/unit/data/functions/statistical/fods/harmean.fods": "6e3c9e8139921fc58bce61adf60067683f1db8af5d0e190ba71e318ce4979ad5",
+    "sc/qa/unit/data/functions/statistical/fods/kurt.fods": "30b2def4fb132339b241cc60200a8750e88d7f73e65aa5acbf0d8d70ce3e23af",
+    "sc/qa/unit/data/functions/statistical/fods/skew.fods": "2474a6cfcd411028bd5e1ff95f8e9d04320508e6f57f3e74fecad8cfdc4dcea9",
+    "sc/qa/unit/data/functions/statistical/fods/skewp.fods": "adb5044d615e8a96b96b5c407bdffc5066f70d60e572f645c1a5beb61ead1df5"
+  },
+  "source_staging": "Receipt inputs were assembled in a temporary tree from exact raw GitHub files at the pinned commit; the repository auxiliary checkout was not assumed to be pinned.",
+  "byte_comparison": "Each staged input was SHA-256 checked against the exact raw GitHub file at commit before extraction.",
+  "selected_observations": 39,
+  "selected_functions": [
+    "AVEDEV",
+    "DEVSQ",
+    "GEOMEAN",
+    "HARMEAN",
+    "KURT",
+    "SKEW",
+    "SKEWP"
+  ],
+  "selected_modes": [
+    "scalar",
+    "matrix"
+  ],
+  "excluded_profile_variances": [
+    {
+      "function": "AVEDEV",
+      "source": "sc/qa/unit/data/functions/statistical/fods/avedev.fods",
+      "sheet": "Sheet2",
+      "row": 5,
+      "column": 1,
+      "formula": "of:=AVEDEV([.I1:.I7])",
+      "cached": "1.02040816326531",
+      "kind": "formula_closure",
+      "reason": "The reference range contains formula-generated values; the cached result is excluded rather than importing formulas."
+    },
+    {
+      "function": "DEVSQ",
+      "source": "sc/qa/unit/data/functions/statistical/fods/devsq.fods",
+      "sheet": "Sheet2",
+      "row": 4,
+      "column": 1,
+      "formula": "of:=DEVSQ([.I2:.I4]~[.I5:.I8])",
+      "cached": "48",
+      "kind": "multi_area_reference",
+      "reason": "The multi-area union is outside this bounded literal-closure extractor."
+    },
+    {
+      "function": "GEOMEAN",
+      "source": "sc/qa/unit/data/functions/statistical/fods/geomean.fods",
+      "sheet": "Sheet2",
+      "row": 6,
+      "column": 1,
+      "formula": "of:=GEOMEAN(sl_j;sl_i)",
+      "cached": "10",
+      "kind": "named_range_unmaterialized",
+      "reason": "Named ranges have no bounded literal closure in the FODS table."
+    },
+    {
+      "function": "KURT",
+      "source": "sc/qa/unit/data/functions/statistical/fods/kurt.fods",
+      "sheet": "Sheet2",
+      "row": 6,
+      "column": 1,
+      "formula": "of:=KURT(sl_j;sl_i)",
+      "cached": "10",
+      "kind": "named_range_unmaterialized",
+      "reason": "Named ranges have no bounded literal closure in the FODS table."
+    },
+    {
+      "function": "KURT",
+      "source": "sc/qa/unit/data/functions/statistical/fods/kurt.fods",
+      "sheet": "Sheet2",
+      "row": 8,
+      "column": 1,
+      "formula": "of:=KURT([.R2:.R101];[.Q2:.Q101])",
+      "cached": "-1.23230908225714",
+      "kind": "formula_closure",
+      "reason": "The large regression closure contains formula-generated values and is excluded from the literal receipt."
+    }
+  ],
+  "coverage_notes": {
+    "source_format": "All selected sources are upstream FODS fixtures; no conversion tool or recalculation step is used.",
+    "closure": "Each selected reference closure contains only literal number, logical, text, or empty cells. Formula cells, dates, named ranges, and nested formula dependencies remain explicit exclusions.",
+    "cache": "The retained cached value is used only as an upstream observation. The Rust test reconstructs the literal closure and evaluates the formula in both scalar and matrix modes.",
+    "profile": "Host-specific date/error coercions and unsupported named-range or nested-expression behavior are not silently promoted to the evaluator contract."
+  }
+}

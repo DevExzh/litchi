@@ -10,12 +10,19 @@ license = "Apache-2.0"
 cargo-fuzz = true
 
 [dependencies]
-libfuzzer-sys = "0.4"
-litchi-core = { path = "..", features = ["odf"] }
+libfuzzer-sys = "0.4.13"
+litchi-core = { path = ".." }
 
 [[bin]]
 name = "detect_format"
 path = "fuzz_targets/detect_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "selector_grammar"
+path = "fuzz_targets/selector_grammar.rs"
 test = false
 doc = false
 bench = false

@@ -1,0 +1,50 @@
+[package]
+name        = "litchi-doc"
+description = "Strictly typed reader and writer for legacy Microsoft Word (.doc) documents."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Converts equations to LaTeX through `litchi-equation`, and makes the
+# content of new or replaced equations from LaTeX, OMML or MTEF
+# (`EquationContent::from_latex`, `from_omml`, `from_mtef`). That renders the
+# preview picture Word shows for each equation, so this feature also turns on
+# the renderer (`litchi-equation/render`, which embeds about 1.9 MB of fonts).
+equation = ["dep:litchi-equation", "litchi-equation/render"]
+# Runtime-neutral phase callbacks for reproducible open/commit profiling.
+performance-diagnostics = ["litchi-ole-common/performance-diagnostics"]
+
+[dependencies]
+bitflags          = { workspace = true }
+bumpalo           = { workspace = true }
+encoding_rs       = { workspace = true }
+litchi-cfb        = { workspace = true }
+litchi-codepage   = { workspace = true }
+litchi-core       = { workspace = true }
+litchi-crypto     = { workspace = true }
+litchi-equation   = { workspace = true, optional = true }
+litchi-odraw      = { workspace = true }
+litchi-ole-common = { workspace = true }
+litchi-sign       = { workspace = true }
+litchi-vba        = { workspace = true }
+rand              = { workspace = true }
+serde_json        = { workspace = true }
+smallvec          = { workspace = true }
+subtle            = { workspace = true }
+thiserror          = { workspace = true }
+zerocopy           = { workspace = true }
+zeroize            = { workspace = true }
+
+[dev-dependencies]
+chrono = { workspace = true }
+flate2 = { workspace = true }
+sha2 = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

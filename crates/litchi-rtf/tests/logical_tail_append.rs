@@ -1,0 +1,1319 @@
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
+    Limits as CoreLimits, Resource,
+};
+use litchi_rtf::tail_append::{
+    DurableTailAppendPatch, EditOptions, Error, LimitKind, PlainParagraph, PlainRun,
+    SemanticLimits, TailAppendOutputProgress, TailAppendPublicationError,
+    TailAppendPublicationLimits, TailSelector,
+};
+use litchi_rtf::{OpenOptions, Package, SourceLimits};
+use std::io::{self, Write};
+use std::num::{NonZeroU64, NonZeroUsize};
+
+fn patch_limits() -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap()
+}
+
+fn retained_bytes(document: &Package) -> Vec<u8> {
+    let commit = document
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .expect("empty append should be valid for this source");
+    let mut output = Vec::new();
+    commit
+        .write_to(&mut output, patch_limits())
+        .expect("in-memory sink should accept the retained source");
+    output
+}
+
+fn publication_context(
+    memory: u64,
+    input: u64,
+    output: u64,
+    work: u64,
+) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "rtf-tail-publication-test",
+        CoreLimits::new(memory, input, output, 1_000_000, 64, work),
+    );
+    let (source, token) = CancellationSource::pair();
+    let execution = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(64 * 1024).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), token, execution);
+    (budget, source, context)
+}
+
+struct PublicationSink {
+    output: Vec<u8>,
+    max_accept: usize,
+    fail_after: Option<usize>,
+    interrupted: usize,
+    zero: bool,
+    excess: bool,
+    cancel_after_write: Option<CancellationSource>,
+    writes: usize,
+    largest: usize,
+    flush_error: bool,
+}
+
+impl PublicationSink {
+    fn accepting(max_accept: usize) -> Self {
+        Self {
+            output: Vec::new(),
+            max_accept,
+            fail_after: None,
+            interrupted: 0,
+            zero: false,
+            excess: false,
+            cancel_after_write: None,
+            writes: 0,
+            largest: 0,
+            flush_error: false,
+        }
+    }
+}
+
+impl Write for PublicationSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        self.writes = self.writes.saturating_add(1);
+        self.largest = self.largest.max(bytes.len());
+        if self.excess {
+            return Ok(bytes.len().saturating_add(1));
+        }
+        if self.zero {
+            return Ok(0);
+        }
+        if self.interrupted != 0 {
+            self.interrupted -= 1;
+            return Err(io::Error::new(io::ErrorKind::Interrupted, "retry"));
+        }
+        if self
+            .fail_after
+            .is_some_and(|limit| self.output.len() >= limit)
+        {
+            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "partial"));
+        }
+        let count = bytes.len().min(self.max_accept);
+        self.output.extend_from_slice(&bytes[..count]);
+        if let Some(source) = self.cancel_after_write.take() {
+            source.cancel();
+        }
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        if self.flush_error {
+            Err(io::Error::new(io::ErrorKind::BrokenPipe, "flush"))
+        } else {
+            Ok(())
+        }
+    }
+}
+
+fn changed_publication_plan(
+    source: &Package,
+    text: &str,
+    limits: SemanticLimits,
+    publication_limits: TailAppendPublicationLimits,
+) -> litchi_rtf::tail_append::TailAppendPublicationPlan {
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits),
+    );
+    edit.append_text_paragraphs(&[text]).unwrap();
+    edit.publication_plan(publication_limits).unwrap()
+}
+
+fn replace_once(mut bytes: Vec<u8>, from: &[u8], to: &[u8]) -> Vec<u8> {
+    assert_eq!(from.len(), to.len());
+    let start = bytes
+        .windows(from.len())
+        .position(|window| window == from)
+        .expect("test wire field should be present");
+    bytes
+        .get_mut(start..start + from.len())
+        .expect("test wire field span should be valid")
+        .copy_from_slice(to);
+    bytes
+}
+
+fn uppercase_after_digest(mut bytes: Vec<u8>) -> Vec<u8> {
+    let marker = br#""after":""#;
+    let marker_start = bytes
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .expect("after digest field should be present");
+    let digest_start = marker_start + marker.len();
+    let digest_end = digest_start + 64;
+    let digest = bytes
+        .get_mut(digest_start..digest_end)
+        .expect("after digest span should be valid");
+    let byte = digest
+        .iter_mut()
+        .find(|byte| matches!(**byte, b'a'..=b'f'))
+        .expect("SHA-256 test digest should contain a letter");
+    *byte = byte.to_ascii_uppercase();
+    bytes
+}
+
+fn mutate_numeric_field(mut bytes: Vec<u8>, field: &[u8]) -> Vec<u8> {
+    let marker = std::iter::once(b'"')
+        .chain(field.iter().copied())
+        .collect::<Vec<_>>();
+    let start = bytes
+        .windows(marker.len())
+        .position(|window| window == marker)
+        .expect("numeric field should be present")
+        + marker.len();
+    let end = bytes
+        .get(start..)
+        .and_then(|tail| tail.iter().position(|byte| *byte == b',' || *byte == b'}'))
+        .map(|offset| start + offset)
+        .expect("numeric field should have a delimiter");
+    let digit = bytes
+        .get_mut(start..end)
+        .and_then(|digits| digits.last_mut())
+        .expect("numeric field should contain a digit");
+    *digit = if *digit == b'9' {
+        b'8'
+    } else {
+        digit.saturating_add(1)
+    };
+    bytes
+}
+
+#[test]
+fn empty_append_is_an_exact_noop_and_shares_snapshot() {
+    let source = Package::parse("{\\rtf1\\ansi  A\\par B}\n").unwrap();
+    let exact = retained_bytes(&source);
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&[]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.package().same_snapshot(&source));
+    assert_eq!(retained_bytes(commit.package()), exact);
+    assert_eq!(commit.diagnostics().inserted_bytes(), 0);
+
+    let mut empty_runs = source.edit_tail_append(TailSelector::Body);
+    empty_runs.append_runs(&[]).unwrap();
+    let empty_run_commit = empty_runs.commit().unwrap();
+    assert!(!empty_run_commit.diagnostics().changed());
+    assert!(empty_run_commit.package().same_snapshot(&source));
+
+    let durable = commit.patch().to_durable(patch_limits()).unwrap();
+    let durable_inverse = durable.inverse();
+    let durable_inverse_json = durable_inverse.to_deterministic_json().unwrap();
+    let durable_inverse =
+        DurableTailAppendPatch::from_deterministic_json(&durable_inverse_json, patch_limits())
+            .unwrap();
+    let restored = durable_inverse.apply(&source).unwrap();
+    assert!(restored.same_snapshot(&source));
+}
+
+#[test]
+fn appends_plain_paragraphs_before_the_exact_root_close() {
+    let source_bytes = b"{\\rtf1\\ansi  A\\par {\\b B}\\par C} \r\n";
+    let source = Package::from_bytes(source_bytes).unwrap();
+    let first = [PlainRun::new("D"), PlainRun::new(" + E")];
+    let second = [PlainRun::new("F{G}\\H\tI")];
+    let paragraphs = [PlainParagraph::new(&first), PlainParagraph::new(&second)];
+
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(patch_limits()),
+    );
+    edit.append_paragraphs(&paragraphs).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    commit.write_to(&mut output, patch_limits()).unwrap();
+
+    assert_eq!(commit.package().text(), " A\nB\nC\nD + E\nF{G}\\H\tI\n");
+    assert!(output.starts_with(br"{\rtf1\ansi  A\par {\b B}\par C"));
+    assert!(output.ends_with(b"} \r\n"));
+    assert!(
+        output
+            .windows(br"{\b B}".len())
+            .any(|window| window == br"{\b B}")
+    );
+    assert!(
+        output
+            .windows(b"\\plain".len())
+            .any(|window| window == b"\\plain")
+    );
+    assert_eq!(commit.diagnostics().paragraphs(), 2);
+    assert_eq!(commit.diagnostics().runs(), 3);
+}
+
+#[test]
+fn appending_after_an_existing_paragraph_break_does_not_add_an_empty_paragraph() {
+    let source = Package::parse(r"{\rtf1\ansi A\par }").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().text(), "A\nB\n");
+    assert_eq!(commit.package().paragraph_count(), 2);
+}
+
+#[test]
+fn unicode_appends_reset_the_source_unicode_fallback_state_locally() {
+    let source = Package::parse(r"{\rtf1\ansi\uc0 A}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["é😀"]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().text(), "A\né😀\n");
+}
+
+#[test]
+fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
+    let source = Package::parse(r"{\rtf1\ansi Before}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["After"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch();
+
+    let applied = source.apply_tail_append(patch).unwrap().into_package();
+    assert_eq!(retained_bytes(&applied), retained_bytes(commit.package()));
+    let restored = applied
+        .apply_tail_append(&patch.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(retained_bytes(&restored), retained_bytes(&source));
+
+    let durable = patch.to_durable(patch_limits()).unwrap();
+    let encoded = durable.to_deterministic_json().unwrap();
+    let decoded =
+        DurableTailAppendPatch::from_deterministic_json(&encoded, patch_limits()).unwrap();
+    assert_eq!(decoded.to_deterministic_json().unwrap(), encoded);
+    let durable_applied = decoded.apply(&source).unwrap();
+    assert_eq!(
+        retained_bytes(&durable_applied),
+        retained_bytes(commit.package())
+    );
+    let inverse = decoded.inverse();
+    let inverse_encoded = inverse.to_deterministic_json().unwrap();
+    let inverse_decoded =
+        DurableTailAppendPatch::from_deterministic_json(&inverse_encoded, patch_limits()).unwrap();
+    let durable_restored = inverse_decoded.apply(&durable_applied).unwrap();
+    assert_eq!(retained_bytes(&durable_restored), retained_bytes(&source));
+
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
+    assert!(matches!(
+        foreign.apply_tail_append(patch),
+        Err(Error::PatchConflict)
+    ));
+}
+
+#[test]
+fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
+    let source = Package::parse(r"{\rtf1\ansi Before} ").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["After"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch();
+    let durable = patch.to_durable(patch_limits()).unwrap();
+    let encoded = durable.to_deterministic_json().unwrap();
+
+    let uppercase = uppercase_after_digest(encoded.clone());
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(&uppercase, patch_limits()),
+        Err(Error::DurablePatch(_))
+    ));
+
+    let forged_sizes = mutate_numeric_field(encoded.clone(), b"after_bytes\":");
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(&forged_sizes, patch_limits()),
+        Err(Error::DurablePatch(_))
+    ));
+
+    let no_op = source
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(patch_limits())
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let forged_no_op = replace_once(
+        no_op,
+        br#""direction":"append""#,
+        br#""direction":"remove""#,
+    );
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(&forged_no_op, patch_limits()),
+        Err(Error::DurablePatch(_))
+    ));
+
+    let tiny_output = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(1)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(&encoded, tiny_output),
+        Err(Error::Limit {
+            kind: LimitKind::PatchOffset | LimitKind::OutputBytes,
+            ..
+        })
+    ));
+
+    let too_small_patch = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(encoded.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        patch.to_durable(too_small_patch),
+        Err(Error::Limit {
+            kind: LimitKind::PatchBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn durable_remove_checks_output_bound_before_publish_and_noop_proof() {
+    let source = Package::parse(r"{\rtf1\ansi Before} ").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["After"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let inverse = commit.patch().inverse();
+    let encoded = inverse
+        .to_durable(patch_limits())
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let low_output = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(retained_bytes(&source).len() - 1)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(&encoded, low_output),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            ..
+        })
+    ));
+
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let protected_noop = protected
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(patch_limits())
+        .unwrap()
+        .to_deterministic_json()
+        .unwrap();
+    let protected_noop =
+        DurableTailAppendPatch::from_deterministic_json(&protected_noop, patch_limits()).unwrap();
+    assert!(matches!(
+        protected_noop.apply(&protected),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
+    ));
+}
+
+#[test]
+fn durable_append_checks_source_limit_before_reserve() {
+    let source_bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(source_bytes).unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let durable = commit.patch().to_durable(patch_limits()).unwrap();
+    let encoded = durable.to_deterministic_json().unwrap();
+    let strict_limits = SourceLimits::builder()
+        .max_input_bytes(source_bytes.len())
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let strict_source = Package::from_bytes_with_options(
+        source_bytes,
+        OpenOptions::new().source_limits(strict_limits),
+    )
+    .unwrap();
+    let decoded =
+        DurableTailAppendPatch::from_deterministic_json(&encoded, patch_limits()).unwrap();
+    assert!(matches!(
+        decoded.apply(&strict_source),
+        Err(Error::Limit {
+            kind: LimitKind::SourceBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn staging_and_commit_limits_fail_atomically() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let limits = SemanticLimits::builder()
+        .max_paragraphs(1)
+        .unwrap()
+        .max_runs(1)
+        .unwrap()
+        .max_input_bytes(2)
+        .unwrap()
+        .max_inserted_bytes(4)
+        .unwrap()
+        .max_output_bytes(128)
+        .unwrap()
+        .max_patch_bytes(256)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits),
+    );
+    let runs = [PlainRun::new("a"), PlainRun::new("b")];
+    let paragraphs = [PlainParagraph::new(&runs)];
+    assert!(matches!(
+        edit.append_paragraphs(&paragraphs),
+        Err(Error::Limit {
+            kind: LimitKind::Runs,
+            observed: 2,
+            maximum: 1
+        })
+    ));
+    assert_eq!(edit.paragraph_count(), 0);
+    edit.append_text_paragraphs(&["ab"]).unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: LimitKind::InsertedBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
+    let active = Package::parse(
+        r#"{\rtf1\ansi {\field{\*\fldinst INCLUDETEXT "file:///tmp/x"}{\fldrslt x}}}"#,
+    )
+    .unwrap();
+    let mut active_edit = active.edit_tail_append(TailSelector::Body);
+    active_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        active_edit.commit(),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+
+    let opaque = Package::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
+    let mut opaque_edit = opaque.edit_tail_append(TailSelector::Body);
+    opaque_edit.append_text_paragraphs(&["x"]).unwrap();
+    let opaque_commit = opaque_edit.commit().unwrap();
+    let mut opaque_output = Vec::new();
+    opaque_commit
+        .write_to(&mut opaque_output, patch_limits())
+        .unwrap();
+    assert!(
+        opaque_output
+            .windows(br"\future42".len())
+            .any(|window| window == br"\future42")
+    );
+    assert_eq!(opaque_commit.package().text(), "AB\nx\n");
+
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let mut protected_edit = protected.edit_tail_append(TailSelector::Body);
+    protected_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        protected_edit.commit(),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
+    ));
+
+    let compressed = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi A}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
+    let compressed = Package::from_bytes(&compressed).unwrap();
+    let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
+    compressed_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        compressed_edit.commit(),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+
+    let binary = Package::parse(r"{\rtf1\ansi {\pict\pngblip\bin1 X} A}");
+    if let Ok(binary) = binary {
+        let mut binary_edit = binary.edit_tail_append(TailSelector::Body);
+        binary_edit.append_text_paragraphs(&["x"]).unwrap();
+        assert!(matches!(
+            binary_edit.commit(),
+            Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+        ));
+    }
+}
+
+#[test]
+fn malformed_durable_envelopes_and_plain_text_controls_refuse() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    assert!(matches!(
+        edit.append_text_paragraphs(&["bad\ntext"]),
+        Err(Error::InvalidText(_))
+    ));
+    assert_eq!(edit.paragraph_count(), 0);
+
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(b"{}", patch_limits()),
+        Err(Error::DurablePatch(_))
+    ));
+    let limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(4)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        DurableTailAppendPatch::from_deterministic_json(br#"{"x":1}"#, limits),
+        Err(Error::Limit {
+            kind: LimitKind::PatchBytes,
+            ..
+        })
+    ));
+}
+
+struct PartialSink {
+    remaining: usize,
+    accepted: usize,
+}
+
+impl Write for PartialSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.remaining == 0 {
+            return Err(io::Error::new(io::ErrorKind::BrokenPipe, "test sink"));
+        }
+        let count = bytes.len().min(self.remaining).min(3);
+        self.remaining -= count;
+        self.accepted += count;
+        Ok(count)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+#[test]
+fn sequential_sink_reports_partial_progress() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let mut sink = PartialSink {
+        remaining: 7,
+        accepted: 0,
+    };
+    let error = commit.write_to(&mut sink, patch_limits()).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Sink {
+            kind: io::ErrorKind::BrokenPipe,
+            written: 7
+        }
+    ));
+    assert_eq!(sink.accepted, 7);
+}
+
+#[test]
+fn publication_plan_emits_exact_reopenable_bytes_with_hard_windows() {
+    let source = Package::from_bytes(b"{\\rtf1\\ansi A\\par {\\b B}} \r\n").unwrap();
+    let publication_limits = TailAppendPublicationLimits::new(5, 3);
+    let plan = changed_publication_plan(&source, "C{D}\\E", patch_limits(), publication_limits);
+
+    let mut semantic_edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(patch_limits()),
+    );
+    semantic_edit.append_text_paragraphs(&["C{D}\\E"]).unwrap();
+    let semantic_commit = semantic_edit.commit().unwrap();
+    let mut expected = Vec::new();
+    semantic_commit
+        .write_to(&mut expected, patch_limits())
+        .unwrap();
+
+    let (_budget, _cancellation, context) = publication_context(
+        16 * 1024,
+        expected.len() as u64,
+        expected.len() as u64,
+        expected.len() as u64,
+    );
+    let mut sink = PublicationSink::accepting(2);
+    let report = plan.write_to(&mut sink, &context).unwrap();
+    assert_eq!(sink.output, expected);
+    assert_eq!(report.bytes(), expected.len());
+    assert_eq!(report.source_bytes(), retained_bytes(&source).len());
+    assert_eq!(report.inserted_bytes(), plan.inserted_bytes());
+    assert_eq!(report.largest_write(), 3);
+    assert!(sink.largest <= 3);
+    let reopened = Package::from_bytes(&sink.output).unwrap();
+    assert_eq!(reopened.text(), "A\nB\nC{D}\\E\n");
+}
+
+#[test]
+fn publication_plan_noop_preserves_source_identity_and_bytes() {
+    let source = Package::from_bytes(br"{\rtf1\ansi A B}").unwrap();
+    let plan = source
+        .edit_tail_append(TailSelector::Body)
+        .publication_plan(TailAppendPublicationLimits::new(4, 2))
+        .unwrap();
+    assert!(plan.is_noop());
+    assert!(plan.source().same_snapshot(&source));
+    let (_budget, _cancellation, context) = publication_context(
+        16 * 1024,
+        retained_bytes(&source).len() as u64,
+        retained_bytes(&source).len() as u64,
+        retained_bytes(&source).len() as u64,
+    );
+    let mut sink = PublicationSink::accepting(1);
+    let report = plan.write_to(&mut sink, &context).unwrap();
+    assert_eq!(sink.output, retained_bytes(&source));
+    assert_eq!(report.inserted_bytes(), 0);
+    assert_eq!(report.bytes(), sink.output.len());
+    assert_eq!(report.largest_write(), 2);
+}
+
+#[test]
+fn context_aware_publication_planning_reserves_before_encoding() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let publication_limits = TailAppendPublicationLimits::new(4, 3);
+
+    let (_budget, _cancellation, context) = publication_context(0, 4096, 4096, 4096);
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let error = edit
+        .publication_plan_with_context(publication_limits, &context)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+
+    let (budget, _cancellation, context) = publication_context(4096, 4096, 4096, 4096);
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let plan = edit
+        .publication_plan_with_context(publication_limits, &context)
+        .unwrap();
+    assert!(budget.used(Resource::Memory) >= plan.inserted_bytes() as u64);
+    let mut sink = PublicationSink::accepting(2);
+    plan.write_to(&mut sink, &context).unwrap();
+    assert!(budget.used(Resource::Memory) > 0);
+    drop(plan);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn publication_plan_rejects_foreign_source_before_output() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(8, 4),
+    );
+    let foreign = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut sink = PublicationSink::accepting(4);
+    let error = plan
+        .write_to_source(&foreign, &mut sink, &context)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        TailAppendPublicationError::SourceVersionChanged { .. }
+    ));
+    assert!(sink.output.is_empty());
+}
+
+#[test]
+fn publication_plan_refuses_active_protected_and_compressed_sources_before_output() {
+    let active = Package::parse(
+        r#"{\rtf1\ansi {\field{\*\fldinst INCLUDETEXT "file:///tmp/x"}{\fldrslt x}}}"#,
+    )
+    .unwrap();
+    let mut active_edit = active.edit_tail_append(TailSelector::Body);
+    active_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        active_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
+    let mut protected_edit = protected.edit_tail_append(TailSelector::Body);
+    protected_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        protected_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::Protected
+    ));
+
+    let compressed = litchi_rtf::transport::compress(
+        br"{\rtf1\ansi A}",
+        true,
+        litchi_rtf::transport::CompressionLimits::default(),
+    )
+    .unwrap();
+    let compressed = Package::from_bytes(&compressed).unwrap();
+    let mut compressed_edit = compressed.edit_tail_append(TailSelector::Body);
+    compressed_edit.append_text_paragraphs(&["x"]).unwrap();
+    assert!(matches!(
+        compressed_edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Refused(refusal)) if refusal.kind() == litchi_core::edit::RefusalKind::UnsupportedContent
+    ));
+}
+
+#[test]
+fn publication_plan_reports_partial_zero_interrupted_and_excess_sinks() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(4, 3),
+    );
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut partial = PublicationSink::accepting(2);
+    partial.fail_after = Some(7);
+    let error = plan.write_to(&mut partial, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::Prefix { accepted, expected })
+            if accepted > 0 && accepted < expected
+    ));
+    assert!(error.written() > 0);
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut zero = PublicationSink::accepting(2);
+    zero.zero = true;
+    let error = plan.write_to(&mut zero, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Sink {
+            kind: io::ErrorKind::WriteZero,
+            written: 0,
+            ..
+        }
+    ));
+    assert!(error.progress().is_none());
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut interrupted = PublicationSink::accepting(2);
+    interrupted.interrupted = 3;
+    let report = plan.write_to(&mut interrupted, &context).unwrap();
+    assert_eq!(report.bytes(), interrupted.output.len());
+    assert_eq!(interrupted.output.len(), plan.output_bytes());
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut flush_failure = PublicationSink::accepting(2);
+    flush_failure.flush_error = true;
+    let error = plan.write_to(&mut flush_failure, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::CompleteUnflushed { bytes })
+            if bytes == plan.output_bytes() as u64
+    ));
+
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut excess = PublicationSink::accepting(2);
+    excess.excess = true;
+    let error = plan.write_to(&mut excess, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::Indeterminate { accepted_before: 0 })
+    ));
+    assert!(excess.output.is_empty());
+}
+
+#[test]
+fn publication_plan_checks_cancellation_and_all_resource_dimensions() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(4, 3),
+    );
+    let expected = plan.output_bytes() as u64;
+
+    let (_budget, cancellation, context) =
+        publication_context(16 * 1024, expected, expected, expected);
+    cancellation.cancel();
+    let mut before = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut before, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::Cancelled,
+            written: 0
+        }
+    ));
+    assert!(before.output.is_empty());
+
+    let (_budget, cancellation, context) =
+        publication_context(16 * 1024, expected, expected, expected);
+    let mut during = PublicationSink::accepting(2);
+    during.cancel_after_write = Some(cancellation);
+    let error = plan.write_to(&mut during, &context).unwrap_err();
+    assert!(matches!(
+        error.progress(),
+        Some(TailAppendOutputProgress::Prefix { accepted, expected: total })
+            if accepted > 0 && total == expected
+    ));
+
+    let (_budget, _cancellation, context) = publication_context(0, expected, expected, expected);
+    let mut memory = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut memory, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(memory.output.is_empty());
+
+    let (_budget, _cancellation, context) =
+        publication_context(16 * 1024, expected - 1, expected, expected);
+    let mut input = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut input, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(input.output.is_empty());
+
+    let (_budget, _cancellation, context) =
+        publication_context(16 * 1024, expected, expected - 1, expected);
+    let mut output = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut output, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(output.output.is_empty());
+
+    let (_budget, _cancellation, context) =
+        publication_context(16 * 1024, expected, expected, expected - 1);
+    let mut work = PublicationSink::accepting(2);
+    let error = plan.write_to(&mut work, &context).unwrap_err();
+    assert!(matches!(
+        &error,
+        TailAppendPublicationError::Execution {
+            error: ExecutionError::ResourceLimit(_),
+            written: 0
+        }
+    ));
+    assert!(work.output.is_empty());
+}
+
+#[test]
+fn publication_plan_enforces_exact_and_over_output_bounds() {
+    let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
+    let broad = changed_publication_plan(
+        &source,
+        "B",
+        patch_limits(),
+        TailAppendPublicationLimits::new(8, 4),
+    );
+    let exact_output = broad.output_bytes();
+    let exact_limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(exact_output)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let exact = changed_publication_plan(
+        &source,
+        "B",
+        exact_limits,
+        TailAppendPublicationLimits::new(8, 4),
+    );
+    let (_budget, _cancellation, context) = publication_context(
+        16 * 1024,
+        exact_output as u64,
+        exact_output as u64,
+        exact_output as u64,
+    );
+    let mut sink = PublicationSink::accepting(4);
+    assert_eq!(
+        exact.write_to(&mut sink, &context).unwrap().bytes(),
+        exact_output
+    );
+
+    let over_limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(exact_output.saturating_sub(1))
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(over_limits),
+    );
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    assert!(matches!(
+        edit.publication_plan(TailAppendPublicationLimits::new(8, 4)),
+        Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn publication_plan_preserves_unknown_source_bytes_and_semantic_closure() {
+    let source = Package::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
+    let plan = changed_publication_plan(
+        &source,
+        "C",
+        patch_limits(),
+        TailAppendPublicationLimits::new(4, 3),
+    );
+    let (_budget, _cancellation, context) = publication_context(16 * 1024, 4096, 4096, 4096);
+    let mut sink = PublicationSink::accepting(2);
+    plan.write_to(&mut sink, &context).unwrap();
+    assert!(
+        sink.output
+            .windows(br"\future42".len())
+            .any(|window| window == br"\future42")
+    );
+    let reopened = Package::from_bytes(&sink.output).unwrap();
+    assert_eq!(reopened.text(), "AB\nC\n");
+}
+
+#[test]
+fn native_replay_preserves_recipient_policy_and_noop_identity() {
+    let bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(bytes).unwrap();
+    let options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
+    let noop = source
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap();
+    assert!(noop.patch().is_noop());
+    assert!(
+        recipient
+            .apply_tail_append(noop.patch())
+            .unwrap()
+            .into_package()
+            .same_snapshot(&recipient)
+    );
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["additional text"]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_noop());
+    assert!(matches!(
+        recipient.apply_tail_append(commit.patch()),
+        Err(Error::Rtf(litchi_rtf::Error::Limit {
+            kind: litchi_rtf::SourceLimitKind::InputBytes,
+            ..
+        }))
+    ));
+    assert_eq!(recipient.open_options(), options);
+    assert_eq!(recipient.to_bytes().unwrap(), bytes);
+
+    let (package, patch) = commit.into_parts();
+    assert_eq!(
+        source
+            .apply_tail_append(&patch)
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        package.to_bytes().unwrap()
+    );
+    assert_eq!(
+        package
+            .apply_tail_append(&patch.inverse())
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
+    assert!(
+        source
+            .edit_tail_append(TailSelector::Body)
+            .commit()
+            .unwrap()
+            .into_package()
+            .same_snapshot(&source)
+    );
+}
+
+#[test]
+fn native_replay_retains_distinct_admitting_recipient_profile() {
+    let bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(bytes).unwrap();
+    let options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(4096)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let applied = recipient
+        .apply_tail_append(commit.patch())
+        .unwrap()
+        .into_package();
+    assert_eq!(applied.open_options(), options);
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = applied
+        .apply_tail_append(&commit.patch().inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.open_options(), options);
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn replay_commit_diagnostics_measure_forward_inverse_and_noop_output() {
+    let source_bytes = br"{\rtf1\ansi A\par}";
+    let source = Package::from_bytes(source_bytes).unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let original = edit.commit().unwrap();
+    let forward = source.apply_tail_append(original.patch()).unwrap();
+    let output_bytes = forward.package().to_bytes().unwrap();
+    let facts = forward.diagnostics();
+    assert!(facts.changed());
+    assert_eq!(facts.source_bytes(), source_bytes.len());
+    assert_eq!(facts.output_bytes(), output_bytes.len());
+    assert_eq!(
+        facts.inserted_bytes(),
+        output_bytes.len() - source_bytes.len()
+    );
+
+    let inverse = forward
+        .package()
+        .apply_tail_append(&forward.patch().inverse())
+        .unwrap();
+    let facts = inverse.diagnostics();
+    assert!(facts.changed());
+    assert_eq!(facts.source_bytes(), output_bytes.len());
+    assert_eq!(facts.output_bytes(), source_bytes.len());
+    assert_eq!(facts.inserted_bytes(), 0, "inverse replay removes bytes");
+    assert_eq!(inverse.package().to_bytes().unwrap(), source_bytes);
+
+    let no_op = source
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap();
+    let replayed_no_op = source.apply_tail_append(no_op.patch()).unwrap();
+    let facts = replayed_no_op.diagnostics();
+    assert!(!facts.changed());
+    assert_eq!(facts.operation_count(), 0);
+    assert_eq!(facts.source_bytes(), source_bytes.len());
+    assert_eq!(facts.output_bytes(), source_bytes.len());
+    assert_eq!(facts.inserted_bytes(), 0);
+    assert!(replayed_no_op.package().same_snapshot(&source));
+}
+
+fn staged_counts(edit: &litchi_rtf::tail_append::Edit) -> (usize, usize, usize) {
+    (edit.paragraph_count(), edit.run_count(), edit.input_bytes())
+}
+
+fn refusal_text<T>(result: Result<T, Error>) -> String {
+    match result {
+        Ok(_) => "accepted".to_string(),
+        Err(error) => error.to_string(),
+    }
+}
+
+const SECOND_BATCH: &str =
+    "tail_append refused (unsupported_operation): the edit already has a staged batch";
+
+#[test]
+fn an_edit_stages_one_batch_and_empty_appends_leave_it_unstaged() {
+    let source = Package::parse(r"{\rtf1\ansi A\par B}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    assert_eq!(staged_counts(&edit), (0, 0, 0));
+    edit.append_paragraphs(&[]).unwrap();
+    edit.append_text_paragraphs(&[]).unwrap();
+    edit.append_runs(&[]).unwrap();
+    assert_eq!(staged_counts(&edit), (0, 0, 0));
+
+    // A batch refused by preflight leaves the edit unstaged.
+    assert_eq!(
+        refusal_text(edit.append_text_paragraphs(&["ok", "bad\u{0}"])),
+        "invalid RTF logical-tail text: control characters other than tab are not plain text"
+    );
+    assert_eq!(staged_counts(&edit), (0, 0, 0));
+
+    let runs = [PlainRun::new("one"), PlainRun::new("two")];
+    let paragraphs = [PlainParagraph::new(&runs), PlainParagraph::new(&runs[..1])];
+    edit.append_paragraphs(&paragraphs).unwrap();
+    assert_eq!(staged_counts(&edit), (2, 3, 9));
+
+    // Every later staging call is refused, an empty one included, except
+    // an empty run list, which is not a batch.
+    assert_eq!(
+        refusal_text(edit.append_text_paragraphs(&["c"])),
+        SECOND_BATCH
+    );
+    assert_eq!(refusal_text(edit.append_paragraphs(&[])), SECOND_BATCH);
+    assert_eq!(refusal_text(edit.append_text_paragraphs(&[])), SECOND_BATCH);
+    assert_eq!(
+        refusal_text(edit.append_runs(&[PlainRun::new("c")])),
+        SECOND_BATCH
+    );
+    assert_eq!(refusal_text(edit.append_runs(&[])), "accepted");
+    assert_eq!(staged_counts(&edit), (2, 3, 9));
+
+    let commit = edit.commit().unwrap();
+    let diagnostics = commit.diagnostics();
+    assert!(diagnostics.changed());
+    assert_eq!(diagnostics.operation_count(), 1);
+    assert_eq!(
+        (
+            diagnostics.paragraphs(),
+            diagnostics.runs(),
+            diagnostics.input_bytes()
+        ),
+        (2, 3, 9)
+    );
+    assert_eq!(commit.package().text(), "A\nB\nonetwo\none\n");
+}
+
+#[test]
+fn an_unstaged_edit_commits_and_plans_no_batch() {
+    let source = Package::parse(r"{\rtf1\ansi A\par B}").unwrap();
+    let mut edit = source.edit_tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&[]).unwrap();
+    let diagnostics = edit.commit().unwrap().diagnostics();
+    assert!(!diagnostics.changed());
+    assert_eq!(
+        (
+            diagnostics.operation_count(),
+            diagnostics.paragraphs(),
+            diagnostics.runs(),
+            diagnostics.input_bytes(),
+            diagnostics.inserted_bytes()
+        ),
+        (0, 0, 0, 0, 0)
+    );
+
+    let limits = TailAppendPublicationLimits::new(64, 64);
+    let plan = source
+        .edit_tail_append(TailSelector::Body)
+        .publication_plan(limits)
+        .unwrap();
+    assert!(plan.is_noop());
+    assert_eq!(
+        (plan.paragraphs(), plan.runs(), plan.input_bytes()),
+        (0, 0, 0)
+    );
+
+    let mut staged = source.edit_tail_append(TailSelector::Body);
+    staged.append_text_paragraphs(&["xy", "z"]).unwrap();
+    let plan = staged.publication_plan(limits).unwrap();
+    assert!(!plan.is_noop());
+    assert_eq!(
+        (plan.paragraphs(), plan.runs(), plan.input_bytes()),
+        (2, 2, 3)
+    );
+}

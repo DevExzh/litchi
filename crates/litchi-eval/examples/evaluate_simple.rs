@@ -14,9 +14,12 @@
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-use litchi_core::sheet::{
-    Cell, CellIterator, CellValue, Result, RowIterator, WorkbookTrait, Worksheet, WorksheetIterator,
-};
+use litchi_core::edit::RefusalKind;
+use litchi_core::sheet::{Cell, CellValue, Error as SheetError, Result, WorkbookTrait, Worksheet};
+
+/// The refusal for a worksheet the workbook does not have.
+const NO_SUCH_SHEET: SheetError =
+    SheetError::refused(RefusalKind::NotFound, "worksheet", "no such worksheet");
 use litchi_eval::FormulaEvaluator;
 
 // ---------------------------------------------------------------------------
@@ -117,32 +120,17 @@ fn column_letter(mut col: u32) -> String {
     String::from_utf8(buf).unwrap_or_default()
 }
 
-// --- empty iterators -------------------------------------------------------
-
-struct EmptyCellIter;
-impl<'a> CellIterator<'a> for EmptyCellIter {
-    fn next(&mut self) -> Option<Result<Box<dyn Cell + 'a>>> {
-        None
-    }
-}
-
-struct EmptyRowIter;
-impl<'a> RowIterator<'a> for EmptyRowIter {
-    fn next(&mut self) -> Option<Result<Cow<'a, [CellValue]>>> {
-        None
-    }
-}
-
-struct EmptyWorksheetIter;
-impl<'a> WorksheetIterator<'a> for EmptyWorksheetIter {
-    fn next(&mut self) -> Option<Result<Box<dyn Worksheet + 'a>>> {
-        None
-    }
-}
-
 // --- Worksheet impl --------------------------------------------------------
+//
+// The traits dispatch statically: the worksheet names its cell and iterator
+// types. This minimal sheet iterates nothing.
 
 impl Worksheet for MemSheet {
+    type Error = SheetError;
+    type Cell<'a> = MemCell<'a>;
+    type Cells<'a> = std::iter::Empty<Result<MemCell<'a>>>;
+    type Rows<'a> = std::iter::Empty<Result<Cow<'a, [CellValue]>>>;
+
     fn name(&self) -> &str {
         &self.name
     }
@@ -159,21 +147,25 @@ impl Worksheet for MemSheet {
         self.dimensions
     }
 
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn Cell + '_>> {
+    fn cell(&self, row: u32, column: u32) -> Result<MemCell<'_>> {
         let value = self.cells.get(&(row, column)).unwrap_or(CellValue::EMPTY);
-        Ok(Box::new(MemCell { row, column, value }))
+        Ok(MemCell { row, column, value })
     }
 
-    fn cell_by_coordinate(&self, _coordinate: &str) -> Result<Box<dyn Cell + '_>> {
-        Err("cell_by_coordinate is not implemented for MemSheet".into())
+    fn cell_by_coordinate(&self, _coordinate: &str) -> Result<MemCell<'_>> {
+        Err(SheetError::refused(
+            RefusalKind::UnsupportedOperation,
+            "cell_by_coordinate",
+            "MemSheet reads cells by row and column",
+        ))
     }
 
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        Box::new(EmptyCellIter)
+    fn cells(&self) -> Self::Cells<'_> {
+        std::iter::empty()
     }
 
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        Box::new(EmptyRowIter)
+    fn rows(&self) -> Self::Rows<'_> {
+        std::iter::empty()
     }
 
     fn row(&self, _row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
@@ -190,9 +182,17 @@ impl Worksheet for MemSheet {
 }
 
 // --- Workbook impl ---------------------------------------------------------
+//
+// Worksheets are lent by reference: `&MemSheet` is a `Worksheet` through the
+// blanket implementation for references.
 
 impl WorkbookTrait for MemWorkbook {
-    fn active_worksheet(&self) -> Result<Box<dyn Worksheet + '_>> {
+    type Error = SheetError;
+    type Worksheet<'a> = &'a MemSheet;
+    type Worksheets<'a> =
+        std::iter::Map<std::slice::Iter<'a, MemSheet>, fn(&'a MemSheet) -> Result<&'a MemSheet>>;
+
+    fn active_worksheet(&self) -> Result<&MemSheet> {
         self.worksheet_by_index(0)
     }
 
@@ -200,25 +200,19 @@ impl WorkbookTrait for MemWorkbook {
         &self.sheet_names
     }
 
-    fn worksheet_by_name(&self, name: &str) -> Result<Box<dyn Worksheet + '_>> {
-        let sheet = self
-            .sheets
+    fn worksheet_by_name(&self, name: &str) -> Result<&MemSheet> {
+        self.sheets
             .iter()
             .find(|s| s.name == name)
-            .ok_or_else(|| format!("worksheet '{name}' not found"))?;
-        Ok(Box::new(SheetRef { inner: sheet }))
+            .ok_or(NO_SUCH_SHEET)
     }
 
-    fn worksheet_by_index(&self, index: usize) -> Result<Box<dyn Worksheet + '_>> {
-        let sheet = self
-            .sheets
-            .get(index)
-            .ok_or_else(|| format!("worksheet index {index} out of range"))?;
-        Ok(Box::new(SheetRef { inner: sheet }))
+    fn worksheet_by_index(&self, index: usize) -> Result<&MemSheet> {
+        self.sheets.get(index).ok_or(NO_SUCH_SHEET)
     }
 
-    fn worksheets(&self) -> Box<dyn WorksheetIterator<'_> + '_> {
-        Box::new(EmptyWorksheetIter)
+    fn worksheets(&self) -> Self::Worksheets<'_> {
+        self.sheets.iter().map(Ok)
     }
 
     fn worksheet_count(&self) -> usize {
@@ -227,54 +221,6 @@ impl WorkbookTrait for MemWorkbook {
 
     fn active_sheet_index(&self) -> usize {
         0
-    }
-}
-
-/// Borrowed wrapper so we can return `Box<dyn Worksheet>` without consuming
-/// the underlying `MemSheet`.
-struct SheetRef<'a> {
-    inner: &'a MemSheet,
-}
-
-impl<'a> Worksheet for SheetRef<'a> {
-    fn name(&self) -> &str {
-        self.inner.name()
-    }
-
-    fn row_count(&self) -> usize {
-        self.inner.row_count()
-    }
-
-    fn column_count(&self) -> usize {
-        self.inner.column_count()
-    }
-
-    fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
-        self.inner.dimensions()
-    }
-
-    fn cell(&self, row: u32, column: u32) -> Result<Box<dyn Cell + '_>> {
-        self.inner.cell(row, column)
-    }
-
-    fn cell_by_coordinate(&self, coordinate: &str) -> Result<Box<dyn Cell + '_>> {
-        self.inner.cell_by_coordinate(coordinate)
-    }
-
-    fn cells(&self) -> Box<dyn CellIterator<'_> + '_> {
-        self.inner.cells()
-    }
-
-    fn rows(&self) -> Box<dyn RowIterator<'_> + '_> {
-        self.inner.rows()
-    }
-
-    fn row(&self, row_idx: usize) -> Result<Cow<'_, [CellValue]>> {
-        self.inner.row(row_idx)
-    }
-
-    fn cell_value(&self, row: u32, column: u32) -> Result<Cow<'_, CellValue>> {
-        self.inner.cell_value(row, column)
     }
 }
 

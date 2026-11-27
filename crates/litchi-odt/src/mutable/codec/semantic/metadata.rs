@@ -1,0 +1,89 @@
+//! Lossless in-content RDFa and `text:meta` operations.
+
+use super::super::super::model::MutableDocument;
+use crate::content_metadata::{self, RdfaAttributes, TextMeta};
+use litchi_core::{Position, Result};
+
+impl MutableDocument {
+    /// Set or clear RDFa on one paragraph while retaining unrelated XML.
+    pub(crate) fn set_paragraph_rdfa(
+        &mut self,
+        position: Position,
+        value: &RdfaAttributes,
+    ) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::set_paragraph_rdfa_with_xml_limits(
+                xml,
+                position,
+                value,
+                self.xml_limits,
+            )
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Set or clear RDFa on a uniquely named bookmark start.
+    pub(crate) fn set_bookmark_rdfa(&mut self, name: &str, value: &RdfaAttributes) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::set_bookmark_rdfa_with_xml_limits(xml, name, value, self.xml_limits)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Set or clear RDFa on one inline `text:meta` occurrence.
+    pub(crate) fn set_text_meta_rdfa(
+        &mut self,
+        position: Position,
+        value: &RdfaAttributes,
+    ) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::set_text_meta_rdfa_with_xml_limits(
+                xml,
+                position,
+                value,
+                self.xml_limits,
+            )
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Insert an inline `text:meta` into a paragraph.
+    pub(crate) fn insert_text_meta(&mut self, paragraph: Position, value: &TextMeta) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::insert_text_meta_with_xml_limits(
+                xml,
+                paragraph,
+                value,
+                self.xml_limits,
+            )
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Replace one inline `text:meta` occurrence.
+    pub(crate) fn replace_text_meta(&mut self, position: Position, value: &TextMeta) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::replace_text_meta_with_xml_limits(
+                xml,
+                position,
+                value,
+                self.xml_limits,
+            )
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+
+    /// Remove one inline `text:meta` occurrence.
+    pub(crate) fn remove_text_meta(&mut self, position: Position) -> Result<()> {
+        let updated = self.with_content_xml(|xml| {
+            content_metadata::remove_text_meta_with_xml_limits(xml, position, self.xml_limits)
+        })?;
+        self.content_xml = Some(updated);
+        Ok(())
+    }
+}

@@ -1,10 +1,16 @@
 # litchi-odf
 
-OpenDocument Format (ODF) reader and writer for `.odt`, `.ods`, and `.odp` files.
+OpenDocument Format (ODF) umbrella for the independently selectable family
+crates covering `.odt`, `.ods`, `.odp`, `.odg`, `.odc`, `.odi`, `.odm`, `.oth`,
+and `.odb` files.
 
 ## Overview
 
-`litchi-odf` parses and produces OpenDocument files conforming to ISO/IEC 26300 (ODF 1.2): text documents (`.odt`), spreadsheets (`.ods`), and presentations (`.odp`). It includes a ZIP-based package layer, XML element model for content / styles / metadata, and high-level types for each document family. Builders and `Mutable*` views are provided for creating and editing files in addition to read-only access.
+`litchi-odf` provides detection and an optional facade over independently
+selectable family crates. For the smallest dependency and memory footprint,
+depend directly on the family crate you need. Each family keeps its API
+contextual and layered: for example, `litchi_odt::Document`,
+`litchi_ods::names::{Definition, Range}`, and `litchi_odp::slide::Slide`.
 
 ## Usage
 
@@ -14,25 +20,44 @@ litchi-odf = "0.0.1"
 ```
 
 ```rust
-use litchi_odf::{Document, Spreadsheet, Presentation};
+use litchi_odf::{odp, ods, odt};
 
-let mut doc = Document::open("document.odt")?;
-let text = doc.text()?;
+// Each family's immutable `Package` owns every state verb; the
+// `Document`, `Workbook` and `Presentation` projections are read-only.
+let package = odt::Package::open("document.odt")?;
+let text = package.document()?.text()?;
 
-let mut sheet = Spreadsheet::open("data.ods")?;
-let csv = sheet.to_csv()?;
+let sheet = ods::Package::open("data.ods")?.workbook()?;
+let names = sheet.sheet_names();
 
-let mut pres = Presentation::open("slides.odp")?;
-let slides = pres.slide_count()?;
+let pres = odp::Package::open("slides.odp")?.presentation()?;
+let slide_values: Vec<odp::slide::Slide> = pres.slides()?;
+let slide_count = pres.slide_count()?;
+
+// Edits stage on a transaction and publish a new package; `save` is an
+// atomic sibling-temporary replacement.
+let mut edit = package.edit();
+edit.replace_paragraph(odt::transaction::Position::new(0), "Updated")?;
+edit.commit()?.package().save("updated.odt")?;
 # Ok::<(), litchi_core::Error>(())
 ```
+
+The umbrella root intentionally exposes only detection and the selected family
+modules. Shared vocabulary and package primitives remain under the separate
+`litchi-odf-common` crate. The default umbrella features are `odt`, `ods`, and
+`odp`; `--no-default-features` enables detection only, while `all` opts into
+every family module.
 
 ## Features
 
 - Read and write ODF text documents (`.odt`) with paragraphs, lists, tables, and styles
 - Read and write ODF spreadsheets (`.ods`) with typed cell values and formulas
 - Read and write ODF presentations (`.odp`) with slides and shapes
-- Metadata extraction (title, author, statistics) for all three formats
+- Read and write standalone drawings (`.odg`), charts (`.odc`), images (`.odi`),
+  master documents (`.odm`), web templates (`.oth`), and database front ends
+  (`.odb`) through their optional family facades
+- Metadata extraction (title, author, statistics) through the selected family
+  modules
 
 ## License
 

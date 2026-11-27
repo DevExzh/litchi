@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<office:document
+    xmlns:ext="urn:producer"
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:style="urn:oasis:names:tc:opendocument:xmlns:style:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    office:mimetype="application/vnd.oasis.opendocument.text"
+    office:version="1.3">
+    <office:styles>
+        <text:outline-style style:name="Outline">
+            <text:outline-level-style text:level="1" style:num-format="1"/>
+            <text:outline-level-style text:level="2" style:num-format="1"/>
+            <text:outline-level-style text:level="3" style:num-format="1"/>
+            <text:outline-level-style text:level="4" style:num-format="1"/>
+            <text:outline-level-style text:level="5" style:num-format="1"/>
+            <text:outline-level-style text:level="6" style:num-format="1"/>
+            <text:outline-level-style text:level="7" style:num-format="1"/>
+            <text:outline-level-style text:level="8" style:num-format="1"/>
+            <text:outline-level-style text:level="9" style:num-format="1"/>
+            <text:outline-level-style
+                text:level="10"
+                style:num-format="1"
+                ext:num-list-format="%10%"/>
+        </text:outline-style>
+    </office:styles>
+    <office:body><office:text/></office:body>
+</office:document>

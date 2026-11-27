@@ -1,0 +1,2293 @@
+//! RTF document type definitions.
+
+use super::border::{Borders, CharacterBorder, CharacterShading, Shading};
+
+use litchi_codepage::Mbcs;
+use std::borrow::Cow;
+use std::num::NonZeroU16;
+
+/// Font reference (index into font table).
+pub type FontRef = u16;
+
+/// Color reference (index into color table).
+pub type ColorRef = u16;
+
+/// RTF color representation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Color {
+    /// Red component (0-255)
+    pub red: u8,
+    /// Green component (0-255)
+    pub green: u8,
+    /// Blue component (0-255)
+    pub blue: u8,
+}
+
+impl Color {
+    /// Create a new color.
+    #[inline]
+    #[must_use]
+    pub const fn new(red: u8, green: u8, blue: u8) -> Self {
+        Self { red, green, blue }
+    }
+
+    /// Black color.
+    #[inline]
+    #[must_use]
+    pub const fn black() -> Self {
+        Self::new(0, 0, 0)
+    }
+
+    /// White color.
+    #[inline]
+    #[must_use]
+    pub const fn white() -> Self {
+        Self::new(255, 255, 255)
+    }
+}
+
+/// Color table containing document colors.
+#[derive(Debug, Clone)]
+pub struct ColorTable {
+    colors: Vec<Color>,
+    automatic: Vec<bool>,
+}
+
+impl ColorTable {
+    /// Create a new color table.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            colors: Vec::new(),
+            automatic: Vec::new(),
+        }
+    }
+
+    /// Add a color to the table and return its index.
+    #[inline]
+    pub fn add(&mut self, color: Color) -> ColorRef {
+        let index = self.colors.len() as ColorRef;
+        self.colors.push(color);
+        self.automatic.push(false);
+        index
+    }
+
+    /// Add the automatic/default color entry and return its index.
+    #[inline]
+    pub fn add_automatic(&mut self) -> ColorRef {
+        let index = self.colors.len() as ColorRef;
+        self.colors.push(Color::default());
+        self.automatic.push(true);
+        index
+    }
+
+    /// Get a color by reference.
+    #[inline]
+    #[must_use]
+    pub fn get(&self, color_ref: ColorRef) -> Option<&Color> {
+        self.colors.get(color_ref as usize)
+    }
+
+    /// Whether a reference denotes the automatic/default color.
+    #[inline]
+    #[must_use]
+    pub fn is_automatic(&self, color_ref: ColorRef) -> bool {
+        self.is_automatic_at(usize::from(color_ref))
+    }
+
+    pub(crate) fn is_automatic_at(&self, position: usize) -> bool {
+        self.automatic.get(position).copied().unwrap_or(false)
+    }
+
+    /// Get all colors in the table.
+    #[inline]
+    #[must_use]
+    pub fn colors(&self) -> &[Color] {
+        &self.colors
+    }
+}
+
+impl Default for ColorTable {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Font family categories.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FontFamily {
+    /// Nil (unknown or default)
+    #[default]
+    Nil,
+    /// Roman (serif) fonts
+    Roman,
+    /// Swiss (sans-serif) fonts
+    Swiss,
+    /// Modern (monospace) fonts
+    Modern,
+    /// Script fonts
+    Script,
+    /// Decorative fonts
+    Decor,
+    /// Technical, symbol, and mathematical fonts
+    Tech,
+}
+
+/// Font pitch preference from `fprq`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum FontPitch {
+    #[default]
+    Default,
+    Fixed,
+    Variable,
+}
+
+/// Embedded font format from the `fontemb` destination.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EmbeddedFontFormat {
+    /// `ftnil` — unknown or unspecified font format.
+    #[default]
+    Nil,
+    /// `fttruetype` — TrueType font data.
+    TrueType,
+}
+
+/// Exact byte-oriented code page for an RTF font name.
+///
+/// The DOS pages have dedicated variants because the shared codec foundation
+/// intentionally does not approximate them with a different IBM code page.
+/// UTF-16 pages are excluded because `cpg` font names are byte streams.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum FontPage {
+    /// Any exact byte-stream page supported by the shared codec foundation.
+    Mbcs(Mbcs),
+    /// Original IBM PC code page 437.
+    Cp437,
+    /// DOS Latin-1 code page 850.
+    Cp850,
+}
+
+impl FontPage {
+    /// Windows-1252.
+    pub const WINDOWS_1252: Self = Self::Mbcs(Mbcs::WINDOWS_1252);
+    /// Shift JIS (Windows code page 932).
+    pub const SHIFT_JIS: Self = Self::Mbcs(Mbcs::SHIFT_JIS);
+    /// Macintosh Roman.
+    pub const MACINTOSH: Self = Self::Mbcs(Mbcs::MACINTOSH);
+    /// UTF-8 (Windows code page 65001).
+    pub const UTF_8: Self = Self::Mbcs(Mbcs::UTF_8);
+
+    /// Validates an RTF font code-page identifier.
+    pub fn new(page: u32) -> Option<Self> {
+        match page {
+            437 => Some(Self::Cp437),
+            850 => Some(Self::Cp850),
+            _ => Mbcs::new(page).map(Self::Mbcs),
+        }
+    }
+
+    /// Validates an identifier and retains an unsupported value in the error.
+    ///
+    /// # Errors
+    /// Returns an error when the code page is unknown or unsupported.
+    pub fn require(page: u32) -> Result<Self, litchi_codepage::Error> {
+        Self::new(page).ok_or(litchi_codepage::Error::Unsupported(page))
+    }
+
+    /// Numeric RTF code-page identifier.
+    #[must_use]
+    pub const fn id(self) -> u16 {
+        match self {
+            Self::Mbcs(page) => page.id16(),
+            Self::Cp437 => 437,
+            Self::Cp850 => 850,
+        }
+    }
+}
+
+impl TryFrom<u32> for FontPage {
+    type Error = litchi_codepage::Error;
+
+    fn try_from(page: u32) -> Result<Self, Self::Error> {
+        Self::require(page)
+    }
+}
+
+impl From<Mbcs> for FontPage {
+    fn from(page: Mbcs) -> Self {
+        Self::Mbcs(page)
+    }
+}
+
+impl From<FontPage> for u32 {
+    fn from(page: FontPage) -> Self {
+        u32::from(page.id())
+    }
+}
+
+/// Valid RTF `fcharset` selector.
+///
+/// The one-byte enum preserves the font-table declaration without confusing a
+/// charset identifier with a code page. [`Self::page`] returns a codec only
+/// where this build has an exact mapping; selected unsupported charsets are
+/// rejected by the parser instead of guessed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum FontCharset {
+    Ansi = 0,
+    Default = 1,
+    Symbol = 2,
+    MacRoman = 77,
+    MacShiftJis = 78,
+    MacHangul = 79,
+    MacGb2312 = 80,
+    MacBig5 = 81,
+    MacJohab = 82,
+    MacHebrew = 83,
+    MacArabic = 84,
+    MacGreek = 85,
+    MacTurkish = 86,
+    MacThai = 87,
+    MacEastEurope = 88,
+    MacRussian = 89,
+    ShiftJis = 128,
+    Hangul = 129,
+    Johab = 130,
+    Gb2312 = 134,
+    Big5 = 136,
+    Greek = 161,
+    Turkish = 162,
+    Vietnamese = 163,
+    Hebrew = 177,
+    Arabic = 178,
+    ArabicTraditional = 179,
+    ArabicUser = 180,
+    HebrewUser = 181,
+    Baltic = 186,
+    Russian = 204,
+    Thai = 222,
+    EastEurope = 238,
+    Pc437 = 254,
+    Oem = 255,
+}
+
+impl FontCharset {
+    /// Validates a numeric RTF charset identifier.
+    #[must_use]
+    pub fn new(charset: u8) -> Option<Self> {
+        Some(match charset {
+            0 => Self::Ansi,
+            1 => Self::Default,
+            2 => Self::Symbol,
+            77 => Self::MacRoman,
+            78 => Self::MacShiftJis,
+            79 => Self::MacHangul,
+            80 => Self::MacGb2312,
+            81 => Self::MacBig5,
+            82 => Self::MacJohab,
+            83 => Self::MacHebrew,
+            84 => Self::MacArabic,
+            85 => Self::MacGreek,
+            86 => Self::MacTurkish,
+            87 => Self::MacThai,
+            88 => Self::MacEastEurope,
+            89 => Self::MacRussian,
+            128 => Self::ShiftJis,
+            129 => Self::Hangul,
+            130 => Self::Johab,
+            134 => Self::Gb2312,
+            136 => Self::Big5,
+            161 => Self::Greek,
+            162 => Self::Turkish,
+            163 => Self::Vietnamese,
+            177 => Self::Hebrew,
+            178 => Self::Arabic,
+            179 => Self::ArabicTraditional,
+            180 => Self::ArabicUser,
+            181 => Self::HebrewUser,
+            186 => Self::Baltic,
+            204 => Self::Russian,
+            222 => Self::Thai,
+            238 => Self::EastEurope,
+            254 => Self::Pc437,
+            255 => Self::Oem,
+            _ => return None,
+        })
+    }
+
+    /// Numeric RTF charset identifier.
+    #[must_use]
+    pub const fn id(self) -> u8 {
+        self as u8
+    }
+
+    /// Exact supported page implied by this charset.
+    #[must_use]
+    pub fn page(self) -> Option<FontPage> {
+        let page = match self {
+            Self::Ansi => return Some(FontPage::WINDOWS_1252),
+            Self::Default
+            | Self::Symbol
+            | Self::MacShiftJis
+            | Self::MacHangul
+            | Self::MacGb2312
+            | Self::MacBig5
+            | Self::MacJohab
+            | Self::MacHebrew
+            | Self::MacArabic
+            | Self::MacGreek
+            | Self::MacTurkish
+            | Self::MacThai
+            | Self::MacEastEurope
+            | Self::MacRussian
+            | Self::Johab
+            | Self::ArabicTraditional
+            | Self::ArabicUser
+            | Self::HebrewUser => return None,
+            Self::MacRoman => return Some(FontPage::MACINTOSH),
+            Self::ShiftJis => return Some(FontPage::SHIFT_JIS),
+            Self::Hangul => 949,
+            Self::Gb2312 => 936,
+            Self::Big5 => 950,
+            Self::Greek => 1253,
+            Self::Turkish => 1254,
+            Self::Vietnamese => 1258,
+            Self::Hebrew => 1255,
+            Self::Arabic => 1256,
+            Self::Baltic => 1257,
+            Self::Russian => 1251,
+            Self::Thai => 874,
+            Self::EastEurope => 1250,
+            Self::Pc437 => return Some(FontPage::Cp437),
+            Self::Oem => return Some(FontPage::Cp850),
+        };
+        FontPage::new(page)
+    }
+}
+
+/// Embedded font payload from the inert `fontemb` destination.
+///
+/// A font entry may embed the font bytes directly (hexadecimal or `bin`
+/// payload) or reference an external font file through the `fontfile`
+/// destination; both carriers are optional in the specification.
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
+pub struct EmbeddedFont<'a> {
+    /// Declared embedded font format.
+    pub format: EmbeddedFontFormat,
+    /// File name from the nested `fontfile` destination, if present.
+    pub file_name: Option<Cow<'a, str>>,
+    /// Exact code page of the `fontfile` name from its `cpg` control word.
+    pub file_code_page: Option<FontPage>,
+    /// Decoded embedded font bytes, if the data is carried inline.
+    pub data: Option<Vec<u8>>,
+}
+
+impl EmbeddedFont<'_> {
+    /// Maximum accepted embedded font payload (32 MiB).
+    pub const MAX_DATA_BYTES: usize = 32 * 1_048_576;
+    /// Maximum accepted `fontfile` name length in bytes.
+    pub const MAX_FILE_NAME_BYTES: usize = 4_096;
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self
+            .file_name
+            .as_ref()
+            .is_some_and(|name| name.is_empty() || name.len() > Self::MAX_FILE_NAME_BYTES)
+        {
+            return Err(crate::Error::MalformedDocument(
+                "invalid or oversized RTF embedded font file name".to_string(),
+            ));
+        }
+        if self
+            .data
+            .as_ref()
+            .is_some_and(|data| data.is_empty() || data.len() > Self::MAX_DATA_BYTES)
+        {
+            return Err(crate::Error::MalformedDocument(
+                "invalid or oversized RTF embedded font data".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> EmbeddedFont<'static> {
+        EmbeddedFont {
+            format: self.format,
+            file_name: self.file_name.map(|name| Cow::Owned(name.into_owned())),
+            file_code_page: self.file_code_page,
+            data: self.data,
+        }
+    }
+}
+
+/// Theme-font role of a font-table entry (`\flomajor` and friends).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FontTheme {
+    /// Major Latin-script theme font (`\flomajor`).
+    MajorLatin,
+    /// Major high-ANSI theme font (`\fhimajor`).
+    MajorHighAnsi,
+    /// Major double-byte (East Asian) theme font (`\fdbmajor`).
+    MajorDoubleByte,
+    /// Major bidi (complex scripts) theme font (`\fbimajor`).
+    MajorBidi,
+    /// Minor Latin-script theme font (`\flominor`).
+    MinorLatin,
+    /// Minor high-ANSI theme font (`\fhiminor`).
+    MinorHighAnsi,
+    /// Minor double-byte (East Asian) theme font (`\fdbminor`).
+    MinorDoubleByte,
+    /// Minor bidi (complex scripts) theme font (`\fbiminor`).
+    MinorBidi,
+}
+
+impl FontTheme {
+    /// The RTF control word selecting this role.
+    #[must_use]
+    pub fn control_word(self) -> &'static str {
+        match self {
+            Self::MajorLatin => "flomajor",
+            Self::MajorHighAnsi => "fhimajor",
+            Self::MajorDoubleByte => "fdbmajor",
+            Self::MajorBidi => "fbimajor",
+            Self::MinorLatin => "flominor",
+            Self::MinorHighAnsi => "fhiminor",
+            Self::MinorDoubleByte => "fdbminor",
+            Self::MinorBidi => "fbiminor",
+        }
+    }
+
+    /// The role for a control word, or `None` for an unknown selector.
+    #[must_use]
+    pub fn from_control_word(word: &str) -> Option<Self> {
+        Some(match word {
+            "flomajor" => Self::MajorLatin,
+            "fhimajor" => Self::MajorHighAnsi,
+            "fdbmajor" => Self::MajorDoubleByte,
+            "fbimajor" => Self::MajorBidi,
+            "flominor" => Self::MinorLatin,
+            "fhiminor" => Self::MinorHighAnsi,
+            "fdbminor" => Self::MinorDoubleByte,
+            "fbiminor" => Self::MinorBidi,
+            _ => return None,
+        })
+    }
+}
+
+/// Font definition.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Font<'a> {
+    /// Font name
+    pub name: Cow<'a, str>,
+    /// Font family category
+    pub family: FontFamily,
+    /// Explicit RTF font charset selector, if declared.
+    pub charset: Option<FontCharset>,
+    /// Alternate font name from the inert `falt` destination.
+    pub alternate_name: Option<Cow<'a, str>>,
+    /// Non-tagged font name from the inert `fname` destination.
+    pub non_tagged_name: Option<Cow<'a, str>>,
+    /// Ten-byte PANOSE classification.
+    pub panose: Option<[u8; 10]>,
+    /// Pitch preference.
+    pub pitch: FontPitch,
+    /// Explicit, exact font code page.
+    pub code_page: Option<FontPage>,
+    /// Embedded font payload from the inert `fontemb` destination.
+    pub embedded: Option<EmbeddedFont<'a>>,
+    /// Theme-font role from the major/minor theme selectors.
+    pub theme: Option<FontTheme>,
+    /// Whether the font is marked as bidirectional by the `fbidi` control.
+    pub bidi: bool,
+}
+
+impl<'a> Font<'a> {
+    /// Create a new font.
+    #[inline]
+    #[must_use]
+    pub fn new(name: Cow<'a, str>, family: FontFamily) -> Self {
+        Self {
+            name,
+            family,
+            charset: None,
+            alternate_name: None,
+            non_tagged_name: None,
+            panose: None,
+            pitch: FontPitch::Default,
+            code_page: None,
+            embedded: None,
+            theme: None,
+            bidi: false,
+        }
+    }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> crate::Result<()> {
+        const MAX_FONT_NAME_BYTES: usize = 4_096;
+        if self.name.is_empty()
+            || self.name.len() > MAX_FONT_NAME_BYTES
+            || self
+                .alternate_name
+                .as_ref()
+                .is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
+            || self
+                .non_tagged_name
+                .as_ref()
+                .is_some_and(|name| name.is_empty() || name.len() > MAX_FONT_NAME_BYTES)
+        {
+            return Err(crate::Error::MalformedDocument(
+                "invalid or oversized RTF font name".to_string(),
+            ));
+        }
+        if let Some(embedded) = &self.embedded {
+            embedded.validate()?;
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> Font<'static> {
+        Font {
+            name: Cow::Owned(self.name.into_owned()),
+            family: self.family,
+            theme: self.theme,
+            charset: self.charset,
+            alternate_name: self
+                .alternate_name
+                .map(|name| Cow::Owned(name.into_owned())),
+            non_tagged_name: self
+                .non_tagged_name
+                .map(|name| Cow::Owned(name.into_owned())),
+            panose: self.panose,
+            pitch: self.pitch,
+            code_page: self.code_page,
+            embedded: self.embedded.map(EmbeddedFont::into_owned),
+            bidi: self.bidi,
+        }
+    }
+}
+
+/// Font table containing document fonts.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FontTable<'a> {
+    pub(crate) fonts: Vec<Font<'a>>,
+    pub(crate) defined: Vec<bool>,
+}
+
+impl<'a> FontTable<'a> {
+    /// Create a new font table.
+    #[inline]
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            fonts: Vec::new(),
+            defined: Vec::new(),
+        }
+    }
+
+    /// Add a validated font at a specific index.
+    ///
+    /// The previous definition is returned when the index was already in use.
+    /// Validation and allocation complete before the table's logical contents
+    /// change.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn insert(&mut self, index: FontRef, font: Font<'a>) -> crate::Result<Option<Font<'a>>> {
+        font.validate()?;
+        if self.fonts.len() != self.defined.len() {
+            return Err(crate::Error::MalformedDocument(
+                "invalid RTF font-table size".to_string(),
+            ));
+        }
+
+        let slot = usize::from(index);
+        let required_len = slot.checked_add(1).ok_or_else(|| {
+            crate::Error::MalformedDocument("RTF font-table index overflow".to_string())
+        })?;
+        if required_len > self.fonts.len() {
+            let additional = required_len - self.fonts.len();
+            crate::error::try_reserve_additional(
+                &mut self.fonts,
+                additional,
+                "font table entries",
+            )?;
+            crate::error::try_reserve_additional(
+                &mut self.defined,
+                additional,
+                "font table definition flags",
+            )?;
+            self.fonts
+                .resize(required_len, Font::new(Cow::Borrowed(""), FontFamily::Nil));
+            self.defined.resize(required_len, false);
+        }
+
+        let (fonts, defined) = (&mut self.fonts, &mut self.defined);
+        let font_slot = fonts.get_mut(slot).ok_or_else(|| {
+            crate::Error::MalformedDocument("invalid RTF font-table index".to_string())
+        })?;
+        let defined_slot = defined.get_mut(slot).ok_or_else(|| {
+            crate::Error::MalformedDocument("invalid RTF font-table index".to_string())
+        })?;
+        let was_defined = *defined_slot;
+        let previous = std::mem::replace(font_slot, font);
+        *defined_slot = true;
+        Ok(was_defined.then_some(previous))
+    }
+
+    /// Get a font by reference.
+    #[inline]
+    #[must_use]
+    pub fn get(&self, font_ref: FontRef) -> Option<&Font<'a>> {
+        let index = usize::from(font_ref);
+        if !self.defined.get(index).copied().unwrap_or(false) {
+            return None;
+        }
+        self.fonts.get(index)
+    }
+
+    /// Get all fonts in the table.
+    #[inline]
+    #[must_use]
+    pub fn fonts(&self) -> &[Font<'a>] {
+        &self.fonts
+    }
+
+    #[must_use]
+    pub fn is_defined(&self, font_ref: FontRef) -> bool {
+        self.defined
+            .get(font_ref as usize)
+            .copied()
+            .unwrap_or(false)
+    }
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> crate::Result<()> {
+        const MAX_AGGREGATE_EMBEDDED_BYTES: usize = 256 * 1_048_576;
+        if self.fonts.len() > 65_536 || self.defined.len() != self.fonts.len() {
+            return Err(crate::Error::MalformedDocument(
+                "invalid RTF font-table size".to_string(),
+            ));
+        }
+        let mut aggregate = 0usize;
+        let mut embedded_aggregate = 0usize;
+        for (font, defined) in self.fonts.iter().zip(&self.defined) {
+            if !defined {
+                continue;
+            }
+            font.validate()?;
+            aggregate = aggregate
+                .checked_add(font.name.len())
+                .and_then(|total| {
+                    total.checked_add(font.alternate_name.as_ref().map_or(0, |name| name.len()))
+                })
+                .and_then(|total| {
+                    total.checked_add(font.non_tagged_name.as_ref().map_or(0, |name| name.len()))
+                })
+                .ok_or_else(|| {
+                    crate::Error::MalformedDocument("RTF font-table text size overflow".to_string())
+                })?;
+            embedded_aggregate = embedded_aggregate
+                .checked_add(
+                    font.embedded
+                        .as_ref()
+                        .map_or(0, |embedded| embedded.data.as_ref().map_or(0, Vec::len)),
+                )
+                .ok_or_else(|| {
+                    crate::Error::MalformedDocument(
+                        "RTF font-table embedded size overflow".to_string(),
+                    )
+                })?;
+        }
+        if aggregate > 16 * 1_048_576 {
+            return Err(crate::Error::MalformedDocument(
+                "RTF font-table text exceeds the safety limit".to_string(),
+            ));
+        }
+        if embedded_aggregate > MAX_AGGREGATE_EMBEDDED_BYTES {
+            return Err(crate::Error::MalformedDocument(
+                "RTF font-table embedded fonts exceed the safety limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn into_owned(self) -> FontTable<'static> {
+        FontTable {
+            fonts: self.fonts.into_iter().map(Font::into_owned).collect(),
+            defined: self.defined,
+        }
+    }
+}
+
+impl Default for FontTable<'_> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+/// Text alignment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Alignment {
+    /// Left-aligned
+    #[default]
+    Left,
+    /// Right-aligned
+    Right,
+    /// Centered
+    Center,
+    /// Justified
+    Justify,
+}
+
+/// Spacing information for paragraphs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Spacing {
+    /// Space before paragraph (in twips, 1/20th of a point)
+    pub before: i32,
+    /// Space after paragraph (in twips)
+    pub after: i32,
+    /// Line spacing (in twips)
+    pub line: i32,
+    /// Line spacing multiplier
+    pub line_multiple: bool,
+}
+
+/// Paragraph spacing policy layered over raw twip spacing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphSpacingPolicy {
+    /// `sbauto1` makes space-before automatic and ignores `sbN`.
+    pub automatic_before: bool,
+    /// `saauto1` makes space-after automatic and ignores `saN`.
+    pub automatic_after: bool,
+    /// `lisbN`, in hundredths of a character unit; overrides `sbN` when present.
+    pub list_before: Option<u32>,
+    /// `lisaN`, in hundredths of a character unit; overrides `saN` when present.
+    pub list_after: Option<u32>,
+    /// Whether lines snap to the document grid; disabled by `nosnaplinegrid`.
+    pub snap_to_line_grid: bool,
+    /// Suppress before/after spacing between adjacent paragraphs of the same style.
+    pub contextual_spacing: bool,
+}
+
+impl Default for ParagraphSpacingPolicy {
+    fn default() -> Self {
+        Self {
+            automatic_before: false,
+            automatic_after: false,
+            list_before: None,
+            list_after: None,
+            snap_to_line_grid: true,
+            contextual_spacing: false,
+        }
+    }
+}
+
+/// Indentation information for paragraphs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Indentation {
+    /// Left indent (in twips)
+    pub left: i32,
+    /// Right indent (in twips)
+    pub right: i32,
+    /// First line indent (in twips)
+    pub first_line: i32,
+}
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphLogicalIndentation {
+    pub start: Option<i32>,
+    pub end: Option<i32>,
+    pub first_line_character_units: Option<i32>,
+    pub left_character_units: Option<i32>,
+    pub right_character_units: Option<i32>,
+    pub mirrored: bool,
+}
+
+/// Paragraph wrapping policy from `wrapdefault`, `nocwrap`, `nowwrap`, and `nooverflow`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphWrapping {
+    #[default]
+    Default,
+    NoCharacterWrap,
+    NoWordWrap,
+    NoOverflow,
+}
+
+/// East Asian paragraph font alignment from the RTF 1.9.1 `fa*` selectors.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFontAlignment {
+    #[default]
+    Auto,
+    Hanging,
+    Center,
+    Roman,
+    Variable,
+    Fixed,
+}
+
+/// Effective paragraph line-breaking and automatic-spacing policy.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphLineBreaking {
+    /// Automatic paragraph hyphenation (`hyphpar`).
+    pub automatic_hyphenation: bool,
+    /// Automatic spacing between Asian and alphabetic text (`aspalpha`).
+    pub auto_space_alphabetic: bool,
+    /// Automatic spacing between Asian text and numbers (`aspnum`).
+    pub auto_space_numbers: bool,
+    /// Adjust the right indent for a document grid (`adjustright`).
+    pub adjust_right_indent: bool,
+    /// Wrapping/overflow selector.
+    pub wrapping: ParagraphWrapping,
+    /// East Asian font-alignment selector.
+    pub font_alignment: ParagraphFontAlignment,
+}
+
+/// Maximum supported number of lines occupied by a paragraph drop cap.
+pub const MAX_PARAGRAPH_DROP_CAP_LINES: u16 = 255;
+
+/// Placement selected by the RTF `\\dropcaptN` paragraph property.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParagraphDropCapKind {
+    /// Drop cap remains within the regular text margin (`\\dropcapt1`).
+    InText,
+    /// Drop cap is placed in the left margin (`\\dropcapt2`).
+    Margin,
+}
+
+impl ParagraphDropCapKind {
+    /// Return the canonical RTF numeric value.
+    #[must_use]
+    pub const fn as_rtf_value(self) -> i32 {
+        match self {
+            Self::InText => 1,
+            Self::Margin => 2,
+        }
+    }
+}
+
+/// Complete, validated paragraph drop-cap settings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphDropCap {
+    kind: ParagraphDropCapKind,
+    line_count: u8,
+}
+impl ParagraphDropCap {
+    /// Construct a complete drop cap.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn new(kind: ParagraphDropCapKind, line_count: u16) -> crate::Result<Self> {
+        if !(1..=MAX_PARAGRAPH_DROP_CAP_LINES).contains(&line_count) {
+            return Err(crate::Error::InvalidStructure(format!(
+                "RTF drop-cap line count must be in 1..={MAX_PARAGRAPH_DROP_CAP_LINES}"
+            )));
+        }
+        Ok(Self {
+            kind,
+            line_count: line_count as u8,
+        })
+    }
+
+    /// Drop-cap placement.
+    #[must_use]
+    pub const fn kind(self) -> ParagraphDropCapKind {
+        self.kind
+    }
+
+    /// Number of text lines occupied by the drop cap.
+    #[must_use]
+    pub const fn line_count(self) -> u8 {
+        self.line_count
+    }
+
+    /// Validate the model before serialization.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(self) -> crate::Result<()> {
+        if self.line_count == 0 {
+            return Err(crate::Error::InvalidStructure(
+                "RTF drop-cap line count must be nonzero".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Largest absolute twip value retained by positioned paragraph frames.
+pub const MAX_PARAGRAPH_FRAME_TWIPS: i32 = 10_000_000;
+
+/// Horizontal reference frame for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameHorizontalReference {
+    /// The text column containing the paragraph (`\phcol`).
+    #[default]
+    Column,
+    /// The page margin (`\phmrg`).
+    Margin,
+    /// The physical page (`\phpg`).
+    Page,
+}
+
+/// Horizontal position selector for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameHorizontalPosition {
+    /// Left edge (`\posxl`).
+    #[default]
+    Left,
+    /// Offset from the left edge (`\posxN`).
+    Offset(i32),
+    /// Offset that may be negative (`\posnegxN`).
+    NegativeOffset(i32),
+    /// Center (`\posxc`).
+    Center,
+    /// Inside edge (`\posxi`).
+    Inside,
+    /// Outside edge (`\posxo`).
+    Outside,
+    /// Right edge (`\posxr`).
+    Right,
+}
+
+/// Vertical reference frame for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameVerticalReference {
+    /// The paragraph margin (`\pvmrg`).
+    #[default]
+    Margin,
+    /// The physical page (`\pvpg`).
+    Page,
+    /// The upper-left corner of the next unframed paragraph in the RTF stream
+    /// (`\pvpara`).
+    Paragraph,
+}
+
+/// Vertical position selector for a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ParagraphFrameVerticalPosition {
+    /// Offset from the top (`\posyN`).
+    Offset(i32),
+    /// Offset that may be negative (`\posnegyN`).
+    NegativeOffset(i32),
+    /// Inline with the paragraph (`\posyil`).
+    Inline,
+    /// Top (`\posyt`).
+    Top,
+    /// Center (`\posyc`).
+    Center,
+    /// Bottom (`\posyb`).
+    Bottom,
+    /// Inside edge (`\posyin`).
+    Inside,
+    /// Outside edge (`\posyout`).
+    Outside,
+}
+
+impl Default for ParagraphFrameVerticalPosition {
+    fn default() -> Self {
+        Self::Offset(0)
+    }
+}
+
+/// Text wrapping around a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameWrap {
+    /// The reader chooses its default wrap (`\wrapdefault`).
+    #[default]
+    Default,
+    /// Wrap around the frame (`\wraparound`).
+    Around,
+    /// Tight wrapping (`\wraptight`).
+    Tight,
+    /// Through wrapping (`\wrapthrough`).
+    Through,
+}
+
+/// Text flow direction inside a positioned paragraph object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ParagraphFrameTextFlow {
+    /// Left-to-right, top-to-bottom (`\frmtxlrtb`).
+    #[default]
+    LeftToRightTopToBottom,
+    /// Top-to-bottom, right-to-left (`\frmtxtbrl`).
+    TopToBottomRightToLeft,
+    /// Bottom-to-top, left-to-right (`\frmtxbtlr`).
+    BottomToTopLeftToRight,
+    /// Vertical left-to-right, top-to-bottom (`\frmtxlrtbv`).
+    LeftToRightTopToBottomVertical,
+    /// Vertical top-to-bottom, right-to-left (`\frmtxtbrlv`).
+    TopToBottomRightToLeftVertical,
+}
+
+/// Typed positioned paragraph frame controls from RTF 1.9.1.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct ParagraphFrame {
+    /// Optional frame width in twips (`\abswN`).
+    pub width_twips: Option<u32>,
+    /// Optional frame height in twips (`\abshN`); negative means exact.
+    pub height_twips: Option<i32>,
+    /// Horizontal reference frame.
+    pub horizontal_reference: ParagraphFrameHorizontalReference,
+    /// Horizontal position selector.
+    pub horizontal_position: ParagraphFrameHorizontalPosition,
+    /// Vertical reference frame.
+    pub vertical_reference: ParagraphFrameVerticalReference,
+    /// Vertical position selector.
+    pub vertical_position: ParagraphFrameVerticalPosition,
+    /// Explicit absolute anchoring lock (`\abslockN`).
+    pub anchor_locked: Option<bool>,
+    /// Suppress text wrapping (`\nowrap`).
+    pub no_wrap: bool,
+    /// Distance from the frame to the main text flow in all directions
+    /// (`\dxfrtextN`).
+    pub horizontal_text_distance_twips: Option<u32>,
+    /// Horizontal frame-text offset (`\dfrmtxtxN`).
+    pub horizontal_text_offset_twips: Option<u32>,
+    /// Vertical frame-text offset (`\dfrmtxtyN`).
+    pub vertical_text_offset_twips: Option<u32>,
+    /// Wrap mode.
+    pub wrap: ParagraphFrameWrap,
+    /// Let surrounding text flow underneath the frame (`\overlay`).
+    pub overlay: bool,
+    /// Explicit no-overlap selector (`\absnoovrlpN`).
+    pub no_overlap: Option<bool>,
+    /// Text flow direction.
+    pub text_flow: ParagraphFrameTextFlow,
+}
+
+impl ParagraphFrame {
+    /// Validate all bounded frame values before serialization.
+    pub fn validate(self) -> crate::Result<()> {
+        if self
+            .width_twips
+            .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+            || self
+                .height_twips
+                .is_some_and(|value| value.unsigned_abs() > MAX_PARAGRAPH_FRAME_TWIPS as u32)
+            || self
+                .horizontal_text_distance_twips
+                .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+            || self
+                .horizontal_text_offset_twips
+                .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+            || self
+                .vertical_text_offset_twips
+                .is_some_and(|value| value as i64 > i64::from(MAX_PARAGRAPH_FRAME_TWIPS))
+        {
+            return Err(crate::Error::InvalidStructure(
+                "RTF paragraph frame distance exceeds the safety limit".to_string(),
+            ));
+        }
+        let check_signed_offset = |value: i32| {
+            value
+                .checked_abs()
+                .is_some_and(|absolute| absolute <= MAX_PARAGRAPH_FRAME_TWIPS)
+        };
+        let check_unsigned_offset = |value: i32| (0..=MAX_PARAGRAPH_FRAME_TWIPS).contains(&value);
+        if matches!(
+            self.horizontal_position,
+            ParagraphFrameHorizontalPosition::Offset(value) if !check_unsigned_offset(value)
+        ) || matches!(
+            self.horizontal_position,
+            ParagraphFrameHorizontalPosition::NegativeOffset(value) if !check_signed_offset(value)
+        ) || matches!(
+            self.vertical_position,
+            ParagraphFrameVerticalPosition::Offset(value) if !check_unsigned_offset(value)
+        ) || matches!(
+            self.vertical_position,
+            ParagraphFrameVerticalPosition::NegativeOffset(value) if !check_signed_offset(value)
+        ) {
+            return Err(crate::Error::InvalidStructure(
+                "RTF paragraph frame position is outside the safety limit".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Author and packed DTTM timestamp attached to a structural revision
+/// marker such as `\prauthN`/`\prdateN` or `\srauthN`/`\srdateN`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RevisionMetadata {
+    /// Index into the document's revision-author table (`revtbl`).
+    pub author: Option<i32>,
+    /// Packed signed RTF DTTM value, as used by `\revdttmN`.
+    pub date: Option<i32>,
+}
+
+impl RevisionMetadata {
+    /// Whether neither an author nor a date was authored.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.author.is_none() && self.date.is_none()
+    }
+
+    /// Validate the author index against the RTF domain.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> crate::Result<()> {
+        if self.author.is_some_and(|author| author < 0) {
+            return Err(crate::Error::MalformedDocument(
+                "RTF revision author index cannot be negative".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Paragraph properties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct Paragraph {
+    /// Applied paragraph-style handle from `\\sN`.
+    ///
+    /// The reference is retained as inert provenance; concrete paragraph and
+    /// character properties remain independently represented.
+    pub paragraph_style: Option<u16>,
+    /// RSID attached to the paragraph formatting (`\pararsidN`).
+    pub paragraph_rsid: Option<u32>,
+    /// Paragraph outline level 0-9 for headings and TOC-by-outline
+    /// (`\outlinelevelN`).
+    pub outline_level: Option<u8>,
+    /// Explicit paragraph direction; `None` uses left-to-right precedence.
+    pub direction: Option<TextDirection>,
+    /// Text alignment
+    pub alignment: Alignment,
+    /// Spacing
+    pub spacing: Spacing,
+    /// Automatic, list-unit, contextual, and grid spacing policy.
+    pub spacing_policy: ParagraphSpacingPolicy,
+    /// Indentation
+    pub indentation: Indentation,
+    pub logical_indentation: ParagraphLogicalIndentation,
+    /// Custom tab stops in RTF declaration order
+    pub tab_stops: super::border::TabStops,
+    /// Borders
+    pub borders: Borders,
+    /// Shading/background
+    pub shading: Shading,
+    /// Keep paragraph on one page
+    pub keep_together: bool,
+    /// Keep with next paragraph
+    pub keep_next: bool,
+    /// Side-by-side paragraph layout (`\sbys`).
+    pub side_by_side: bool,
+    /// Page break before
+    pub page_break_before: bool,
+    /// Widow/orphan control
+    pub widow_control: bool,
+    /// Whether line numbering is suppressed for this paragraph (`\noline`).
+    pub no_line_numbering: bool,
+    /// Whether the automatic hanging-indent tab stop is suppressed
+    /// (`\notabind`).
+    pub no_auto_tab_indent: bool,
+    /// Complete drop-cap settings from `\\dropcapliN` and `\\dropcaptN`.
+    pub drop_cap: Option<ParagraphDropCap>,
+    /// Positioned paragraph object/frame controls.
+    pub frame: Option<ParagraphFrame>,
+    /// Line-breaking and automatic-spacing policy.
+    pub line_breaking: ParagraphLineBreaking,
+    /// List override index (`\lsN`) applied to this paragraph
+    pub list_override: Option<i32>,
+    /// Zero-based list level (`\ilvlN`) applied to this paragraph
+    pub list_level: Option<u8>,
+    /// Index into the document's ordered inert legacy `pn` record table.
+    pub legacy_numbering: Option<u32>,
+    /// Author/date metadata for the revision that inserted this paragraph
+    /// (`\prauthN`, `\prdateN`).
+    pub revision: RevisionMetadata,
+}
+
+impl Paragraph {
+    /// Set or clear the applied paragraph-style handle.
+    #[inline]
+    pub fn set_paragraph_style(&mut self, value: Option<u16>) {
+        self.paragraph_style = value;
+    }
+
+    /// Replace the paragraph shading after validating its RTF domain.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn set_shading(&mut self, shading: Shading) -> crate::Result<()> {
+        shading.validate()?;
+        self.shading = shading;
+        Ok(())
+    }
+
+    /// Clear all explicit paragraph-shading controls.
+    #[inline]
+    pub fn clear_shading(&mut self) {
+        self.shading.clear();
+    }
+}
+
+/// Underline style
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum UnderlineStyle {
+    /// No underline
+    #[default]
+    None,
+    /// Single underline
+    Single,
+    /// Double underline
+    Double,
+    /// Dotted underline
+    Dotted,
+    /// Dashed underline
+    Dashed,
+    /// Dash-dot underline
+    DashDot,
+    /// Dash-dot-dot underline
+    DashDotDot,
+    /// Word-only underline
+    Words,
+    /// Thick underline
+    Thick,
+    /// Wave underline
+    Wave,
+    /// Hairline underline
+    Hairline,
+    /// Thick dotted underline
+    ThickDotted,
+    /// Thick dashed underline
+    ThickDashed,
+    /// Thick dash-dot underline
+    ThickDashDot,
+    /// Thick dash-dot-dot underline
+    ThickDashDotDot,
+    /// Thick long-dash underline
+    ThickLongDash,
+    /// Long-dash underline
+    LongDash,
+    /// Heavy wave underline
+    HeavyWave,
+    /// Double wave underline
+    DoubleWave,
+}
+
+/// Animated text effect selected by `\animtextN`.
+///
+/// The numeric values are fixed by the RTF 1.9.1 specification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum AnimatedTextEffect {
+    /// No animation (`\animtext0`).
+    #[default]
+    None,
+    /// Las Vegas lights (`\animtext1`).
+    LasVegasLights,
+    /// Blinking background (`\animtext2`).
+    BlinkingBackground,
+    /// Sparkle text (`\animtext3`).
+    SparkleText,
+    /// Marching black ants (`\animtext4`).
+    MarchingBlackAnts,
+    /// Marching red ants (`\animtext5`).
+    MarchingRedAnts,
+    /// Shimmer (`\animtext6`).
+    Shimmer,
+}
+
+impl AnimatedTextEffect {
+    /// Maximum value accepted by the RTF `\animtextN` domain.
+    pub const MAX_RTF_VALUE: i32 = 6;
+
+    /// Convert a raw RTF `\animtextN` parameter to a typed effect.
+    #[inline]
+    #[must_use]
+    pub fn from_rtf(value: i32) -> Option<Self> {
+        Some(match value {
+            0 => Self::None,
+            1 => Self::LasVegasLights,
+            2 => Self::BlinkingBackground,
+            3 => Self::SparkleText,
+            4 => Self::MarchingBlackAnts,
+            5 => Self::MarchingRedAnts,
+            6 => Self::Shimmer,
+            _ => return None,
+        })
+    }
+
+    /// Return the raw RTF `\animtextN` parameter for this effect.
+    #[inline]
+    #[must_use]
+    pub fn rtf_value(self) -> i32 {
+        match self {
+            Self::None => 0,
+            Self::LasVegasLights => 1,
+            Self::BlinkingBackground => 2,
+            Self::SparkleText => 3,
+            Self::MarchingBlackAnts => 4,
+            Self::MarchingRedAnts => 5,
+            Self::Shimmer => 6,
+        }
+    }
+}
+
+/// Fixed-width text fitting selected by `\fittextN` (RTF 1.9.1 character
+/// properties).
+///
+/// `\fittextN` fits the text of the current group into `N` twips;
+/// `\fittext-1` continues the previous fit-text run, so
+/// `{\fittext1000 Fit this}{\fittext-1 text}` fits "Fit this text" into
+/// 1000 twips.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FitText {
+    /// No fit-text property.
+    #[default]
+    None,
+    /// Fit the group's text into this many twips (`\fittextN` with N ≥ 0).
+    Fixed(u32),
+    /// Continue the previous fit-text run (`\fittext-1`).
+    Continue,
+}
+
+impl FitText {
+    /// Maximum width accepted by the RTF `\fittextN` domain, in twips.
+    pub const MAX_TWIPS: i32 = 1_048_576;
+
+    /// Convert a raw RTF `\fittextN` parameter to a typed value.
+    #[inline]
+    #[must_use]
+    pub fn from_rtf(value: i32) -> Option<Self> {
+        Some(match value {
+            -1 => Self::Continue,
+            0..=Self::MAX_TWIPS => Self::Fixed(value.cast_unsigned()),
+            _ => return None,
+        })
+    }
+
+    /// Return the raw RTF `\fittextN` parameter for this value, or `None`
+    /// when no fit-text property is active.
+    #[inline]
+    #[must_use]
+    pub fn rtf_value(self) -> Option<i32> {
+        match self {
+            Self::None => None,
+            Self::Continue => Some(-1),
+            Self::Fixed(twips) => Some(twips.cast_signed()),
+        }
+    }
+}
+
+/// East Asian emphasis mark selected by an `\acc*` character control.
+///
+/// The marks are mutually exclusive; the last control in a run wins. The
+/// control words are fixed by the RTF 1.9.1 specification.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum EmphasisMark {
+    /// No emphasis mark (`\accnone` or the default state).
+    #[default]
+    None,
+    /// Dot emphasis mark (`\accdot`).
+    Dot,
+    /// Comma emphasis mark (`\acccomma`).
+    Comma,
+    /// Under-dot emphasis mark (`\accunderdot`).
+    UnderDot,
+    /// Circle emphasis mark (`\acccircle`).
+    Circle,
+}
+
+impl EmphasisMark {
+    /// Return the RTF control word selecting this mark, without the backslash.
+    #[inline]
+    #[must_use]
+    pub const fn control_word(self) -> &'static str {
+        match self {
+            Self::None => "accnone",
+            Self::Dot => "accdot",
+            Self::Comma => "acccomma",
+            Self::UnderDot => "accunderdot",
+            Self::Circle => "acccircle",
+        }
+    }
+}
+
+/// Explicit bidirectional precedence for a character run or paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TextDirection {
+    LeftToRight,
+    RightToLeft,
+}
+
+/// Character repertoire selected for a formatted run.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterType {
+    /// Low ANSI characters (`\\loch`, byte range 0x00 through 0x7f).
+    LowAnsi,
+    /// High ANSI characters (`\\hich`, byte range 0x80 through 0xff).
+    HighAnsi,
+    /// Double-byte characters (`\\dbch`).
+    DoubleByte,
+}
+
+/// Exact form of the East Asian character-grid control.
+///
+/// Parameterless `\\cgrid` is retained separately from a numeric value because
+/// both forms are emitted by common RTF producers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CharacterGrid {
+    /// A parameterless `\\cgrid` control.
+    Parameterless,
+    /// An explicit signed 16-bit `\\cgridN` value.
+    Value(i16),
+}
+
+/// Associated-font baseline selected by `\\aupN` or `\\adnN`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssociatedCharacterBaseline {
+    /// Raise the associated font by the given number of half-points.
+    RaisedHalfPoints(u16),
+    /// Lower the associated font by the given number of half-points.
+    LoweredHalfPoints(u16),
+}
+
+/// Underline styles defined for an associated font.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AssociatedUnderlineStyle {
+    None,
+    Single,
+    Dotted,
+    Double,
+    Words,
+}
+
+/// Associated character properties used for complex-script text.
+///
+/// Optional fields preserve the distinction between an omitted property and an
+/// explicit off value such as `\ab0` or `\ai0`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct AssociatedCharacterFormatting {
+    /// Associated bold override from `\\ab` or `\\ab0`.
+    pub bold: Option<bool>,
+    /// Associated all-capitals override from `\\acaps` or `\\acaps0`.
+    pub all_caps: Option<bool>,
+    /// Associated foreground color from `\\acfN`.
+    pub color_ref: Option<ColorRef>,
+    /// Associated baseline from `\\adnN` or `\\aupN`.
+    pub baseline: Option<AssociatedCharacterBaseline>,
+    /// Associated character expansion in quarter-points from `\\aexpndN`.
+    pub expansion_quarter_points: Option<i16>,
+    /// Associated font reference from `\afN`.
+    pub font_ref: Option<FontRef>,
+    /// Associated font size in half-points from `\afsN`.
+    pub font_size: Option<NonZeroU16>,
+    /// Associated complex-script language from `\alangN`.
+    pub language: Option<crate::LanguageId>,
+    /// Associated italic override from `\ai` or `\ai0`.
+    pub italic: Option<bool>,
+    /// Associated outline override from `\\aoutl` or `\\aoutl0`.
+    pub outline: Option<bool>,
+    /// Associated small-capitals override from `\\ascaps` or `\\ascaps0`.
+    pub small_caps: Option<bool>,
+    /// Associated shadow override from `\\ashad` or `\\ashad0`.
+    pub shadow: Option<bool>,
+    /// Associated strikethrough override from `\\astrike` or `\\astrike0`.
+    pub strike: Option<bool>,
+    /// Associated underline selector, including an explicit no-underline value.
+    pub underline: Option<AssociatedUnderlineStyle>,
+}
+
+impl AssociatedCharacterFormatting {
+    /// Replace this metadata with the omitted/default state.
+    #[inline]
+    pub fn clear(&mut self) {
+        *self = Self::default();
+    }
+
+    /// Set or clear the associated baseline after validating the RTF domain.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn set_baseline(
+        &mut self,
+        value: Option<AssociatedCharacterBaseline>,
+    ) -> crate::Result<()> {
+        if matches!(
+            value,
+            Some(
+                AssociatedCharacterBaseline::RaisedHalfPoints(points)
+                    | AssociatedCharacterBaseline::LoweredHalfPoints(points)
+            ) if points == 0 || i32::from(points) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS
+        ) {
+            return Err(crate::Error::MalformedDocument(
+                "RTF associated character baseline is out of range".to_string(),
+            ));
+        }
+        self.baseline = value;
+        Ok(())
+    }
+
+    /// Set or clear associated quarter-point expansion.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn set_expansion_quarter_points(&mut self, value: Option<i32>) -> crate::Result<()> {
+        self.expansion_quarter_points = match value {
+            None => None,
+            Some(points)
+                if (-crate::MAX_CHARACTER_EXPANSION..=crate::MAX_CHARACTER_EXPANSION)
+                    .contains(&points) =>
+            {
+                Some(points as i16)
+            },
+            Some(_) => {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF associated character expansion is out of range".to_string(),
+                ));
+            },
+        };
+        Ok(())
+    }
+
+    /// Validate metadata before canonical serialization.
+    ///
+    /// # Errors
+    /// Returns an error when the input is malformed or a configured limit is exceeded.
+    pub fn validate(&self) -> crate::Result<()> {
+        if let Some(baseline) = self.baseline {
+            let value = match baseline {
+                AssociatedCharacterBaseline::RaisedHalfPoints(value)
+                | AssociatedCharacterBaseline::LoweredHalfPoints(value) => value,
+            };
+            if value == 0 || i32::from(value) > crate::MAX_CHARACTER_BASELINE_HALF_POINTS {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF associated character baseline is out of range".to_string(),
+                ));
+            }
+        }
+        if self.expansion_quarter_points.is_some_and(|value| {
+            i32::from(value).unsigned_abs() > crate::MAX_CHARACTER_EXPANSION as u32
+        }) {
+            return Err(crate::Error::MalformedDocument(
+                "RTF associated character expansion is out of range".to_string(),
+            ));
+        }
+        Ok(())
+    }
+}
+
+/// Character formatting properties.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Formatting {
+    /// Typed baseline, expansion, scaling, and kerning state.
+    pub character_positioning: crate::CharacterPositioning,
+    /// Applied character-style handle from `\\csN`.
+    ///
+    /// RTF requires the concrete style properties to accompany the reference,
+    /// so this is retained as inert provenance rather than resolved into the
+    /// surrounding formatting.
+    pub character_style: Option<u16>,
+    /// RSID of the revision that inserted this text (`\insrsidN`).
+    pub insert_rsid: Option<u32>,
+    /// RSID of the revision that deleted this text (`\delrsidN`).
+    pub delete_rsid: Option<u32>,
+    /// RSID attached to the character formatting (`\charrsidN`).
+    pub char_style_rsid: Option<u32>,
+    /// Underline color reference from `\ulcN`; `None` uses the text color.
+    pub underline_color: Option<ColorRef>,
+    /// Font reference
+    pub font_ref: FontRef,
+    /// Font size in half-points
+    pub font_size: NonZeroU16,
+    /// Color reference
+    pub color_ref: ColorRef,
+    /// Exact background color reference from `\cbN`; `None` preserves omission.
+    pub background_color: Option<ColorRef>,
+    /// Background/highlight color reference
+    pub highlight_color: Option<ColorRef>,
+    /// Character border introduced by `chbrdr`.
+    pub character_border: Option<CharacterBorder>,
+    /// Exact character shading controls.
+    pub character_shading: Option<CharacterShading>,
+    /// Bold
+    pub bold: bool,
+    /// Italic
+    pub italic: bool,
+    /// Underline style
+    pub underline: UnderlineStyle,
+    /// Strikethrough
+    pub strike: bool,
+    /// Double strikethrough
+    pub double_strike: bool,
+    /// Superscript
+    pub superscript: bool,
+    /// Subscript
+    pub subscript: bool,
+    /// Small caps
+    pub smallcaps: bool,
+    /// All caps
+    pub all_caps: bool,
+    /// Hidden text
+    pub hidden: bool,
+    /// Outline
+    pub outline: bool,
+    /// Shadow
+    pub shadow: bool,
+    /// Emboss
+    pub emboss: bool,
+    /// Engrave (imprint)
+    pub imprint: bool,
+    /// Character spacing (in twips)
+    pub char_spacing: i32,
+    /// Horizontal scaling (percentage)
+    pub char_scale: i32,
+    /// Kerning (in half-points)
+    pub kerning: i32,
+    /// Primary language applied to this run.
+    pub language: Option<crate::LanguageId>,
+    /// East Asian language applied to this run.
+    pub east_asian_language: Option<crate::LanguageId>,
+    /// Primary language retained while proofing is disabled.
+    pub language_no_proof: Option<crate::LanguageId>,
+    /// East Asian language retained while proofing is disabled.
+    pub east_asian_language_no_proof: Option<crate::LanguageId>,
+    /// Whether spelling and grammar proofing is disabled for this run.
+    pub no_proof: bool,
+    /// Explicit character-run direction; `None` uses left-to-right precedence.
+    pub direction: Option<TextDirection>,
+    /// Character repertoire selected by `\\loch`, `\\hich`, or `\\dbch`.
+    pub character_type: Option<CharacterType>,
+    /// Complex-script selector from `\\fcs0` or `\\fcs1`.
+    ///
+    /// `None` means that no selector was present; `Some(false)` preserves an
+    /// explicit `\\fcs0`.
+    pub complex_script: Option<bool>,
+    /// East Asian character-grid metadata from `\\cgrid` or `\\cgridN`.
+    pub character_grid: Option<CharacterGrid>,
+    /// Animated text effect from `\animtextN`.
+    pub animated_text: AnimatedTextEffect,
+    /// Fixed-width text fitting from `\fittextN`.
+    pub fit_text: FitText,
+    /// East Asian emphasis mark from an `\acc*` control.
+    pub emphasis_mark: EmphasisMark,
+    /// Associated complex-script character properties.
+    pub associated: AssociatedCharacterFormatting,
+}
+
+impl Default for Formatting {
+    fn default() -> Self {
+        Self {
+            character_positioning: crate::CharacterPositioning::default(),
+            character_style: None,
+            insert_rsid: None,
+            delete_rsid: None,
+            char_style_rsid: None,
+            underline_color: None,
+            font_ref: 0,
+            font_size: NonZeroU16::new(24).unwrap_or(NonZeroU16::MIN),
+            color_ref: 0,
+            background_color: None,
+            highlight_color: None,
+            character_border: None,
+            character_shading: None,
+            bold: false,
+            italic: false,
+            underline: UnderlineStyle::default(),
+            strike: false,
+            double_strike: false,
+            superscript: false,
+            subscript: false,
+            smallcaps: false,
+            all_caps: false,
+            hidden: false,
+            outline: false,
+            shadow: false,
+            emboss: false,
+            imprint: false,
+            char_spacing: 0,
+            char_scale: 100,
+            kerning: 0,
+            language: None,
+            east_asian_language: None,
+            language_no_proof: None,
+            east_asian_language_no_proof: None,
+            no_proof: false,
+            direction: None,
+            character_type: None,
+            complex_script: None,
+            character_grid: None,
+            animated_text: AnimatedTextEffect::default(),
+            fit_text: FitText::default(),
+            emphasis_mark: EmphasisMark::default(),
+            associated: AssociatedCharacterFormatting::default(),
+        }
+    }
+}
+
+impl Formatting {
+    /// Set or clear the applied character-style handle.
+    #[inline]
+    pub fn set_character_style(&mut self, value: Option<u16>) {
+        self.character_style = value;
+    }
+
+    /// Set or clear the exact `\cbN` character background color.
+    #[inline]
+    pub fn set_background_color(&mut self, value: Option<ColorRef>) {
+        self.background_color = value;
+    }
+
+    /// Clear the exact character background color without changing highlighting.
+    #[inline]
+    pub fn clear_background_color(&mut self) {
+        self.background_color = None;
+    }
+
+    /// Set or clear the character repertoire selector.
+    #[inline]
+    pub fn set_character_type(&mut self, value: Option<CharacterType>) {
+        self.character_type = value;
+    }
+
+    /// Set or clear the complex-script selector.
+    #[inline]
+    pub fn set_complex_script(&mut self, value: Option<bool>) {
+        self.complex_script = value;
+    }
+
+    /// Set or clear the East Asian character-grid metadata.
+    #[inline]
+    pub fn set_character_grid(&mut self, value: Option<CharacterGrid>) {
+        self.character_grid = value;
+    }
+}
+
+/// A text run with formatting.
+#[derive(Debug, Clone)]
+pub struct Run<'a> {
+    /// Text content
+    pub text: Cow<'a, str>,
+    /// Character formatting
+    pub formatting: Formatting,
+}
+
+impl<'a> Run<'a> {
+    /// Create a new run.
+    #[inline]
+    #[must_use]
+    pub fn new(text: Cow<'a, str>, formatting: Formatting) -> Self {
+        Self { text, formatting }
+    }
+
+    /// Get the text content.
+    #[inline]
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Check if this run is bold.
+    #[inline]
+    #[must_use]
+    pub fn bold(&self) -> Option<bool> {
+        Some(self.formatting.bold)
+    }
+
+    /// Check if this run is italic.
+    #[inline]
+    #[must_use]
+    pub fn italic(&self) -> Option<bool> {
+        Some(self.formatting.italic)
+    }
+
+    /// Check if this run has strikethrough.
+    #[inline]
+    #[must_use]
+    pub fn strikethrough(&self) -> Option<bool> {
+        Some(self.formatting.strike || self.formatting.double_strike)
+    }
+
+    /// Check if this run has underline.
+    #[inline]
+    #[must_use]
+    pub fn underline(&self) -> bool {
+        !matches!(self.formatting.underline, UnderlineStyle::None)
+    }
+
+    /// Get the vertical position of this run (superscript/subscript).
+    #[inline]
+    #[must_use]
+    pub fn vertical_position(&self) -> Option<litchi_core::style::text::pos::VerticalPosition> {
+        if self.formatting.superscript {
+            Some(litchi_core::style::text::pos::VerticalPosition::Superscript)
+        } else if self.formatting.subscript {
+            Some(litchi_core::style::text::pos::VerticalPosition::Subscript)
+        } else {
+            None
+        }
+    }
+}
+
+/// A styled block of text with paragraph and character formatting.
+#[derive(Debug, Clone)]
+pub struct StyleBlock<'a> {
+    /// Paragraph properties
+    pub paragraph: Paragraph,
+    /// Character formatting
+    pub formatting: Formatting,
+    /// Text content
+    pub text: Cow<'a, str>,
+}
+
+impl<'a> StyleBlock<'a> {
+    /// Create a new style block.
+    #[inline]
+    #[must_use]
+    pub fn new(text: Cow<'a, str>, formatting: Formatting, paragraph: Paragraph) -> Self {
+        Self {
+            paragraph,
+            formatting,
+            text,
+        }
+    }
+
+    /// Get the text content.
+    #[inline]
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+}
+
+/// A paragraph with content (runs).
+///
+/// This represents a paragraph in the unified Document API, containing
+/// both paragraph properties and the runs that make up the paragraph content.
+#[derive(Debug, Clone)]
+pub struct ParagraphContent<'a> {
+    /// Paragraph properties (alignment, spacing, indentation)
+    pub properties: Paragraph,
+    /// Runs contained in this paragraph
+    pub runs: Vec<Run<'a>>,
+}
+
+/// Document element - either a paragraph or a table.
+///
+/// This enum is used by the `elements()` method to represent
+/// the mixed content of an RTF document in sequential order.
+#[derive(Debug, Clone)]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "public content enum; boxing would break the API"
+)]
+pub enum DocumentElement<'a> {
+    /// A paragraph with formatted runs
+    Paragraph(ParagraphContent<'a>),
+    /// A table with rows and cells
+    Table(super::table::Table<'a>),
+}
+
+impl<'a> ParagraphContent<'a> {
+    /// Create a new paragraph with content.
+    #[inline]
+    #[must_use]
+    pub fn new(properties: Paragraph, runs: Vec<Run<'a>>) -> Self {
+        Self { properties, runs }
+    }
+
+    /// Get the text content of the paragraph.
+    #[inline]
+    #[must_use]
+    pub fn text(&self) -> String {
+        self.runs.iter().map(|r| r.text.as_ref()).collect()
+    }
+
+    /// Get the runs in this paragraph.
+    #[inline]
+    #[must_use]
+    pub fn runs(&self) -> &[Run<'a>] {
+        &self.runs
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_color_new() {
+        let color = Color::new(255, 128, 0);
+        assert_eq!(color.red, 255);
+        assert_eq!(color.green, 128);
+        assert_eq!(color.blue, 0);
+    }
+
+    #[test]
+    fn test_color_black() {
+        let color = Color::black();
+        assert_eq!(color.red, 0);
+        assert_eq!(color.green, 0);
+        assert_eq!(color.blue, 0);
+    }
+
+    #[test]
+    fn test_color_white() {
+        let color = Color::white();
+        assert_eq!(color.red, 255);
+        assert_eq!(color.green, 255);
+        assert_eq!(color.blue, 255);
+    }
+
+    #[test]
+    fn test_color_clone() {
+        let color = Color::new(100, 150, 200);
+        let cloned = color;
+        assert_eq!(cloned.red, color.red);
+        assert_eq!(cloned.green, color.green);
+        assert_eq!(cloned.blue, color.blue);
+    }
+
+    #[test]
+    fn test_color_debug() {
+        let color = Color::new(255, 0, 0);
+        let debug = format!("{color:?}");
+        assert!(debug.contains("Color"));
+        assert!(debug.contains("255"));
+    }
+
+    #[test]
+    fn test_color_table_new() {
+        let table = ColorTable::new();
+        assert!(table.colors().is_empty());
+    }
+
+    #[test]
+    fn test_color_table_default() {
+        let table: ColorTable = ColorTable::default();
+        assert!(table.colors().is_empty());
+    }
+
+    #[test]
+    fn test_color_table_add() {
+        let mut table = ColorTable::new();
+        let idx1 = table.add(Color::new(255, 0, 0));
+        let idx2 = table.add(Color::new(0, 255, 0));
+        assert_eq!(idx1, 0);
+        assert_eq!(idx2, 1);
+        assert_eq!(table.colors().len(), 2);
+    }
+
+    #[test]
+    fn test_color_table_preserves_automatic_entries() {
+        let mut table = ColorTable::new();
+        let automatic = table.add_automatic();
+        let explicit = table.add(Color::black());
+
+        assert!(table.is_automatic(automatic));
+        assert!(!table.is_automatic(explicit));
+        assert_eq!(table.get(automatic), Some(&Color::black()));
+        assert_eq!(table.get(explicit), Some(&Color::black()));
+    }
+
+    #[test]
+    fn test_color_table_get() {
+        let mut table = ColorTable::new();
+        table.add(Color::new(255, 0, 0));
+        table.add(Color::new(0, 255, 0));
+        assert!(table.get(0).is_some());
+        assert!(table.get(1).is_some());
+        assert!(table.get(2).is_none());
+    }
+
+    #[test]
+    fn test_font_family_variants() {
+        assert_eq!(FontFamily::default(), FontFamily::Nil);
+        assert_ne!(FontFamily::Roman, FontFamily::Swiss);
+    }
+
+    #[test]
+    fn test_font_new() {
+        let font = Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss);
+        assert_eq!(font.name, "Arial");
+        assert_eq!(font.family, FontFamily::Swiss);
+        assert_eq!(font.charset, None);
+    }
+
+    #[test]
+    fn font_charset_is_compact_and_maps_pc_pages_exactly() {
+        assert_eq!(size_of::<FontCharset>(), 1);
+        assert_eq!(size_of::<Option<FontCharset>>(), 1);
+        assert_eq!(FontCharset::new(254), Some(FontCharset::Pc437));
+        assert_eq!(FontCharset::Pc437.page(), Some(FontPage::Cp437));
+        assert_eq!(FontCharset::new(255), Some(FontCharset::Oem));
+        assert_eq!(FontCharset::Oem.page(), Some(FontPage::Cp850));
+        assert_eq!(FontCharset::Default.page(), None);
+        assert_eq!(FontCharset::MacShiftJis.page(), None);
+    }
+
+    #[test]
+    fn test_font_table_new() {
+        let table: FontTable<'_> = FontTable::new();
+        assert!(table.fonts().is_empty());
+    }
+
+    #[test]
+    fn test_font_table_insert() {
+        let mut table: FontTable<'_> = FontTable::new();
+        assert!(
+            table
+                .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        assert!(
+            table
+                .insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman))
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(table.fonts().len(), 2);
+    }
+
+    #[test]
+    fn test_font_table_get() {
+        let mut table: FontTable<'_> = FontTable::new();
+        assert!(
+            table
+                .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        assert!(table.get(0).is_some());
+        assert!(table.get(1).is_none());
+    }
+
+    #[test]
+    fn test_font_table_sparse() {
+        let mut table: FontTable<'_> = FontTable::new();
+        assert!(
+            table
+                .insert(5, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        assert_eq!(table.fonts().len(), 6);
+    }
+
+    #[test]
+    fn font_table_insert_returns_replaced_definition() {
+        let mut table: FontTable<'_> = FontTable::new();
+        assert!(
+            table
+                .insert(2, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        let previous = table
+            .insert(
+                2,
+                Font::new(Cow::Borrowed("Times New Roman"), FontFamily::Roman),
+            )
+            .unwrap()
+            .unwrap();
+        assert_eq!(previous.name, "Arial");
+        assert_eq!(table.get(2).unwrap().name, "Times New Roman");
+    }
+
+    #[test]
+    fn font_table_insert_rejects_invalid_fonts_atomically() {
+        let mut table: FontTable<'_> = FontTable::new();
+        let invalid = Font::new(Cow::Borrowed(""), FontFamily::Nil);
+        assert!(table.insert(4, invalid).is_err());
+        assert!(table.fonts().is_empty());
+        assert!(!table.is_defined(4));
+    }
+
+    #[test]
+    fn font_table_lookup_is_total_for_inconsistent_private_storage() {
+        let mut table: FontTable<'_> = FontTable::new();
+        assert!(
+            table
+                .insert(0, Font::new(Cow::Borrowed("Arial"), FontFamily::Swiss))
+                .unwrap()
+                .is_none()
+        );
+        table.fonts.clear();
+        assert!(table.get(0).is_none());
+        assert!(
+            table
+                .insert(1, Font::new(Cow::Borrowed("Times"), FontFamily::Roman))
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_alignment_variants() {
+        assert_eq!(Alignment::default(), Alignment::Left);
+        assert_ne!(Alignment::Left, Alignment::Right);
+    }
+
+    #[test]
+    fn test_spacing_default() {
+        let spacing = Spacing::default();
+        assert_eq!(spacing.before, 0);
+        assert_eq!(spacing.after, 0);
+        assert_eq!(spacing.line, 0);
+        assert!(!spacing.line_multiple);
+    }
+
+    #[test]
+    fn test_indentation_default() {
+        let indent = Indentation::default();
+        assert_eq!(indent.left, 0);
+        assert_eq!(indent.right, 0);
+        assert_eq!(indent.first_line, 0);
+    }
+
+    #[test]
+    fn test_paragraph_default() {
+        let para = Paragraph::default();
+        assert_eq!(para.alignment, Alignment::Left);
+        assert!(!para.keep_together);
+        assert!(!para.keep_next);
+        assert!(!para.page_break_before);
+        assert!(!para.widow_control);
+    }
+
+    #[test]
+    fn test_underline_style_variants() {
+        assert_eq!(UnderlineStyle::default(), UnderlineStyle::None);
+        assert_ne!(UnderlineStyle::Single, UnderlineStyle::Double);
+    }
+
+    #[test]
+    fn test_formatting_default() {
+        let fmt = Formatting::default();
+        assert_eq!(fmt.font_ref, 0);
+        assert!(!fmt.bold);
+        assert!(!fmt.italic);
+        assert!(!fmt.strike);
+        assert!(!fmt.superscript);
+        assert!(!fmt.subscript);
+    }
+
+    #[test]
+    fn test_run_new() {
+        let fmt = Formatting::default();
+        let run = Run::new(Cow::Borrowed("Hello"), fmt);
+        assert_eq!(run.text(), "Hello");
+        assert!(!run.bold().unwrap());
+    }
+
+    #[test]
+    fn test_run_bold() {
+        let fmt = Formatting {
+            bold: true,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("Bold"), fmt);
+        assert!(run.bold().unwrap());
+    }
+
+    #[test]
+    fn test_run_italic() {
+        let fmt = Formatting {
+            italic: true,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("Italic"), fmt);
+        assert!(run.italic().unwrap());
+    }
+
+    #[test]
+    fn test_run_strikethrough() {
+        let fmt = Formatting {
+            strike: true,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("Strike"), fmt);
+        assert!(run.strikethrough().unwrap());
+    }
+
+    #[test]
+    fn test_run_double_strikethrough() {
+        let fmt = Formatting {
+            double_strike: true,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("DStrike"), fmt);
+        assert!(run.strikethrough().unwrap());
+    }
+
+    #[test]
+    fn test_run_underline() {
+        let fmt = Formatting {
+            underline: UnderlineStyle::Single,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("Underline"), fmt);
+        assert!(run.underline());
+    }
+
+    #[test]
+    fn test_run_no_underline() {
+        let fmt = Formatting::default();
+        let run = Run::new(Cow::Borrowed("No Underline"), fmt);
+        assert!(!run.underline());
+    }
+
+    #[test]
+    fn test_run_vertical_position_superscript() {
+        let fmt = Formatting {
+            superscript: true,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("Super"), fmt);
+        assert!(matches!(
+            run.vertical_position(),
+            Some(litchi_core::style::text::pos::VerticalPosition::Superscript)
+        ));
+    }
+
+    #[test]
+    fn test_run_vertical_position_subscript() {
+        let fmt = Formatting {
+            subscript: true,
+            ..Formatting::default()
+        };
+        let run = Run::new(Cow::Borrowed("Sub"), fmt);
+        assert!(matches!(
+            run.vertical_position(),
+            Some(litchi_core::style::text::pos::VerticalPosition::Subscript)
+        ));
+    }
+
+    #[test]
+    fn test_run_vertical_position_none() {
+        let fmt = Formatting::default();
+        let run = Run::new(Cow::Borrowed("Normal"), fmt);
+        assert!(run.vertical_position().is_none());
+    }
+
+    #[test]
+    fn test_style_block_new() {
+        let fmt = Formatting::default();
+        let para = Paragraph::default();
+        let block = StyleBlock::new(Cow::Borrowed("Text"), fmt, para);
+        assert_eq!(block.text(), "Text");
+    }
+
+    #[test]
+    fn test_paragraph_content_new() {
+        let para = Paragraph::default();
+        let content = ParagraphContent::new(para, vec![]);
+        assert!(content.runs().is_empty());
+    }
+
+    #[test]
+    fn test_paragraph_content_text() {
+        let fmt = Formatting::default();
+        let runs = vec![
+            Run::new(Cow::Borrowed("Hello "), fmt),
+            Run::new(Cow::Borrowed("World"), fmt),
+        ];
+        let content = ParagraphContent::new(Paragraph::default(), runs);
+        assert_eq!(content.text(), "Hello World");
+    }
+}

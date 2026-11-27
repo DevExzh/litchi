@@ -145,6 +145,18 @@ impl WorldTransform {
             && self.dx.abs() < 1e-6
             && self.dy.abs() < 1e-6
     }
+
+    /// Compose two column-vector transforms (`self * other`).
+    pub fn multiply(&self, other: &Self) -> Self {
+        Self {
+            m11: self.m11 * other.m11 + self.m21 * other.m12,
+            m12: self.m12 * other.m11 + self.m22 * other.m12,
+            m21: self.m11 * other.m21 + self.m21 * other.m22,
+            m22: self.m12 * other.m21 + self.m22 * other.m22,
+            dx: self.m11 * other.dx + self.m21 * other.dy + self.dx,
+            dy: self.m12 * other.dx + self.m22 * other.dy + self.dy,
+        }
+    }
 }
 
 /// Device Context state
@@ -222,7 +234,10 @@ impl Default for DeviceContext {
 impl DeviceContext {
     /// Transform point from logical to device coordinates
     pub fn transform_point(&self, x: f64, y: f64) -> (f64, f64) {
-        // First apply window-to-viewport mapping
+        // World transform maps logical space to page space first.
+        let (x, y) = self.world_transform.transform_point(x, y);
+
+        // Page-to-device window/viewport mapping follows.
         let vp_x = if self.window_ext_x != 0 {
             (x - self.window_org_x as f64) * (self.viewport_ext_x as f64 / self.window_ext_x as f64)
                 + self.viewport_org_x as f64
@@ -237,8 +252,7 @@ impl DeviceContext {
             y
         };
 
-        // Then apply world transform
-        self.world_transform.transform_point(vp_x, vp_y)
+        (vp_x, vp_y)
     }
 
     /// Set text color from COLORREF
@@ -294,7 +308,9 @@ impl DeviceContextStack {
     pub fn pop_to(&mut self, index: isize) -> Option<DeviceContext> {
         if index < 0 {
             // Negative index means relative from top
-            let abs_index = (-index) as usize;
+            let abs_index = index
+                .checked_abs()
+                .and_then(|value| usize::try_from(value).ok())?;
             if abs_index <= self.stack.len() {
                 // Pop abs_index items
                 for _ in 1..abs_index {

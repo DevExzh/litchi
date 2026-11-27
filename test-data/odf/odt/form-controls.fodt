@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Classic ODF form controls in a text document, modeled on what LibreOffice
+  Writer stores for Form > Text Box / Check Box / List Box and friends:
+
+    * one `office:forms` collection with a single `form:form` holding the
+      common control kinds: text, textarea, checkbox, button, combobox with
+      items, listbox with options, radio, fixed-text, hidden, and the typed
+      number/date/time controls;
+    * a checkbox carrying an inert `script:event-listener` declaration that
+      litchi retains but never executes;
+    * a paragraph anchoring one control through `draw:control`, the way
+      producers place controls in the text flow.
+-->
+<office:document
+    xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0"
+    xmlns:form="urn:oasis:names:tc:opendocument:xmlns:form:1.0"
+    xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0"
+    xmlns:draw="urn:oasis:names:tc:opendocument:xmlns:drawing:1.0"
+    xmlns:script="urn:oasis:names:tc:opendocument:xmlns:script:1.0"
+    xmlns:xlink="http://www.w3.org/1999/xlink"
+    office:mimetype="application/vnd.oasis.opendocument.text"
+    office:version="1.3">
+  <office:body>
+    <office:text>
+      <office:forms form:automatic-focus="false" form:apply-design-mode="true">
+        <form:form form:name="registration">
+          <form:text form:name="Name" xml:id="name_field" form:current-value="Ada" form:title="Your name" form:max-length="40"/>
+          <form:textarea form:name="Bio" xml:id="bio_field" form:readonly="true">
+            <text:p>first line</text:p>
+            <text:p>second line</text:p>
+          </form:textarea>
+          <form:checkbox form:name="Subscribe" xml:id="subscribe_box" form:label="Subscribe to newsletter" form:current-state="checked">
+            <office:event-listeners>
+              <script:event-listener script:language="vnd.sun.star.script:never" script:event-name="form:performaction" script:macro-name="macro:///never.open"/>
+            </office:event-listeners>
+          </form:checkbox>
+          <form:button form:name="Go" xml:id="go_button" form:label="Go"/>
+          <form:combobox form:name="City" xml:id="city_combo" form:current-value="Paris" form:dropdown="true">
+            <form:item form:label="Paris"/>
+            <form:item form:label="London"/>
+          </form:combobox>
+          <form:listbox form:name="Color" xml:id="color_list" form:dropdown="true">
+            <form:option form:label="Red" form:value="r" form:current-selected="true"/>
+            <form:option form:label="Blue" form:value="b"/>
+          </form:listbox>
+          <form:radio form:name="Choice" xml:id="choice_a" form:label="Option A" form:current-selected="true" form:value="a"/>
+          <form:fixed-text form:name="Caption" xml:id="caption_label" form:label="Static caption" form:for="name_field"/>
+          <form:hidden form:name="Token" xml:id="hidden_token" form:value="inert-token"/>
+          <form:number form:name="Age" xml:id="age_number" form:current-value="36"/>
+          <form:date form:name="When" xml:id="when_date" form:current-value="2024-01-31"/>
+          <form:time form:name="At" xml:id="at_time" form:current-value="12:30:00"/>
+        </form:form>
+      </office:forms>
+      <text:p>Registration form <draw:control draw:control="name_field" draw:z-index="0"/> anchored inline.</text:p>
+    </office:text>
+  </office:body>
+</office:document>

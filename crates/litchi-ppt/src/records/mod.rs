@@ -1,0 +1,21 @@
+//! PPT record types and parsing.
+//!
+//! This module provides structures and functions for parsing `PowerPoint` binary records.
+
+pub mod document_info;
+pub mod payload;
+pub mod record;
+pub mod slide_atoms_set;
+pub mod slide_info;
+
+#[cfg(test)]
+mod limit_tests;
+
+// Re-export commonly used types
+pub use document_info::DocumentInfo;
+pub use payload::RecordPayload;
+pub(crate) use record::PayloadStore;
+pub use record::Record;
+pub(crate) use record::RecordParseSession;
+pub use slide_atoms_set::SlideAtomsSet;
+pub use slide_info::SlideInfo;

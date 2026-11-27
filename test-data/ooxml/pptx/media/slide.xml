@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:sld
+    xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:cSld>
+    <p:spTree>
+      <p:pic>
+        <p:nvPicPr>
+          <p:cNvPr id="7" name="clip.mp3"/>
+          <p:cNvPicPr/>
+          <p:nvPr>
+            <a:audioFile r:link="rIdAudio"/>
+          </p:nvPr>
+        </p:nvPicPr>
+      </p:pic>
+    </p:spTree>
+  </p:cSld>
+</p:sld>

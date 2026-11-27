@@ -1,0 +1,224 @@
+//! Native Keynote chart-data reads.
+
+use std::path::PathBuf;
+
+use litchi_keynote::{
+    ChartData, ChartSelector, Package, Position, SlideSelector,
+    chart::data::Error as SlideChartDataError,
+};
+
+type TestResult<T = ()> = Result<T, Box<dyn std::error::Error>>;
+
+const ROWS: [&str; 2] = ["Region 1", "Region 2"];
+const COLUMNS: [&str; 4] = ["April", "May", "June", "July"];
+const VALUES: [[f64; 4]; 2] = [[17.0, 26.0, 53.0, 96.0], [55.0, 43.0, 70.0, 58.0]];
+
+fn fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/chart-caption-native.key")
+}
+
+fn data_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/chart-data-native.key")
+}
+
+fn edited_data_fixture_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/iwork/keynote/chart-data-edited-native.key")
+}
+
+fn expected(values: [[Option<f64>; 4]; 2]) -> ChartData {
+    ChartData::new(
+        ROWS.iter().map(|value| (*value).to_owned()).collect(),
+        COLUMNS.iter().map(|value| (*value).to_owned()).collect(),
+        values
+            .into_iter()
+            .map(|row| row.into_iter().collect())
+            .collect(),
+    )
+    .expect("native chart data is rectangular")
+}
+
+fn exact_bytes(package: &Package) -> TestResult<Vec<u8>> {
+    let mut bytes = Vec::new();
+    package.write_to(&mut bytes)?;
+    Ok(bytes)
+}
+
+#[test]
+fn native_chart_data_reads_the_selected_grid_and_preserves_exact_bytes() -> TestResult {
+    let source = std::fs::read(fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+
+    let data = package.slide_chart_data(
+        SlideSelector::position(Position::new(0)),
+        ChartSelector::index(0),
+    )?;
+
+    assert_eq!(data, expected(VALUES.map(|row| row.map(Some))));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn native_chart_data_preserves_missing_numeric_cells() -> TestResult {
+    let source = std::fs::read(data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+
+    let data = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+
+    assert_eq!(
+        data,
+        expected([
+            [Some(17.25), None, Some(53.0), Some(96.0)],
+            [Some(55.0), Some(43.0), Some(70.0), Some(58.0)],
+        ])
+    );
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn native_keynote_saved_chart_data_matches_the_golden_grid_and_caption() -> TestResult {
+    let source = std::fs::read(edited_data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+
+    let data = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    assert_eq!(
+        data,
+        expected([
+            [Some(27.5), Some(12.75), Some(53.0), Some(96.0)],
+            [Some(55.0), Some(43.0), Some(70.0), Some(58.0)],
+        ])
+    );
+    assert_eq!(
+        package.slide_chart_caption(SlideSelector::index(0), ChartSelector::index(0))?,
+        Some(String::from("Native chart caption marker"))
+    );
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn chart_data_rejects_unknown_selectors_before_reading_a_grid() -> TestResult {
+    let source = std::fs::read(fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+
+    assert!(matches!(
+        package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(1)),
+        Err(SlideChartDataError::Refused(litchi_keynote::chart::data::Refusal::ChartPositionNotFound { position }))
+            if position == Position::new(1)
+    ));
+    assert!(matches!(
+        package.slide_chart_data(SlideSelector::index(1), ChartSelector::index(0)),
+        Err(SlideChartDataError::Refused(litchi_keynote::chart::data::Refusal::SlidePositionNotFound { position }))
+            if position == Position::new(1)
+    ));
+    assert!(matches!(
+        package.slide_chart_data(SlideSelector::index(0), ChartSelector::name("")),
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::EmptyChartName
+        ))
+    ));
+    assert_eq!(exact_bytes(&package)?, source);
+    Ok(())
+}
+
+#[test]
+fn native_chart_data_transaction_rewrites_values_and_restores_exact_source() -> TestResult {
+    let source = std::fs::read(data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    let mut values = before.values().to_owned();
+    values[0][0] = Some(27.5);
+    values[0][1] = Some(12.75);
+    let requested = ChartData::new(
+        before.row_names().to_owned(),
+        before.column_names().to_owned(),
+        values,
+    )?;
+
+    let edit = package.edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+    assert!(format!("{edit:?}").contains("has_selection: false"));
+    let noop = edit.set(before.clone()).commit()?;
+    assert!(noop.patch().is_noop());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(exact_bytes(noop.package())?, source);
+
+    let commit = package
+        .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+        .set(requested.clone())
+        .commit()?;
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.diagnostics().touched_components(), 1);
+    assert_eq!(
+        commit
+            .package()
+            .slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?,
+        requested
+    );
+    assert!(!commit.patch().is_noop());
+    assert!(matches!(
+        commit.package().apply_slide_chart_data(commit.patch()),
+        Err(SlideChartDataError::PatchConflict)
+    ));
+
+    let restored = commit
+        .package()
+        .apply_slide_chart_data(&commit.patch().inverse())?;
+    assert_eq!(exact_bytes(restored.package())?, source);
+    assert_eq!(
+        restored
+            .package()
+            .slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?,
+        before
+    );
+    Ok(())
+}
+
+#[test]
+fn chart_data_transaction_refuses_label_and_shape_changes() -> TestResult {
+    let source = std::fs::read(data_fixture_path())?;
+    let package = Package::from_bytes(&source)?;
+    let before = package.slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?;
+
+    let mut labels = before.row_names().to_owned();
+    labels[0].push_str(" changed");
+    let changed_labels = ChartData::new(
+        labels,
+        before.column_names().to_owned(),
+        before.values().to_owned(),
+    )?;
+    assert!(matches!(
+        package
+            .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+            .set(changed_labels)
+            .commit(),
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::LabelsChanged
+        ))
+    ));
+
+    let mut changed_shape = before.values().to_owned();
+    for row in &mut changed_shape {
+        row.push(None);
+    }
+    let mut changed_columns = before.column_names().to_owned();
+    changed_columns.push(String::from("August"));
+    let changed_shape = ChartData::new(
+        before.row_names().to_owned(),
+        changed_columns,
+        changed_shape,
+    )?;
+    assert!(matches!(
+        package
+            .edit_slide_chart_data(SlideSelector::index(0), ChartSelector::index(0))?
+            .set(changed_shape)
+            .commit(),
+        Err(SlideChartDataError::Refused(
+            litchi_keynote::chart::data::Refusal::LabelsChanged
+        ))
+    ));
+    Ok(())
+}

@@ -1,0 +1,435 @@
+use super::TextRuler;
+use super::package::{Error, Result};
+/// `EscherTextboxWrapper` implementation.
+///
+/// Based on Apache POI's `EscherTextboxWrapper`, this wraps an Escher textbox record
+/// and provides access to its child PPT records (`TextCharsAtom`, `TextBytesAtom`, `StyleTextPropAtom`).
+use super::records::{Record, RecordParseSession};
+use super::text_interaction::{TextInteraction, TextInteractionLimits, text_units_from_records};
+use super::text_run::{ParagraphRun, TextRun, TextRunExtractor};
+use crate::consts::RecordType;
+
+/// Wrapper around Escher textbox data.
+///
+/// Based on POI's `EscherTextboxWrapper`. Parses child records from the textbox data.
+#[derive(Debug, Clone)]
+pub struct EscherTextboxWrapper {
+    /// The raw Escher textbox data
+    data: Vec<u8>,
+    /// Child PPT records found in the textbox
+    child_records: Vec<Record>,
+    /// Extracted text
+    text: String,
+    /// Text split into character-formatting runs
+    runs: Vec<TextRun>,
+    /// Text split into paragraph-formatting runs
+    paragraph_runs: Vec<ParagraphRun>,
+    /// Text ruler carried by the textbox, when present
+    text_ruler: Option<TextRuler>,
+    /// Range-anchored click and mouse-over actions.
+    text_interactions: Vec<TextInteraction>,
+    /// Header/footer metacharacter placeholders in the textbox.
+    metachars: Vec<super::text_metachar::TextMetachar>,
+    /// Outline text references tying the textbox to outline text bodies.
+    outline_text_refs: Vec<super::text_si_exception::OutlineTextRef>,
+}
+
+impl EscherTextboxWrapper {
+    /// Create a new wrapper from Escher textbox data.
+    ///
+    /// Based on POI's `EscherTextboxWrapper` constructor which calls
+    /// Record.findChildRecords(data, 0, data.length).
+    ///
+    /// Text-style defects repaired while parsing (see
+    /// [`crate::TextPropDefect`]) are applied but *not* enumerable through
+    /// this convenience constructor; use [`Self::new_with_report`] to
+    /// enumerate them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn new(data: Vec<u8>) -> Result<Self> {
+        Self::new_with_interaction_limits(data, TextInteractionLimits::default())
+    }
+
+    /// Create a wrapper with explicit text-interaction resource limits.
+    ///
+    /// Like [`Self::new`], repaired text-style defects are not enumerable
+    /// through this constructor; use
+    /// [`Self::new_with_interaction_limits_and_report`] to enumerate them.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn new_with_interaction_limits(
+        data: Vec<u8>,
+        limits: TextInteractionLimits,
+    ) -> Result<Self> {
+        Self::new_with_interaction_limits_and_report(
+            data,
+            limits,
+            &mut crate::leniency::ToleranceReport::default(),
+        )
+    }
+
+    /// Create a wrapper, recording every repaired non-structural text-style
+    /// defect in `report`.
+    ///
+    /// Records [`crate::TextPropDefect`] classes repaired while the textbox's
+    /// `StyleTextPropAtom` is parsed: clamped run coverage and masked
+    /// reserved `BulletFlags`/`PFWrapFlags` bits, plus ignored
+    /// duplicate `TextRulerAtom` records
+    /// ([`crate::ShapeDefect::DuplicateTextRuler`]). A detached
+    /// text-box payload knows neither its slide nor its shape, so the
+    /// recorded [`crate::DefectLocation`] fields stay `None`; the slide and
+    /// notes shape readers fill them in.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn new_with_report(
+        data: Vec<u8>,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        Self::new_with_interaction_limits_and_report(data, TextInteractionLimits::default(), report)
+    }
+
+    /// Create a source-bound wrapper, recording repaired text-style defects.
+    ///
+    /// Shape projections retain the package's [`crate::SourceLimits`] while
+    /// the detached `ClientTextbox` payload is decoded.  Keep those limits
+    /// on this second parse too; otherwise a low event, depth, or record-size
+    /// profile would be silently replaced by the neutral wrapper defaults.
+    pub(crate) fn new_source_bound_with_report(
+        data: Vec<u8>,
+        source_limits: crate::SourceLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        Self::new_with_source_limits_and_interaction_limits_and_report(
+            data,
+            source_limits,
+            crate::text_interaction::limits_for_source(source_limits),
+            report,
+        )
+    }
+
+    /// Create a wrapper with explicit text-interaction resource limits,
+    /// recording every repaired non-structural text-style defect in `report`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn new_with_interaction_limits_and_report(
+        data: Vec<u8>,
+        limits: TextInteractionLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        // Parse child records from the escher data
+        let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        Self::new_with_source_limits_and_interaction_limits_and_report(
+            data,
+            source_limits,
+            limits,
+            report,
+        )
+    }
+
+    fn new_with_source_limits_and_interaction_limits_and_report(
+        data: Vec<u8>,
+        source_limits: crate::SourceLimits,
+        limits: TextInteractionLimits,
+        report: &mut crate::leniency::ToleranceReport,
+    ) -> Result<Self> {
+        let child_records = Self::find_child_records(&data, &source_limits)?;
+
+        let mut extractor = TextRunExtractor::new();
+        extractor.extract_from_records_with_report(&child_records, report)?;
+        let text = extractor.text().to_string();
+        let runs = extractor.runs().to_vec();
+        let paragraph_runs = extractor.paragraph_runs().to_vec();
+        let mut ruler_records = child_records
+            .iter()
+            .filter(|record| record.record_type == RecordType::TextRulerAtom);
+        let text_ruler = ruler_records
+            .next()
+            .map(|record| TextRuler::parse(&record.data))
+            .transpose()?;
+        // MS-PPT 2.9.43 defines one optional ruler; POI tolerates several.
+        // Keep the first and record every ignored duplicate.
+        for (ordinal, _) in (1u32..).zip(ruler_records) {
+            report.record(crate::leniency::ShapeDefect::DuplicateTextRuler, ordinal);
+        }
+        let text_interactions = Self::text_interactions_from_records(&child_records, limits)?;
+        let metachars = super::text_metachar::metachars_from_records(child_records.iter())?;
+        let outline_text_refs = child_records
+            .iter()
+            .filter(|record| record.record_type == RecordType::OutlineTextRefAtom)
+            .map(super::text_si_exception::OutlineTextRef::parse_record)
+            .collect::<Result<Vec<_>>>()?;
+
+        Ok(Self {
+            data,
+            child_records,
+            text,
+            runs,
+            paragraph_runs,
+            text_ruler,
+            text_interactions,
+            metachars,
+            outline_text_refs,
+        })
+    }
+
+    /// Find child PPT records in the Escher textbox data.
+    ///
+    /// Based on POI's `Record.findChildRecords()`.
+    fn find_child_records(data: &[u8], limits: &crate::SourceLimits) -> Result<Vec<Record>> {
+        let mut session = RecordParseSession::new(*limits, data.len())?;
+        let mut records = Vec::new();
+        let mut offset = 0;
+
+        while offset < data.len() {
+            let header_end = offset.checked_add(8).ok_or_else(|| {
+                Error::Corrupted("ClientTextbox record offset overflow".to_string())
+            })?;
+            if header_end > data.len() {
+                return Err(Error::Corrupted(
+                    "Truncated record header in ClientTextbox".to_string(),
+                ));
+            }
+
+            let payload_length = u32::from_le_bytes([
+                data[offset + 4],
+                data[offset + 5],
+                data[offset + 6],
+                data[offset + 7],
+            ]);
+            let payload_len = usize::try_from(payload_length).map_err(|_err| {
+                Error::Corrupted("ClientTextbox record size overflow".to_string())
+            })?;
+            let record_end = header_end.checked_add(payload_len).ok_or_else(|| {
+                Error::Corrupted("ClientTextbox record size overflow".to_string())
+            })?;
+            if record_end > data.len() {
+                return Err(Error::Corrupted(
+                    "Record extends beyond ClientTextbox data".to_string(),
+                ));
+            }
+
+            let (record, consumed) = session.parse_strict_record_at_depth(data, offset, 0)?;
+            if consumed != record_end - offset {
+                return Err(Error::Corrupted(
+                    "ClientTextbox child record was only partially parsed".to_string(),
+                ));
+            }
+            records.push(record);
+            offset = record_end;
+        }
+
+        Ok(records)
+    }
+
+    /// Parse only text-range actions without retaining or decoding the textbox.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn parse_text_interactions_with_limits(
+        data: &[u8],
+        limits: TextInteractionLimits,
+    ) -> Result<Vec<TextInteraction>> {
+        let source_limits = crate::hyperlink::interaction_source_limits(limits.interaction)?;
+        let records = Self::find_child_records(data, &source_limits)?;
+        Self::text_interactions_from_records(&records, limits)
+    }
+
+    fn text_interactions_from_records(
+        records: &[Record],
+        limits: TextInteractionLimits,
+    ) -> Result<Vec<TextInteraction>> {
+        let has_text_interactions = records.iter().any(|record| {
+            matches!(
+                record.record_type,
+                RecordType::InteractiveInfo | RecordType::TextInteractiveInfoAtom
+            )
+        });
+        if !has_text_interactions {
+            return Ok(Vec::new());
+        }
+        let mut headers = records
+            .iter()
+            .filter(|record| record.record_type == RecordType::TextHeaderAtom);
+        let header = headers.next().ok_or_else(|| {
+            Error::Corrupted("Interactive ClientTextbox has no TextHeaderAtom".to_string())
+        })?;
+        if headers.next().is_some()
+            || header.version != 0
+            || header.data_length != 4
+            || header.data.len() != 4
+        {
+            return Err(Error::Corrupted(
+                "Interactive ClientTextbox has an invalid TextHeaderAtom".to_string(),
+            ));
+        }
+        let text_type = header.data.as_slice().try_into().map_err(|_err| {
+            Error::Corrupted(
+                "Interactive ClientTextbox TextHeaderAtom is not four bytes".to_string(),
+            )
+        })?;
+        let _ = crate::TextType::parse(u32::from_le_bytes(text_type))?;
+        let text_units = text_units_from_records(records)?;
+        TextInteraction::parse_records(records, text_units, limits)
+    }
+
+    /// Get the extracted text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Get child records.
+    #[must_use]
+    pub fn child_records(&self) -> &[Record] {
+        &self.child_records
+    }
+
+    /// Get the character-formatting runs extracted from `StyleTextPropAtom`.
+    #[must_use]
+    pub fn runs(&self) -> &[TextRun] {
+        &self.runs
+    }
+
+    /// Get paragraph-formatting runs extracted from `StyleTextPropAtom`.
+    #[must_use]
+    pub fn paragraph_runs(&self) -> &[ParagraphRun] {
+        &self.paragraph_runs
+    }
+
+    /// Get the textbox-specific ruler, when present.
+    #[must_use]
+    pub fn text_ruler(&self) -> Option<&TextRuler> {
+        self.text_ruler.as_ref()
+    }
+
+    /// Strictly paired text-range interactions in record order.
+    #[must_use]
+    pub fn text_interactions(&self) -> &[TextInteraction] {
+        &self.text_interactions
+    }
+
+    /// Header/footer metacharacter placeholders in this textbox, in record
+    /// order (MS-PPT 2.9.47-2.9.52). Placeholders are never substituted,
+    /// formatted, or laid out.
+    #[must_use]
+    pub fn metachars(&self) -> &[super::text_metachar::TextMetachar] {
+        &self.metachars
+    }
+
+    /// Outline text references (`OutlineTextRefAtom`, MS-PPT 2.9.78) tying
+    /// this textbox to outline text bodies.
+    #[must_use]
+    pub fn outline_text_refs(&self) -> &[super::text_si_exception::OutlineTextRef] {
+        &self.outline_text_refs
+    }
+
+    /// Find a `StyleTextPropAtom` record.
+    #[must_use]
+    pub fn find_style_text_prop_atom(&self) -> Option<&Record> {
+        self.child_records
+            .iter()
+            .find(|r| r.record_type == RecordType::StyleTextPropAtom)
+    }
+
+    /// Get the raw data.
+    #[must_use]
+    pub fn data(&self) -> &[u8] {
+        &self.data
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_escher_textbox_wrapper_creation() {
+        // Create a simple textbox with a TextCharsAtom
+        // PPT record header: ver/inst (2 bytes) | type (2 bytes) | length (4 bytes)
+        let mut data = Vec::new();
+
+        // TextCharsAtom: Record type 0x0FA0 (4000)
+        data.extend_from_slice(&[0x00, 0x00]); // Version/instance (ver=0, inst=0)
+        data.extend_from_slice(&[0xA0, 0x0F]); // Record type 0x0FA0 (little-endian)
+        data.extend_from_slice(&[0x0A, 0x00, 0x00, 0x00]); // Length: 10 bytes (little-endian)
+
+        // Text data (UTF-16LE): "Hello"
+        data.extend_from_slice(&[
+            0x48, 0x00, // 'H'
+            0x65, 0x00, // 'e'
+            0x6C, 0x00, // 'l'
+            0x6C, 0x00, // 'l'
+            0x6F, 0x00, // 'o'
+        ]);
+
+        let wrapper = EscherTextboxWrapper::new(data).unwrap();
+        assert!(wrapper.text().contains("Hello") || !wrapper.text().is_empty());
+        assert!(!wrapper.child_records().is_empty());
+    }
+
+    #[test]
+    fn rejects_truncated_child_record_instead_of_resynchronizing() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&4008u16.to_le_bytes());
+        data.extend_from_slice(&5u32.to_le_bytes());
+        data.extend_from_slice(b"bad");
+
+        let error = EscherTextboxWrapper::new(data).unwrap_err();
+        assert!(error.to_string().contains("extends beyond ClientTextbox"));
+    }
+
+    #[test]
+    fn allows_client_textboxes_without_inline_text() {
+        let mut data = Vec::new();
+        data.extend_from_slice(&0u16.to_le_bytes());
+        data.extend_from_slice(&3999u16.to_le_bytes());
+        data.extend_from_slice(&4u32.to_le_bytes());
+        data.extend_from_slice(&1u32.to_le_bytes());
+
+        let wrapper = EscherTextboxWrapper::new(data).unwrap();
+        assert_eq!(wrapper.text(), "");
+        assert!(wrapper.runs().is_empty());
+    }
+
+    #[test]
+    fn keeps_the_first_of_multiple_text_rulers_and_records_the_rest() {
+        let mut data = Vec::new();
+        for _ in 0..3 {
+            data.extend_from_slice(&0u16.to_le_bytes());
+            data.extend_from_slice(&4006u16.to_le_bytes());
+            data.extend_from_slice(&4u32.to_le_bytes());
+            data.extend_from_slice(&0u32.to_le_bytes());
+        }
+
+        let mut report = crate::leniency::ToleranceReport::default();
+        let wrapper = EscherTextboxWrapper::new_with_report(data, &mut report).unwrap();
+        assert!(wrapper.text_ruler().is_some());
+        assert_eq!(
+            report
+                .defects()
+                .iter()
+                .map(|defect| (defect.defect, defect.context))
+                .collect::<Vec<_>>(),
+            [
+                (
+                    crate::Defect::Shape(crate::ShapeDefect::DuplicateTextRuler),
+                    1
+                ),
+                (
+                    crate::Defect::Shape(crate::ShapeDefect::DuplicateTextRuler),
+                    2
+                ),
+            ]
+        );
+    }
+}

@@ -13,7 +13,7 @@ use litchi::Result;
 #[cfg(feature = "odf")]
 use litchi::common::Metadata;
 #[cfg(feature = "odf")]
-use litchi::odf::DocumentBuilder;
+use litchi::odt::Builder;
 
 #[cfg(feature = "odf")]
 fn main() -> Result<()> {
@@ -22,8 +22,8 @@ fn main() -> Result<()> {
     let output_file = "odt_writer_test_output.odt";
     println!("📝 Creating comprehensive ODT document: {}", output_file);
 
-    // Create a new document using DocumentBuilder
-    let mut builder = DocumentBuilder::new();
+    // Create a new document using the ODT builder.
+    let mut builder = Builder::new();
 
     // Set document metadata
     println!("✅ Setting metadata...");
@@ -134,8 +134,8 @@ fn main() -> Result<()> {
     println!("✅ Adding technical content...");
     builder.add_paragraph("API Methods Available:")?;
     builder.add_bulleted_list(vec![
-        "Document::open() - Load documents from file",
-        "Document::from_bytes() - Load from memory",
+        "Package::open() - Load packages from file",
+        "Package::from_bytes() - Load from memory",
         "text() - Extract plain text",
         "paragraphs() - Get structured paragraphs",
         "tables() - Parse document tables",
@@ -191,7 +191,7 @@ fn main() -> Result<()> {
 
     // Save the document
     println!("💾 Saving document to: {}", output_file);
-    builder.save(output_file)?;
+    builder.build()?.save(output_file)?;
 
     println!("✅ Document saved successfully!");
     println!("\n📊 Document Contents:");

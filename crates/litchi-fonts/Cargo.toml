@@ -1,6 +1,6 @@
 [package]
 name        = "litchi-fonts"
-description = "Font discovery, loading, and subsetting for the Litchi office-formats library."
+description = "Font discovery, OpenType metadata, glyph subsetting, Office embedding, and obfuscation for Litchi."
 version.workspace      = true
 edition.workspace      = true
 authors.workspace      = true
@@ -8,9 +8,31 @@ license.workspace      = true
 repository.workspace   = true
 rust-version.workspace = true
 
+[features]
+default = []
+# OpenType cmap mapping and font-program reduction through allsorts.
+subset = ["dep:allsorts"]
+# Native system-font resolution through font-kit/fontconfig.
+discovery = ["dep:font-kit"]
+# The conventional system-resolution and subsetting workflow.
+automatic = ["discovery", "subset"]
+
 [dependencies]
-allsorts    = { workspace = true }
-font-kit    = { workspace = true }
+# Keep the reviewed decoder paths explicit: this crate is also consumed by
+# standalone Cargo roots, which do not inherit the workspace patch table.
+allsorts    = { version = "0.17", path = "../../vendor/allsorts", default-features = false, features = ["flate2_zlib-rs"], optional = true }
+font-kit    = { workspace = true, optional = true }
 litchi-core = { workspace = true }
 roaring     = { workspace = true }
 thiserror   = { workspace = true }
+
+[[example]]
+name = "load_font"
+required-features = ["discovery"]
+
+[[example]]
+name = "subset_glyphs"
+required-features = ["automatic"]
+
+[lints]
+workspace = true

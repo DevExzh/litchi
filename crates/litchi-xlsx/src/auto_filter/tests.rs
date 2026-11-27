@@ -1,0 +1,497 @@
+use super::codec::*;
+use super::model::*;
+use super::package::parse_auto_filter;
+use crate::sort::SortMethod;
+use litchi_opc::PackURI;
+fn fixture(path: &str) -> Definition {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
+    let p = litchi_opc::phys_pkg::OwnedPhysPkgReader::open(
+        root.join(path),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    let u = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    parse_auto_filter(&p.blob_for(&u).unwrap())
+        .unwrap()
+        .unwrap()
+}
+#[test]
+fn parses_bundled_fixtures() {
+    let custom = fixture("test-data/ooxml/xlsx/autofilter.xlsx");
+    assert_eq!(custom.reference.unwrap().as_str(), "A1:C5");
+    assert!(matches!(
+        custom.columns[0].payload,
+        Some(Payload::Custom(_))
+    ));
+    let values = fixture("test-data/ooxml/xlsx/autofilternamedrange.xlsx");
+    assert!(matches!(&values.columns[0].payload,Some(Payload::Values(v))if v.items.len()==2));
+    let date = fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/dateAutofilter.xlsx");
+    assert!(matches!(&date.columns[0].payload,Some(Payload::Values(v))if v.items.len()==2));
+    let top = fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/tdf143068_top10filter.xlsx");
+    assert!(
+        matches!(&top.columns[0].payload,Some(Payload::Top10(v))if v.value==4.0&&v.filter_value==Some(7.0))
+    );
+    let buttons =
+        fixture("test-data/libreoffice-core/sc/qa/unit/data/xlsx/autofilterShowButton.xlsx");
+    assert_eq!(buttons.columns.len(), 4);
+    assert!(buttons.columns.iter().all(|v| !v.show_button));
+    for f in [
+        "test-data/ooxml/xlsx/sortconditionref.xlsx",
+        "test-data/ooxml/xlsx/sortconditionref2.xlsx",
+    ] {
+        let v = fixture(f);
+        assert_eq!(v.sort_state.unwrap().conditions.len(), 1);
+    }
+}
+#[test]
+fn parses_all_variants_strict_and_mce() {
+    let xml=br#"<s:worksheet xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><s:autoFilter ref="A1:F9"><s:filterColumn colId="0"><s:filters blank="1"><s:filter val="x"/><s:dateGroupItem year="2024" month="2" dateTimeGrouping="month"/></s:filters></s:filterColumn><s:filterColumn colId="1"><s:customFilters and="1"><s:customFilter operator="greaterThan" val="2"/></s:customFilters></s:filterColumn><s:filterColumn colId="2"><s:dynamicFilter type="today" val="4"/></s:filterColumn><s:filterColumn colId="3"><s:colorFilter dxfId="2" cellColor="0"/></s:filterColumn><s:filterColumn colId="4"><mc:AlternateContent><mc:Choice Requires="x14"><x14:iconFilter iconSet="3Arrows" iconId="2"/></mc:Choice><mc:Fallback><s:customFilters><s:customFilter val="fallback"/></s:customFilters></mc:Fallback></mc:AlternateContent></s:filterColumn><s:filterColumn colId="5"><s:top10 percent="1" val="10"/></s:filterColumn><s:sortState ref="A2:F9" caseSensitive="1" sortMethod="none"><s:sortCondition ref="D2:D9" sortBy="cellColor" dxfId="2"/><s:sortCondition ref="E2:E9" sortBy="icon" iconSet="3Arrows" iconId="1"/></s:sortState></s:autoFilter></s:worksheet>"#;
+    let v = parse_auto_filter(xml).unwrap().unwrap();
+    assert_eq!(v.columns.len(), 6);
+    assert!(matches!(v.columns[4].payload, Some(Payload::Custom(_))));
+    let sort = v.sort_state.unwrap();
+    assert_eq!(sort.sort_method, Some(SortMethod::None));
+    assert_eq!(sort.conditions.len(), 2);
+}
+
+#[test]
+fn authored_filter_payloads_round_trip_through_shared_serializer() {
+    let payloads = vec![
+        Payload::Values(
+            Values::new(
+                true,
+                Calendar::Gregorian,
+                vec![
+                    Item::Value("North".into()),
+                    Item::DateGroup(
+                        DateGroup::new(2026, Some(7), Some(26), None, None, None, Grouping::Day)
+                            .unwrap(),
+                    ),
+                ],
+            )
+            .unwrap(),
+        ),
+        Payload::Custom(
+            Customs::new(
+                true,
+                vec![
+                    Custom::new(Operator::GreaterThan, "10").unwrap(),
+                    Custom::new(Operator::LessThan, "20").unwrap(),
+                ],
+            )
+            .unwrap(),
+        ),
+        Payload::Dynamic(Dynamic::new(DynamicType::ThisMonth, Some(1.5), Some(2.5)).unwrap()),
+        Payload::Color(Color::new(4, false)),
+        Payload::Icon(Icon::new(IconSet::ThreeArrows, 2).unwrap()),
+        Payload::Top10(Top10::new(false, true, 25.0, Some(9.0)).unwrap()),
+    ];
+    let mut authored = Definition::new(Some(Range::new("A1:F20").unwrap()));
+    for (column_id, payload) in payloads.into_iter().enumerate() {
+        let mut column = Column::new(column_id as u32).unwrap();
+        column.set_payload(Some(payload));
+        authored.columns.push(column);
+    }
+
+    let xml = write_auto_filter_fragment(&authored).unwrap();
+    assert_eq!(parse_auto_filter_fragment(&xml).unwrap(), authored);
+}
+
+#[test]
+fn authored_sort_state_round_trips_and_strict_splice_preserves_neighbors() {
+    use crate::sort::SortBy;
+
+    let condition = Condition::new(Range::new("B2:B20").unwrap(), true, SortBy::Value);
+    let state = State::new(
+        Range::new("A2:C20").unwrap(),
+        false,
+        true,
+        Some(SortMethod::None),
+        vec![condition],
+    )
+    .unwrap();
+    let mut definition = Definition::new(Some(Range::new("A1:C20").unwrap()));
+    definition.set_sort_state(Some(state)).unwrap();
+
+    let xml = br#"<s:worksheet xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main"><s:sheetData/><!--keep--><s:mergeCells count="0"/></s:worksheet>"#;
+    let changed = super::package::replace_auto_filter(xml, Some(&definition)).unwrap();
+    assert!(
+        changed
+            .windows(b"<!--keep-->".len())
+            .any(|v| v == b"<!--keep-->")
+    );
+    let strict_filter = b"<x:autoFilter xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"";
+    assert!(
+        changed
+            .windows(strict_filter.len())
+            .any(|value| value == strict_filter)
+    );
+    assert_eq!(
+        parse_auto_filter(&changed).unwrap(),
+        Some(definition.clone())
+    );
+    let cleared = super::package::replace_auto_filter(&changed, None).unwrap();
+    assert_eq!(cleared, xml);
+}
+
+#[test]
+fn source_publication_refuses_mce_selected_auto_filter() {
+    let xml = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="http://schemas.microsoft.com/office/spreadsheetml/2009/9/main"><sheetData/><mc:AlternateContent><mc:Choice Requires="x14"><autoFilter ref="A1:A2"/></mc:Choice><mc:Fallback/></mc:AlternateContent></worksheet>"#;
+    let definition = Definition::new(Some(Range::new("A1:B2").unwrap()));
+    assert!(super::package::replace_auto_filter(xml, Some(&definition)).is_err());
+}
+
+#[test]
+fn rejects_malformed_and_security_cases() {
+    for xml in [
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="B2:A1"/></worksheet>"#,
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="A1:A2"><filterColumn colId="1"/></autoFilter></worksheet>"#,
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="A1:B2"><filterColumn colId="0"/><filterColumn colId="0"/></autoFilter></worksheet>"#,
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="A1:B2"><filterColumn colId="0"><customFilters/></filterColumn></autoFilter></worksheet>"#,
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="A1:B2"><filterColumn colId="0"><top10 percent="1" val="101"/></filterColumn></autoFilter></worksheet>"#,
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter><sortState ref="A1"><sortCondition ref="A1" sortBy="icon"/></sortState></autoFilter></worksheet>"#,
+        r#"<!DOCTYPE x><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+        r#"<?bad x?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+        r#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><autoFilter ref="A1"><filterColumn colId="0"><filters><filter val="&bogus;"/></filters></filterColumn></autoFilter></worksheet>"#,
+    ] {
+        assert!(parse_auto_filter(xml.as_bytes()).is_err(), "{xml}");
+    }
+    let conditions = "<sortCondition ref=\"A1\"/>".repeat(MAX_SORT_CONDITIONS + 1);
+    let xml = format!(
+        "<worksheet xmlns=\"http://schemas.openxmlformats.org/spreadsheetml/2006/main\"><autoFilter><sortState ref=\"A1\">{conditions}</sortState></autoFilter></worksheet>"
+    );
+    assert!(parse_auto_filter(xml.as_bytes()).is_err());
+}
+
+#[test]
+fn worksheet_replacement_preserves_dialect_and_unrelated_bytes() {
+    let strict = br#"<s:worksheet xmlns:s="http://purl.oclc.org/ooxml/spreadsheetml/main"><s:sheetData/><!--keep--><s:pageMargins left="1" right="1" top="1" bottom="1" header="0" footer="0"/></s:worksheet>"#;
+    let mut value = Definition::new(Some(Range::new("A1:C9").unwrap()));
+    let mut column = Column::new(0).unwrap();
+    column.set_payload(Some(Payload::Values(
+        Values::new(
+            false,
+            Calendar::None,
+            vec![Item::Value("violet".to_owned())],
+        )
+        .unwrap(),
+    )));
+    value.columns.push(column);
+    let output = super::package::replace_auto_filter(strict, Some(&value)).unwrap();
+    assert!(
+        output
+            .windows(b"<!--keep-->".len())
+            .any(|v| v == b"<!--keep-->")
+    );
+    let strict_filter = b"<x:autoFilter xmlns:x=\"http://purl.oclc.org/ooxml/spreadsheetml/main\"";
+    assert!(
+        output
+            .windows(strict_filter.len())
+            .any(|value| value == strict_filter)
+    );
+    assert_eq!(parse_auto_filter(&output).unwrap(), Some(value.clone()));
+    assert_eq!(
+        super::package::replace_auto_filter(&output, Some(&value)).unwrap(),
+        output
+    );
+    let cleared = super::package::replace_auto_filter(&output, None).unwrap();
+    assert_eq!(parse_auto_filter(&cleared).unwrap(), None);
+    assert!(
+        cleared
+            .windows(b"<!--keep-->".len())
+            .any(|v| v == b"<!--keep-->")
+    );
+}
+
+#[test]
+fn worksheet_replacement_refuses_mce_and_bounded_hostile_input() {
+    let mce = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x14="urn:test"><sheetData/><mc:AlternateContent><mc:Choice Requires="x14"><autoFilter ref="A1"/></mc:Choice><mc:Fallback/></mc:AlternateContent></worksheet>"#;
+    let value = Definition::new(Some(Range::new("A1").unwrap()));
+    assert!(super::package::replace_auto_filter(mce, Some(&value)).is_err());
+    assert!(
+        super::package::replace_auto_filter(&vec![b'x'; 32 * 1024 * 1024 + 1], Some(&value))
+            .is_err()
+    );
+    let nested = format!(
+        "<worksheet xmlns=\"{}\"><sheetData/>{}</worksheet>",
+        std::str::from_utf8(CORE).unwrap(),
+        "<extLst>".repeat(129)
+    );
+    assert!(super::package::replace_auto_filter(nested.as_bytes(), Some(&value)).is_err());
+}
+
+fn root_child_outcome(fragment: &str) -> String {
+    match parse_auto_filter_fragment(fragment.as_bytes()) {
+        Ok(value) => format!(
+            "ok columns={:?} sort conditions={:?}",
+            value
+                .columns
+                .iter()
+                .map(|column| column.column_id)
+                .collect::<Vec<_>>(),
+            value
+                .sort_state
+                .as_ref()
+                .map(|state| state.conditions.len())
+        ),
+        Err(error) => format!("{error:?}"),
+    }
+}
+
+#[test]
+fn root_child_order_matrix_is_stable() {
+    // `{id}` is replaced by the position of the child, so that two columns in
+    // one case never collide on `colId`.
+    let column = ("column", r#"<filterColumn colId="{id}"/>"#);
+    let open_column = (
+        "open column",
+        r#"<filterColumn colId="{id}"></filterColumn>"#,
+    );
+    let sort = ("sort", r#"<sortState ref="A2:C5"/>"#);
+    let open_sort = (
+        "open sort",
+        r#"<sortState ref="A2:C5"><sortCondition ref="A2:A5"/></sortState>"#,
+    );
+    let unknown = ("unknown", "<unknown/>");
+    let open_unknown = (
+        "unknown holding sort",
+        r#"<unknown><sortState ref="A2:C5"/></unknown>"#,
+    );
+    let foreign_sort = (
+        "foreign sort",
+        r#"<q:sortState xmlns:q="urn:other" ref="A2:C5"/>"#,
+    );
+    let column_holding_sort = (
+        "column holding sort",
+        r#"<filterColumn colId="{id}"><sortState ref="A2:C5"/></filterColumn>"#,
+    );
+    let children = [column, open_column, sort, open_sort, unknown];
+    let mut cases: Vec<Vec<(&str, &str)>> = vec![Vec::new()];
+    for first in children {
+        cases.push(vec![first]);
+    }
+    for first in children {
+        for second in children {
+            cases.push(vec![first, second]);
+        }
+    }
+    for extra in [open_unknown, foreign_sort, column_holding_sort] {
+        cases.push(vec![extra]);
+        cases.push(vec![extra, column]);
+        cases.push(vec![extra, sort]);
+        cases.push(vec![extra, open_sort]);
+        cases.push(vec![sort, extra]);
+        cases.push(vec![open_sort, extra]);
+    }
+    cases.push(vec![column, sort, column]);
+    cases.push(vec![column, open_sort, open_column]);
+    cases.push(vec![column, column, sort, sort]);
+    cases.push(vec![sort, unknown, column]);
+    cases.push(vec![sort, unknown, sort]);
+    let mut actual: Vec<(String, String)> = cases
+        .iter()
+        .map(|case| {
+            let label = case.iter().map(|(name, _)| *name).collect::<Vec<_>>();
+            let body: String = case
+                .iter()
+                .enumerate()
+                .map(|(index, (_, xml))| xml.replace("{id}", &index.to_string()))
+                .collect();
+            (
+                label.join(","),
+                root_child_outcome(&format!(r#"<autoFilter ref="A1:E5">{body}</autoFilter>"#)),
+            )
+        })
+        .collect();
+    // The self-closing root, and markup before or after the root.
+    for (label, fragment) in [
+        ("self-closing root", r#"<autoFilter ref="A1:E5"/>"#),
+        (
+            "self-closing root, then sort twice",
+            r#"<autoFilter ref="A1:E5"/><sortState ref="A2:C5"/><sortState ref="A2:C5"/>"#,
+        ),
+        (
+            "self-closing root, then sort, then column",
+            r#"<autoFilter ref="A1:E5"/><sortState ref="A2:C5"/><filterColumn colId="0"/>"#,
+        ),
+        (
+            "root with sort, then root with sort",
+            r#"<autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter><autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter>"#,
+        ),
+        (
+            "root with sort, then sort outside",
+            r#"<autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter><sortState ref="A2:C5"/>"#,
+        ),
+        (
+            "sort before root",
+            r#"<sortState ref="A2:C5"/><autoFilter ref="A1:E5"><sortState ref="A2:C5"/></autoFilter>"#,
+        ),
+        (
+            "strict prefix column after sort",
+            r#"<s:autoFilter ref="A1:E5"><s:sortState ref="A2:C5"/><s:filterColumn colId="0"/></s:autoFilter>"#,
+        ),
+    ] {
+        actual.push((label.to_owned(), root_child_outcome(fragment)));
+    }
+    let expected: &[(&str, &str)] = &[
+        ("", "ok columns=[] sort conditions=None"),
+        ("column", "ok columns=[0] sort conditions=None"),
+        ("open column", "ok columns=[0] sort conditions=None"),
+        ("sort", "ok columns=[] sort conditions=Some(0)"),
+        ("open sort", "ok columns=[] sort conditions=Some(1)"),
+        ("unknown", "ok columns=[] sort conditions=None"),
+        ("column,column", "ok columns=[0, 1] sort conditions=None"),
+        (
+            "column,open column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        ("column,sort", "ok columns=[0] sort conditions=Some(0)"),
+        ("column,open sort", "ok columns=[0] sort conditions=Some(1)"),
+        ("column,unknown", "ok columns=[0] sort conditions=None"),
+        (
+            "open column,column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        (
+            "open column,open column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        ("open column,sort", "ok columns=[0] sort conditions=Some(0)"),
+        (
+            "open column,open sort",
+            "ok columns=[0] sort conditions=Some(1)",
+        ),
+        ("open column,unknown", "ok columns=[0] sort conditions=None"),
+        (
+            "sort,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "sort,open column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        ("sort,sort", "Invalid(\"duplicate sortState\")"),
+        ("sort,open sort", "Invalid(\"duplicate sortState\")"),
+        ("sort,unknown", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "open sort,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "open sort,open column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        ("open sort,sort", "Invalid(\"duplicate sortState\")"),
+        ("open sort,open sort", "Invalid(\"duplicate sortState\")"),
+        ("open sort,unknown", "ok columns=[] sort conditions=Some(1)"),
+        ("unknown,column", "ok columns=[1] sort conditions=None"),
+        ("unknown,open column", "ok columns=[1] sort conditions=None"),
+        ("unknown,sort", "ok columns=[] sort conditions=Some(0)"),
+        ("unknown,open sort", "ok columns=[] sort conditions=Some(1)"),
+        ("unknown,unknown", "ok columns=[] sort conditions=None"),
+        ("unknown holding sort", "ok columns=[] sort conditions=None"),
+        (
+            "unknown holding sort,column",
+            "ok columns=[1] sort conditions=None",
+        ),
+        (
+            "unknown holding sort,sort",
+            "ok columns=[] sort conditions=Some(0)",
+        ),
+        (
+            "unknown holding sort,open sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        (
+            "sort,unknown holding sort",
+            "ok columns=[] sort conditions=Some(0)",
+        ),
+        (
+            "open sort,unknown holding sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        ("foreign sort", "ok columns=[] sort conditions=None"),
+        ("foreign sort,column", "ok columns=[1] sort conditions=None"),
+        ("foreign sort,sort", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "foreign sort,open sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        ("sort,foreign sort", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "open sort,foreign sort",
+            "ok columns=[] sort conditions=Some(1)",
+        ),
+        ("column holding sort", "ok columns=[0] sort conditions=None"),
+        (
+            "column holding sort,column",
+            "ok columns=[0, 1] sort conditions=None",
+        ),
+        (
+            "column holding sort,sort",
+            "ok columns=[0] sort conditions=Some(0)",
+        ),
+        (
+            "column holding sort,open sort",
+            "ok columns=[0] sort conditions=Some(1)",
+        ),
+        (
+            "sort,column holding sort",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "open sort,column holding sort",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "column,sort,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "column,open sort,open column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        (
+            "column,column,sort,sort",
+            "Invalid(\"duplicate sortState\")",
+        ),
+        (
+            "sort,unknown,column",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+        ("sort,unknown,sort", "Invalid(\"duplicate sortState\")"),
+        ("self-closing root", "ok columns=[] sort conditions=None"),
+        (
+            "self-closing root, then sort twice",
+            "ok columns=[] sort conditions=None",
+        ),
+        (
+            "self-closing root, then sort, then column",
+            "ok columns=[] sort conditions=None",
+        ),
+        (
+            "root with sort, then root with sort",
+            "Invalid(\"duplicate sortState\")",
+        ),
+        (
+            "root with sort, then sort outside",
+            "ok columns=[] sort conditions=Some(0)",
+        ),
+        ("sort before root", "ok columns=[] sort conditions=Some(0)"),
+        (
+            "strict prefix column after sort",
+            "Invalid(\"filterColumn must precede sortState\")",
+        ),
+    ];
+    let same = actual.len() == expected.len()
+        && actual.iter().zip(expected).all(
+            |((label, outcome), (expected_label, expected_outcome))| {
+                label == expected_label && outcome == expected_outcome
+            },
+        );
+    let observed: String = actual
+        .iter()
+        .map(|(label, outcome)| format!("({label:?}, {outcome:?}),\n"))
+        .collect();
+    assert!(same, "observed rows:\n{observed}");
+}

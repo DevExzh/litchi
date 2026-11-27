@@ -4,7 +4,7 @@ use super::helpers::{EPS, is_even, number_result, round_away_from_zero};
 use crate::engine::{EvalCtx, evaluate_expression, to_number};
 use crate::parser::Expr;
 
-pub(crate) async fn eval_round(
+pub(crate) fn eval_round(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -12,8 +12,8 @@ pub(crate) async fn eval_round(
     if args.len() != 2 {
         return Ok(CellValue::Error("ROUND expects 2 arguments".to_string()));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let digits = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let digits = evaluate_expression(ctx, current_sheet, &args[1])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => return Ok(CellValue::Error("ROUND number is not numeric".to_string())),
@@ -31,7 +31,7 @@ pub(crate) async fn eval_round(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_rounddown(
+pub(crate) fn eval_rounddown(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -41,8 +41,8 @@ pub(crate) async fn eval_rounddown(
             "ROUNDDOWN expects 2 arguments".to_string(),
         ));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let digits = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let digits = evaluate_expression(ctx, current_sheet, &args[1])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => {
@@ -68,7 +68,7 @@ pub(crate) async fn eval_rounddown(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_roundup(
+pub(crate) fn eval_roundup(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -76,8 +76,8 @@ pub(crate) async fn eval_roundup(
     if args.len() != 2 {
         return Ok(CellValue::Error("ROUNDUP expects 2 arguments".to_string()));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let digits = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let digits = evaluate_expression(ctx, current_sheet, &args[1])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => {
@@ -109,7 +109,7 @@ pub(crate) async fn eval_roundup(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_floor(
+pub(crate) fn eval_floor(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -119,13 +119,13 @@ pub(crate) async fn eval_floor(
             "FLOOR expects 1 or 2 arguments (number, [significance])".to_string(),
         ));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => return Ok(CellValue::Error("FLOOR number is not numeric".to_string())),
     };
     let sig = if args.len() == 2 {
-        let s_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let s_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&s_val) {
             Some(n) if n != 0.0 => n,
             _ => {
@@ -141,7 +141,7 @@ pub(crate) async fn eval_floor(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_ceiling(
+pub(crate) fn eval_ceiling(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -151,7 +151,7 @@ pub(crate) async fn eval_ceiling(
             "CEILING expects 1 or 2 arguments (number, [significance])".to_string(),
         ));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => {
@@ -161,7 +161,7 @@ pub(crate) async fn eval_ceiling(
         },
     };
     let sig = if args.len() == 2 {
-        let s_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let s_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&s_val) {
             Some(n) if n != 0.0 => n,
             _ => {
@@ -177,7 +177,7 @@ pub(crate) async fn eval_ceiling(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_floor_math(
+pub(crate) fn eval_floor_math(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -188,7 +188,7 @@ pub(crate) async fn eval_floor_math(
         ));
     }
 
-    let num_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&num_val) {
         Some(n) => n,
         None => {
@@ -199,7 +199,7 @@ pub(crate) async fn eval_floor_math(
     };
 
     let significance = if args.len() >= 2 {
-        let sig_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let sig_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&sig_val) {
             Some(n) if n.abs() >= EPS => n.abs(),
             Some(_) => {
@@ -218,7 +218,7 @@ pub(crate) async fn eval_floor_math(
     };
 
     let round_toward_zero = if args.len() == 3 {
-        let mode_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let mode_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_number(&mode_val) {
             Some(n) => n != 0.0,
             None => {
@@ -247,7 +247,7 @@ pub(crate) async fn eval_floor_math(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_floor_precise(
+pub(crate) fn eval_floor_precise(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -258,7 +258,7 @@ pub(crate) async fn eval_floor_precise(
         ));
     }
 
-    let num_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&num_val) {
         Some(n) => n,
         None => {
@@ -269,7 +269,7 @@ pub(crate) async fn eval_floor_precise(
     };
 
     let significance = if args.len() == 2 {
-        let sig_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let sig_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&sig_val) {
             Some(n) if n.abs() >= EPS => n.abs(),
             Some(_) => {
@@ -297,7 +297,7 @@ pub(crate) async fn eval_floor_precise(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_ceiling_math(
+pub(crate) fn eval_ceiling_math(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -308,7 +308,7 @@ pub(crate) async fn eval_ceiling_math(
         ));
     }
 
-    let num_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&num_val) {
         Some(n) => n,
         None => {
@@ -319,7 +319,7 @@ pub(crate) async fn eval_ceiling_math(
     };
 
     let significance = if args.len() >= 2 {
-        let sig_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let sig_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&sig_val) {
             Some(n) if n.abs() >= EPS => n,
             Some(_) => {
@@ -341,7 +341,7 @@ pub(crate) async fn eval_ceiling_math(
     let significance = significance.abs();
 
     let round_away_from_zero = if args.len() == 3 {
-        let mode_val = evaluate_expression(ctx, current_sheet, &args[2]).await?;
+        let mode_val = evaluate_expression(ctx, current_sheet, &args[2])?;
         match to_number(&mode_val) {
             Some(n) => n != 0.0,
             None => {
@@ -370,7 +370,7 @@ pub(crate) async fn eval_ceiling_math(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_ceiling_precise(
+pub(crate) fn eval_ceiling_precise(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -381,7 +381,7 @@ pub(crate) async fn eval_ceiling_precise(
         ));
     }
 
-    let num_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let number = match to_number(&num_val) {
         Some(n) => n,
         None => {
@@ -392,7 +392,7 @@ pub(crate) async fn eval_ceiling_precise(
     };
 
     let significance = if args.len() == 2 {
-        let sig_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let sig_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&sig_val) {
             Some(n) if n.abs() >= EPS => n.abs(),
             Some(_) => {
@@ -416,18 +416,14 @@ pub(crate) async fn eval_ceiling_precise(
     Ok(CellValue::Float(result))
 }
 
-pub(crate) async fn eval_mod(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_mod(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 2 {
         return Ok(CellValue::Error(
             "MOD expects 2 arguments (number, divisor)".to_string(),
         ));
     }
-    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let divisor_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let divisor_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let number = match to_number(&number_val) {
         Some(n) => n,
         None => return Ok(CellValue::Error("MOD number is not numeric".to_string())),
@@ -444,7 +440,7 @@ pub(crate) async fn eval_mod(
     Ok(number_result(result))
 }
 
-pub(crate) async fn eval_mround(
+pub(crate) fn eval_mround(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -454,8 +450,8 @@ pub(crate) async fn eval_mround(
             "MROUND expects 2 arguments (number, multiple)".to_string(),
         ));
     }
-    let number_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let multiple_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let number_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let multiple_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let number = match to_number(&number_val) {
         Some(n) => n,
         None => return Ok(CellValue::Error("MROUND number is not numeric".to_string())),
@@ -488,7 +484,7 @@ pub(crate) async fn eval_mround(
     Ok(number_result(result))
 }
 
-pub(crate) async fn eval_quotient(
+pub(crate) fn eval_quotient(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -498,8 +494,8 @@ pub(crate) async fn eval_quotient(
             "QUOTIENT expects 2 arguments (numerator, denominator)".to_string(),
         ));
     }
-    let numerator_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
-    let denominator_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+    let numerator_val = evaluate_expression(ctx, current_sheet, &args[0])?;
+    let denominator_val = evaluate_expression(ctx, current_sheet, &args[1])?;
     let numerator = match to_number(&numerator_val) {
         Some(n) => n,
         None => {
@@ -525,7 +521,7 @@ pub(crate) async fn eval_quotient(
     Ok(number_result(value))
 }
 
-pub(crate) async fn eval_trunc(
+pub(crate) fn eval_trunc(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -535,13 +531,13 @@ pub(crate) async fn eval_trunc(
             "TRUNC expects 1 or 2 arguments (number, [num_digits])".to_string(),
         ));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => return Ok(CellValue::Error("TRUNC number is not numeric".to_string())),
     };
     let digits = if args.len() == 2 {
-        let d_expr = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let d_expr = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&d_expr) {
             Some(n) => n.trunc() as i32,
             None => {
@@ -563,15 +559,11 @@ pub(crate) async fn eval_trunc(
     Ok(number_result(result))
 }
 
-pub(crate) async fn eval_even(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_even(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("EVEN expects 1 argument".to_string()));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => return Ok(CellValue::Error("EVEN on non-numeric value".to_string())),
@@ -590,15 +582,11 @@ pub(crate) async fn eval_even(
     Ok(number_result(even))
 }
 
-pub(crate) async fn eval_odd(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_odd(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("ODD expects 1 argument".to_string()));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => return Ok(CellValue::Error("ODD on non-numeric value".to_string())),
@@ -619,15 +607,11 @@ pub(crate) async fn eval_odd(
     Ok(number_result(odd))
 }
 
-pub(crate) async fn eval_sign(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_sign(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error("SIGN expects 1 argument".to_string()));
     }
-    let num = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num) {
         Some(n) => n,
         None => return Ok(CellValue::Error("SIGN on non-numeric value".to_string())),
@@ -642,7 +626,7 @@ pub(crate) async fn eval_sign(
     Ok(CellValue::Int(value))
 }
 
-pub(crate) async fn eval_iso_ceiling(
+pub(crate) fn eval_iso_ceiling(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -652,13 +636,13 @@ pub(crate) async fn eval_iso_ceiling(
             "ISO.CEILING expects 1 or 2 arguments (number, [significance])".to_string(),
         ));
     }
-    let num_val = evaluate_expression(ctx, current_sheet, &args[0]).await?;
+    let num_val = evaluate_expression(ctx, current_sheet, &args[0])?;
     let x = match to_number(&num_val) {
         Some(n) => n,
         None => return Ok(CellValue::Error("#VALUE!".to_string())),
     };
     let sig = if args.len() == 2 {
-        let sig_val = evaluate_expression(ctx, current_sheet, &args[1]).await?;
+        let sig_val = evaluate_expression(ctx, current_sheet, &args[1])?;
         match to_number(&sig_val) {
             Some(n) if n != 0.0 => n,
             _ => return Ok(CellValue::Error("#NUM!".to_string())),
@@ -687,12 +671,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_round_positive() {
+    #[test]
+    fn test_eval_round_positive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(std::f64::consts::PI), num_expr(2.0)];
-        let result = eval_round(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_round(ctx, "Sheet1", &args).unwrap();
         let expected = (std::f64::consts::PI * 100.0).round() / 100.0;
         match result {
             CellValue::Float(v) => assert!((v - expected).abs() < 1e-9),
@@ -700,240 +684,240 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_round_negative_digits() {
+    #[test]
+    fn test_eval_round_negative_digits() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(1234.0), num_expr(-2.0)];
-        let result = eval_round(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_round(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 1200.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_round_wrong_args() {
+    #[test]
+    fn test_eval_round_wrong_args() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(std::f64::consts::PI)];
-        let result = eval_round(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_round(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects 2 arguments")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rounddown() {
+    #[test]
+    fn test_eval_rounddown() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.99), num_expr(0.0)];
-        let result = eval_rounddown(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rounddown(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_rounddown_negative() {
+    #[test]
+    fn test_eval_rounddown_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.99), num_expr(0.0)];
-        let result = eval_rounddown(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rounddown(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - (-3.0)).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_roundup() {
+    #[test]
+    fn test_eval_roundup() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.01), num_expr(0.0)];
-        let result = eval_roundup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roundup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_roundup_negative() {
+    #[test]
+    fn test_eval_roundup_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.01), num_expr(0.0)];
-        let result = eval_roundup(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_roundup(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - (-4.0)).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor() {
+    #[test]
+    fn test_eval_floor() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.7), num_expr(1.0)];
-        let result = eval_floor(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor_default_sig() {
+    #[test]
+    fn test_eval_floor_default_sig() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.7)];
-        let result = eval_floor(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor_zero_sig() {
+    #[test]
+    fn test_eval_floor_zero_sig() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.7), num_expr(0.0)];
-        let result = eval_floor(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("non-zero")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_ceiling() {
+    #[test]
+    fn test_eval_ceiling() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2), num_expr(1.0)];
-        let result = eval_ceiling(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_ceiling(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_ceiling_default_sig() {
+    #[test]
+    fn test_eval_ceiling_default_sig() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2)];
-        let result = eval_ceiling(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_ceiling(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_ceiling_zero_sig() {
+    #[test]
+    fn test_eval_ceiling_zero_sig() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2), num_expr(0.0)];
-        let result = eval_ceiling(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_ceiling(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("non-zero")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor_math() {
+    #[test]
+    fn test_eval_floor_math() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.7)];
-        let result = eval_floor_math(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor_math(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor_math_negative() {
+    #[test]
+    fn test_eval_floor_math_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.7)];
-        let result = eval_floor_math(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor_math(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - (-4.0)).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor_math_mode() {
+    #[test]
+    fn test_eval_floor_math_mode() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.7), num_expr(1.0), num_expr(1.0)];
-        let result = eval_floor_math(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor_math(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - (-3.0)).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_floor_precise() {
+    #[test]
+    fn test_eval_floor_precise() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.7)];
-        let result = eval_floor_precise(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_floor_precise(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_ceiling_math() {
+    #[test]
+    fn test_eval_ceiling_math() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2)];
-        let result = eval_ceiling_math(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_ceiling_math(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_ceiling_math_negative() {
+    #[test]
+    fn test_eval_ceiling_math_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.2)];
-        let result = eval_ceiling_math(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_ceiling_math(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - (-3.0)).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_ceiling_precise() {
+    #[test]
+    fn test_eval_ceiling_precise() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2)];
-        let result = eval_ceiling_precise(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_ceiling_precise(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mod() {
+    #[test]
+    fn test_eval_mod() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0), num_expr(3.0)];
-        let result = eval_mod(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mod(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 1),
             CellValue::Float(v) => assert!((v - 1.0).abs() < 1e-9),
@@ -941,12 +925,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mod_negative() {
+    #[test]
+    fn test_eval_mod_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-10.0), num_expr(3.0)];
-        let result = eval_mod(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mod(ctx, "Sheet1", &args).unwrap();
         match result {
             // Implementation returns 2: -10 = 3 * (-4) + 2
             // Result has same sign as divisor (positive)
@@ -956,24 +940,24 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mod_zero_divisor() {
+    #[test]
+    fn test_eval_mod_zero_divisor() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0), num_expr(0.0)];
-        let result = eval_mod(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mod(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("cannot be zero")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mround() {
+    #[test]
+    fn test_eval_mround() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0), num_expr(3.0)];
-        let result = eval_mround(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mround(ctx, "Sheet1", &args).unwrap();
         match result {
             // Implementation rounds 10 to 12 for multiple 3 (rounds away from zero)
             CellValue::Int(v) => assert_eq!(v, 12),
@@ -982,24 +966,24 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_mround_different_signs() {
+    #[test]
+    fn test_eval_mround_different_signs() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0), num_expr(-3.0)];
-        let result = eval_mround(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_mround(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("same sign")),
             _ => panic!("Expected Error result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_quotient() {
+    #[test]
+    fn test_eval_quotient() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(10.0), num_expr(3.0)];
-        let result = eval_quotient(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_quotient(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 3),
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
@@ -1007,12 +991,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_quotient_negative() {
+    #[test]
+    fn test_eval_quotient_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-10.0), num_expr(3.0)];
-        let result = eval_quotient(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_quotient(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, -3),
             CellValue::Float(v) => assert!((v - (-3.0)).abs() < 1e-9),
@@ -1020,12 +1004,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_trunc() {
+    #[test]
+    fn test_eval_trunc() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.99)];
-        let result = eval_trunc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_trunc(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 3),
             CellValue::Float(v) => assert!((v - 3.0).abs() < 1e-9),
@@ -1033,12 +1017,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_trunc_with_digits() {
+    #[test]
+    fn test_eval_trunc_with_digits() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(std::f64::consts::PI), num_expr(2.0)];
-        let result = eval_trunc(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_trunc(ctx, "Sheet1", &args).unwrap();
         let expected = (std::f64::consts::PI * 100.0).trunc() / 100.0;
         match result {
             CellValue::Float(v) => assert!((v - expected).abs() < 1e-9),
@@ -1046,12 +1030,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_even_positive() {
+    #[test]
+    fn test_eval_even_positive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2)];
-        let result = eval_even(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_even(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 4),
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
@@ -1059,12 +1043,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_even_negative() {
+    #[test]
+    fn test_eval_even_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.2)];
-        let result = eval_even(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_even(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, -4),
             CellValue::Float(v) => assert!((v - (-4.0)).abs() < 1e-9),
@@ -1072,24 +1056,24 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_even_zero() {
+    #[test]
+    fn test_eval_even_zero() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0)];
-        let result = eval_even(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_even(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 0),
             _ => panic!("Expected Int result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_odd_positive() {
+    #[test]
+    fn test_eval_odd_positive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2)];
-        let result = eval_odd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_odd(ctx, "Sheet1", &args).unwrap();
         match result {
             // ODD rounds away from zero, so 3.2 becomes 5 (the next odd number away from zero)
             CellValue::Int(v) => assert_eq!(v, 5),
@@ -1098,12 +1082,12 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_odd_negative() {
+    #[test]
+    fn test_eval_odd_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-3.2)];
-        let result = eval_odd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_odd(ctx, "Sheet1", &args).unwrap();
         match result {
             // ODD rounds away from zero, so -3.2 becomes -5
             CellValue::Int(v) => assert_eq!(v, -5),
@@ -1112,60 +1096,60 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_odd_zero() {
+    #[test]
+    fn test_eval_odd_zero() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0)];
-        let result = eval_odd(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_odd(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 1),
             _ => panic!("Expected Int result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sign_positive() {
+    #[test]
+    fn test_eval_sign_positive() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(42.0)];
-        let result = eval_sign(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sign(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 1),
             _ => panic!("Expected Int result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sign_negative() {
+    #[test]
+    fn test_eval_sign_negative() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(-42.0)];
-        let result = eval_sign(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sign(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, -1),
             _ => panic!("Expected Int result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_sign_zero() {
+    #[test]
+    fn test_eval_sign_zero() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(0.0)];
-        let result = eval_sign(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_sign(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Int(v) => assert_eq!(v, 0),
             _ => panic!("Expected Int result"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_iso_ceiling() {
+    #[test]
+    fn test_eval_iso_ceiling() {
         let engine = crate::engine::test_helpers::TestEngine::new();
         let ctx = engine.ctx();
         let args = vec![num_expr(3.2)];
-        let result = eval_iso_ceiling(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_iso_ceiling(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Float(v) => assert!((v - 4.0).abs() < 1e-9),
             _ => panic!("Expected Float result"),

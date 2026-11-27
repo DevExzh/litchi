@@ -1,0 +1,232 @@
+use super::{Error, Refusal, RefusalKind, Result};
+
+/// The semantic meaning of a picture name.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum Kind {
+    /// The name is a producer comment.
+    Comment,
+    /// The name identifies a file.
+    File,
+    /// The name identifies a URL.
+    Url,
+}
+
+/// Checked `[MS-ODRAW]` `MSOBLIPFLAGS` metadata.
+///
+/// Bits outside the specified low nibble are retained exactly as reserved
+/// producer data.  The defined low-bit constraints are enforced by
+/// [`Self::from_raw`] and [`Self::new`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Flags(u32);
+
+impl Flags {
+    const KIND_MASK: u32 = 0x03;
+    const DO_NOT_SAVE: u32 = 0x04;
+    const LINK_TO_FILE: u32 = 0x08;
+    const DEFINED_MASK: u32 = Self::KIND_MASK | Self::DO_NOT_SAVE | Self::LINK_TO_FILE;
+
+    /// Creates checked flags from their semantic components.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Refused` with `RefusalKind::InvalidValue` if `do_not_save` is set without
+    /// `link_to_file`, or if `link_to_file` is set for a comment name.
+    pub fn new(kind: Kind, link_to_file: bool, do_not_save: bool) -> Result<Self> {
+        if do_not_save && !link_to_file {
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::InvalidValue,
+                "picture_flags",
+                "picture do-not-save requires link-to-file",
+            )));
+        }
+        if link_to_file && matches!(kind, Kind::Comment) {
+            return Err(Error::Refused(Refusal::new(
+                RefusalKind::InvalidValue,
+                "picture_flags",
+                "picture link-to-file requires a file or URL name",
+            )));
+        }
+        let kind_bits = match kind {
+            Kind::Comment => 0,
+            Kind::File => 1,
+            Kind::Url => 2,
+        };
+        let raw = kind_bits
+            | if link_to_file { Self::LINK_TO_FILE } else { 0 }
+            | if do_not_save { Self::DO_NOT_SAVE } else { 0 };
+        Ok(Self(raw))
+    }
+
+    /// Decodes flags while retaining undefined producer bits.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Format` if the kind bits hold the reserved
+    /// value 3, if do-not-save is set without link-to-file, or if link-to-file
+    /// is set for a comment name.
+    pub fn from_raw(raw: u32) -> Result<Self> {
+        let kind = raw & Self::KIND_MASK;
+        if kind == 3 {
+            return Err(Error::Format(crate::Error::MalformedProperties {
+                reason: "picture name kind uses a reserved flag value",
+            }));
+        }
+        let link_to_file = raw & Self::LINK_TO_FILE != 0;
+        let do_not_save = raw & Self::DO_NOT_SAVE != 0;
+        if do_not_save && !link_to_file {
+            return Err(Error::Format(crate::Error::MalformedProperties {
+                reason: "picture do-not-save requires link-to-file",
+            }));
+        }
+        if link_to_file && kind == 0 {
+            return Err(Error::Format(crate::Error::MalformedProperties {
+                reason: "picture link-to-file requires a file or URL name",
+            }));
+        }
+        Ok(Self(raw))
+    }
+
+    /// Returns the exact 32-bit flags value, including reserved bits.
+    #[must_use]
+    pub const fn raw(self) -> u32 {
+        self.0
+    }
+
+    /// Returns the semantic name kind.
+    #[must_use]
+    pub const fn kind(self) -> Kind {
+        match self.0 & Self::KIND_MASK {
+            1 => Kind::File,
+            2 => Kind::Url,
+            _ => Kind::Comment,
+        }
+    }
+
+    /// Returns whether the BLIP is linked to a file or URL.
+    #[must_use]
+    pub const fn link_to_file(self) -> bool {
+        self.0 & Self::LINK_TO_FILE != 0
+    }
+
+    /// Returns whether the BLIP must not be embedded on save.
+    #[must_use]
+    pub const fn do_not_save(self) -> bool {
+        self.0 & Self::DO_NOT_SAVE != 0
+    }
+
+    /// Returns the exact undefined bits retained from the producer.
+    #[must_use]
+    pub const fn reserved(self) -> u32 {
+        self.0 & !Self::DEFINED_MASK
+    }
+}
+
+/// A checked, zero-copy view of one null-terminated `OfficeArt` Unicode name.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct Name<'data> {
+    raw: &'data [u8],
+}
+
+impl<'data> Name<'data> {
+    pub(crate) const fn from_raw(raw: &'data [u8]) -> Self {
+        Self { raw }
+    }
+
+    /// Returns the exact UTF-16LE bytes, including the terminating NUL.
+    #[must_use]
+    pub const fn raw_bytes(self) -> &'data [u8] {
+        self.raw
+    }
+
+    /// Returns the number of UTF-16 code units excluding the terminator.
+    #[must_use]
+    pub fn unit_len(self) -> usize {
+        self.raw.len() / 2 - 1
+    }
+
+    /// Decodes the checked name into an owned Rust string.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::Format` when the name is not valid
+    /// UTF-16.
+    pub fn text(self) -> Result<String> {
+        let units = self
+            .raw
+            .as_chunks::<2>()
+            .0
+            .iter()
+            .take(self.unit_len())
+            .map(|pair| u16::from_le_bytes([pair[0], pair[1]]));
+        String::from_utf16(&units.collect::<Vec<_>>()).map_err(|_err| {
+            Error::Format(crate::Error::MalformedProperties {
+                reason: "picture name is not valid UTF-16",
+            })
+        })
+    }
+}
+
+/// The typed picture metadata projection for one shape property table.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Metadata<'data> {
+    name: Option<Name<'data>>,
+    flags: Flags,
+}
+
+impl<'data> Metadata<'data> {
+    pub(crate) const fn new(name: Option<Name<'data>>, flags: Flags) -> Self {
+        Self { name, flags }
+    }
+
+    /// Returns the optional picture comment, file name, or URL.
+    #[must_use]
+    pub const fn name(self) -> Option<Name<'data>> {
+        self.name
+    }
+
+    /// Returns the effective BLIP-name flags, including retained reserved bits.
+    #[must_use]
+    pub const fn flags(self) -> Flags {
+        self.flags
+    }
+}
+
+/// One reversible before/after value in a picture package patch.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Change<T> {
+    pub(super) before: Option<T>,
+    pub(super) after: Option<T>,
+}
+
+impl<T> Change<T> {
+    pub(crate) const fn new(before: Option<T>, after: Option<T>) -> Self {
+        Self { before, after }
+    }
+
+    /// Returns the value observed in the source package.
+    pub fn before(&self) -> Option<&T> {
+        self.before.as_ref()
+    }
+
+    /// Returns the value published by the committed package.
+    pub fn after(&self) -> Option<&T> {
+        self.after.as_ref()
+    }
+}
+
+impl std::fmt::Debug for Name<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Name")
+            .field("utf16_units", &self.unit_len())
+            .finish_non_exhaustive()
+    }
+}
+
+impl<T> std::fmt::Debug for Change<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Change")
+            .field("before_present", &self.before.is_some())
+            .field("after_present", &self.after.is_some())
+            .finish_non_exhaustive()
+    }
+}

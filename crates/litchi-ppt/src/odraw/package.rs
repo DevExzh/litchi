@@ -1,0 +1,151 @@
+use litchi_odraw::shape::Shape;
+use litchi_odraw::{Record, RecordKind};
+
+use crate::package::{Error, Result, SourceLimitKind};
+
+pub(super) const CLIENT_DATA_RAW_KIND: u16 = 0xf011;
+pub(super) const CLIENT_TEXTBOX_RAW_KIND: u16 = 0xf00d;
+
+#[derive(Debug, Clone, Copy)]
+pub(super) struct RawRecord<'data> {
+    /// The record version (`recVer`, the low four bits of the header).
+    pub(super) version: u16,
+    pub(super) kind: u16,
+    pub(super) data: &'data [u8],
+}
+
+/// Strict, allocation-free iterator for records embedded in host payloads.
+pub(super) struct RawRecords<'data> {
+    data: &'data [u8],
+    offset: usize,
+    seen: u32,
+    max_records: u32,
+    failed: bool,
+}
+
+impl<'data> RawRecords<'data> {
+    pub(super) fn new(data: &'data [u8], max_records: u32) -> Self {
+        Self {
+            data,
+            offset: 0,
+            seen: 0,
+            max_records,
+            failed: false,
+        }
+    }
+}
+
+impl<'data> Iterator for RawRecords<'data> {
+    type Item = Result<RawRecord<'data>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.failed || self.offset == self.data.len() {
+            return None;
+        }
+        self.seen = match self.seen.checked_add(1) {
+            Some(seen) if seen <= self.max_records => seen,
+            Some(seen) => {
+                self.failed = true;
+                return Some(Err(event_limit(seen as usize, self.max_records)));
+            },
+            None => {
+                self.failed = true;
+                return Some(Err(event_limit(usize::MAX, self.max_records)));
+            },
+        };
+        let Some(header_end) = self.offset.checked_add(8) else {
+            self.failed = true;
+            return Some(Err(corrupted("PPT record header offset overflow")));
+        };
+        let Some(header) = self.data.get(self.offset..header_end) else {
+            self.failed = true;
+            return Some(Err(corrupted(
+                "Host payload ends with a truncated PPT record header",
+            )));
+        };
+        let version = u16::from_le_bytes([header[0], header[1]]) & 0x000f;
+        let kind = u16::from_le_bytes([header[2], header[3]]);
+        let Ok(len) = usize::try_from(u32::from_le_bytes([
+            header[4], header[5], header[6], header[7],
+        ])) else {
+            self.failed = true;
+            return Some(Err(corrupted(
+                "PPT record length cannot be represented on this platform",
+            )));
+        };
+        let Some(end) = header_end.checked_add(len) else {
+            self.failed = true;
+            return Some(Err(corrupted("PPT record payload offset overflow")));
+        };
+        let Some(data) = self.data.get(header_end..end) else {
+            self.failed = true;
+            return Some(Err(corrupted(
+                "Host payload contains a truncated PPT record",
+            )));
+        };
+        self.offset = end;
+        Some(Ok(RawRecord {
+            version,
+            kind,
+            data,
+        }))
+    }
+}
+
+pub(super) fn host_record<'data>(
+    shape: &Shape<'data>,
+    kind: RecordKind,
+) -> Result<Option<Record<'data>>> {
+    if kind == RecordKind::ClientData {
+        Ok(shape.client_data().cloned())
+    } else if kind == RecordKind::ClientTextbox {
+        Ok(shape.textbox().cloned())
+    } else {
+        shape.container().find(kind).map_err(Into::into)
+    }
+}
+
+pub(super) fn validate_host_record(record: &Record<'_>, raw_kind: u16, name: &str) -> Result<()> {
+    if record.version() != 0x0f
+        || record.instance() != 0
+        || record.raw_kind() != raw_kind
+        || usize::try_from(record.len()).ok() != Some(record.data().len())
+    {
+        return Err(corrupted(&format!(
+            "Invalid OfficeArt {name} record header"
+        )));
+    }
+    Ok(())
+}
+
+pub(super) fn advance(offset: usize, consumed: usize, context: &str) -> Result<usize> {
+    if consumed == 0 {
+        return Err(corrupted(&format!("Zero-length PPT record in {context}")));
+    }
+    offset
+        .checked_add(consumed)
+        .ok_or_else(|| corrupted(&format!("{context} offset overflow")))
+}
+
+pub(super) fn visit_host_record(records: &mut u32, max_records: u32) -> Result<()> {
+    *records = match records.checked_add(1) {
+        Some(value) => value,
+        None => return Err(event_limit(usize::MAX, max_records)),
+    };
+    if *records > max_records {
+        return Err(event_limit(*records as usize, max_records));
+    }
+    Ok(())
+}
+
+fn event_limit(observed: usize, maximum: u32) -> Error {
+    Error::Limit {
+        kind: SourceLimitKind::Events,
+        observed,
+        maximum: maximum as usize,
+    }
+}
+
+pub(super) fn corrupted(message: &str) -> Error {
+    Error::Corrupted(message.to_owned())
+}

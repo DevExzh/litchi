@@ -1,0 +1,374 @@
+//! Regression tests for the layered drawing inventory owner.
+
+use super::{Anchor, AnchorId, Kind, LegacyAnchorKind, Object, parse, parse_legacy};
+use litchi_drawingml::geom::Preset;
+
+#[test]
+fn keeps_unknown_or_missing_shape_presets_as_raw_geometry() {
+    assert!("customShape".parse::<Preset>().is_err());
+    assert!("textBox".parse::<Preset>().is_err());
+
+    let xml = br#"<w:drawing><wp:inline><wp:docPr name="Odd"/><wps:wsp><wps:spPr>
+        <a:prstGeom prst="customShape"/>
+        </wps:spPr></wps:wsp></wp:inline></w:drawing><w:drawing><wp:inline><wps:wsp><wps:spPr>
+        <a:prstGeom/>
+        </wps:spPr></wps:wsp></wp:inline></w:drawing><w:drawing><wp:inline><wps:wsp><wps:spPr>
+        <a:prstGeom prst="ellipse"/>
+        </wps:spPr></wps:wsp></wp:inline></w:drawing>"#;
+    let objects = parse(xml).unwrap();
+    assert_eq!(objects.len(), 3);
+    assert_eq!(objects[0].name(), "Odd");
+    assert_eq!(objects[0].kind(), Kind::Shape);
+    assert_eq!(objects[0].preset(), None);
+    assert_eq!(objects[0].unknown_preset(), Some("customShape"));
+    assert_eq!(objects[1].preset(), None);
+    assert_eq!(objects[1].unknown_preset(), Some(""));
+    assert_eq!(objects[2].preset(), Some(Preset::Ellipse));
+    assert_eq!(objects[2].unknown_preset(), None);
+}
+
+#[test]
+fn rejects_invalid_utf8_in_preset_tokens() {
+    let xml = b"<w:drawing><wp:inline><wps:wsp><wps:spPr>\
+        <a:prstGeom prst=\"\xff\"/>\
+        </wps:spPr></wps:wsp></wp:inline></w:drawing>";
+    assert!(parse(xml).is_err());
+}
+
+#[test]
+fn object_dimensions_and_context_are_ergonomic() {
+    let object = Object::new(
+        "Shape 1".to_string(),
+        "Test shape".to_string(),
+        914_400,
+        1828800,
+        Preset::Rect,
+    );
+
+    assert_eq!(object.width_emu(), 914_400);
+    assert_eq!(object.height_emu(), 1828800);
+    assert_eq!(object.width_px(), 96);
+    assert_eq!(object.height_px(), 192);
+    assert!((object.width_pt() - 72.0).abs() < 0.1);
+    assert!((object.height_pt() - 144.0).abs() < 0.1);
+    assert_eq!(object.kind(), Kind::Shape);
+    assert_eq!(object.anchor(), Anchor::Inline);
+    assert_eq!(object.anchor_id(), None);
+}
+
+#[test]
+fn empty_paragraph_has_no_drawings() {
+    let drawings = parse(b"<w:p><w:r><w:t>Text only</w:t></w:r></w:p>").unwrap();
+    assert!(drawings.is_empty());
+}
+
+#[test]
+fn missing_geometry_is_not_reported_as_a_rectangle() {
+    let xml = br#"<w:drawing><wp:inline><wps:wsp><wps:spPr/></wps:wsp></wp:inline></w:drawing>"#;
+    let drawings = parse(xml).unwrap();
+    assert_eq!(drawings.len(), 1);
+    assert_eq!(drawings[0].preset(), None);
+    assert_eq!(drawings[0].kind(), Kind::Shape);
+}
+
+#[test]
+fn defaults_and_document_order_are_preserved() {
+    let xml = br#"<w:p>
+        <w:r><w:drawing><wp:inline><wps:wsp><wp:docPr name="first"/></wps:wsp></wp:inline></w:drawing></w:r>
+        <w:r><w:drawing><wp:anchor><wp:docPr name="second"/><x:opaque/></wp:anchor></w:drawing></w:r>
+    </w:p>"#;
+    let drawings = parse(xml).unwrap();
+    assert_eq!(drawings.len(), 2);
+    assert_eq!(drawings[0].name(), "first");
+    assert_eq!(drawings[1].name(), "second");
+    assert_eq!(drawings[0].width_emu(), 914_400);
+    assert_eq!(drawings[0].height_emu(), 914_400);
+    assert_eq!(drawings[1].anchor(), Anchor::Floating);
+    assert_eq!(drawings[1].kind(), Kind::Other);
+}
+
+#[test]
+fn parses_shape_inventory() {
+    let xml = br#"<w:p>
+        <w:r>
+            <w:drawing>
+                <wp:inline>
+                    <wp:extent cx="1000000" cy="2000000"/>
+                    <wp:docPr id="1" name="MyShape" descr="Test shape"/>
+                    <a:graphic>
+                        <a:graphicData>
+                            <wps:wsp>
+                                <wps:spPr>
+                                    <a:prstGeom prst="rect"/>
+                                </wps:spPr>
+                            </wps:wsp>
+                        </a:graphicData>
+                    </a:graphic>
+                </wp:inline>
+            </w:drawing>
+        </w:r>
+    </w:p>"#;
+
+    let drawings = parse(xml).unwrap();
+    assert_eq!(drawings.len(), 1);
+
+    let drawing = &drawings[0];
+    assert_eq!(drawing.name(), "MyShape");
+    assert_eq!(drawing.description(), "Test shape");
+    assert_eq!(drawing.width_emu(), 1000000);
+    assert_eq!(drawing.height_emu(), 2000000);
+    assert_eq!(drawing.preset(), Some(Preset::Rect));
+    assert_eq!(drawing.kind(), Kind::Shape);
+    assert_eq!(drawing.anchor_id(), None);
+    assert!(!drawing.is_text_box());
+    assert!(drawing.is_inline());
+}
+
+#[test]
+fn parses_checked_inline_and_floating_anchor_ids() {
+    let xml = br#"<w:p>
+        <w:r><w:drawing><wp:inline wp14:anchorId="00000001"/>
+        </w:drawing></w:r>
+        <w:r><w:drawing><wp:anchor wp14:anchorId="7fffffff"/></w:drawing></w:r>
+    </w:p>"#;
+    let drawings = parse(xml).unwrap();
+    assert_eq!(drawings.len(), 2);
+    assert_eq!(drawings[0].anchor_id(), AnchorId::new(1));
+    assert_eq!(drawings[1].anchor_id(), AnchorId::new(0x7fff_ffff));
+}
+
+#[test]
+fn rejects_invalid_anchor_ids() {
+    for value in ["00000000", "80000000", "0000001", "0000000G"] {
+        let xml = format!(r#"<w:drawing><wp:inline wp14:anchorId="{value}"/></w:drawing>"#);
+        assert!(
+            parse(xml.as_bytes()).is_err(),
+            "accepted invalid anchorId {value}"
+        );
+    }
+}
+
+#[test]
+fn parses_legacy_object_and_picture_anchor_ids_in_document_order() {
+    let xml = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+        xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"
+        xmlns:v="urn:schemas-microsoft-com:vml">
+        <w:r><w:object w14:anchorId="0000002a"><v:shape/></w:object></w:r>
+        <w:r><w:pict w14:anchorId="7fffffff"><v:shape/></w:pict></w:r>
+    </w:p>"#;
+
+    let anchors = parse_legacy(xml).unwrap();
+    assert_eq!(anchors.len(), 2);
+    assert_eq!(anchors[0].kind(), LegacyAnchorKind::Object);
+    assert_eq!(anchors[0].anchor_id(), AnchorId::new(0x2a));
+    assert_eq!(anchors[1].kind(), LegacyAnchorKind::Picture);
+    assert_eq!(anchors[1].anchor_id(), AnchorId::new(0x7fff_ffff));
+}
+
+#[test]
+fn legacy_anchor_parser_is_namespace_and_range_strict() {
+    let invalid_values = ["00000000", "80000000", "0000001", "0000000G"];
+    for value in invalid_values {
+        let xml = format!(
+            r#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml"><w:pict w14:anchorId="{value}"/></w:p>"#
+        );
+        assert!(parse_legacy(xml.as_bytes()).is_err(), "accepted {value}");
+    }
+
+    let wrong_namespace = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:x="urn:not-word-2010"><w:object x:anchorId="00000001"/></w:p>"#;
+    assert!(parse_legacy(wrong_namespace).is_err());
+
+    let unqualified = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:pict anchorId="00000001"/></w:p>"#;
+    assert!(parse_legacy(unqualified).is_err());
+
+    let duplicate_namespace = br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:b="http://schemas.microsoft.com/office/word/2010/wordml"><w:object a:anchorId="00000001" b:anchorId="00000002"/></w:p>"#;
+    assert!(parse_legacy(duplicate_namespace).is_err());
+}
+
+#[test]
+fn paragraph_legacy_anchor_api_is_typed_and_inert() {
+    let paragraph = crate::paragraph::Paragraph::new(
+        br#"<w:p xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" xmlns:foreign="urn:foreign"><w:r><w:pict w14:anchorId="00000009"><foreign:payload/></w:pict></w:r></w:p>"#.to_vec(),
+    );
+    let anchors = paragraph.legacy_anchors().unwrap();
+    assert_eq!(
+        anchors.as_slice(),
+        &[super::LegacyAnchor::from_parts(
+            LegacyAnchorKind::Picture,
+            AnchorId::new(9),
+        )]
+    );
+}
+
+#[test]
+fn parses_nested_textbox_text_in_source_order() {
+    let xml = br#"<w:p>
+        <w:r>
+            <w:drawing>
+                <wp:anchor>
+                    <wp:extent cx="1000000" cy="1000000"/>
+                    <wp:docPr name="TextBox1"/>
+                    <wps:wsp>
+                        <wps:spPr>
+                            <a:prstGeom prst="rect"/>
+                        </wps:spPr>
+                        <wps:txbx>
+                            <w:txbxContent>
+                                <w:p><w:r><w:t>Hello World</w:t></w:r></w:p>
+                            </w:txbxContent>
+                        </wps:txbx>
+                    </wps:wsp>
+                </wp:anchor>
+            </w:drawing>
+        </w:r>
+    </w:p>"#;
+
+    let drawings = parse(xml).unwrap();
+    assert_eq!(drawings.len(), 1);
+
+    let drawing = &drawings[0];
+    assert_eq!(drawing.name(), "TextBox1");
+    assert_eq!(drawing.preset(), Some(Preset::Rect));
+    assert_eq!(drawing.kind(), Kind::TextBox);
+    assert!(drawing.is_text_box());
+    assert_eq!(drawing.text(), "Hello World");
+    assert!(!drawing.is_inline());
+}
+
+#[test]
+fn group_children_cannot_overwrite_the_outer_anchor() {
+    let xml = br#"<w:p><w:r><w:drawing><wp:inline>
+        <wp:extent cx="3000000" cy="1700000"/><wp:docPr name="group"/>
+        <a:graphic><a:graphicData><wpg:wgp><wpg:grpSpPr><a:xfrm>
+        <a:off x="50" y="60"/><a:ext cx="700" cy="800"/></a:xfrm></wpg:grpSpPr>
+        <wps:wsp><wps:spPr><a:xfrm><a:off x="12" y="34"/>
+        <a:ext cx="100" cy="200"/></a:xfrm><a:prstGeom prst="ellipse"/></wps:spPr>
+        <wps:txbx><w:txbxContent><w:p><w:r><w:t>child</w:t></w:r></w:p></w:txbxContent></wps:txbx>
+        </wps:wsp></wpg:wgp></a:graphicData></a:graphic></wp:inline></w:drawing></w:r></w:p>"#;
+    let objects = parse(xml).unwrap();
+    assert_eq!(objects.len(), 1);
+    let group = &objects[0];
+    assert_eq!((group.name(), group.kind()), ("group", Kind::Other));
+    assert_eq!((group.width_emu(), group.height_emu()), (3000000, 1700000));
+    assert_eq!((group.x_emu(), group.y_emu()), (50, 60));
+    assert_eq!(group.preset(), None);
+    assert_eq!(group.unknown_preset(), None);
+    assert!(group.text().is_empty());
+}
+
+#[test]
+fn frame_extent_and_textbox_text_keep_their_own_scopes() {
+    let xml = br#"<w:drawing><wp:anchor><wp:extent cx="1000" cy="2000"/><wp:docPr name="outer"/>
+        <wps:wsp><wps:spPr><a:xfrm><a:off x="12" y="34"/><a:ext cx="99" cy="88"/></a:xfrm>
+        <a:prstGeom prst="rect"/></wps:spPr><wps:txbx><w:txbxContent>
+        <w:p><w:r><w:t xml:space="preserve"> A &amp; B </w:t><w:tab/><w:t>&#x1f600;</w:t><w:br/><w:t><![CDATA[<C>]]></w:t></w:r></w:p>
+        <w:p/><w:p><w:r><w:t>last</w:t><w:drawing><wp:inline><wp:docPr name="nested"/><wp:extent cx="7" cy="8"/></wp:inline></w:drawing></w:r></w:p>
+        </w:txbxContent></wps:txbx></wps:wsp></wp:anchor></w:drawing>"#;
+    let objects = parse(xml).unwrap();
+    assert_eq!(objects.len(), 1);
+    let shape = &objects[0];
+    assert_eq!(shape.name(), "outer");
+    assert_eq!(shape.kind(), Kind::TextBox);
+    assert_eq!((shape.width_emu(), shape.height_emu()), (1000, 2000));
+    assert_eq!((shape.x_emu(), shape.y_emu()), (12, 34));
+    assert_eq!(shape.text(), " A & B \t😀\n<C>\n\nlast");
+    assert_eq!(shape.preset(), Some(Preset::Rect));
+}
+
+#[test]
+fn truncated_or_excessively_nested_drawing_children_are_errors() {
+    assert!(parse(b"<w:drawing><wp:inline><wpg:wgp>").is_err());
+    let xml = format!(
+        "<w:drawing><wp:inline><wpg:wgp>{}</wpg:wgp></wp:inline></w:drawing>",
+        "<x:group>".repeat(129) + &"</x:group>".repeat(129)
+    );
+    assert!(parse(xml.as_bytes()).is_err());
+}
+
+/// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a tag
+/// quick-xml's checked iterator reads in `O(n²)` when every item is read.
+fn repeated_attributes() -> String {
+    let mut attributes = String::new();
+    for index in 0..20_000 {
+        attributes.push_str(&format!(" n{index:05}=\"\""));
+    }
+    for _ in 0..20_000 {
+        attributes.push_str(" n19999=\"\"");
+    }
+    attributes
+}
+
+fn inventory(extent: &str, doc_pr: &str) -> Object {
+    let xml = format!(
+        r#"<w:p><w:r><w:drawing><wp:inline><wp:extent{extent}/><wp:docPr{doc_pr}/></wp:inline></w:drawing></w:r></w:p>"#
+    );
+    let mut drawings = parse(xml.as_bytes()).unwrap();
+    assert_eq!(drawings.len(), 1);
+    drawings.remove(0)
+}
+
+#[test]
+fn repeated_inventory_attributes_keep_their_first_value() {
+    let single = inventory(r#" cx="1000" cy="2000""#, r#" name="first" descr="kept""#);
+    assert_eq!((single.width_emu(), single.height_emu()), (1000, 2000));
+    assert_eq!((single.name(), single.description()), ("first", "kept"));
+
+    let repeated = inventory(
+        r#" cx="1000" cy="2000" cx="3000" cy="4000""#,
+        r#" name="first" descr="kept" name="second" descr="dropped""#,
+    );
+    assert_eq!((repeated.width_emu(), repeated.height_emu()), (1000, 2000));
+    assert_eq!((repeated.name(), repeated.description()), ("first", "kept"));
+
+    let names = repeated_attributes();
+    let hostile = inventory(
+        &format!(r#" cx="1000"{names} cy="2000" cx="3000""#),
+        &format!(r#" name="first"{names} descr="kept" name="second""#),
+    );
+    assert_eq!((hostile.width_emu(), hostile.height_emu()), (1000, 2000));
+    assert_eq!((hostile.name(), hostile.description()), ("first", "kept"));
+}
+
+fn inherited_anchor_paragraph(xml: &str) -> crate::Paragraph {
+    let namespaces = std::sync::Arc::from([
+        (
+            Some(b"d".to_vec()),
+            b"http://purl.oclc.org/ooxml/wordprocessingml/main".to_vec(),
+        ),
+        (
+            Some(b"aid".to_vec()),
+            b"http://schemas.microsoft.com/office/word/2010/wordml".to_vec(),
+        ),
+    ]);
+    crate::Paragraph::from_arc_range_with_context(
+        std::sync::Arc::new(xml.as_bytes().to_vec()),
+        0,
+        u32::try_from(xml.len()).unwrap(),
+        namespaces,
+    )
+}
+
+#[test]
+fn legacy_anchors_use_inherited_aliases_without_leaking_sibling_bindings() {
+    let p = inherited_anchor_paragraph(
+        r#"<d:p><d:r><d:pict xmlns:aid="urn:foreign"/><d:object aid:anchorId="0000002a"/></d:r></d:p>"#,
+    );
+    let anchors = p.legacy_anchors().unwrap();
+    assert_eq!(anchors.len(), 2);
+    assert_eq!(anchors[0].kind(), LegacyAnchorKind::Picture);
+    assert_eq!(anchors[0].anchor_id(), None);
+    assert_eq!(anchors[1].kind(), LegacyAnchorKind::Object);
+    assert_eq!(anchors[1].anchor_id(), AnchorId::new(42));
+}
+
+#[test]
+fn inherited_legacy_anchors_still_reject_wrong_namespaces_and_invalid_ranges() {
+    for xml in [
+        r#"<d:p><d:object xmlns:aid="urn:foreign" aid:anchorId="0000002a"/></d:p>"#,
+        r#"<d:p><d:object anchorId="0000002a"/></d:p>"#,
+        r#"<d:p><d:object aid:anchorId="80000000"/></d:p>"#,
+        r#"<d:p><d:object aid:anchorId="00000000"/></d:p>"#,
+    ] {
+        assert!(inherited_anchor_paragraph(xml).legacy_anchors().is_err());
+    }
+}

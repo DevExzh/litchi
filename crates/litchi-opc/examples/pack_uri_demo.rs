@@ -11,9 +11,12 @@
 //! ```
 
 use litchi_opc::PackURI;
+use std::io::Write as _;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== PackURI::new (absolute partnames) ===");
+    let mut out = std::io::stdout();
+
+    writeln!(out, "=== PackURI::new (absolute partnames) ===")?;
     let absolute_inputs = [
         "/word/document.xml",
         "/ppt/slides/slide1.xml",
@@ -24,7 +27,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     for input in absolute_inputs {
         match PackURI::new(input) {
             Ok(uri) => {
-                println!(
+                writeln!(
+                    out,
                     "  {:<32} -> uri={}, base={}, filename={}, ext={}, idx={:?}",
                     format!("{input:?}"),
                     uri.as_str(),
@@ -32,21 +36,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                     uri.filename(),
                     uri.ext(),
                     uri.idx(),
-                );
+                )?;
             },
-            Err(e) => println!("  {input:?} -> ERROR: {e}"),
+            Err(e) => writeln!(out, "  {input:?} -> ERROR: {e}")?,
         }
     }
 
-    println!("\n=== PackURI::new error cases ===");
+    writeln!(out, "\n=== PackURI::new error cases ===")?;
     for input in ["word/document.xml", "relative/path"] {
         match PackURI::new(input) {
-            Ok(uri) => println!("  {input:?} -> ok: {uri}"),
-            Err(e) => println!("  {input:?} -> ERROR: {e}"),
+            Ok(uri) => writeln!(out, "  {input:?} -> ok: {uri}")?,
+            Err(e) => writeln!(out, "  {input:?} -> ERROR: {e}")?,
         }
     }
 
-    println!("\n=== PackURI::from_rel_ref (resolve & normalize) ===");
+    writeln!(out, "\n=== PackURI::from_rel_ref (resolve & normalize) ===")?;
     // (base_uri, relative_ref)
     let rel_inputs: &[(&str, &str)] = &[
         // Sibling reference inside same dir
@@ -66,22 +70,24 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     for (base, rel) in rel_inputs {
         match PackURI::from_rel_ref(base, rel) {
-            Ok(uri) => println!(
+            Ok(uri) => writeln!(
+                out,
                 "  base={:<22} rel={:<40} -> {}",
                 format!("{base:?}"),
                 format!("{rel:?}"),
                 uri,
-            ),
-            Err(e) => println!(
+            )?,
+            Err(e) => writeln!(
+                out,
                 "  base={:<22} rel={:<40} -> ERROR: {}",
                 format!("{base:?}"),
                 format!("{rel:?}"),
                 e,
-            ),
+            )?,
         }
     }
 
-    println!("\n=== PackURI::relative_ref (inverse direction) ===");
+    writeln!(out, "\n=== PackURI::relative_ref (inverse direction) ===")?;
     let relative_pairs: &[(&str, &str)] = &[
         ("/ppt/slideLayouts/slideLayout1.xml", "/ppt/slides"),
         ("/word/media/image1.png", "/word"),
@@ -89,20 +95,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     ];
     for (target, base) in relative_pairs {
         let uri = PackURI::new(*target)?;
-        println!(
+        writeln!(
+            out,
             "  target={:<42} base={:<14} -> {}",
             format!("{target:?}"),
             format!("{base:?}"),
             uri.relative_ref(base),
-        );
+        )?;
     }
 
-    println!("\n=== PackURI::rels_uri ===");
+    writeln!(out, "\n=== PackURI::rels_uri ===")?;
     for input in ["/word/document.xml", "/ppt/presentation.xml", "/"] {
         let uri = PackURI::new(input)?;
         match uri.rels_uri() {
-            Ok(rels) => println!("  {:<28} -> {}", uri.as_str(), rels),
-            Err(e) => println!("  {:<28} -> ERROR: {}", uri.as_str(), e),
+            Ok(rels) => writeln!(out, "  {:<28} -> {}", uri.as_str(), rels)?,
+            Err(e) => writeln!(out, "  {:<28} -> ERROR: {}", uri.as_str(), e)?,
         }
     }
 

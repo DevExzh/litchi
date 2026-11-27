@@ -1,0 +1,271 @@
+{
+  "schema": "xlsx-form-control-properties-existing-fixtures-v1",
+  "scope": "Existing corpus input identities and observed OPC metadata only; no output acceptance or rendering claim.",
+  "fixtures": [
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf134769.xlsx",
+      "sha256": "50d4f7d5d0ffe17e2251b21cfb66bd5018e3b1791c7f5c27592a47a9d9e004b1",
+      "bytes": 16892,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "ee451e92b54ea18058c6346e97fba72b06b7ca68050b6cd334de1efa1d2bd15f",
+          "bytes": 208,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "CheckBox",
+            "fmlaLink": "#REF!",
+            "lockText": "1",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId4",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/tdf134769.xlsx"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf161365.xlsx",
+      "sha256": "5c5ec45c1dd5db0a911e74d0e7e6cde5bf713b5ef38fcf84483903ddad583957",
+      "bytes": 12161,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "be9ec4e18bbc82af16dd7c4867228f37d07bc4eeacbe26c951c5fa69ae373774",
+          "bytes": 178,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "CheckBox",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId3",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        },
+        {
+          "member": "xl/ctrlProps/ctrlProp2.xml",
+          "sha256": "9734573ff8601e72482b4f71e93988e9a90c0042121015b56daa42d71612acce",
+          "bytes": 196,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "CheckBox",
+            "checked": "Checked",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId4",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp2.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/tdf161365.xlsx"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/button-form-control.xlsx",
+      "sha256": "624321843560b792805592d604e7a645040f19f0ae1f661fec024b9aeec9613f",
+      "bytes": 11190,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "7c1c0df33df49e6bfaac423ee1d265c62366d59279b13656d21ff468d3232265",
+          "bytes": 176,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "Button",
+            "lockText": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId3",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/button-form-control.xlsx"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf120301_xmlSpaceParsing.xlsx",
+      "sha256": "73709ecaa9270324eaf3f0c4fae8ec5e733ab639daa7b407f08d42538bac60bf",
+      "bytes": 11538,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "3ee809532b360df6270a88d5f5f546d380fdce24874e0ff80f97f351226bfde2",
+          "bytes": 191,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "CheckBox",
+            "lockText": "1",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId4",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        },
+        {
+          "member": "xl/ctrlProps/ctrlProp2.xml",
+          "sha256": "27a21638d1c95252a61eb44940f403927f751efbaf286c3676409cc5bde2ca90",
+          "bytes": 204,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "Radio",
+            "firstButton": "1",
+            "lockText": "1",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId5",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp2.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/tdf120301_xmlSpaceParsing.xlsx"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/tdf60673.xlsx",
+      "sha256": "d9abab27b6cb7ae4eda4729473d8d48175f63fa66457e64a8134f9fa59689bc8",
+      "bytes": 13249,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "7c1c0df33df49e6bfaac423ee1d265c62366d59279b13656d21ff468d3232265",
+          "bytes": 176,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "Button",
+            "lockText": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId3",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        },
+        {
+          "member": "xl/ctrlProps/ctrlProp2.xml",
+          "sha256": "7c1c0df33df49e6bfaac423ee1d265c62366d59279b13656d21ff468d3232265",
+          "bytes": 176,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "Button",
+            "lockText": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId4",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp2.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/tdf60673.xlsx"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/singlecontrol.xlsx",
+      "sha256": "a13fd1a411a499f4b474bbe553c7950959ab8895131c40687522d14379885cde",
+      "bytes": 17915,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "87536c4c081860e76ae7636a6e6c6b9b4a3c47282545de174c0106a2babfff85",
+          "bytes": 209,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "CheckBox",
+            "checked": "Checked",
+            "lockText": "1",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId4",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/singlecontrol.xlsx"
+    },
+    {
+      "path": "3rdparty/libreoffice-core/sc/qa/unit/data/xlsx/checkbox-form-control.xlsx",
+      "sha256": "8b602b21777bc06ca574f61783594caa5c37f68bdf66c66e58ef598758367038",
+      "bytes": 11394,
+      "form_control_parts": [
+        {
+          "member": "xl/ctrlProps/ctrlProp1.xml",
+          "sha256": "3ee809532b360df6270a88d5f5f546d380fdce24874e0ff80f97f351226bfde2",
+          "bytes": 191,
+          "content_type": "application/vnd.ms-excel.controlproperties+xml",
+          "root": "{http://schemas.microsoft.com/office/spreadsheetml/2009/9/main}formControlPr",
+          "attributes": {
+            "objectType": "CheckBox",
+            "lockText": "1",
+            "noThreeD": "1"
+          },
+          "incoming_relationships": [
+            {
+              "source_part": "xl/worksheets/sheet1.xml",
+              "relationships_member": "xl/worksheets/_rels/sheet1.xml.rels",
+              "id": "rId3",
+              "type": "http://schemas.openxmlformats.org/officeDocument/2006/relationships/ctrlProp",
+              "target": "../ctrlProps/ctrlProp1.xml"
+            }
+          ]
+        }
+      ],
+      "retained_path": "crates/litchi-xlsx/tests/fixtures/form_control_properties/checkbox-form-control.xlsx"
+    }
+  ]
+}

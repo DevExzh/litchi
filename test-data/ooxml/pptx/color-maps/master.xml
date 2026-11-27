@@ -1,0 +1,6 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:clrMap bg1="dk1" tx1="lt1" bg2="dk2" tx2="lt2"
+      accent1="accent1" accent2="accent2" accent3="accent3"
+      accent4="accent4" accent5="accent5" accent6="accent6"
+      hlink="hlink" folHlink="folHlink"/>
+</p:sldMaster>

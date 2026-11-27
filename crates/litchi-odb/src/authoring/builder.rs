@@ -1,0 +1,57 @@
+//! Database package authoring.
+
+use litchi_core::Result;
+use litchi_odf_common::{compact_xml, core::PackageWriter};
+
+/// Detached builder; publication validates through the package facade.
+#[derive(Clone, Debug)]
+pub struct Builder {
+    content_xml: String,
+}
+
+impl Builder {
+    /// Creates a builder pre-filled with an empty database content document.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            content_xml: empty_content().to_owned(),
+        }
+    }
+
+    /// Replaces the `content.xml` payload.
+    #[must_use]
+    pub fn content_xml(mut self, xml: impl Into<String>) -> Self {
+        self.content_xml = xml.into();
+        self
+    }
+
+    /// Validates, packages, and reopens the database as an immutable
+    /// [`crate::Package`]. Identical input produces identical bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if content validation or package writing fails.
+    pub fn build(self) -> std::result::Result<crate::Package, litchi_odf_common::Error> {
+        Ok(self.build_core()?)
+    }
+
+    fn build_core(self) -> Result<crate::Package> {
+        compact_xml::validate(self.content_xml.as_bytes(), compact_xml::Limits::default())?;
+        crate::codec::validate(&self.content_xml)?;
+        let mut writer =
+            PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+        writer.set_mimetype(crate::package::MIMETYPE)?;
+        writer.add_file("content.xml", self.content_xml.as_bytes())?;
+        crate::Package::from_published(writer.finish_to_bytes()?)
+    }
+}
+
+impl Default for Builder {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+fn empty_content() -> &'static str {
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:db="urn:oasis:names:tc:opendocument:xmlns:database:1.0" xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.3"><office:body><office:database><db:data-source><db:connection-data><db:connection-resource xlink:href="" xlink:type="simple"/></db:connection-data></db:data-source></office:database></office:body></office:document-content>"#
+}

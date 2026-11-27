@@ -1,0 +1,435 @@
+[package]
+name = "litchi-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[[bin]]
+name = "parse_iwork"
+path = "fuzz_targets/parse_iwork.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_text"
+path = "fuzz_targets/keynote_slide_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_show_settings"
+path = "fuzz_targets/keynote_show_settings.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_transition"
+path = "fuzz_targets/keynote_slide_transition.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_headers"
+path = "fuzz_targets/keynote_slide_table_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_lock_state"
+path = "fuzz_targets/keynote_slide_table_lock_state.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_appearance"
+path = "fuzz_targets/keynote_slide_table_appearance.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_dimension"
+path = "fuzz_targets/keynote_slide_table_dimension.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_name"
+path = "fuzz_targets/keynote_slide_table_name.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_sort_order"
+path = "fuzz_targets/keynote_slide_table_sort_order.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_table_physical_sort"
+path = "fuzz_targets/keynote_slide_table_physical_sort.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_movie_playback"
+path = "fuzz_targets/keynote_movie_playback.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_soundtrack_items"
+path = "fuzz_targets/keynote_soundtrack_items.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_movie_geometry"
+path = "fuzz_targets/keynote_slide_movie_geometry.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_title"
+path = "fuzz_targets/keynote_chart_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_arrangement"
+path = "fuzz_targets/keynote_chart_arrangement.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_axis_title"
+path = "fuzz_targets/keynote_chart_axis_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_chart_value_axis"
+path = "fuzz_targets/keynote_chart_value_axis.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_lock"
+path = "fuzz_targets/numbers_table_lock.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_headers"
+path = "fuzz_targets/numbers_table_headers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_names"
+path = "fuzz_targets/numbers_names.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_title"
+path = "fuzz_targets/numbers_table_title.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_formula_cells"
+path = "fuzz_targets/numbers_formula_cells.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formula_render_arena"
+path = "fuzz_targets/formula_render_arena.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formula_render_events"
+path = "fuzz_targets/formula_render_events.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "formula_envelope"
+path = "fuzz_targets/formula_envelope.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_api"
+path = "fuzz_targets/numbers_table_cell_api.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_appearance"
+path = "fuzz_targets/numbers_table_appearance.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_sort_order"
+path = "fuzz_targets/numbers_table_sort_order.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_relocation"
+path = "fuzz_targets/numbers_table_relocation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_body_table_sort_order"
+path = "fuzz_targets/pages_body_table_sort_order.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_body_table_appearance"
+path = "fuzz_targets/pages_body_table_appearance.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_body_table_name"
+path = "fuzz_targets/pages_body_table_name.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_pop_up_menu"
+path = "fuzz_targets/numbers_table_cell_pop_up_menu.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_control"
+path = "fuzz_targets/numbers_table_cell_control.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_number_format"
+path = "fuzz_targets/numbers_table_cell_number_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_percentage_format"
+path = "fuzz_targets/numbers_table_cell_percentage_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_currency_format"
+path = "fuzz_targets/numbers_table_cell_currency_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_scientific_format"
+path = "fuzz_targets/numbers_table_cell_scientific_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_fraction_format"
+path = "fuzz_targets/numbers_table_cell_fraction_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_text_format"
+path = "fuzz_targets/numbers_table_cell_text_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_date_time_format"
+path = "fuzz_targets/numbers_table_cell_date_time_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_custom_format"
+path = "fuzz_targets/numbers_table_cell_custom_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_duration_format"
+path = "fuzz_targets/numbers_table_cell_duration_format.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "numbers_table_cell_comment_reply"
+path = "fuzz_targets/numbers_table_cell_comment_reply.rs"
+test = false
+doc = false
+bench = false
+
+
+[[bin]]
+name = "pages_page_layout"
+path = "fuzz_targets/pages_page_layout.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_document_settings"
+path = "fuzz_targets/pages_document_settings.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_text"
+path = "fuzz_targets/pages_section_text.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_section_pagination"
+path = "fuzz_targets/pages_section_pagination.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_body_footnote_lifecycle"
+path = "fuzz_targets/pages_body_footnote_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "pages_header_footer_lifecycle"
+path = "fuzz_targets/pages_header_footer_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_deletion"
+path = "fuzz_targets/keynote_slide_deletion.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_media_data"
+path = "fuzz_targets/keynote_slide_media_data.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_media_lifecycle"
+path = "fuzz_targets/keynote_slide_media_lifecycle.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "archive_object_identity_remap"
+path = "fuzz_targets/archive_object_identity_remap.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table_merges"
+path = "fuzz_targets/table_merges.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cell_value"
+path = "fuzz_targets/cell_value.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "table_data_list"
+path = "fuzz_targets/table_data_list.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+litchi = { path = "..", default-features = false, features = ["iwork"] }
+litchi-iwa-archive = { path = "../../litchi-iwa-archive" }
+litchi-iwa-common = { path = "../../litchi-iwa-common" }
+litchi-iwa-core = { path = "../../litchi-iwa-core" }
+litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
+litchi-numbers-wire = { path = "../../litchi-numbers-wire" }
+prost = "0.14.6"
+sha1 = "0.11.0"
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"

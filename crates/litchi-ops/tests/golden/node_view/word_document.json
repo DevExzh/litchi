@@ -1,0 +1,18 @@
+{
+  "path": "/",
+  "type": "document",
+  "childCount": 1,
+  "format": {
+    "title": "Q4 Report",
+    "author": "Finance"
+  },
+  "children": [
+    {
+      "path": "/body",
+      "type": "body",
+      "childCount": 3,
+      "format": {},
+      "children": []
+    }
+  ]
+}

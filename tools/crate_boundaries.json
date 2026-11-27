@@ -1,0 +1,583 @@
+{
+  "schema": 1,
+  "packages": {
+    "litchi": [
+      "litchi-cfb",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-doc",
+      "litchi-docx",
+      "litchi-drawingml",
+      "litchi-equation",
+      "litchi-eval",
+      "litchi-fonts",
+      "litchi-imgconv",
+      "litchi-iwa-detect",
+      "litchi-keynote",
+      "litchi-markdown",
+      "litchi-numbers",
+      "litchi-odf-common",
+      "litchi-odp",
+      "litchi-odraw",
+      "litchi-ods",
+      "litchi-odt",
+      "litchi-ole-common",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-ops",
+      "litchi-pages",
+      "litchi-ppt",
+      "litchi-pptx",
+      "litchi-rtf",
+      "litchi-sheet",
+      "litchi-sheet-text",
+      "litchi-sign",
+      "litchi-xls",
+      "litchi-xlsb",
+      "litchi-xlsx"
+    ],
+    "litchi-biff": [],
+    "litchi-cfb": [
+      "litchi-core"
+    ],
+    "litchi-cli": [
+      "litchi-core",
+      "litchi-ops"
+    ],
+    "litchi-codepage": [],
+    "litchi-core": [],
+    "litchi-crypto": [
+      "litchi-cfb",
+      "litchi-core",
+      "litchi-ole-common"
+    ],
+    "litchi-doc": [
+      "litchi-cfb",
+      "litchi-codepage",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-equation",
+      "litchi-odraw",
+      "litchi-ole-common",
+      "litchi-sign",
+      "litchi-vba"
+    ],
+    "litchi-docx": [
+      "litchi-cfb",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-drawingml",
+      "litchi-equation",
+      "litchi-fonts",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-sign",
+      "litchi-vba",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
+    "litchi-drawingml": [
+      "litchi-core",
+      "litchi-equation",
+      "litchi-ooxml-common"
+    ],
+    "litchi-equation": [
+      "litchi-cfb"
+    ],
+    "litchi-eval": [
+      "litchi-core"
+    ],
+    "litchi-fonts": [
+      "litchi-core"
+    ],
+    "litchi-imgconv": [
+      "litchi-codepage",
+      "litchi-core",
+      "litchi-odraw",
+      "xml-minifier"
+    ],
+    "litchi-iwa-archive": [
+      "litchi-core",
+      "litchi-iwa-cache",
+      "litchi-iwa-core",
+      "litchi-iwa-package",
+      "soapberry-zip"
+    ],
+    "litchi-iwa-cache": [],
+    "litchi-iwa-common": [],
+    "litchi-iwa-core": [
+      "litchi-iwa-common",
+      "litchi-iwa-protos"
+    ],
+    "litchi-iwa-detect": [
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-package",
+      "litchi-iwa-protos"
+    ],
+    "litchi-iwa-graph": [],
+    "litchi-iwa-index": [
+      "litchi-iwa-graph"
+    ],
+    "litchi-iwa-package": [],
+    "litchi-iwa-protos": [],
+    "litchi-iwa-structured": [
+      "litchi-iwa-text",
+      "litchi-keynote",
+      "litchi-numbers",
+      "litchi-pages"
+    ],
+    "litchi-iwa-style": [
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire"
+    ],
+    "litchi-iwa-table": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "litchi-numbers-wire"
+    ],
+    "litchi-iwa-text": [
+      "litchi-iwa-common"
+    ],
+    "litchi-iwa-text-wire": [
+      "litchi-iwa-common",
+      "litchi-iwa-protos",
+      "litchi-iwa-text"
+    ],
+    "litchi-keynote": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-detect",
+      "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-table",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "litchi-numbers-wire"
+    ],
+    "litchi-markdown": [
+      "litchi-core"
+    ],
+    "litchi-numbers": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-detect",
+      "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-table",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "litchi-numbers-wire"
+    ],
+    "litchi-numbers-wire": [
+      "litchi-iwa-common",
+      "litchi-iwa-protos"
+    ],
+    "litchi-odb": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odc": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip"
+    ],
+    "litchi-odf": [
+      "litchi-odb",
+      "litchi-odc",
+      "litchi-odf-common",
+      "litchi-odf-formula",
+      "litchi-odg",
+      "litchi-odi",
+      "litchi-odm",
+      "litchi-odp",
+      "litchi-ods",
+      "litchi-odt",
+      "litchi-oth"
+    ],
+    "litchi-odf-common": [
+      "litchi-core",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
+    "litchi-odf-formula": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip"
+    ],
+    "litchi-odg": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip"
+    ],
+    "litchi-odi": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odm": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odp": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
+    "litchi-odraw": [
+      "litchi-core"
+    ],
+    "litchi-ods": [
+      "litchi-core",
+      "litchi-odf-common"
+    ],
+    "litchi-odt": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
+    "litchi-ograph": [
+      "litchi-biff",
+      "litchi-cfb",
+      "litchi-core"
+    ],
+    "litchi-ole-common": [
+      "litchi-cfb",
+      "litchi-codepage",
+      "litchi-core"
+    ],
+    "litchi-ooxml-common": [
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-opc",
+      "litchi-vba",
+      "soapberry-zip"
+    ],
+    "litchi-opc": [
+      "litchi-core",
+      "litchi-sign",
+      "soapberry-zip",
+      "xml-minifier"
+    ],
+    "litchi-ops": [
+      "litchi-biff",
+      "litchi-cfb",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-doc",
+      "litchi-docx",
+      "litchi-drawingml",
+      "litchi-equation",
+      "litchi-eval",
+      "litchi-iwa-archive",
+      "litchi-iwa-detect",
+      "litchi-keynote",
+      "litchi-markdown",
+      "litchi-numbers",
+      "litchi-odb",
+      "litchi-odc",
+      "litchi-odf-common",
+      "litchi-odf-formula",
+      "litchi-odg",
+      "litchi-odi",
+      "litchi-odm",
+      "litchi-odp",
+      "litchi-ods",
+      "litchi-odt",
+      "litchi-ograph",
+      "litchi-ole-common",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-oth",
+      "litchi-pages",
+      "litchi-ppt",
+      "litchi-pptx",
+      "litchi-rtf",
+      "litchi-sheet-text",
+      "litchi-sign",
+      "litchi-vba",
+      "litchi-xls",
+      "litchi-xlsb",
+      "litchi-xlsx",
+      "soapberry-zip"
+    ],
+    "litchi-oth": [
+      "litchi-core",
+      "litchi-odf-common",
+      "soapberry-zip"
+    ],
+    "litchi-pages": [
+      "litchi-core",
+      "litchi-iwa-archive",
+      "litchi-iwa-common",
+      "litchi-iwa-core",
+      "litchi-iwa-detect",
+      "litchi-iwa-protos",
+      "litchi-iwa-style",
+      "litchi-iwa-table",
+      "litchi-iwa-text",
+      "litchi-iwa-text-wire",
+      "litchi-numbers-wire"
+    ],
+    "litchi-ppt": [
+      "litchi-cfb",
+      "litchi-codepage",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-equation",
+      "litchi-fonts",
+      "litchi-odraw",
+      "litchi-ograph",
+      "litchi-ole-common",
+      "litchi-opc",
+      "litchi-sign",
+      "litchi-vba",
+      "soapberry-zip"
+    ],
+    "litchi-pptx": [
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-drawingml",
+      "litchi-equation",
+      "litchi-fonts",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "soapberry-zip"
+    ],
+    "litchi-py": [
+      "litchi"
+    ],
+    "litchi-rtf": [
+      "litchi-codepage",
+      "litchi-core"
+    ],
+    "litchi-sheet": [
+      "litchi-core"
+    ],
+    "litchi-sheet-text": [
+      "litchi-core",
+      "litchi-sheet"
+    ],
+    "litchi-sign": [
+      "litchi-cfb",
+      "soapberry-zip"
+    ],
+    "litchi-slide": [
+      "litchi-core"
+    ],
+    "litchi-spreadsheet-drawing": [
+      "litchi-core",
+      "litchi-drawingml",
+      "litchi-ooxml-common",
+      "litchi-opc"
+    ],
+    "litchi-vba": [
+      "litchi-cfb",
+      "litchi-codepage"
+    ],
+    "litchi-word": [],
+    "litchi-xldm": [],
+    "litchi-xls": [
+      "litchi-biff",
+      "litchi-cfb",
+      "litchi-codepage",
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-equation",
+      "litchi-odraw",
+      "litchi-ograph",
+      "litchi-ole-common",
+      "litchi-sign",
+      "litchi-vba"
+    ],
+    "litchi-xlsb": [
+      "litchi-core",
+      "litchi-drawingml",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-sheet",
+      "litchi-sign",
+      "litchi-spreadsheet-drawing",
+      "litchi-vba",
+      "litchi-xldm",
+      "soapberry-zip"
+    ],
+    "litchi-xlsx": [
+      "litchi-core",
+      "litchi-crypto",
+      "litchi-drawingml",
+      "litchi-equation",
+      "litchi-ooxml-common",
+      "litchi-opc",
+      "litchi-sheet",
+      "litchi-spreadsheet-drawing",
+      "litchi-vba",
+      "litchi-xldm",
+      "soapberry-zip"
+    ],
+    "soapberry-zip": [],
+    "xml-minifier": [
+      "xml-minifier-macros"
+    ],
+    "xml-minifier-macros": []
+  },
+  "dev_only_edges": [
+    {
+      "dependent": "litchi-docx",
+      "dependency": "litchi-cfb"
+    },
+    {
+      "dependent": "litchi-docx",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-iwa-detect",
+      "dependency": "litchi-iwa-protos"
+    },
+    {
+      "dependent": "litchi-iwa-structured",
+      "dependency": "litchi-iwa-text"
+    },
+    {
+      "dependent": "litchi-odc",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-odf-formula",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-odg",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-ooxml-common",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-oth",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-ppt",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-pptx",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-sign",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-xlsb",
+      "dependency": "soapberry-zip"
+    },
+    {
+      "dependent": "litchi-xlsx",
+      "dependency": "soapberry-zip"
+    }
+  ],
+  "migration_hosts": [],
+  "migration_debt": [],
+  "runtime_neutral": [
+    "litchi-biff",
+    "litchi-cli",
+    "litchi-codepage",
+    "litchi-core",
+    "litchi-crypto",
+    "litchi-docx",
+    "litchi-drawingml",
+    "litchi-eval",
+    "litchi-iwa-archive",
+    "litchi-iwa-cache",
+    "litchi-iwa-common",
+    "litchi-iwa-core",
+    "litchi-iwa-detect",
+    "litchi-iwa-graph",
+    "litchi-iwa-index",
+    "litchi-iwa-package",
+    "litchi-iwa-protos",
+    "litchi-iwa-structured",
+    "litchi-iwa-style",
+    "litchi-iwa-table",
+    "litchi-iwa-text",
+    "litchi-iwa-text-wire",
+    "litchi-keynote",
+    "litchi-numbers",
+    "litchi-numbers-wire",
+    "litchi-odb",
+    "litchi-odc",
+    "litchi-odf-common",
+    "litchi-odf-formula",
+    "litchi-odg",
+    "litchi-odi",
+    "litchi-odm",
+    "litchi-odp",
+    "litchi-odraw",
+    "litchi-ods",
+    "litchi-odt",
+    "litchi-ograph",
+    "litchi-ole-common",
+    "litchi-ooxml-common",
+    "litchi-ops",
+    "litchi-pages",
+    "litchi-pptx",
+    "litchi-sheet",
+    "litchi-sheet-text",
+    "litchi-sign",
+    "litchi-slide",
+    "litchi-spreadsheet-drawing",
+    "litchi-vba",
+    "litchi-word",
+    "litchi-xldm",
+    "litchi-xlsb"
+  ],
+  "runtime_packages": [
+    "rayon",
+    "reqwest",
+    "tokio"
+  ],
+  "core": {
+    "forbidden_dependencies": [
+      "encoding_rs",
+      "litchi-cfb",
+      "litchi-opc",
+      "quick-xml",
+      "rayon",
+      "reqwest",
+      "soapberry-zip",
+      "tokio"
+    ],
+    "dependency_debt": [],
+    "format_features": [
+      "doc",
+      "docx",
+      "odf",
+      "ole",
+      "ppt",
+      "pptx",
+      "rtf",
+      "xls",
+      "xlsb",
+      "xlsx"
+    ],
+    "feature_debt": []
+  }
+}

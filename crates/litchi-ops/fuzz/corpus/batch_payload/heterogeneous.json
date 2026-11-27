@@ -1,0 +1,1 @@
+[{"command":"meta","dumpVersion":2},{"command":"add","parent":"/body","type":"p","props":["text=first"]},{"op":"set","path":"/body/p[last()]","props":{"bold":true}}]

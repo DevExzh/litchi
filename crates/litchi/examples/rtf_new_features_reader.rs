@@ -6,7 +6,7 @@
 
 use litchi::rtf::*;
 
-fn main() -> Result<(), Box<dyn std::error::Error>> {
+fn main() -> std::result::Result<(), Box<dyn std::error::Error>> {
     println!("RTF Document Feature Reader\n");
     println!("{}", "=".repeat(60));
 
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\n📄 Parsing RTF document...\n");
 
     // Parse the document
-    let doc = RtfDocument::parse(rtf_content)?;
+    let doc = raw::Tree::parse(rtf_content, litchi::rtf::read::OpenOptions::default())?;
 
     // Display basic document info
     println!("✅ Document parsed successfully!\n");
@@ -156,17 +156,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         println!("  ℹ️  No fields found");
     } else {
         for (i, field) in fields.iter().enumerate() {
-            let field_type_name = match field.field_type {
-                FieldType::Hyperlink => "Hyperlink",
-                FieldType::Reference => "Reference",
-                FieldType::Page => "Page",
-                FieldType::Date => "Date",
-                FieldType::Toc => "Table of Contents",
-                FieldType::Bookmark => "Bookmark",
-                FieldType::Equation => "Equation",
-                FieldType::Index => "Index",
-                FieldType::Unknown => "Unknown",
-            };
+            let field_type_name = format!("{:?}", field.field_type);
 
             println!("  Field {}: {}", i + 1, field_type_name);
             println!("    Instruction: {}", field.instruction);

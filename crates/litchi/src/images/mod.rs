@@ -1,153 +1,225 @@
-//! Image processing and conversion module.
+//! Office image grammar, codecs, and legacy-container discovery.
 //!
-//! Re-exports the [`litchi-imgconv`](../../litchi_imgconv/index.html) crate
-//! (pure BLIP / EMF / WMF / PICT decoders and converters) plus an
-//! integration helper, [`extractor`], that bridges OLE Escher records to
-//! `litchi-imgconv` types. The integration helper stays in the umbrella
-//! because it depends on `crate::ole` and therefore cannot live in a leaf
-//! crate.
+//! The layers remain explicit:
 //!
-//! # Quick Start: Extract Images from Office Files
+//! - [`art`](crate::images::art) owns borrowed OfficeArt BLIP and BStore grammar;
+//! - [`codec`](crate::images::codec) owns bounded decoding, rendering, and conversion;
+//! - concrete DOC and PPT packages map their storage topology onto those views.
 //!
 //! ```no_run
-//! use litchi::images::{extract_images_from_doc, extract_images_from_ppt};
-//!
-//! # fn main() -> Result<(), litchi::Error> {
-//! // Extract from Word document
-//! let images = extract_images_from_doc("document.doc")?;
-//! for (i, img) in images.iter().enumerate() {
-//!     let png = img.to_png(Some(800), None)?;
-//!     std::fs::write(format!("image_{}.png", i), png)?;
+//! # fn main() -> Result<(), litchi::common::Error> {
+//! #[cfg(feature = "doc")]
+//! {
+//!     use litchi::images::{Convert, Options, doc};
+//!     for image in doc("document.doc")? {
+//!         std::fs::write(image.out_name(), image.extract(Options::default())?)?;
+//!     }
 //! }
-//!
-//! // Extract from PowerPoint presentation
-//! let images = extract_images_from_ppt("presentation.ppt")?;
-//! for img in images {
-//!     let filename = img.suggested_filename();
-//!     let png = img.to_png(None, None)?;
-//!     std::fs::write(filename, png)?;
+//! #[cfg(feature = "ppt")]
+//! {
+//!     use litchi::images::{Convert, Options, ppt};
+//!     for image in ppt("presentation.ppt")? {
+//!         std::fs::write(image.out_name(), image.extract(Options::default())?)?;
+//!     }
 //! }
-//! # Ok::<(), litchi::Error>(())
+//! # Ok(())
 //! # }
 //! ```
-//!
-//! # Example: Converting a BLIP record
-//!
-//! ```no_run
-//! use litchi::images::blip::Blip;
-//! use litchi::images::convert_blip_to_png;
-//!
-//! let blip_data = vec![/* BLIP record bytes */];
-//! let blip = Blip::parse(&blip_data)?;
-//! let png_bytes = convert_blip_to_png(&blip, Some(800), None)?;
-//! # Ok::<(), litchi::Error>(())
-//! ```
 
-pub use litchi_imgconv::*;
-
-// Integration glue between `litchi_ole::escher` and `litchi_imgconv` lives
-// in the `litchi-ole` crate because it reaches into private Escher types.
-// Re-exported here so `litchi::images::ImageExtractor` resolves.
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub use litchi_ole::extractor::{ExtractedImage, ImageExtractor};
-
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-use litchi_core::error::Result;
-
-/// Extract all images from a PPT presentation file
-///
-/// # Arguments
-/// * `path` - Path to the .ppt file
-///
-/// # Returns
-/// Vector of extracted images with metadata
-///
-/// # Example
-/// ```no_run
-/// use litchi::images::extract_images_from_ppt;
-///
-/// let images = extract_images_from_ppt("presentation.ppt")?;
-/// for (i, img) in images.iter().enumerate() {
-///     let png_data = img.to_png(None, None)?;
-///     std::fs::write(format!("image_{}.png", i), png_data)?;
-/// }
-/// # Ok::<(), litchi::Error>(())
-/// ```
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn extract_images_from_ppt<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Vec<ExtractedImage<'static>>> {
-    use crate::ole::OleFile;
-    use std::fs::File;
-
-    let file = File::open(path).map_err(litchi_core::error::Error::Io)?;
-    let mut ole = OleFile::open(file).map_err(|e| {
-        litchi_core::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
-    })?;
-
-    ImageExtractor::extract_from_ppt(&mut ole)
+/// Borrowed OfficeArt image records, checked identifiers, stores, and writers.
+pub mod art {
+    pub use litchi_odraw::image::*;
 }
 
-/// Extract all images from a DOC document file
-///
-/// # Arguments
-/// * `path` - Path to the .doc file
-///
-/// # Returns
-/// Vector of extracted images with metadata
-///
-/// # Example
-/// ```no_run
-/// use litchi::images::extract_images_from_doc;
-///
-/// let images = extract_images_from_doc("document.doc")?;
-/// for img in images {
-///     let filename = img.suggested_filename();
-///     let data = img.decompressed_data()?;
-///     std::fs::write(filename, &*data)?;
-/// }
-/// # Ok::<(), litchi::Error>(())
-/// ```
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn extract_images_from_doc<P: AsRef<std::path::Path>>(
-    path: P,
-) -> Result<Vec<ExtractedImage<'static>>> {
-    use crate::ole::OleFile;
-    use std::fs::File;
-
-    let file = File::open(path).map_err(litchi_core::error::Error::Io)?;
-    let mut ole = OleFile::open(file).map_err(|e| {
-        litchi_core::error::Error::ParseError(format!("Failed to open OLE file: {}", e))
-    })?;
-
-    ImageExtractor::extract_from_doc(&mut ole)
+/// Bounded native-image decoding, rendering, and format conversion.
+pub mod codec {
+    pub use litchi_imgconv::*;
 }
 
-/// Extract images from raw Escher drawing data
-///
-/// This is a lower-level function useful when you already have Escher data
-/// extracted from a document.
-///
-/// # Arguments
-/// * `escher_data` - Raw Escher drawing layer data
-///
-/// # Returns
-/// Vector of extracted images
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn extract_images_from_escher(escher_data: &[u8]) -> Result<Vec<ExtractedImage<'static>>> {
-    ImageExtractor::extract_blips(escher_data)
+pub use art::File;
+pub use codec::{Convert, Limits, Options, convert, decode_data, to_jpeg, to_png, to_svg, to_webp};
+
+use litchi_core::error::{Error, Result};
+
+fn office_art(error: litchi_odraw::Error) -> Error {
+    Error::ParseError(error.to_string())
 }
 
-/// Parse a BLIP store (BSE index) from Escher data
+/// Extracts images from a legacy PowerPoint presentation.
 ///
-/// The BLIP store provides metadata about all images in a document.
+/// Returned records own their OfficeArt framing because the compound file is
+/// closed before this function returns. Native image data is not decoded.
+#[cfg(feature = "ppt")]
+pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
+    let package = litchi_ppt::Package::open(path).map_err(Error::from)?;
+    let presentation = package.presentation().map_err(Error::from)?;
+    presentation
+        .images()
+        .map_err(Error::from)?
+        .into_iter()
+        .map(|image| image.into_owned().map_err(office_art))
+        .collect()
+}
+
+/// Most native image bytes [`doc`] returns in total.
 ///
-/// # Arguments
-/// * `escher_data` - Raw Escher drawing layer data
+/// Every returned picture is copied out of the document, which is closed
+/// before [`doc`] returns.
+#[cfg(feature = "doc")]
+pub const MAX_DOC_IMAGE_BYTES: u64 = 1 << 30;
+
+/// Extracts images from a legacy Word document.
 ///
-/// # Returns
-/// BlipStore with all BSE entries
-#[cfg(all(feature = "ole", feature = "imgconv"))]
-pub fn parse_blip_store(escher_data: &[u8]) -> Result<BlipStore<'_>> {
-    ImageExtractor::extract_blip_store(escher_data)
+/// Returned records own their OfficeArt framing because the compound file is
+/// closed before this function returns. Native image data is not decoded.
+///
+/// Each inline picture (one Data-stream PICF) is returned once, and so is each
+/// picture of the drawing's image store that floating pictures show (one
+/// OfficeArt shape, including each picture inside an anchored group), however
+/// many shapes show it. Picture frames that store no picture, such as linked
+/// pictures saved without their data, are skipped. The document is read with
+/// [`litchi_doc::Leniency::TolerateStylesheetDefects`].
+///
+/// # Errors
+///
+/// Returns an error when the document cannot be read, when it holds more
+/// pictures than the default [`art::Limits::max_files`], or when their image
+/// data exceeds [`MAX_DOC_IMAGE_BYTES`] in total.
+#[cfg(feature = "doc")]
+pub fn doc(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
+    // Style names only label styles; a duplicated one, which Word opens
+    // without complaint, cannot change where a picture is stored.
+    let options = litchi_doc::OpenOptions::default()
+        .leniency(litchi_doc::Leniency::TolerateStylesheetDefects);
+    let package = litchi_doc::Package::open_with_options(path, options).map_err(Error::from)?;
+    let max_files = usize::try_from(art::Limits::default().max_files).unwrap_or(usize::MAX);
+    doc_images(&package.document(), max_files, MAX_DOC_IMAGE_BYTES)
+}
+
+/// The pictures of `document`, failing past `max_files` pictures or
+/// `max_bytes` bytes of image data.
+#[cfg(feature = "doc")]
+fn doc_images(
+    document: &litchi_doc::Document,
+    max_files: usize,
+    max_bytes: u64,
+) -> Result<Vec<File<'static>>> {
+    let mut inline_seen = std::collections::HashSet::new();
+    let mut shapes_seen = std::collections::HashSet::new();
+    let mut entries_seen = std::collections::HashSet::new();
+    let mut retained = 0u64;
+    let mut images = Vec::new();
+
+    for paragraph in document.paragraphs().map_err(Error::from)? {
+        for run in paragraph.runs().map_err(Error::from)? {
+            let pictures = match run.image() {
+                Some(image) => vec![*image],
+                None => anchored_pictures(document, &run)?,
+            };
+            for image in &pictures {
+                // A floating picture's CPicLocation is only a legacy hint that
+                // other pictures can share; its shape identifies it.
+                let first = match image.drawing_shape_id() {
+                    Some(shape_id) => shapes_seen.insert(shape_id),
+                    None => inline_seen.insert(image.pic_offset()),
+                };
+                if !first {
+                    continue;
+                }
+                let file = match document.image_data(image) {
+                    Ok(file) => file,
+                    Err(litchi_doc::ImageError::NoPicture) => continue,
+                    Err(error) => return Err(Error::ParseError(error.to_string())),
+                };
+                // A floating picture's file is indexed by its image-store
+                // entry, which other shapes can show as well.
+                if image.drawing_shape_id().is_some() && !entries_seen.insert(file.index()) {
+                    continue;
+                }
+                if images.len() >= max_files {
+                    return Err(office_art(litchi_odraw::Error::ImageLimitExceeded {
+                        limit: art::LimitKind::Files,
+                        observed: u64::try_from(images.len() + 1).unwrap_or(u64::MAX),
+                        maximum: u64::try_from(max_files).unwrap_or(u64::MAX),
+                    }));
+                }
+                let size = file.data().map_err(office_art)?.len();
+                retained = retained.saturating_add(u64::try_from(size).unwrap_or(u64::MAX));
+                if retained > max_bytes {
+                    return Err(Error::ParseError(format!(
+                        "document pictures hold more than {max_bytes} bytes of image data"
+                    )));
+                }
+                let index = images.len();
+                images.push(file.with_index(index).into_owned().map_err(office_art)?);
+            }
+        }
+    }
+
+    Ok(images)
+}
+
+/// The floating pictures of a run that `Run::image` does not describe: a run
+/// of several anchor characters, or an anchor of a group of pictures.
+#[cfg(feature = "doc")]
+fn anchored_pictures(
+    document: &litchi_doc::Document,
+    run: &litchi_doc::Run,
+) -> Result<Vec<litchi_doc::Image>> {
+    let properties = run.properties();
+    if !properties.is_spec || properties.is_obj || properties.is_ole2 || properties.is_data {
+        return Ok(Vec::new());
+    }
+    let (Some(range), Ok(text)) = (run.cp_range(), run.text()) else {
+        return Ok(Vec::new());
+    };
+    let mut pictures = Vec::new();
+    for (offset, unit) in text.encode_utf16().enumerate() {
+        let cp = u32::try_from(offset)
+            .ok()
+            .and_then(|offset| range.start().checked_add(offset));
+        if let (0x0008, Some(cp)) = (unit, cp) {
+            pictures.extend(document.floating_images_at(cp).map_err(Error::from)?);
+        }
+    }
+    Ok(pictures)
+}
+
+/// Discovers borrowed images in an OfficeArt record sequence.
+pub fn scan(data: &[u8], limits: art::Limits) -> Result<Vec<File<'_>>> {
+    art::scan(data, limits).map_err(office_art)
+}
+
+/// Finds the unique borrowed BStore in an OfficeArt drawing sequence.
+pub fn store(data: &[u8], limits: art::Limits) -> Result<Option<art::Store<'_>>> {
+    art::store(data, limits).map_err(office_art)
+}
+
+#[cfg(all(test, feature = "doc"))]
+mod tests {
+    use super::*;
+
+    fn floating_pictures(max_files: usize, max_bytes: u64) -> Result<Vec<File<'static>>> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/doc/FloatingPictures.doc");
+        let options = litchi_doc::OpenOptions::default()
+            .leniency(litchi_doc::Leniency::TolerateStylesheetDefects);
+        let package = litchi_doc::Package::open_with_options(path, options).map_err(Error::from)?;
+        doc_images(&package.document(), max_files, max_bytes)
+    }
+
+    #[test]
+    fn doc_images_bound_the_pictures_and_bytes_they_return() {
+        // Seventeen pictures: sixteen inline ones, and one image-store entry
+        // that four floating shapes show.
+        let all = floating_pictures(17, u64::MAX).unwrap();
+        assert_eq!(all.len(), 17);
+        let bytes = all
+            .iter()
+            .map(|file| file.data().unwrap().len() as u64)
+            .sum::<u64>();
+        assert!(floating_pictures(16, u64::MAX).is_err());
+        assert!(floating_pictures(17, bytes - 1).is_err());
+        assert!(floating_pictures(17, bytes).is_ok());
+    }
 }

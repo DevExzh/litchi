@@ -2,7 +2,10 @@
 //!
 //! This module provides a unified error type that encompasses errors from both
 //! OLE2 and OOXML parsing, presenting a consistent API to users.
+use std::collections::TryReserveError;
+
 use crate::binary::BinaryError;
+use crate::xml::CompactnessKind;
 use thiserror::Error;
 
 /// Main error type for Litchi operations.
@@ -12,6 +15,12 @@ pub enum Error {
     /// IO error
     #[error("IO error: {0}")]
     Io(#[from] std::io::Error),
+
+    /// Atomic publication replaced its destination, but a later durability
+    /// synchronization failed. Callers must not retry as though publication
+    /// had not occurred.
+    #[error("publication committed but durability synchronization failed: {0}")]
+    Committed(#[source] std::io::Error),
 
     /// Parse error occurred
     #[error("Parse error: {0}")]
@@ -25,6 +34,19 @@ pub enum Error {
     #[error("Not a valid Office file")]
     NotOfficeFile,
 
+    /// The input is a recognized Office format, but not one this opener owns.
+    ///
+    /// This is distinct from [`Error::NotOfficeFile`]: detection succeeded and
+    /// named the format, so a caller can report "this is a Word document" or
+    /// re-dispatch to the right opener instead of being told only that the
+    /// input was unusable. Openers return it wherever a classification is
+    /// already in hand.
+    #[error("Detected {detected:?}, which this opener does not handle")]
+    UnexpectedFormat {
+        /// Neutral classification produced by detection.
+        detected: crate::detection::FileFormat,
+    },
+
     /// Corrupted or malformed file
     #[error("Corrupted file: {0}")]
     CorruptedFile(String),
@@ -36,6 +58,15 @@ pub enum Error {
     /// XML parsing error
     #[error("XML error: {0}")]
     XmlError(String),
+
+    /// XML cannot be represented by a compact parser.
+    #[error("compact XML {kind} at byte offset {offset}")]
+    XmlCompactness {
+        /// Structural cause of the compactness failure.
+        kind: CompactnessKind,
+        /// Byte offset where the parser observed the failure.
+        offset: u64,
+    },
 
     /// Invalid content type
     #[error("Invalid content type: expected {expected}, got {got}")]
@@ -49,9 +80,54 @@ pub enum Error {
     #[error("Unsupported feature: {0}")]
     Unsupported(String),
 
+    /// A well-formed request the route refuses, with a static content-free
+    /// reason classified by its [`RefusalKind`](crate::edit::RefusalKind).
+    #[error("{0}")]
+    Refused(crate::edit::Refusal),
+
+    /// A patch's recorded base differs from the recipient content.
+    #[error("patch base does not match recipient")]
+    PatchConflict,
+
+    /// A configured resource limit lies outside its supported range.
+    #[error("invalid {scope} {kind:?} limit: {value}; maximum {maximum}")]
+    InvalidLimit {
+        /// Finite resource dimension.
+        kind: crate::Resource,
+        /// Requested value.
+        value: u64,
+        /// Largest supported value.
+        maximum: u64,
+        /// Fixed, content-free resource scope.
+        scope: &'static str,
+    },
+
     /// Feature disabled at compile time
     #[error("Feature '{0}' is disabled. Enable it with --features {0}")]
     FeatureDisabled(String),
+
+    /// A bounded operation could not reserve its required memory.
+    #[error("allocation failed for {resource}: {source}")]
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        #[source]
+        source: TryReserveError,
+    },
+
+    /// A finite resource budget was exceeded.
+    #[error(transparent)]
+    ResourceLimit(#[from] crate::ResourceLimit),
+
+    /// A positional source changed after a caller captured its identity.
+    #[error("positional source changed (expected {expected:?}, observed {observed:?})")]
+    SourceChanged {
+        /// Source identity and revision captured before the operation.
+        expected: crate::SourceVersion,
+        /// Source identity and revision observed during or after the operation.
+        observed: crate::SourceVersion,
+    },
 
     /// Generic error
     #[error("{0}")]
@@ -60,7 +136,7 @@ pub enum Error {
 
 impl From<BinaryError> for Error {
     fn from(err: BinaryError) -> Self {
-        Error::ParseError(format!("Binary parsing error: {}", err))
+        Error::ParseError(format!("Binary parsing error: {err}"))
     }
 }
 

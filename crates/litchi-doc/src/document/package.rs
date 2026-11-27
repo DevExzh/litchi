@@ -1,0 +1,691 @@
+//! OLE package orchestration for the typed Word document model.
+
+use super::model::{Document, DocumentState};
+use crate::encryption::decrypt_document_streams;
+use crate::leniency::{AuxiliaryTableDefect, ToleranceReport};
+use crate::package::{
+    Error as PackageError, OpenOptions, Result, SourceLimitKind, preflight_declared_streams,
+};
+use crate::parts::associated_strings::DocumentAssociatedStrings;
+use crate::parts::auto_summary::DocumentAutoSummary;
+use crate::parts::bookmarks::BookmarksTable;
+use crate::parts::captions::CaptionTables;
+use crate::parts::chp_bin_table::ChpBinTable;
+use crate::parts::comments::CommentsTable;
+use crate::parts::document_properties::DocumentProperties;
+use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
+use crate::parts::envelope::Envelope;
+use crate::parts::fib::{FileInformationBlock, WORD_97_NFIB};
+use crate::parts::fields::FieldsTable;
+use crate::parts::footnotes::{EndnotesTable, FootnotesTable};
+use crate::parts::format_consistency::DocumentFormatConsistencyMarks;
+use crate::parts::glossary::{AttachedGlossary, GlossaryMetadata};
+use crate::parts::grammar_cookies::GrammarCookieTables;
+use crate::parts::headers::HeadersTable;
+use crate::parts::hyperlinks::HyperlinksTable;
+use crate::parts::list_names::ListNamesTable;
+use crate::parts::list_templates::ListTemplateTable;
+use crate::parts::mail_merge::DocumentMailMerge;
+use crate::parts::numbering::ListTables;
+use crate::parts::ole_controls::RgxOcxInfo;
+use crate::parts::pap_bin_table::PapBinTable;
+use crate::parts::proofing::ProofingTables;
+use crate::parts::protection::Ranges;
+use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
+use crate::parts::revisions::RevisionAuthorTable;
+use crate::parts::rmd_threading::DocumentRmdThreading;
+use crate::parts::route_slip::Metadata;
+use crate::parts::rsids::DocumentRsids;
+use crate::parts::saved_by::SavedByTable;
+use crate::parts::sections::SectionsTable;
+use crate::parts::smart_tags::DocumentSmartTags;
+use crate::parts::structured_tags::DocumentStructuredTags;
+use crate::parts::styles::StyleSheet;
+use crate::parts::subdocuments::Collection;
+use crate::parts::table_char_cache::TableCharacterCache;
+use crate::parts::text::TextExtractor;
+use crate::parts::text_services::TextServicesTables;
+use crate::parts::textbox_breaks::TextBoxBreakTables;
+use litchi_cfb::OleFile;
+use litchi_ole_common::property_set::PropertySetReader as _;
+use std::io::{Read, Seek};
+use std::sync::Arc;
+
+impl Document {
+    /// Create a new Document from an OLE file.
+    ///
+    /// This is typically called internally by `Package::document()`.
+    pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
+        Self::from_ole_with_options(ole, OpenOptions::default())
+    }
+
+    /// Create a new Document from an OLE file under one merged options envelope.
+    pub(crate) fn from_ole_with_options<R: Read + Seek>(
+        ole: &mut OleFile<R>,
+        options: OpenOptions,
+    ) -> Result<Self> {
+        let source_limits = options.source_limits_value();
+        // Charge every declared CFB stream before any DOC-owned payload is
+        // materialized. This covers metadata, Equation Native, embedded
+        // objects, VBA, and opaque streams that format-specific readers may
+        // inspect later.
+        preflight_declared_streams(ole, source_limits)?;
+        // Resolve hostile lengths before materializing the corresponding payload.
+        let _word_document_size = locate_stream(
+            ole,
+            &["WordDocument"],
+            source_limits.max_entry_bytes(),
+            "WordDocument",
+        )?
+        .ok_or_else(|| PackageError::StreamNotFound("WordDocument".to_string()))?;
+
+        // The global preflight above has charged WordDocument before this
+        // stream is materialized. The stream is shared rather than copied:
+        // the FIB, the attached glossary FIB, and this document all read the
+        // same bytes.
+        let mut word_document = Arc::new(ole.open_stream(&["WordDocument"])?);
+
+        // Parse the File Information Block (FIB) from the start of WordDocument
+        let mut fib = FileInformationBlock::parse_shared(Arc::clone(&word_document), 0)?;
+
+        // Reject an older layout before consulting any modern table pointer.
+        // A stray/retained Table stream does not make a Word 6/95 FIB readable
+        // as Word 97. MS-DOC's Word 97 shell-template value 00C0 is the known
+        // exception, also admitted by the positional source owner.
+        if fib.version() < WORD_97_NFIB && fib.version() != 0x00c0 {
+            return Err(PackageError::UnsupportedVersion {
+                nfib: fib.version(),
+                name: fib.version_name(),
+            });
+        }
+
+        // Determine which table stream to use (0Table or 1Table)
+        let table_stream_name = if fib.which_table_stream() {
+            "1Table"
+        } else {
+            "0Table"
+        };
+
+        // Every admitted modern layout requires the selected table stream.
+        let _table_stream_size = locate_stream(
+            ole,
+            &[table_stream_name],
+            source_limits.max_entry_bytes(),
+            table_stream_name,
+        )?
+        .ok_or_else(|| PackageError::StreamNotFound(table_stream_name.to_string()))?;
+
+        let data_stream_present =
+            locate_stream(ole, &["Data"], source_limits.max_entry_bytes(), "Data")?;
+
+        let mut table_stream = ole.open_stream(&[table_stream_name])?;
+        // According to Apache POI, pictures are stored in Data, not WordDocument.
+        let mut data_stream = data_stream_present
+            .map(|_| ole.open_stream(&["Data"]))
+            .transpose()?;
+
+        if fib.is_encrypted() {
+            // Decryption rewrites the stream in place, so it works on a private
+            // copy that then replaces the shared one.
+            let mut decrypted = word_document.as_ref().clone();
+            decrypt_document_streams(
+                &fib,
+                &mut decrypted,
+                &mut table_stream,
+                data_stream.as_deref_mut(),
+                options.credential(),
+            )?;
+            word_document = Arc::new(decrypted);
+            // FibBase is clear, but the rest of the FIB was encrypted and must be
+            // reparsed before any offsets or character counts are consulted.
+            fib = FileInformationBlock::parse_shared(Arc::clone(&word_document), 0)?;
+        }
+
+        // Create text extractor
+        let text_extractor = TextExtractor::new(&fib, &word_document, &table_stream)?;
+
+        // Word-compatible repairs recorded while the optional FIB-pointed
+        // auxiliary tables below are parsed. MS-DOC 2.5 makes each of these
+        // fc/lcb pairs independently optional metadata, so a malformed table
+        // degrades to its absent value with a recorded
+        // `AuxiliaryTableDefect` instead of aborting the open — the same
+        // posture Word and LibreOffice take, and the one this function
+        // already used for headers, footnotes, endnotes, and list tables.
+        let mut tolerance = ToleranceReport::default();
+        // Container repairs come first: the compound-file reader applied
+        // them while the OLE file was opened, before any DOC stream was read.
+        tolerance.append_container(ole.tolerance_report());
+
+        // Parse fields table to identify embedded equations and hyperlinks
+        let fields_table = auxiliary_or_absent(
+            FieldsTable::parse(&fib, &table_stream).map(Some),
+            AuxiliaryTableDefect::Fields,
+            &mut tolerance,
+        );
+
+        // Parse headers/footers table
+        let headers_table = HeadersTable::parse(&fib, &table_stream).ok();
+
+        // Parse footnotes and endnotes tables
+        let footnotes_table = FootnotesTable::parse(&fib, &table_stream).ok();
+        let endnotes_table = EndnotesTable::parse(&fib, &table_stream).ok();
+        let comments_table = auxiliary_recorded(
+            CommentsTable::parse_recording(&fib, &table_stream),
+            AuxiliaryTableDefect::Comments,
+            &mut tolerance,
+        );
+        let annotation_bookmarks_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::annotation_bookmarks::FIB_INDEX,
+            crate::parts::annotation_bookmarks::MAX_TABLE_BYTES,
+            "SttbfAtnBkmk",
+        );
+        let font_table_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::fonts::FIB_INDEX,
+            crate::parts::fonts::MAX_TABLE_BYTES,
+            "SttbfFfn",
+        );
+        let document_properties = DocumentProperties::parse(&fib, &table_stream);
+        let bookmarks_table = auxiliary_recorded(
+            BookmarksTable::parse_recording(&fib, &table_stream),
+            AuxiliaryTableDefect::Bookmarks,
+            &mut tolerance,
+        );
+        let smart_tags = auxiliary_or_absent(
+            DocumentSmartTags::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::SmartTags,
+            &mut tolerance,
+        );
+        let rsids = auxiliary_recorded(
+            DocumentRsids::parse_recording(&fib, &table_stream),
+            AuxiliaryTableDefect::Rsids,
+            &mut tolerance,
+        );
+        let rmd_threading = auxiliary_or_absent(
+            DocumentRmdThreading::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::RmdThreading,
+            &mut tolerance,
+        );
+        let embedded_fonts = auxiliary_or_absent(
+            DocumentEmbeddedFonts::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::EmbeddedFonts,
+            &mut tolerance,
+        );
+        let envelope = auxiliary_or_absent(
+            Envelope::parse_fib(&fib, &table_stream),
+            AuxiliaryTableDefect::Envelope,
+            &mut tolerance,
+        );
+        let auto_summary = auxiliary_or_absent(
+            DocumentAutoSummary::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::AutoSummary,
+            &mut tolerance,
+        );
+        let route_slip = Metadata::parse(&fib, &table_stream, &source_limits);
+        let protected_ranges = auxiliary_or_absent(
+            Ranges::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::ProtectedRanges,
+            &mut tolerance,
+        );
+        let format_consistency_marks = auxiliary_or_absent(
+            DocumentFormatConsistencyMarks::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::FormatConsistency,
+            &mut tolerance,
+        );
+        let structured_tags = auxiliary_or_absent(
+            DocumentStructuredTags::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::StructuredTags,
+            &mut tolerance,
+        );
+        let xml_schemas = auxiliary_or_absent(
+            crate::parts::xml_schemas::Collection::parse(&fib, &table_stream, &source_limits),
+            AuxiliaryTableDefect::XmlSchemas,
+            &mut tolerance,
+        );
+        let custom_xml_transform_path = auxiliary_or_absent(
+            crate::parts::xml_schemas::parse_custom_xml_transform(
+                &fib,
+                &table_stream,
+                &source_limits,
+            ),
+            AuxiliaryTableDefect::CustomXmlTransform,
+            &mut tolerance,
+        );
+        let ole_controls = auxiliary_or_absent(
+            RgxOcxInfo::parse(&fib, &table_stream, &source_limits),
+            AuxiliaryTableDefect::OleControls,
+            &mut tolerance,
+        );
+        let mail_merge = auxiliary_or_absent(
+            DocumentMailMerge::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::MailMerge,
+            &mut tolerance,
+        );
+        let subdocuments = auxiliary_or_absent(
+            Collection::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::Subdocuments,
+            &mut tolerance,
+        );
+        // The revision-author table feeds section and style author
+        // resolution below. Degrading it to empty cannot corrupt those reads:
+        // an unresolved author stays unresolved (recorded), never invented.
+        let revision_authors = auxiliary_or_default(
+            RevisionAuthorTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::RevisionAuthors,
+            &mut tolerance,
+        );
+        let associated_strings = auxiliary_or_absent(
+            DocumentAssociatedStrings::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::AssociatedStrings,
+            &mut tolerance,
+        );
+        let list_names = auxiliary_or_absent(
+            ListNamesTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::ListNames,
+            &mut tolerance,
+        );
+        let list_templates = auxiliary_or_absent(
+            ListTemplateTable::parse(&fib, &table_stream),
+            AuxiliaryTableDefect::ListTemplates,
+            &mut tolerance,
+        );
+        let proofing_tables = ProofingTables::parse(&fib, &table_stream);
+        let grammar_cookies = GrammarCookieTables::parse(&fib, &table_stream);
+        let table_char_cache = TableCharacterCache::parse(&fib, &table_stream);
+        let textbox_breaks = TextBoxBreakTables::parse(&fib, &table_stream);
+        let text_services = TextServicesTables::parse(&fib, &table_stream);
+        let saved_by_table = SavedByTable::parse(&fib, &table_stream);
+        let caption_tables = CaptionTables::parse(&fib, &table_stream);
+        let repair_bookmarks = DocumentRepairBookmarks::parse(&fib, &table_stream);
+        let glossary_metadata = GlossaryMetadata::parse(&fib, &table_stream).and_then(|metadata| {
+            if let Some(metadata) = &metadata {
+                metadata.validate_text_boundaries(&text_extractor)?;
+            }
+            Ok(metadata)
+        });
+        let attached_glossary =
+            AttachedGlossary::parse(&fib, &word_document, &table_stream, data_stream.as_deref());
+        // Section ranges feed only layout queries (`sections()`,
+        // `section_at_cp()`), never structural offsets, so a malformed
+        // PlcfSed degrades to the same empty table an absent one produces.
+        let sections = auxiliary_recorded(
+            SectionsTable::parse_recording(&fib, &table_stream, &word_document, &revision_authors),
+            AuxiliaryTableDefect::Sections,
+            &mut tolerance,
+        );
+        let shape_anchors = Self::parse_shape_anchors(&fib, &table_stream);
+        let header_shape_anchors = Self::parse_header_shape_anchors(&fib, &table_stream);
+        let drawing_images = crate::image::DrawingSource::new(
+            if shape_anchors.is_empty() && header_shape_anchors.is_empty() {
+                Ok(None)
+            } else {
+                capture_optional_table_range(
+                    &fib,
+                    &table_stream,
+                    crate::shape::FIB_INDEX_DGG_INFO,
+                    source_limits.max_entry_bytes(),
+                    "OfficeArtContent",
+                )
+            },
+        );
+        let textbox_entries = Self::parse_textbox_entries(
+            &fib,
+            &table_stream,
+            crate::parts::textbox::FIB_INDEX_PLCF_TXBX_TXT,
+        );
+        let header_textbox_entries = Self::parse_textbox_entries(
+            &fib,
+            &table_stream,
+            crate::parts::textbox::FIB_INDEX_PLCF_HDR_TXBX_TXT,
+        );
+
+        // Parse hyperlinks from fields table
+        let hyperlinks_table = fields_table.as_ref().and_then(|ft| {
+            HyperlinksTable::from_fields(ft, |start, end| {
+                Ok(text_extractor.text_at_range(start, end).to_string())
+            })
+            .ok()
+        });
+
+        // Parse list/numbering tables
+        let list_tables = ListTables::parse(&fib, &table_stream).ok();
+
+        // Word 97+ files are required to carry a stylesheet. Older Word files use
+        // a different FIB and stylesheet representation that is not interpreted here.
+        let mut stylesheet = (fib.version() >= 0x00C1)
+            .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.leniency_value()))
+            .transpose()?;
+        if let Some(stylesheet) = &mut stylesheet {
+            stylesheet.resolve_revision_authors(&revision_authors);
+        }
+
+        // Decode the embedded MTEF equations; the ones that cannot be
+        // decoded are recorded in the tolerance report below.
+        let (parsed_mtef, undecodable_equations, equation_natives) = Self::read_equations(ole)?;
+
+        // Reconstruct both property bin tables from one shared piece-table parse.
+        let piece_table = Self::parse_piece_table(&fib, &table_stream);
+        let chp_bin_table = piece_table.as_ref().and_then(|piece_table| {
+            Self::table_slice(&fib, &table_stream, 12)
+                .and_then(|data| ChpBinTable::parse(data, &word_document, piece_table))
+        });
+        let pap_bin_table = if let (Some(piece_table), Some(data)) = (
+            piece_table.as_ref(),
+            Self::table_slice(&fib, &table_stream, 13),
+        ) {
+            PapBinTable::parse(
+                data,
+                &word_document,
+                data_stream.as_deref(),
+                piece_table,
+                stylesheet.as_ref(),
+            )?
+        } else {
+            None
+        };
+
+        // Everything repaired while the document was opened, in discovery
+        // order: the container repairs and the optional auxiliary tables
+        // above first, then the stylesheet's repairs, then the piece-table,
+        // CHPX, and PAPX bin-table repairs, then the
+        // attached glossary's own stylesheet and PAPX repairs, then the
+        // embedded equations that could not be decoded, then the
+        // property-set repairs of the document metadata streams.
+        if let Some(parsed) = &stylesheet {
+            tolerance.append(parsed.tolerance_report());
+        }
+        if let Some(table) = &piece_table {
+            tolerance.append(table.tolerance_report());
+        }
+        if let Some(table) = &chp_bin_table {
+            tolerance.append(table.tolerance_report());
+        }
+        if let Some(table) = &pap_bin_table {
+            tolerance.append(table.tolerance_report());
+        }
+        if let Ok(Some(glossary)) = &attached_glossary {
+            glossary.append_tolerance_to(&mut tolerance);
+        }
+        for storage_id in undecodable_equations {
+            tolerance.record_wide(crate::leniency::EquationDefect::Undecodable, storage_id);
+        }
+        // The document metadata streams come last: their repairs are read
+        // from the same container once the document itself has parsed.
+        append_property_set_repairs(ole, &mut tolerance);
+
+        // Optional metadata readers defer semantic validation until their
+        // accessors are called. Retain only their bounded FIB-selected ranges
+        // so an ordinary document does not keep the complete table stream
+        // alive solely for optional metadata.
+        let saved_selection_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::saved_selection::FIB_INDEX_WSS,
+            crate::parts::saved_selection::SELSF_SIZE,
+            "Selsf",
+        );
+        let paragraph_groups_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::paragraph_groups::FIB_INDEX_PGP,
+            crate::parts::paragraph_groups::MAX_PGP_BYTES,
+            "PGPArray",
+        );
+        let dofr_records_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::dofr::FIB_INDEX_RG_DOFR,
+            crate::parts::dofr::MAX_DOFR_BYTES,
+            "RgDofr",
+        );
+        let print_driver_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::print_environment::FIB_INDEX_PR_DRVR,
+            crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
+            "PrDrvr",
+        );
+        let print_environment_portrait_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::print_environment::FIB_INDEX_PR_ENV_PORT,
+            crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
+            "PrEnvPort",
+        );
+        let print_environment_landscape_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::print_environment::FIB_INDEX_PR_ENV_LAND,
+            crate::parts::print_environment::MAX_PRINT_METADATA_BYTES,
+            "PrEnvLand",
+        );
+        let vba_signatures_source = capture_optional_table_range(
+            &fib,
+            &table_stream,
+            crate::parts::vba_signature::FIB_INDEX_STW_USER,
+            crate::parts::vba_signature::MAX_STW_USER_BYTES,
+            "StwUser",
+        );
+
+        Ok(Document::from_state(DocumentState {
+            source_limits,
+            fib,
+            word_document,
+            data_stream,
+            drawing_images,
+            text_extractor,
+            chp_bin_table,
+            pap_bin_table,
+            fields_table,
+            headers_table,
+            footnotes_table,
+            endnotes_table,
+            comments_table,
+            annotation_bookmarks_source,
+            annotation_bookmarks: std::sync::OnceLock::new(),
+            document_properties,
+            bookmarks_table,
+            smart_tags,
+            rsids,
+            rmd_threading,
+            embedded_fonts,
+            envelope,
+            auto_summary,
+            route_slip,
+            protected_ranges,
+            format_consistency_marks,
+            structured_tags,
+            xml_schemas,
+            custom_xml_transform_path,
+            ole_controls,
+            mail_merge,
+            subdocuments,
+            revision_authors,
+            associated_strings,
+            list_names,
+            list_templates,
+            proofing_tables,
+            grammar_cookies,
+            table_char_cache,
+            textbox_breaks,
+            text_services,
+            saved_by_table,
+            saved_selection_source,
+            saved_selection: std::sync::OnceLock::new(),
+            paragraph_groups_source,
+            paragraph_groups: std::sync::OnceLock::new(),
+            dofr_records_source,
+            dofr_records: std::sync::OnceLock::new(),
+            print_driver_source,
+            print_environment_portrait_source,
+            print_environment_landscape_source,
+            print_environment: std::sync::OnceLock::new(),
+            vba_signatures_source,
+            vba_signatures: std::sync::OnceLock::new(),
+            caption_tables,
+            repair_bookmarks,
+            glossary_metadata,
+            attached_glossary,
+            sections,
+            shape_anchors,
+            header_shape_anchors,
+            textbox_entries,
+            header_textbox_entries,
+            hyperlinks_table,
+            list_tables,
+            stylesheet,
+            tolerance,
+            parsed_mtef,
+            equation_natives,
+            font_table_source,
+            font_table: std::sync::OnceLock::new(),
+            story_indexes: super::model::StoryIndexCache::new(),
+        }))
+    }
+}
+
+/// Read one optional FIB-pointed auxiliary table, degrading a parse failure
+/// to the table's absent value and recording the defect instead of aborting
+/// the document open.
+///
+/// The stream-level resource limits were already enforced before the table
+/// stream was read, so dropping the table here never bypasses a size cap; it
+/// only skips interpreting bytes the document can live without.
+fn auxiliary_or_absent<T>(
+    result: Result<Option<T>>,
+    defect: AuxiliaryTableDefect,
+    tolerance: &mut ToleranceReport,
+) -> Option<T> {
+    match result {
+        Ok(table) => table,
+        Err(_) => {
+            tolerance.record(defect, defect.fib_index());
+            None
+        },
+    }
+}
+
+/// [`auxiliary_or_absent`] for tables whose stored form is a plain value
+/// with an empty default rather than an `Option`.
+fn auxiliary_or_default<T: Default>(
+    result: Result<T>,
+    defect: AuxiliaryTableDefect,
+    tolerance: &mut ToleranceReport,
+) -> T {
+    match result {
+        Ok(table) => table,
+        Err(_) => {
+            tolerance.record(defect, defect.fib_index());
+            T::default()
+        },
+    }
+}
+
+/// [`auxiliary_or_default`] for tables that also report per-item repairs.
+///
+/// The per-item record is merged only when the table as a whole parsed; a
+/// table that still fails degrades to its default with only the
+/// table-level defect recorded, so a discarded table never reports repairs
+/// to items the caller cannot see.
+fn auxiliary_recorded<T: Default>(
+    result: Result<(T, ToleranceReport)>,
+    defect: AuxiliaryTableDefect,
+    tolerance: &mut ToleranceReport,
+) -> T {
+    match result {
+        Ok((table, repairs)) => {
+            tolerance.append(&repairs);
+            table
+        },
+        Err(_) => {
+            tolerance.record(defect, defect.fib_index());
+            T::default()
+        },
+    }
+}
+
+fn capture_optional_table_range(
+    fib: &FileInformationBlock,
+    table_stream: &[u8],
+    index: usize,
+    max_bytes: usize,
+    field: &str,
+) -> std::result::Result<Option<Vec<u8>>, String> {
+    let Some((offset, length)) = fib.get_table_pointer(index) else {
+        return Ok(None);
+    };
+    if length == 0 {
+        return Ok(None);
+    }
+    let length =
+        usize::try_from(length).map_err(|_| format!("{field} length does not fit in memory"))?;
+    if length > max_bytes {
+        return Err(format!("{field} exceeds the {max_bytes}-byte limit"));
+    }
+    let start =
+        usize::try_from(offset).map_err(|_| format!("{field} offset does not fit in memory"))?;
+    let end = start
+        .checked_add(length)
+        .ok_or_else(|| format!("{field} range overflows"))?;
+    let data = table_stream
+        .get(start..end)
+        .ok_or_else(|| format!("{field} extends beyond the table stream"))?;
+    let mut source = Vec::new();
+    source
+        .try_reserve_exact(data.len())
+        .map_err(|error| format!("{field} source allocation failed: {error}"))?;
+    source.extend_from_slice(data);
+    Ok(Some(source))
+}
+
+fn locate_stream<R: Read + Seek>(
+    ole: &OleFile<R>,
+    path: &[&str],
+    max_bytes: usize,
+    _label: &'static str,
+) -> Result<Option<u64>> {
+    match ole.stream_len(path) {
+        Ok(size) => {
+            let maximum = u64::try_from(max_bytes).unwrap_or(u64::MAX);
+            if size > maximum {
+                return Err(PackageError::Limit {
+                    kind: SourceLimitKind::EntryBytes,
+                    observed: size,
+                    maximum,
+                });
+            }
+            Ok(Some(size))
+        },
+        Err(litchi_cfb::OleError::StreamNotFound) => Ok(None),
+        Err(error) => Err(error.into()),
+    }
+}
+
+/// Record the repairs the property-set reader applies to the document
+/// metadata streams, so a lossy metadata decode is enumerable from
+/// [`Document::tolerance_report`].
+///
+/// An absent or unreadable stream records nothing and does not fail the open:
+/// the document body never depends on its metadata, and the property-set
+/// accessors (`Package::summary_information` and friends) still report the
+/// failure when the metadata is asked for.
+fn append_property_set_repairs<R: Read + Seek>(
+    ole: &mut OleFile<R>,
+    tolerance: &mut ToleranceReport,
+) {
+    // `from_ole_with_options` runs the allocation-free declared-stream
+    // preflight before this function is reached. Keep this comment beside
+    // the reads because property-set payloads are otherwise a separate
+    // metadata path from the main DOC streams.
+    for name in [
+        "\u{0005}SummaryInformation",
+        "\u{0005}DocumentSummaryInformation",
+    ] {
+        if let Ok(stream) = ole.property_set_stream(&[name]) {
+            tolerance.append_property_set(stream.tolerance_report());
+        }
+    }
+}

@@ -1,0 +1,339 @@
+use crate::{
+    Builder, Cell, CellValue, Package, Sheet, builder::Workbook as Draft, worksheet::Snapshot,
+};
+use litchi_core::Position;
+use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
+
+const OPAQUE_ROW: &str = concat!(
+    r#"<table:table-row><table:table-cell office:value-type="string">"#,
+    r#"<text:p>opaque owner</text:p><office:annotation office:name="vendor-note">"#,
+    r#"<text:p>retain exactly</text:p></office:annotation>"#,
+    r#"</table:table-cell></table:table-row>"#,
+);
+
+const INLINE_UNSUPPORTED_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" "#,
+    r#"xmlns:xlink="http://www.w3.org/1999/xlink" office:version="1.4">"#,
+    r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
+    r#"<table:table-row><table:table-cell office:value-type="string">"#,
+    r#"<text:p><text:span>linked</text:span></text:p>"#,
+    r#"</table:table-cell></table:table-row></table:table>"#,
+    r#"</office:spreadsheet></office:body></office:document-content>"#,
+);
+
+const TABLE_COMMENT_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+    r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
+    r#"<!--retain producer marker--><table:table-row><table:table-cell/>"#,
+    r#"</table:table-row></table:table></office:spreadsheet></office:body>"#,
+    r#"</office:document-content>"#,
+);
+
+const TABLE_ATTRIBUTE_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+    r#"<office:body><office:spreadsheet><table:table table:name="Data" "#,
+    r#"table:protected="true"><table:table-row><table:table-cell/>"#,
+    r#"</table:table-row></table:table></office:spreadsheet></office:body>"#,
+    r#"</office:document-content>"#,
+);
+
+fn inline_link_source() -> litchi_core::Result<Vec<u8>> {
+    Ok(Builder::new()
+        .content_xml(INLINE_UNSUPPORTED_CONTENT)
+        .build()?
+        .to_bytes()?)
+}
+
+fn row_splice_content() -> String {
+    format!(
+        concat!(
+            r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+            r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+            r#"xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" "#,
+            r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.4">"#,
+            r#"<office:body><office:spreadsheet><table:table table:name="Data">"#,
+            "{OPAQUE_ROW}",
+            r#"<table:table-row><table:table-cell office:value-type="string">"#,
+            r#"<text:p>replace me</text:p></table:table-cell></table:table-row>"#,
+            r#"</table:table></office:spreadsheet></office:body></office:document-content>"#,
+        ),
+        OPAQUE_ROW = OPAQUE_ROW,
+    )
+}
+
+fn row_splice_package() -> litchi_core::Result<Vec<u8>> {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    writer.set_mimetype(constants::ODF_SPREADSHEET)?;
+    writer.add_file("content.xml", row_splice_content().as_bytes())?;
+    let opaque_payload = vec![0x5a; 128 * 1024];
+    writer.add_file_with_media_type(
+        "Pictures/opaque.bin",
+        &opaque_payload,
+        "application/octet-stream",
+    )?;
+    writer.finish_to_bytes()
+}
+
+#[test]
+fn failed_worksheet_staging_does_not_mutate_the_draft() -> litchi_core::Result<()> {
+    let mut builder = Builder::new();
+    builder.add_sheet(Sheet::new("Data")?)?;
+    let source = builder.build()?.to_bytes()?;
+    let snapshot = Snapshot::from_bytes(source)?;
+    let mut edit = snapshot.edit();
+    let before = edit.sheets().to_vec();
+
+    assert!(edit.add(Sheet::new("Data")?).is_err());
+    assert_eq!(edit.sheets(), before);
+    assert!(edit.remove("Missing")?.is_none());
+    assert!(edit.move_to("Data", Position::new(2)).is_err());
+    assert_eq!(edit.sheets(), before);
+    Ok(())
+}
+
+#[test]
+fn mutable_facade_publishes_batched_worksheet_edits() -> litchi_core::Result<()> {
+    let source = Builder::new().build()?.to_bytes()?;
+    let mut mutable = Draft::from_workbook(Package::from_bytes(&source)?.workbook()?);
+    mutable.edit_worksheets(|edit| {
+        edit.add(Sheet::new("Data")?)?;
+        edit.set_formula("Data", 0, 0, "of:=1")?;
+        Ok(())
+    })?;
+
+    let sheet = mutable
+        .sheet("Data")
+        .ok_or_else(|| litchi_core::Error::InvalidFormat("the new sheet is missing".to_string()))?;
+    let cell = sheet.cell(0, 0).ok_or_else(|| {
+        litchi_core::Error::InvalidFormat("the formula cell is missing".to_string())
+    })?;
+    assert_eq!(cell.formula.as_deref(), Some("of:=1"));
+    Ok(())
+}
+
+#[test]
+fn structural_fallback_refuses_unsupported_inline_content_without_mutation()
+-> litchi_core::Result<()> {
+    let source = inline_link_source()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.add(Sheet::new("Added")?)?;
+
+    let error = edit.commit().err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "unsupported inline content unexpectedly survived structural fallback".to_string(),
+        )
+    })?;
+    let message = error.to_string();
+    assert!(message.contains("unsupported"), "{message}");
+    assert!(message.contains("text:span"), "{message}");
+    assert_eq!(snapshot.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn builder_set_sheets_refuses_unsupported_inline_content_without_mutation()
+-> litchi_core::Result<()> {
+    let mut builder = Builder::new().content_xml(INLINE_UNSUPPORTED_CONTENT);
+    let before = builder.clone().build()?.to_bytes()?;
+    let mut sheets = builder.sheets()?;
+    sheets.push(Sheet::new("Added")?);
+
+    let error = builder.set_sheets(sheets).err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "unsupported inline content unexpectedly survived builder set_sheets".to_string(),
+        )
+    })?;
+    let message = error.to_string();
+    assert!(message.contains("unsupported"), "{message}");
+    assert!(message.contains("text:span"), "{message}");
+    assert_eq!(builder.clone().build()?.to_bytes()?, before);
+    Ok(())
+}
+
+#[test]
+fn structural_fallback_refuses_table_level_markup_without_mutation() -> litchi_core::Result<()> {
+    let source = Builder::new()
+        .content_xml(TABLE_COMMENT_CONTENT)
+        .build()?
+        .to_bytes()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.add(Sheet::new("Added")?)?;
+
+    let error = edit.commit().err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "table-level markup unexpectedly survived structural fallback".to_string(),
+        )
+    })?;
+    assert!(error.to_string().contains("table-level markup"));
+    assert_eq!(snapshot.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn builder_set_sheets_refuses_table_level_markup_without_mutation() -> litchi_core::Result<()> {
+    let mut builder = Builder::new().content_xml(TABLE_COMMENT_CONTENT);
+    let before = builder.clone().build()?.to_bytes()?;
+    let mut sheets = builder.sheets()?;
+    sheets.push(Sheet::new("Added")?);
+
+    let error = builder.set_sheets(sheets).err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "table-level markup unexpectedly survived builder set_sheets".to_string(),
+        )
+    })?;
+    assert!(error.to_string().contains("table-level markup"));
+    assert_eq!(builder.clone().build()?.to_bytes()?, before);
+    Ok(())
+}
+
+#[test]
+fn structural_fallback_refuses_unmodeled_table_attributes_without_mutation()
+-> litchi_core::Result<()> {
+    let source = Builder::new()
+        .content_xml(TABLE_ATTRIBUTE_CONTENT)
+        .build()?
+        .to_bytes()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.add(Sheet::new("Added")?)?;
+
+    let error = edit.commit().err().ok_or_else(|| {
+        litchi_core::Error::InvalidFormat(
+            "unmodeled table attribute unexpectedly survived structural fallback".to_string(),
+        )
+    })?;
+    let message = error.to_string();
+    assert!(message.contains("table attribute"), "{message}");
+    assert!(message.contains("protected"), "{message}");
+    assert_eq!(snapshot.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn row_local_commit_preserves_untouched_opaque_rows_and_refuses_touched_ones()
+-> litchi_core::Result<()> {
+    let source = row_splice_package()?;
+    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let mut edit = snapshot.edit();
+    edit.set_cell(
+        "Data",
+        1,
+        0,
+        Cell::new(CellValue::Text("changed".to_string()), "changed"),
+    )?
+    .ok_or_else(|| {
+        litchi_core::Error::InvalidFormat("the selected worksheet is missing".to_string())
+    })?;
+    let commit = edit.commit()?;
+    let reopened = Package::from_bytes(commit.snapshot().as_bytes())?.workbook()?;
+    assert!(reopened.content_xml().contains(OPAQUE_ROW));
+    assert!(matches!(
+        reopened.cell("Data", 1, 0),
+        Some(crate::CellView::Stored(cell)) if cell.text == "changed"
+    ));
+    let identical =
+        raw_identical_members(&source, commit.snapshot().as_bytes()).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("raw ODS comparison failed".to_string())
+        })?;
+    assert!(identical.contains("mimetype"));
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Pictures/opaque.bin"));
+    assert!(!identical.contains("content.xml"));
+
+    let untouched = Snapshot::from_bytes(source.clone())?;
+    let mut refused = untouched.edit();
+    refused
+        .set_cell(
+            "Data",
+            0,
+            0,
+            Cell::new(CellValue::Text("unsafe".to_string()), "unsafe"),
+        )?
+        .ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("the selected worksheet is missing".to_string())
+        })?;
+    assert!(refused.commit().is_err());
+    assert_eq!(untouched.as_bytes(), source);
+    Ok(())
+}
+
+#[test]
+fn unified_row_local_commit_retains_raw_package_members() -> litchi_core::Result<()> {
+    let source = row_splice_package()?;
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
+    edit.worksheets(|worksheets| {
+        worksheets
+            .set_cell(
+                "Data",
+                1,
+                0,
+                Cell::new(CellValue::Text("unified".to_string()), "unified"),
+            )?
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "the selected unified worksheet is missing".to_string(),
+                )
+            })?;
+        Ok(())
+    })?;
+    let commit = edit.commit()?;
+    let identical =
+        raw_identical_members(&source, commit.package().as_bytes()).ok_or_else(|| {
+            litchi_core::Error::InvalidFormat("raw unified ODS comparison failed".to_string())
+        })?;
+    assert!(identical.contains("mimetype"));
+    assert!(identical.contains("META-INF/manifest.xml"));
+    assert!(identical.contains("Pictures/opaque.bin"));
+    assert!(!identical.contains("content.xml"));
+
+    let reopened = Package::from_bytes(commit.package().as_bytes())?.workbook()?;
+    assert!(matches!(
+        reopened.cell("Data", 1, 0),
+        Some(crate::CellView::Stored(cell)) if cell.text == "unified"
+    ));
+    Ok(())
+}
+
+#[test]
+fn unified_worksheet_handoff_restores_the_candidate_after_failure() -> litchi_core::Result<()> {
+    let source = row_splice_package()?;
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
+    let before = edit.as_bytes().to_vec();
+    let before_pointer = edit.as_bytes().as_ptr();
+
+    let result = edit.worksheets(|worksheets| {
+        worksheets
+            .set_cell(
+                "Data",
+                1,
+                0,
+                Cell::new(CellValue::Text("discarded".to_string()), "discarded"),
+            )?
+            .ok_or_else(|| {
+                litchi_core::Error::InvalidFormat(
+                    "the selected rollback worksheet is missing".to_string(),
+                )
+            })?;
+        Err(litchi_core::Error::InvalidFormat(
+            "forced worksheet staging failure".to_string(),
+        ))
+    });
+
+    assert!(result.is_err());
+    assert_eq!(edit.as_bytes(), before);
+    assert_eq!(edit.as_bytes().as_ptr(), before_pointer);
+    Ok(())
+}

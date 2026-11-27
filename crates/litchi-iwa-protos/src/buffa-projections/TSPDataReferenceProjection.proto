@@ -1,0 +1,9 @@
+// Wire-only Buffa projection for the nested Keynote movie data-reference edge.
+// The caller-owned source bytes remain authoritative for preservation.
+syntax = "proto2";
+
+package LitchiIwaDataReferenceProjection;
+
+message DataReference {
+  required uint64 identifier = 1;
+}

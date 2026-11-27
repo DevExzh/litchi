@@ -1,0 +1,13 @@
+// Narrow scalar projection for one native Numbers fraction format.
+//
+// The complete TSK.FormatStructArchive remains source-authoritative. This
+// sidecar exists only to parity-check the selected scalar fields after the
+// handwritten codec has performed its complete bounded wire preflight.
+syntax = "proto2";
+package LitchiIwaNumbersTableCellFractionFormatProjection;
+
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+  optional uint32 fraction_accuracy = 11;
+  optional bool requires_fraction_replacement = 20;
+}

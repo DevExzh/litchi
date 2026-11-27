@@ -1,0 +1,636 @@
+use super::parts::chp::CharacterProperties;
+use std::mem::size_of;
+
+mod drawing;
+mod metafile;
+pub(crate) use drawing::DrawingSource;
+
+const BLOCK_TYPE_OFFSET: usize = 0xE;
+const MM_MODE_TYPE_OFFSET: usize = 0x6;
+
+#[repr(u8)]
+#[derive(Debug, Clone, Copy)]
+pub enum BlockType {
+    Image = 0x08,
+    ImageWord2000 = 0x00,
+    ImagePastedFromClipboard = 0xA,
+    ImagePastedFromClipboardWord2000 = 0x2,
+    HorizontalLine = 0xE,
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum ImageError {
+    #[error("Invalid picture offset: {0}")]
+    InvalidPicOffset(u32),
+    #[error("Invalid picture block length: {0}")]
+    InvalidPictureLength(i32),
+    #[error("Invalid block type: {0}")]
+    InvalidBlockType(u8),
+    #[error("No picture found")]
+    NoPicture,
+    #[error("Floating picture for shape {0} requires its document drawing store")]
+    DrawingStoreRequired(u32),
+    #[error("Invalid Word drawing image metadata: {0}")]
+    InvalidDrawing(String),
+    #[error("Decompression failed: {0}")]
+    DecompressionFailed(String),
+
+    #[error("Failed to decode OfficeArt record: {0}")]
+    DecodeOfficeArtRecord(litchi_odraw::Error),
+
+    #[error("Failed to extract image from container: {0}")]
+    ExtractImageFailed(litchi_odraw::Error),
+}
+
+impl TryFrom<u8> for BlockType {
+    type Error = ImageError;
+
+    #[inline]
+    fn try_from(v: u8) -> Result<Self, Self::Error> {
+        Ok(match v {
+            0x08 => BlockType::Image,
+            0x00 => BlockType::ImageWord2000,
+            0x0A => BlockType::ImagePastedFromClipboard,
+            0x02 => BlockType::ImagePastedFromClipboardWord2000,
+            0x0E => BlockType::HorizontalLine,
+            _ => return Err(ImageError::InvalidBlockType(v)),
+        })
+    }
+}
+
+fn get_block_type(data_buff: &[u8], pic_offset: u32) -> Result<BlockType, ImageError> {
+    let offset = usize::try_from(pic_offset)
+        .ok()
+        .and_then(|offset| offset.checked_add(BLOCK_TYPE_OFFSET))
+        .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
+    let block_type = data_buff
+        .get(offset)
+        .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
+    BlockType::try_from(*block_type)
+}
+
+fn get_mm_mode_type(data_buff: &[u8], pic_offset: u32) -> Result<u8, ImageError> {
+    let offset = usize::try_from(pic_offset)
+        .ok()
+        .and_then(|offset| offset.checked_add(MM_MODE_TYPE_OFFSET))
+        .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
+    let mm_mode_type = data_buff
+        .get(offset)
+        .ok_or(ImageError::InvalidPicOffset(pic_offset))?;
+    Ok(*mm_mode_type)
+}
+
+fn is_picture_recognized(block_type: BlockType, mm_mode_type: u8) -> bool {
+    matches!(
+        (block_type, mm_mode_type),
+        (BlockType::Image | BlockType::ImagePastedFromClipboard, _)
+            | (
+                BlockType::ImageWord2000 | BlockType::ImagePastedFromClipboardWord2000,
+                0x64
+            )
+    )
+}
+
+/// The raw metafile of a METAFILEPICT-form PICF at `pic_offset`, if any.
+fn raw_metafile_at(data_buff: &[u8], pic_offset: u32) -> Option<metafile::Payload<'_>> {
+    let base = usize::try_from(pic_offset).ok()?;
+    let fields = PictureFields::try_parse(data_buff, base)?;
+    let end = base.checked_add(usize::try_from(fields.lcb).ok()?)?;
+    let picture = data_buff.get(base.checked_add(size_of::<PictureFields>())?..end)?;
+    metafile::payload(&fields, picture)
+}
+
+/// Check whether a block contains an image.
+fn does_block_contain_image(data_buff: &[u8], pic_offset: u32) -> Result<bool, ImageError> {
+    // The byte the block-type heuristic reads belongs to the ignored PICF
+    // innerHeader; a raw metafile is recognized from mfpf.mm and its header.
+    if raw_metafile_at(data_buff, pic_offset).is_some() {
+        return Ok(true);
+    }
+    Ok(is_picture_recognized(
+        get_block_type(data_buff, pic_offset)?,
+        get_mm_mode_type(data_buff, pic_offset)?,
+    ))
+}
+
+/// Check if a run anchors an inline PICF image. Floating shapes need their
+/// document's Spa/OfficeArt context and cannot be recognized from a Data offset.
+pub fn has_picture(
+    data_buff: &[u8],
+    text: &str,
+    props: &CharacterProperties,
+) -> Result<bool, ImageError> {
+    if props.is_spec && !props.is_obj && !props.is_ole2 && !props.is_data {
+        // Image should be in its own run, or in a run with the end-of-special
+        // marker. 0x0008 anchors an OfficeArt shape, which can be a picture,
+        // a text box or a group; its inherited CPicLocation is not a PICF link.
+        if matches!(text, "\u{0001}" | "\u{0001}\u{0015}") {
+            let pic_offset = props.pic_offset.unwrap_or(0);
+            return does_block_contain_image(data_buff, pic_offset);
+        }
+    }
+    Ok(false)
+}
+
+/// Picture fields structure
+///
+/// Based on Apache Poi's `fillFields` method in `PICFAbstractType.java`
+///
+/// The fields ordered as they appear in the PICF structure.
+/// Total size: 0x44 (68) bytes
+#[derive(Debug, Clone)]
+#[repr(C, packed)]
+pub struct PictureFields {
+    /// Total length of picture data including header (offset 0x00)
+    pub lcb: i32,
+    /// Size of PICF header (offset 0x04)
+    pub cb_header: i16,
+    /// Metafile mapping mode (offset 0x06)
+    pub mm: i16,
+    /// Horizontal extent (offset 0x08)
+    pub x_ext: i16,
+    /// Vertical extent (offset 0x0A)
+    pub y_ext: i16,
+    /// HMF swap value (offset 0x0C)
+    pub sw_hmf: i16,
+    /// GRF flags (offset 0x0E)
+    pub grf: i32,
+    /// Padding (offset 0x12)
+    pub padding: i32,
+    /// Presentation manager metafile mapping mode (offset 0x16)
+    pub mm_pm: i16,
+    /// Padding 2 (offset 0x18)
+    pub padding2: i32,
+    /// Horizontal goal (offset 0x1C)
+    pub dxa_goal: i16,
+    /// Vertical goal (offset 0x1E)
+    pub dya_goal: i16,
+    /// Horizontal scaling factor (offset 0x20)
+    pub mx: i16,
+    /// Vertical scaling factor (offset 0x22)
+    pub my: i16,
+    /// Reserved horizontal value 1 (offset 0x24)
+    pub dxa_reserved1: i16,
+    /// Reserved vertical value 1 (offset 0x26)
+    pub dya_reserved1: i16,
+    /// Reserved horizontal value 2 (offset 0x28)
+    pub dxa_reserved2: i16,
+    /// Reserved vertical value 2 (offset 0x2A)
+    pub dya_reserved2: i16,
+    /// Reserved flag (offset 0x2C)
+    pub f_reserved: u8,
+    /// Bits per pixel (offset 0x2D)
+    pub bpp: u8,
+    /// Top border (offset 0x2E)
+    pub brc_top80: [u8; 4],
+    /// Left border (offset 0x32)
+    pub brc_left80: [u8; 4],
+    /// Bottom border (offset 0x36)
+    pub brc_bottom80: [u8; 4],
+    /// Right border (offset 0x3A)
+    pub brc_right80: [u8; 4],
+    /// Reserved horizontal value 3 (offset 0x3E)
+    pub dxa_reserved3: i16,
+    /// Reserved vertical value 3 (offset 0x40)
+    pub dya_reserved3: i16,
+    /// Number of properties (offset 0x42)
+    pub c_props: i16,
+}
+
+impl PictureFields {
+    /// Try to parse `PictureFields` from raw bytes
+    ///
+    /// # Arguments
+    /// * `data` - Raw byte slice
+    /// * `offset` - Starting offset within the data
+    ///
+    /// # Returns
+    /// * `Some(PictureFields)` if parsing succeeds
+    /// * `None` if data is too short
+    #[must_use]
+    pub fn try_parse(data: &[u8], offset: usize) -> Option<Self> {
+        let fields = data.get(offset..offset.checked_add(size_of::<Self>())?)?;
+        Some(Self {
+            lcb: i32::from_le_bytes(read_bytes(fields, 0)?),
+            cb_header: i16::from_le_bytes(read_bytes(fields, 4)?),
+            mm: i16::from_le_bytes(read_bytes(fields, 6)?),
+            x_ext: i16::from_le_bytes(read_bytes(fields, 8)?),
+            y_ext: i16::from_le_bytes(read_bytes(fields, 10)?),
+            sw_hmf: i16::from_le_bytes(read_bytes(fields, 12)?),
+            grf: i32::from_le_bytes(read_bytes(fields, 14)?),
+            padding: i32::from_le_bytes(read_bytes(fields, 18)?),
+            mm_pm: i16::from_le_bytes(read_bytes(fields, 22)?),
+            padding2: i32::from_le_bytes(read_bytes(fields, 24)?),
+            dxa_goal: i16::from_le_bytes(read_bytes(fields, 28)?),
+            dya_goal: i16::from_le_bytes(read_bytes(fields, 30)?),
+            mx: i16::from_le_bytes(read_bytes(fields, 32)?),
+            my: i16::from_le_bytes(read_bytes(fields, 34)?),
+            dxa_reserved1: i16::from_le_bytes(read_bytes(fields, 36)?),
+            dya_reserved1: i16::from_le_bytes(read_bytes(fields, 38)?),
+            dxa_reserved2: i16::from_le_bytes(read_bytes(fields, 40)?),
+            dya_reserved2: i16::from_le_bytes(read_bytes(fields, 42)?),
+            f_reserved: read_bytes::<1>(fields, 44)?[0],
+            bpp: read_bytes::<1>(fields, 45)?[0],
+            brc_top80: read_bytes(fields, 46)?,
+            brc_left80: read_bytes(fields, 50)?,
+            brc_bottom80: read_bytes(fields, 54)?,
+            brc_right80: read_bytes(fields, 58)?,
+            dxa_reserved3: i16::from_le_bytes(read_bytes(fields, 62)?),
+            dya_reserved3: i16::from_le_bytes(read_bytes(fields, 64)?),
+            c_props: i16::from_le_bytes(read_bytes(fields, 66)?),
+        })
+    }
+}
+
+fn read_bytes<const N: usize>(data: &[u8], offset: usize) -> Option<[u8; N]> {
+    data.get(offset..offset.checked_add(N)?)?.try_into().ok()
+}
+
+const _: () = {
+    assert!(size_of::<PictureFields>() == 0x44);
+};
+
+// ============================================================================
+// Image struct - metadata only, data loaded lazily
+// ============================================================================
+
+/// Embedded image in a Word document.
+///
+/// This struct stores a PICF offset or a floating drawing reference. Binary
+/// data is resolved as borrowed views via `Document::image_data()` without
+/// copying each image payload into its run.
+#[derive(Debug, Clone, Copy)]
+pub struct Image {
+    /// Stored CPicLocation value; a PICF offset only for an inline picture.
+    pic_offset: u32,
+    drawing: Option<(bool, u32)>,
+}
+
+impl Image {
+    /// Create an inline PICF descriptor with the given Data-stream offset.
+    #[inline]
+    #[must_use]
+    pub fn new(pic_offset: u32) -> Self {
+        Self {
+            pic_offset,
+            drawing: None,
+        }
+    }
+
+    pub(crate) fn from_drawing(pic_offset: u32, header: bool, shape_id: u32) -> Self {
+        Self {
+            pic_offset,
+            drawing: Some((header, shape_id)),
+        }
+    }
+
+    /// The OfficeArt shape identity of a floating picture. Resolve it with
+    /// `Document::image_data`; the stored CPicLocation may belong to another run.
+    #[must_use]
+    pub fn drawing_shape_id(&self) -> Option<u32> {
+        self.drawing.map(|(_, id)| id)
+    }
+
+    pub(crate) fn drawing_reference(&self) -> Option<(bool, u32)> {
+        self.drawing
+    }
+
+    /// Get the stored or default CPicLocation value. For inline pictures this addresses
+    /// the Data stream's PICF. For floating pictures it is only a legacy hint;
+    /// `drawing_shape_id` identifies the drawing-store route instead.
+    #[inline]
+    #[must_use]
+    pub fn pic_offset(&self) -> u32 {
+        self.pic_offset
+    }
+
+    /// Get raw image data from the document buffer (zero-copy when possible).
+    ///
+    /// This method extracts an inline PICF's stored BLIP data. Metafile bytes
+    /// can remain compressed, as described by the BLIP metadata. Floating
+    /// pictures require the higher-level `Document::image_data()` API.
+    /// A PICF that stores a raw metafile instead of OfficeArt data yields an
+    /// owned metafile BLIP built around that metafile.
+    ///
+    /// - After header: actual picture content (may include BLIP container)
+    ///
+    /// Logics is copied from Apache Poi's `PICFAndOfficeArtData` method in `PICFAndOfficeArtData.java`
+    pub fn data<'data>(
+        &self,
+        data_stream: &'data [u8],
+        word_document: &'data [u8],
+    ) -> Result<litchi_odraw::image::File<'data>, ImageError> {
+        use litchi_odraw::Record;
+
+        if let Some((_, shape_id)) = self.drawing {
+            return Err(ImageError::DrawingStoreRequired(shape_id));
+        }
+
+        let base = usize::try_from(self.pic_offset)
+            .map_err(|_| ImageError::InvalidPicOffset(self.pic_offset))?;
+
+        let pic_fields = PictureFields::try_parse(data_stream, base)
+            .ok_or(ImageError::InvalidPicOffset(self.pic_offset))?;
+        let block_len = usize::try_from(pic_fields.lcb)
+            .map_err(|_| ImageError::InvalidPictureLength(pic_fields.lcb))?;
+        let block_end = base
+            .checked_add(block_len)
+            .filter(|end| *end <= data_stream.len())
+            .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
+
+        let mut offset = base
+            .checked_add(size_of::<PictureFields>())
+            .filter(|offset| *offset <= block_end)
+            .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
+
+        if let Some(payload) = metafile::payload(&pic_fields, &data_stream[offset..block_end]) {
+            return metafile::file(&pic_fields, payload);
+        }
+
+        // Handle picture name if mm == 0x66
+        if pic_fields.mm == 0x66 {
+            let cch_pic_name = match data_stream.get(offset) {
+                Some(&b) => b,
+                None => return Err(ImageError::InvalidPicOffset(self.pic_offset)),
+            };
+            offset = offset
+                .checked_add(1)
+                .and_then(|offset| offset.checked_add(usize::from(cch_pic_name)))
+                .filter(|offset| *offset <= block_end)
+                .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
+        }
+
+        // Parse the first Escher record (usually SpContainer or BStoreContainer)
+        let (_, record_size) = Record::parse(data_stream, offset, litchi_odraw::Limits::default())
+            .map_err(ImageError::DecodeOfficeArtRecord)?;
+        offset = offset
+            .checked_add(record_size)
+            .filter(|offset| *offset <= block_end)
+            .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
+
+        // Continue parsing remaining records looking for BSE or BLIP
+        let mut picture_error = None;
+        while offset < block_end {
+            let (next_record, next_record_size) =
+                match Record::parse(data_stream, offset, litchi_odraw::Limits::default()) {
+                    Ok(r) => r,
+                    Err(_) => break,
+                };
+
+            // Check if this is a BSE (0xF007) or BLIP record (0xF018-0xF117)
+            if next_record.raw_kind() != 0xF007
+                && (next_record.raw_kind() < 0xF018 || next_record.raw_kind() > 0xF117)
+            {
+                break;
+            }
+            offset = offset
+                .checked_add(next_record_size)
+                .filter(|offset| *offset <= block_end)
+                .ok_or(ImageError::InvalidPictureLength(pic_fields.lcb))?;
+
+            // A BSE delay offset addresses the WordDocument stream.
+            match litchi_odraw::image::record_with_delay(
+                &next_record,
+                Some(word_document),
+                litchi_odraw::image::Limits::default(),
+            ) {
+                Ok(img) => return Ok(img),
+                Err(error) => {
+                    picture_error.get_or_insert(error);
+                },
+            }
+        }
+
+        // A PICF whose shape carries no BLIP (a linked or empty picture frame)
+        // has no stored picture; a BLIP that fails to parse is reported as such.
+        Err(picture_error.map_or(ImageError::NoPicture, ImageError::ExtractImageFailed))
+    }
+}
+
+/// Recognize an inline PICF run and create its image descriptor. Floating
+/// pictures are resolved by the document owner instead.
+pub fn extract_image(
+    data_buff: &[u8],
+    text: &str,
+    props: &CharacterProperties,
+) -> Result<Option<Image>, ImageError> {
+    if !has_picture(data_buff, text, props)? {
+        return Ok(None);
+    }
+
+    props
+        .pic_offset
+        .map(Image::new)
+        .ok_or(ImageError::NoPicture)
+        .map(Some)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::parts::chp::CharacterProperties;
+
+    #[test]
+    fn floating_marker_cannot_reuse_a_valid_inline_picf_offset() {
+        let mut data = vec![0; 68];
+        data[14] = 8;
+        let props = CharacterProperties {
+            is_spec: true,
+            pic_offset: Some(0),
+            ..Default::default()
+        };
+        assert!(has_picture(&data, "\u{0001}", &props).unwrap());
+        assert!(!has_picture(&data, "\u{0008}", &props).unwrap());
+        assert!(extract_image(&data, "\u{0008}", &props).unwrap().is_none());
+    }
+
+    fn make_props(pic_offset: Option<u32>) -> CharacterProperties {
+        CharacterProperties {
+            is_spec: true,
+            pic_offset,
+            ..Default::default()
+        }
+    }
+
+    fn make_data(block_type: u8, mm_mode: u8) -> Vec<u8> {
+        let mut data = vec![0u8; 0x20];
+        data[MM_MODE_TYPE_OFFSET] = mm_mode;
+        data[BLOCK_TYPE_OFFSET] = block_type;
+        data
+    }
+
+    #[test]
+    fn test_has_picture_returns_true_for_valid_image_block() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let props = make_props(Some(0));
+
+        let has = has_picture(&data, "\u{0001}", &props).unwrap();
+        assert!(has);
+    }
+
+    #[test]
+    fn test_has_picture_with_end_of_special_marker() {
+        let data = make_data(BlockType::ImageWord2000 as u8, 0x64);
+        let props = make_props(Some(0));
+
+        let has = has_picture(&data, "\u{0001}\u{0015}", &props).unwrap();
+        assert!(has);
+    }
+
+    #[test]
+    fn image_data_rejects_negative_or_out_of_bounds_block_lengths() {
+        let image = Image::new(0);
+        let mut data = vec![0; size_of::<PictureFields>()];
+        data[..4].copy_from_slice(&(-1i32).to_le_bytes());
+        assert!(matches!(
+            image.data(&data, &[]),
+            Err(ImageError::InvalidPictureLength(-1))
+        ));
+
+        data[..4].copy_from_slice(&(1024i32).to_le_bytes());
+        assert!(matches!(
+            image.data(&data, &[]),
+            Err(ImageError::InvalidPictureLength(1024))
+        ));
+    }
+
+    /// A PICF with `mm` whose picture bytes follow the 68-byte header.
+    fn picf(mm: i16, picture: &[u8]) -> Vec<u8> {
+        let mut data = vec![0; size_of::<PictureFields>()];
+        let lcb = i32::try_from(data.len() + picture.len()).unwrap();
+        data[..4].copy_from_slice(&lcb.to_le_bytes());
+        data[4..6].copy_from_slice(&0x44i16.to_le_bytes());
+        data[6..8].copy_from_slice(&mm.to_le_bytes());
+        data[28..30].copy_from_slice(&1440i16.to_le_bytes());
+        data[30..32].copy_from_slice(&720i16.to_le_bytes());
+        data.extend_from_slice(picture);
+        data
+    }
+
+    fn office_art_record(kind: u16, version: u16, instance: u16, body: &[u8]) -> Vec<u8> {
+        let mut bytes = ((instance << 4) | version).to_le_bytes().to_vec();
+        bytes.extend_from_slice(&kind.to_le_bytes());
+        bytes.extend_from_slice(&u32::try_from(body.len()).unwrap().to_le_bytes());
+        bytes.extend_from_slice(body);
+        bytes
+    }
+
+    #[test]
+    fn metafilepict_picf_is_a_picture_holding_its_raw_wmf() {
+        let wmf = metafile::tests::wmf();
+        // A zero innerHeader byte would fail the block-type heuristic.
+        let data = picf(8, &wmf);
+        assert!(has_picture(&data, "\u{0001}", &make_props(Some(0))).unwrap());
+        let file = Image::new(0).data(&data, &[]).unwrap();
+        assert_eq!(file.kind(), litchi_odraw::image::Kind::Wmf);
+        assert_eq!(file.data().unwrap(), wmf.as_slice());
+
+        let mac = picf(8, &[wmf.as_slice(), &metafile::tests::pict()].concat());
+        let file = Image::new(0).data(&mac, &[]).unwrap();
+        assert_eq!(file.kind(), litchi_odraw::image::Kind::Pict);
+    }
+
+    #[test]
+    fn metafilepict_without_a_wmf_header_is_not_a_picture() {
+        let data = picf(8, &[0; 32]);
+        assert!(!has_picture(&data, "\u{0001}", &make_props(Some(0))).unwrap());
+    }
+
+    #[test]
+    fn shape_without_a_blip_stores_no_picture() {
+        let shape = office_art_record(0xF004, 0xF, 0, &[]);
+        let data = picf(0x64, &shape);
+        assert!(matches!(
+            Image::new(0).data(&data, &[]),
+            Err(ImageError::NoPicture)
+        ));
+    }
+
+    #[test]
+    fn unreadable_blip_is_reported_instead_of_no_picture() {
+        let shape = office_art_record(0xF004, 0xF, 0, &[]);
+        // A PNG BLIP too short to hold its UID and tag.
+        let blip = office_art_record(0xF01E, 0, 0x6E0, &[0; 4]);
+        let data = picf(0x64, &[shape, blip].concat());
+        assert!(matches!(
+            Image::new(0).data(&data, &[]),
+            Err(ImageError::ExtractImageFailed(_))
+        ));
+    }
+
+    #[test]
+    fn test_has_picture_returns_false_for_wrong_text() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let props = make_props(Some(0));
+
+        let has = has_picture(&data, "not-special", &props).unwrap();
+        assert!(!has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_false_when_not_spec() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let mut props = make_props(Some(0));
+        props.is_spec = false;
+
+        let has = has_picture(&data, "\u{0001}", &props).unwrap();
+        assert!(!has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_false_when_is_obj() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let mut props = make_props(Some(0));
+        props.is_obj = true;
+
+        let has = has_picture(&data, "\u{0001}", &props).unwrap();
+        assert!(!has);
+    }
+
+    #[test]
+    fn test_has_picture_returns_error_for_invalid_offset() {
+        let data = vec![0u8; 4];
+        let props = make_props(Some(10));
+
+        let err = has_picture(&data, "\u{0001}", &props).unwrap_err();
+        assert!(matches!(err, ImageError::InvalidPicOffset(10)));
+    }
+
+    #[test]
+    fn test_extract_image_returns_none_when_no_picture() {
+        let data = make_data(BlockType::Image as u8, 0x00);
+        let mut props = make_props(Some(0));
+        props.is_spec = false;
+
+        let extracted = extract_image(&data, "\u{0001}", &props).unwrap();
+        assert!(extracted.is_none());
+    }
+
+    #[test]
+    fn test_block_type_conversion() {
+        assert!(matches!(
+            BlockType::try_from(0x08).unwrap(),
+            BlockType::Image
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x00).unwrap(),
+            BlockType::ImageWord2000
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x0A).unwrap(),
+            BlockType::ImagePastedFromClipboard
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x02).unwrap(),
+            BlockType::ImagePastedFromClipboardWord2000
+        ));
+        assert!(matches!(
+            BlockType::try_from(0x0E).unwrap(),
+            BlockType::HorizontalLine
+        ));
+        assert!(matches!(
+            BlockType::try_from(0xFF),
+            Err(ImageError::InvalidBlockType(0xFF))
+        ));
+    }
+}

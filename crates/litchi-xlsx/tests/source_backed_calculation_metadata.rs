@@ -1,0 +1,484 @@
+use std::io;
+use std::io::Write;
+use std::num::{NonZeroU64, NonZeroUsize};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicU64, Ordering};
+
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits,
+    Limits as BudgetLimits, ReadAt, Resource, SourceVersion,
+};
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter, SourceCacheLimits};
+use litchi_xlsx::SourceBackedWorkbook;
+use litchi_xlsx::calculation_properties::{Properties, Snapshot};
+use litchi_xlsx::{Error, SourceLimits};
+
+const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const MAIN: &str = "/xl/workbook.xml";
+const SHEET: &str = "/xl/worksheets/sheet1.xml";
+const UNUSED: &str = "/xl/media/unused.bin";
+
+struct VersionedSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+}
+
+impl VersionedSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            revision: AtomicU64::new(0),
+        }
+    }
+
+    fn changed(&self) {
+        self.revision.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+impl ReadAt for VersionedSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(29, self.revision.load(Ordering::SeqCst)))
+    }
+}
+
+struct FailingSink {
+    accepted: usize,
+    limit: usize,
+}
+
+impl Write for FailingSink {
+    fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
+        if self.accepted >= self.limit {
+            return Err(io::Error::other("injected sink failure"));
+        }
+        let written = bytes.len().min(self.limit - self.accepted);
+        self.accepted += written;
+        Ok(written)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn fixture(workbook_suffix: &str, signed: bool) -> Vec<u8> {
+    let workbook = format!(
+        r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets><calcPr calcId="7"/>{workbook_suffix}</workbook>"#
+    );
+    fixture_with_workbook(workbook, signed)
+}
+
+fn fixture_with_workbook(workbook: String, signed: bool) -> Vec<u8> {
+    let mut package = OpcPackage::new();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(MAIN).unwrap(),
+            ct::SML_SHEET_MAIN.to_string(),
+            workbook.into_bytes(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(SHEET).unwrap(),
+            ct::SML_WORKSHEET.to_string(),
+            format!(r#"<worksheet xmlns="{SML}"><sheetData/></worksheet>"#).into_bytes(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new(UNUSED).unwrap(),
+            "application/octet-stream".to_string(),
+            (0..128 * 1024).map(|value| (value % 251) as u8).collect(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::WORKSHEET.to_string(),
+            "worksheets/sheet1.xml".to_string(),
+            "rIdSheet".to_string(),
+            litchi_opc::TargetMode::Internal,
+        )
+        .unwrap();
+    package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+    if signed {
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+                ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_string(),
+                b"<origin/>".to_vec(),
+            )))
+            .unwrap();
+        package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    }
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
+fn changed_edit(
+    editor: &SourceBackedWorkbook,
+) -> litchi_xlsx::calculation_properties::source::Edit {
+    let mut edit = editor.edit_calculation_metadata().unwrap();
+    assert!(edit.set_properties(Properties::new().with_calculation_id(Some(91))));
+    edit
+}
+
+fn changed_commit(
+    editor: &SourceBackedWorkbook,
+) -> litchi_xlsx::calculation_properties::source::Commit {
+    let commit = changed_edit(editor).commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .after()
+            .properties()
+            .unwrap()
+            .calculation_id(),
+        7
+    );
+    commit
+}
+
+fn relationship_signatures(relationships: &litchi_opc::Relationships) -> Vec<String> {
+    let mut signatures = relationships
+        .iter()
+        .map(|relationship| {
+            format!(
+                "{}\u{1f}{}\u{1f}{}\u{1f}{:?}",
+                relationship.r_id(),
+                relationship.reltype(),
+                relationship.target_ref(),
+                relationship.target_mode()
+            )
+        })
+        .collect::<Vec<_>>();
+    signatures.sort_unstable();
+    signatures
+}
+
+fn part_len(bytes: &[u8], member: &str) -> u64 {
+    OpcPackage::from_bytes(bytes, SourceLimits::default())
+        .unwrap()
+        .get_part(&PackURI::new(member).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64
+}
+
+fn managed_context(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsx-calculation-metadata-managed-test",
+        BudgetLimits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
+}
+
+#[test]
+fn changed_edit_reopens_and_changes_only_workbook_xml() {
+    let source_bytes = fixture(r#"<extLst><ext uri="urn:keep"/></extLst>"#, false);
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(source_bytes.clone())))
+            .unwrap();
+    let opened = editor.cache_diagnostics().successful_loads;
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
+    let commit = changed_commit(&editor);
+    assert_eq!(editor.cache_diagnostics().successful_loads, opened);
+
+    let mut replay = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    assert_eq!(
+        Snapshot::load(&replay)
+            .unwrap()
+            .properties()
+            .unwrap()
+            .calculation_id(),
+        91
+    );
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
+    assert_eq!(
+        replay
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob(),
+        OpcPackage::from_bytes(&source_bytes, SourceLimits::default())
+            .unwrap()
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob()
+    );
+
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    let published = commit.patch().after().clone();
+    assert_eq!(published.properties().unwrap().calculation_id(), 91);
+
+    let source = OpcPackage::from_bytes(&source_bytes, SourceLimits::default()).unwrap();
+    let candidate = OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap();
+    assert_eq!(source.part_count(), candidate.part_count());
+    assert_eq!(
+        relationship_signatures(source.rels()),
+        relationship_signatures(candidate.rels())
+    );
+    for part in source
+        .try_iter_parts()
+        .map(|part| part.expect("part payload decodes"))
+    {
+        let output_part = candidate.get_part(part.partname()).unwrap();
+        assert_eq!(part.content_type(), output_part.content_type());
+        assert_eq!(
+            relationship_signatures(part.rels()),
+            relationship_signatures(output_part.rels())
+        );
+        if part.partname().as_str() == MAIN {
+            assert_ne!(part.blob(), output_part.blob());
+            let output_xml = std::str::from_utf8(output_part.blob()).unwrap();
+            assert!(output_xml.contains(r#"calcId="91""#));
+            assert!(output_xml.contains(r#"<extLst><ext uri="urn:keep"/></extLst>"#));
+        } else {
+            assert_eq!(part.blob(), output_part.blob());
+        }
+    }
+    assert_eq!(
+        Snapshot::load(&candidate)
+            .unwrap()
+            .properties()
+            .unwrap()
+            .calculation_id(),
+        91
+    );
+}
+
+#[test]
+fn noop_is_byte_exact_and_signed_change_is_refused() {
+    let signed = fixture("", true);
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed.clone()))).unwrap();
+    let noop = editor
+        .edit_calculation_metadata()
+        .unwrap()
+        .commit()
+        .unwrap();
+    let mut output = Vec::new();
+    noop.package().write_to(&mut output).unwrap();
+    assert_eq!(output, signed);
+
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(signed))).unwrap();
+    assert!(matches!(
+        changed_edit(&editor).commit(),
+        Err(Error::Package(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+}
+
+#[test]
+fn foreign_workbook_and_changed_source_refuse_before_output() {
+    let bytes = fixture("", false);
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(bytes.clone()))).unwrap();
+    let commit = changed_commit(&editor);
+    let foreign = fixture(r#"<extLst><ext uri="urn:foreign"/></extLst>"#, false);
+    let foreign_editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(foreign))).unwrap();
+    assert!(matches!(
+        foreign_editor
+            .apply_calculation_metadata(commit.patch())
+            .map(|_| ()),
+        Err(Error::PatchConflict { .. })
+    ));
+
+    let source = Arc::new(VersionedSource::new(bytes));
+    let editor = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let commit = changed_commit(&editor);
+    source.changed();
+    let mut output = Vec::new();
+    assert!(matches!(
+        commit.package().write_to(&mut output),
+        Err(Error::Package(OpcError::SourceChanged { .. }))
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn mce_limits_and_partial_sink_are_checked() {
+    let mce = fixture_with_workbook(
+        format!(
+            r#"<workbook xmlns="{SML}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:u="urn:unsupported"><mc:AlternateContent><mc:Choice Requires="u"><calcPr calcId="1"/></mc:Choice><mc:Fallback><calcPr calcId="7"/></mc:Fallback></mc:AlternateContent></workbook>"#
+        ),
+        false,
+    );
+    let editor = SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
+    let mut edit = editor.edit_calculation_metadata().unwrap();
+    edit.set_properties(Properties::new().with_calculation_id(Some(91)));
+    assert!(edit.commit().is_err());
+
+    let limits = SourceLimits::builder()
+        .max_part_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(VersionedSource::new(fixture("", false))),
+            litchi_xlsx::OpenOptions::new().source_limits(limits)
+        ),
+        Err(Error::Package(OpcError::Limit { .. }))
+    ));
+
+    let editor =
+        SourceBackedWorkbook::from_read_at(Arc::new(VersionedSource::new(fixture("", false))))
+            .unwrap();
+    let commit = changed_commit(&editor);
+    let mut sink = FailingSink {
+        accepted: 0,
+        limit: 128,
+    };
+    assert!(matches!(
+        commit.package().write_to(&mut sink),
+        Err(Error::Package(OpcError::IncompleteOutput { .. }))
+    ));
+    assert_eq!(sink.accepted, 128);
+}
+
+#[test]
+fn managed_workbook_payload_is_budgeted_streamed_and_released() {
+    let bytes = fixture("", false);
+    let exact = part_len(&bytes, MAIN);
+    let (budget, _cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .cache_limits(SourceCacheLimits::new(usize::try_from(exact).unwrap(), 4).unwrap())
+            .execution_context(context),
+    )
+    .unwrap();
+    assert!(editor.cache_diagnostics().budget_managed);
+    assert_eq!(budget.used(Resource::Memory), exact);
+
+    let commit = changed_commit(&editor);
+    let mut replay = OpcPackage::from_bytes(&bytes, SourceLimits::default()).unwrap();
+    replay_patch(&mut replay, commit.patch()).unwrap();
+    replay_patch(&mut replay, &commit.patch().inverse()).unwrap();
+
+    let mut output = Vec::new();
+    commit.package().write_to(&mut output).unwrap();
+    let published = commit.patch().after().clone();
+    assert_eq!(published.properties().unwrap().calculation_id(), 91);
+    assert_eq!(
+        Snapshot::load(&OpcPackage::from_bytes(&output, SourceLimits::default()).unwrap())
+            .unwrap()
+            .properties()
+            .unwrap()
+            .calculation_id(),
+        91
+    );
+    drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_one_under_budget_fails_before_payload_retention_and_cancellation_stops_output() {
+    let bytes = fixture("", false);
+    let exact = part_len(&bytes, MAIN);
+    let (budget, _cancellation_source, context) = managed_context(exact - 1);
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(VersionedSource::new(bytes.clone())),
+            litchi_xlsx::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context)
+        ),
+        Err(Error::Package(OpcError::Execution(
+            ExecutionError::ResourceLimit(_)
+        )))
+    ));
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes.clone())),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let edit = editor.edit_calculation_metadata().unwrap();
+    cancellation_source.cancel();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+
+    let (budget, cancellation_source, context) = managed_context(exact);
+    let editor = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(VersionedSource::new(bytes)),
+        litchi_xlsx::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let commit = changed_commit(&editor);
+    cancellation_source.cancel();
+    let mut output = Vec::new();
+    assert!(matches!(
+        commit.package().write_to(&mut output),
+        Err(Error::Package(OpcError::Cancelled))
+    ));
+    assert!(output.is_empty());
+    drop(commit);
+    assert!(budget.used(Resource::Memory) <= exact);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+/// Replay a source-backed patch onto `package` through a source-backed
+/// workbook over its bytes (source-backed patches replay onto
+/// source-backed workbooks).
+fn replay_patch(
+    package: &mut OpcPackage,
+    patch: &litchi_xlsx::calculation_properties::source::Patch,
+) -> litchi_xlsx::Result<()> {
+    let bytes = PackageWriter::to_bytes(package)?;
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(litchi_core::OwnedSource::new(bytes)))?;
+    let next = workbook
+        .apply_calculation_metadata(patch)?
+        .into_package()
+        .to_bytes()?;
+    *package = OpcPackage::from_bytes(&next, SourceLimits::default())?;
+    Ok(())
+}

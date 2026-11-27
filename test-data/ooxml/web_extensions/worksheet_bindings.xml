@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">
+  <sheetData/>
+  <extLst>
+    <ext uri="{F7C9EE02-42E1-4005-9D12-6889AFFD525C}">
+      <x15:webExtensions xmlns:x15="http://schemas.microsoft.com/office/spreadsheetml/2010/11/main"
+                         xmlns:xm="http://schemas.microsoft.com/office/excel/2006/main">
+        <x15:webExtension appRef="sales-table">
+          <xm:f>Sheet1!$A$1:$B$4</xm:f>
+        </x15:webExtension>
+        <x15:webExtension appRef="sales-point">
+          <xm:f>&apos;Sales 2026&apos;!C3</xm:f>
+        </x15:webExtension>
+      </x15:webExtensions>
+    </ext>
+  </extLst>
+</worksheet>

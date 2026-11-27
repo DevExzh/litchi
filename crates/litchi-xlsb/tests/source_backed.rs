@@ -1,0 +1,2735 @@
+use std::io::{self, Cursor};
+use std::num::{NonZeroU64, NonZeroUsize};
+use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicUsize, Ordering};
+
+use litchi_core::sheet::{Cell, CellValue, Worksheet as _};
+use litchi_core::{
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as BudgetLimits,
+    OwnedSource, ReadAt, SourceVersion, TextOutputError, TextOutputLimitKind, TextOutputOptions,
+};
+use litchi_ooxml_common::Error as OoxmlError;
+use litchi_ooxml_common::properties::Error as MetadataError;
+use litchi_opc::constants::relationship_type;
+use litchi_opc::{
+    BlobPart, OpcError, OpcPackage, PackURI, Part, SourceBackedPackage, SourceCacheLimits,
+};
+use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
+use litchi_xlsb::external_link::ExternalLinkLimits;
+use litchi_xlsb::package::PackageError;
+use litchi_xlsb::raw::{Encoder, Header, Limits as RawLimits, Records, kind};
+use litchi_xlsb::sheet::{Kind, State};
+use litchi_xlsb::{Leniency, SourceBackedWorkbook, SourceLimits, Workbook};
+
+#[path = "support/projection.rs"]
+mod projection;
+use projection::OwnedWorkbook as _;
+
+fn fixture() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/Simple.xlsb"
+    ))
+    .unwrap()
+}
+
+fn indexed_fixture() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/sample.xlsb"
+    ))
+    .unwrap()
+}
+
+fn external_link_fixture() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/bug66682.xlsb"
+    ))
+    .unwrap()
+}
+
+fn external_wide_string(value: &str) -> Vec<u8> {
+    let units: Vec<u16> = value.encode_utf16().collect();
+    let mut output = Vec::with_capacity(4 + units.len() * 2);
+    output.extend_from_slice(&u32::try_from(units.len()).unwrap().to_le_bytes());
+    for unit in units {
+        output.extend_from_slice(&unit.to_le_bytes());
+    }
+    output
+}
+
+fn two_external_link_fixture() -> (Vec<u8>, usize) {
+    let mut package = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        SourceLimits::default(),
+    )
+    .unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
+    let copied_external_uri = PackURI::new("/xl/externalLinks/externalLink2.bin").unwrap();
+    let (external_part_bytes, external_content_type, external_blob, external_relationships) = {
+        let external = package.get_part(&external_uri).unwrap();
+        (
+            external.blob().len(),
+            external.content_type().to_owned(),
+            external.blob().to_vec(),
+            external
+                .rels()
+                .iter()
+                .map(|relationship| {
+                    (
+                        relationship.reltype().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.r_id().to_owned(),
+                        relationship.is_external(),
+                    )
+                })
+                .collect::<Vec<_>>(),
+        )
+    };
+    let workbook_relationship_type = package
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find(|relationship| {
+            relationship
+                .target_partname()
+                .is_ok_and(|target| target == external_uri)
+        })
+        .unwrap()
+        .reltype()
+        .to_owned();
+    let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let end = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
+        .find_map(|record| {
+            let record = record.unwrap();
+            (record.kind() == kind::SUP_BOOK_SRC).then(|| {
+                let (_, header_len) =
+                    Header::parse(&workbook_blob[record.offset()..], RawLimits::DEFAULT).unwrap();
+                record.offset() + header_len + record.len()
+            })
+        })
+        .unwrap();
+    let mut second_reference = Vec::new();
+    Encoder::new(&mut second_reference, litchi_xlsb::raw::Limits::DEFAULT)
+        .write_record(kind::SUP_BOOK_SRC, &external_wide_string("rIdExternalCopy"))
+        .unwrap();
+    workbook_blob.splice(end..end, second_reference);
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(workbook_blob);
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            workbook_relationship_type,
+            "externalLinks/externalLink2.bin".to_owned(),
+            "rIdExternalCopy".to_owned(),
+            false,
+        );
+    let mut copied_external =
+        BlobPart::new(copied_external_uri, external_content_type, external_blob);
+    for (reltype, target, relationship_id, external) in external_relationships {
+        copied_external
+            .rels_mut()
+            .add_relationship(reltype, target, relationship_id, external);
+    }
+    package.add_part(Box::new(copied_external));
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    (output, external_part_bytes)
+}
+
+fn rewrite_part(partname: &str, blob: Vec<u8>) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    package
+        .get_part_mut(&PackURI::new(partname).unwrap())
+        .unwrap()
+        .set_blob(blob);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn reserved_cell_flag_fixture() -> Vec<u8> {
+    let source = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/universal-content.xlsb"
+    ))
+    .unwrap();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), SourceLimits::default()).unwrap();
+    let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let source = package.get_part(&uri).unwrap().blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    let mut changed = false;
+    for record in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
+        let record = record.unwrap();
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::CELL_RK && !changed {
+            payload[7] |= 0x80;
+            changed = true;
+        }
+        writer.write_record(record.kind(), &payload).unwrap();
+    }
+    assert!(changed, "Simple.xlsb should contain an RK cell");
+    package.get_part_mut(&uri).unwrap().set_blob(rewritten);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn reserved_indexed_fixture() -> Vec<u8> {
+    let source = indexed_fixture();
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), SourceLimits::default()).unwrap();
+    let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let source = package.get_part(&uri).unwrap().blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut writer = Encoder::new(&mut rewritten, litchi_xlsb::raw::Limits::DEFAULT);
+    let mut changed = false;
+    for record in Records::new(&source, litchi_xlsb::raw::Limits::DEFAULT) {
+        let record = record.unwrap();
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::CELL_RK && !changed {
+            payload[7] |= 0x80;
+            changed = true;
+        }
+        writer.write_record(record.kind(), &payload).unwrap();
+    }
+    assert!(changed, "sample.xlsb should contain an RK cell");
+    package.get_part_mut(&uri).unwrap().set_blob(rewritten);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn rewrite_workbook_blob(blob: Vec<u8>) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/workbook.bin").unwrap())
+        .unwrap()
+        .set_blob(blob);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn rewrite_sheet_states(states: &[u32]) -> Vec<u8> {
+    let package = OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let offsets: Vec<usize> = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
+        .filter_map(|record| {
+            let record = record.unwrap();
+            (record.kind() == kind::BUNDLE_SH).then(|| {
+                let (_, header_len) =
+                    Header::parse(&workbook_blob[record.offset()..], RawLimits::DEFAULT).unwrap();
+                record.offset() + header_len
+            })
+        })
+        .collect();
+    for (offset, state) in offsets.into_iter().zip(states.iter().copied()) {
+        workbook_blob[offset..offset + 4].copy_from_slice(&state.to_le_bytes());
+    }
+    rewrite_workbook_blob(workbook_blob)
+}
+
+fn rewrite_null_relationship(position: usize, state: u32) -> Vec<u8> {
+    let package = OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let mut workbook_blob = Vec::new();
+    let mut current_position = 0;
+    {
+        let mut writer = Encoder::new(&mut workbook_blob, litchi_xlsb::raw::Limits::DEFAULT);
+        for record in Records::new(&original, litchi_xlsb::raw::Limits::DEFAULT) {
+            let record = record.unwrap();
+            let mut payload = record.payload().to_vec();
+            if record.kind() == kind::BUNDLE_SH {
+                if current_position == position {
+                    payload[0..4].copy_from_slice(&state.to_le_bytes());
+                    let current_id = u32::from_le_bytes(payload[4..8].try_into().unwrap());
+                    let strings_offset = if (1..=0xFFFF).contains(&current_id) {
+                        8
+                    } else {
+                        12
+                    };
+                    let rel_units = u32::from_le_bytes(
+                        payload[strings_offset..strings_offset + 4]
+                            .try_into()
+                            .unwrap(),
+                    ) as usize;
+                    let rel_end = strings_offset + 4 + rel_units * 2;
+                    let mut null_payload = Vec::with_capacity(payload.len() - rel_units * 2);
+                    null_payload.extend_from_slice(&payload[..strings_offset]);
+                    null_payload.extend_from_slice(&u32::MAX.to_le_bytes());
+                    null_payload.extend_from_slice(&payload[rel_end..]);
+                    payload = null_payload;
+                }
+                current_position += 1;
+            }
+            writer.write_record(record.kind(), &payload).unwrap();
+        }
+    }
+    rewrite_workbook_blob(workbook_blob)
+}
+
+fn remove_part(partname: &str) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    assert!(package.remove_part(&PackURI::new(partname).unwrap()));
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn rewrite_content_type(partname: &str, content_type: &str) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    package
+        .get_part_mut(&PackURI::new(partname).unwrap())
+        .unwrap()
+        .set_content_type(content_type.to_string())
+        .unwrap();
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn add_comments_part(content_type: &str) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let comments_uri = PackURI::new("/xl/comments1.bin").unwrap();
+    let mut comments = Vec::new();
+    litchi_xlsb::comments::write(
+        &mut Encoder::new(&mut comments, litchi_xlsb::raw::Limits::DEFAULT),
+        &[],
+    )
+    .unwrap();
+    package.add_part(Box::new(BlobPart::new(
+        comments_uri,
+        content_type.to_owned(),
+        comments,
+    )));
+    package
+        .get_part_mut(&sheet_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            relationship_type::COMMENTS.to_owned(),
+            "../comments1.bin".to_owned(),
+            "rIdComments".to_owned(),
+            false,
+        );
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn rewrite_sheet_relationship(relationship_type: &str, content_type: &str) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let sheet_uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let (r_id, target_ref, is_external) = package
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            let target = relationship.target_partname().ok()?;
+            (target == sheet_uri).then(|| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.target_ref().to_owned(),
+                    relationship.is_external(),
+                )
+            })
+        })
+        .unwrap();
+    {
+        let workbook = package.get_part_mut(&workbook_uri).unwrap();
+        workbook.rels_mut().remove(&r_id).unwrap();
+        workbook.rels_mut().add_relationship(
+            relationship_type.to_owned(),
+            target_ref,
+            r_id,
+            is_external,
+        );
+    }
+    package
+        .get_part_mut(&sheet_uri)
+        .unwrap()
+        .set_content_type(content_type.to_owned())
+        .unwrap();
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn rewrite_sheet_relationship_with_blob(
+    relationship_type: &str,
+    content_type: &str,
+    blob: Vec<u8>,
+) -> Vec<u8> {
+    let source = rewrite_sheet_relationship(relationship_type, content_type);
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), SourceLimits::default()).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
+        .unwrap()
+        .set_blob(blob);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn rewrite_sheet_target(target_partname: &str, target_ref: &str) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let target_partname = PackURI::new(target_partname).unwrap();
+    let (r_id, rel_type, is_external) = package
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            let target = relationship.target_partname().ok()?;
+            (target == target_partname).then(|| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.reltype().to_owned(),
+                    relationship.is_external(),
+                )
+            })
+        })
+        .unwrap();
+    let workbook = package.get_part_mut(&workbook_uri).unwrap();
+    workbook.rels_mut().remove(&r_id).unwrap();
+    workbook
+        .rels_mut()
+        .add_relationship(rel_type, target_ref.to_owned(), r_id, is_external);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn set_date1904() -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let payload_offset = Records::new(&workbook_blob, litchi_xlsb::raw::Limits::DEFAULT)
+        .find_map(|record| {
+            let record = record.unwrap();
+            if record.kind() != kind::WORKBOOK_PROP || record.payload().is_empty() {
+                return None;
+            }
+            let (_, header_len) =
+                Header::parse(&workbook_blob[record.offset()..], RawLimits::DEFAULT).unwrap();
+            Some(record.offset() + header_len)
+        })
+        .unwrap();
+    workbook_blob[payload_offset] |= 1;
+    package
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .set_blob(workbook_blob);
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+struct VersionedSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+}
+
+struct CancelOnArmedRead {
+    bytes: Vec<u8>,
+    cancellation_source: CancellationSource,
+    armed: AtomicBool,
+    triggered: AtomicBool,
+}
+
+impl CancelOnArmedRead {
+    fn new(bytes: Vec<u8>, cancellation_source: CancellationSource) -> Self {
+        Self {
+            bytes,
+            cancellation_source,
+            armed: AtomicBool::new(false),
+            triggered: AtomicBool::new(false),
+        }
+    }
+
+    fn arm(&self) {
+        self.armed.store(true, Ordering::SeqCst);
+    }
+
+    fn triggered(&self) -> bool {
+        self.triggered.load(Ordering::SeqCst)
+    }
+}
+
+impl ReadAt for CancelOnArmedRead {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if self.armed.swap(false, Ordering::SeqCst) {
+            self.triggered.store(true, Ordering::SeqCst);
+            self.cancellation_source.cancel();
+        }
+        let offset = usize::try_from(offset)
+            .map_err(|_error| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(0x4341_4e43, 0))
+    }
+}
+
+impl VersionedSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            revision: AtomicU64::new(0),
+        }
+    }
+
+    fn change(&self) {
+        self.revision.fetch_add(1, Ordering::SeqCst);
+    }
+}
+
+struct LateFenceSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+    armed: AtomicBool,
+    skip_versions: AtomicUsize,
+}
+
+impl LateFenceSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            revision: AtomicU64::new(0),
+            armed: AtomicBool::new(false),
+            skip_versions: AtomicUsize::new(0),
+        }
+    }
+
+    fn arm_after_versions(&self, skip_versions: usize) {
+        self.skip_versions.store(skip_versions, Ordering::SeqCst);
+        self.armed.store(true, Ordering::SeqCst);
+    }
+
+    fn reset(&self) {
+        self.revision.store(0, Ordering::SeqCst);
+        self.skip_versions.store(0, Ordering::SeqCst);
+        self.armed.store(false, Ordering::SeqCst);
+    }
+}
+
+impl ReadAt for LateFenceSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_error| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        if self.armed.load(Ordering::SeqCst)
+            && self
+                .skip_versions
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_err()
+        {
+            self.armed.store(false, Ordering::SeqCst);
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+        Ok(SourceVersion::new(
+            0x4c41_5445,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
+fn managed_context() -> (CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "xlsb-source-backed-test",
+        BudgetLimits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroUsize::new(1).unwrap(),
+        NonZeroU64::new(u64::MAX).unwrap(),
+        0,
+    )
+    .unwrap();
+    (
+        cancellation_source,
+        ExecutionContext::new(budget, cancellation, execution_limits),
+    )
+}
+
+fn assert_cancelled<T>(result: Result<T, PackageError>) {
+    assert!(matches!(
+        result,
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
+}
+
+impl ReadAt for VersionedSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_error| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x584c_5342,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
+#[test]
+fn catalog_defers_sheet_payloads_and_materializes_one_selection() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    assert!(workbook.worksheet_count().unwrap() > 0);
+    let names = workbook.worksheet_names().unwrap();
+    assert_eq!(names.len(), workbook.worksheet_count().unwrap());
+
+    let catalog_diagnostics = workbook.cache_diagnostics();
+    assert_eq!(catalog_diagnostics.cold_loads, 1);
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    assert_eq!(selected.name().unwrap(), names[0].as_str());
+    assert_eq!(selected.workbook_position().unwrap(), 0);
+    selected.materialize().unwrap();
+
+    let first_materialization = workbook.cache_diagnostics();
+    let first_semantic = workbook.semantic_cache_diagnostics();
+    assert!(first_materialization.cold_loads > catalog_diagnostics.cold_loads);
+    selected.materialize().unwrap();
+    let repeated_materialization = workbook.cache_diagnostics();
+    let repeated_semantic = workbook.semantic_cache_diagnostics();
+    assert_eq!(
+        repeated_materialization.cold_loads,
+        first_materialization.cold_loads
+    );
+    assert!(repeated_semantic.hits > first_semantic.hits);
+}
+
+#[test]
+fn cached_grid_projects_indexed_scalars_and_reuses_the_leaf_snapshot() {
+    let workbook = SourceBackedWorkbook::from_reader(Cursor::new(indexed_fixture())).unwrap();
+    let sheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let indexed = sheet.indexed_values().unwrap().unwrap();
+    let expected = indexed.cached_value(0, 1).unwrap().unwrap();
+
+    let first = sheet.cached_grid().unwrap();
+    assert_eq!(first.cell_at((0, 1)).unwrap().unwrap().value(), &expected);
+    assert!(first.stored_cell_count() > 0);
+    assert!(
+        first
+            .cells_in("A1:Z20")
+            .unwrap()
+            .all(|cell| !matches!(cell.value(), CellValue::Formula { .. }))
+    );
+
+    let second = sheet.cached_grid().unwrap();
+    assert_eq!(second.stored_cell_count(), first.stored_cell_count());
+    assert_eq!(second.name(), first.name());
+}
+
+#[test]
+fn selectors_remain_metadata_only_and_source_checked() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let name = workbook.worksheet_names().unwrap().remove(0);
+    let selected = workbook.worksheet_by_name(&name).unwrap().unwrap();
+    selected.materialize().unwrap();
+    assert!(workbook.worksheet_by_name(&name).unwrap().is_some());
+    assert!(workbook.worksheet_by_name("missing").unwrap().is_none());
+
+    source.change();
+    assert!(workbook.worksheet_count().is_err());
+    assert!(workbook.worksheet_by_name(&name).is_err());
+    assert!(selected.materialize().is_err());
+}
+
+#[test]
+fn managed_cancellation_is_checked_for_catalog_selectors_state_and_handles() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let sheet_name = workbook.sheet_names().unwrap().remove(0);
+    let worksheet_name = workbook.worksheet_names().unwrap().remove(0);
+    let selected_sheet = workbook.sheet_by_index(0).unwrap().unwrap();
+    let selected_worksheet = workbook
+        .worksheet_by_name(&worksheet_name)
+        .unwrap()
+        .unwrap();
+    selected_worksheet.materialize().unwrap();
+
+    cancellation_source.cancel();
+
+    assert_cancelled(workbook.sheet_count());
+    assert_cancelled(workbook.sheet_names());
+    assert_cancelled(workbook.sheets());
+    assert_cancelled(workbook.sheet_by_index(0));
+    assert_cancelled(workbook.sheet_by_index(usize::MAX));
+    assert_cancelled(workbook.sheet_by_name(&sheet_name));
+    assert_cancelled(workbook.sheet_by_name("missing"));
+    assert_cancelled(workbook.sheet(0_usize));
+    assert_cancelled(workbook.sheet("missing"));
+    assert_cancelled(workbook.worksheet_count());
+    assert_cancelled(workbook.worksheet_names());
+    assert_cancelled(workbook.worksheets());
+    assert_cancelled(workbook.worksheet_by_index(0));
+    assert_cancelled(workbook.worksheet_by_index(usize::MAX));
+    assert_cancelled(workbook.worksheet_by_name(&worksheet_name));
+    assert_cancelled(workbook.worksheet_by_name("missing"));
+    assert_cancelled(workbook.active_catalog_position());
+    assert_cancelled(workbook.active_worksheet_index());
+    assert_cancelled(workbook.source_version());
+    assert_cancelled(workbook.is_1904_date_system());
+    assert_cancelled(selected_sheet.name());
+    assert_cancelled(selected_sheet.workbook_position());
+    assert_cancelled(selected_sheet.kind());
+    assert_cancelled(selected_sheet.state());
+    assert_cancelled(selected_worksheet.materialize());
+}
+
+#[test]
+fn managed_cancellation_is_checked_before_catalog_construction() {
+    let (cancellation_source, context) = managed_context();
+    cancellation_source.cancel();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(OwnedSource::new(fixture())),
+            litchi_xlsb::OpenOptions::new()
+                .source_limits(SourceLimits::default())
+                .execution_context(context)
+        ),
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
+}
+
+#[test]
+fn managed_cancellation_precedes_stale_source_preflight() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    source.change();
+    cancellation_source.cancel();
+
+    assert_cancelled(workbook.sheet_count());
+}
+
+#[test]
+fn stale_source_preflight_remains_source_changed_without_cancellation() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (_cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let selected = workbook.sheet(0_usize).unwrap().unwrap();
+    source.change();
+
+    assert!(matches!(
+        workbook.sheet_count(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(matches!(
+        workbook.sheet(0_usize),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(matches!(
+        selected.kind(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(matches!(
+        selected.state(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+}
+
+#[test]
+fn metadata_noop_commit_rechecks_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let edit = workbook.edit_metadata().unwrap();
+    source.change();
+
+    assert!(matches!(
+        edit.commit(),
+        Err(MetadataError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn metadata_noop_commit_checks_cancellation_before_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let edit = workbook.edit_metadata().unwrap();
+    source.change();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        edit.commit(),
+        Err(MetadataError::Package(OoxmlError::Opc(OpcError::Cancelled)))
+    ));
+}
+
+#[test]
+fn metadata_revised_noop_replay_rechecks_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let no_op = revised.edit_metadata().unwrap().commit().unwrap();
+    source.change();
+
+    assert!(matches!(
+        revised.apply_metadata(no_op.patch()),
+        Err(MetadataError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn metadata_revised_noop_replay_checks_cancellation_before_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let no_op = revised.edit_metadata().unwrap().commit().unwrap();
+    source.change();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        revised.apply_metadata(no_op.patch()),
+        Err(MetadataError::Package(OoxmlError::Opc(OpcError::Cancelled)))
+    ));
+}
+
+#[test]
+fn metadata_revised_undo_rechecks_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let original = workbook.metadata().unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let mut undo = revised.edit_metadata().unwrap();
+    undo.set(original);
+    source.change();
+
+    assert!(matches!(
+        undo.commit(),
+        Err(MetadataError::SourceChanged { .. })
+    ));
+}
+
+#[test]
+fn metadata_revised_undo_checks_cancellation_before_stale_source() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let original = workbook.metadata().unwrap();
+    let mut edit = workbook.edit_metadata().unwrap();
+    edit.update(|metadata| metadata.title = Some("revised".to_owned()))
+        .unwrap();
+    let revised = edit.commit().unwrap().into_package();
+    let mut undo = revised.edit_metadata().unwrap();
+    undo.set(original);
+    source.change();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        undo.commit(),
+        Err(MetadataError::Package(OoxmlError::Opc(OpcError::Cancelled)))
+    ));
+}
+
+#[test]
+fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
+    let (cancellation_source, context) = managed_context();
+    let source = Arc::new(CancelOnArmedRead::new(fixture(), cancellation_source));
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let before = workbook.cache_diagnostics();
+    let before_semantic = workbook.semantic_cache_diagnostics();
+
+    source.arm();
+    assert!(matches!(
+        selected.materialize(),
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
+    assert!(source.triggered());
+
+    let after = workbook.cache_diagnostics();
+    assert_eq!(after.retained_entries, before.retained_entries);
+    let after_semantic = workbook.semantic_cache_diagnostics();
+    assert_eq!(
+        after_semantic.retained_entries,
+        before_semantic.retained_entries
+    );
+    assert_eq!(after_semantic.builds, before_semantic.builds);
+}
+
+#[test]
+fn source_fences_run_before_a_semantic_cache_hit() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    selected.grid().unwrap();
+    let before_change = workbook.semantic_cache_diagnostics();
+    assert_eq!(before_change.builds, 1);
+
+    source.change();
+    assert!(matches!(
+        selected.grid(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    let after_change = workbook.semantic_cache_diagnostics();
+    assert_eq!(after_change.hits, before_change.hits);
+    assert_eq!(after_change.builds, before_change.builds);
+
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    selected.grid().unwrap();
+    let before_cancel = workbook.semantic_cache_diagnostics();
+
+    cancellation_source.cancel();
+    assert_cancelled(selected.grid());
+    let after_cancel = workbook.semantic_cache_diagnostics();
+    assert_eq!(after_cancel.hits, before_cancel.hits);
+    assert_eq!(after_cancel.builds, before_cancel.builds);
+}
+
+#[test]
+fn late_source_fence_rolls_back_candidate_and_report_publication() {
+    let mut observed_postpublication_failure = false;
+    for skip_versions in 0..64 {
+        let source = Arc::new(LateFenceSource::new(reserved_cell_flag_fixture()));
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+        source.arm_after_versions(skip_versions);
+
+        let result = selected.grid();
+        let Err(error) = result else {
+            break;
+        };
+        assert!(matches!(
+            error,
+            PackageError::Opc(OpcError::SourceChanged { .. })
+        ));
+
+        let diagnostics = workbook.semantic_cache_diagnostics();
+        if diagnostics.builds > 0 {
+            observed_postpublication_failure = true;
+            assert_eq!(diagnostics.retained_entries, 0);
+            source.reset();
+            assert_eq!(workbook.read_tolerance_report().unwrap().total(), 0);
+            selected.grid().unwrap();
+            assert_eq!(workbook.read_tolerance_report().unwrap().total(), 1);
+            break;
+        }
+    }
+    assert!(
+        observed_postpublication_failure,
+        "the late-fence source did not reach the publication rollback fence"
+    );
+}
+
+#[test]
+fn cached_grid_trim_and_reparse_keeps_one_fallback_tolerance_report() {
+    let source = add_pivot_relationship(reserved_indexed_fixture());
+    let workbook = SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(source),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::Strict),
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    assert!(matches!(
+        selected.grid(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+
+    let first = selected.cached_grid().unwrap();
+    let report = first.tolerance_report().clone();
+    assert_eq!(report.total(), 1);
+    assert_eq!(workbook.read_tolerance_report().unwrap(), report);
+    drop(first);
+    assert!(workbook.trim_semantic_cache() > 0);
+
+    let second = selected.cached_grid().unwrap();
+    assert_eq!(second.tolerance_report(), &report);
+    assert_eq!(workbook.read_tolerance_report().unwrap(), report);
+}
+
+#[test]
+fn late_source_fence_rolls_back_cached_grid_and_fallback_report() {
+    let source_bytes = add_pivot_relationship(reserved_indexed_fixture());
+    for skip_versions in 0..128 {
+        let source = Arc::new(LateFenceSource::new(source_bytes.clone()));
+        let workbook = SourceBackedWorkbook::from_read_at_with_options(
+            source.clone(),
+            litchi_xlsb::OpenOptions::new().leniency(Leniency::Strict),
+        )
+        .unwrap();
+        let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+        source.arm_after_versions(skip_versions);
+
+        let result = selected.cached_grid();
+        let Err(error) = result else {
+            continue;
+        };
+        assert!(matches!(
+            error,
+            PackageError::Opc(OpcError::SourceChanged { .. })
+        ));
+        source.reset();
+        assert!(workbook.read_tolerance_report().unwrap().is_clean());
+        let retry = selected.cached_grid().unwrap();
+        assert_eq!(retry.tolerance_report().total(), 1);
+        assert_eq!(workbook.read_tolerance_report().unwrap().total(), 1);
+        return;
+    }
+    panic!("the late-fence source did not produce a source-change refusal");
+}
+
+#[test]
+fn source_trim_and_reparse_keeps_one_worksheet_tolerance_report() {
+    let source = reserved_cell_flag_fixture();
+    let workbook = SourceBackedWorkbook::from_reader_with_options(
+        Cursor::new(source),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::Strict),
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+
+    let first = selected.grid().unwrap();
+    let report = first.tolerance_report().clone();
+    assert_eq!(report.total(), 1);
+    assert!(workbook.tolerance_report().is_clean());
+    let aggregate = workbook.read_tolerance_report().unwrap();
+    assert_eq!(aggregate, report);
+    drop(first);
+    assert!(workbook.trim_semantic_cache() > 0);
+
+    let second = selected.grid().unwrap();
+    assert_eq!(second.tolerance_report(), &report);
+    assert!(workbook.tolerance_report().is_clean());
+    assert_eq!(workbook.read_tolerance_report().unwrap(), aggregate);
+}
+
+#[test]
+fn eager_grid_selectors_share_the_owner_cache_and_survive_republication() {
+    let mut workbook = Workbook::new(Cursor::new(fixture())).unwrap();
+    let old_grid = workbook.grid(0_usize).unwrap().unwrap();
+    let name = old_grid.name().to_owned();
+    let before = workbook.semantic_cache_diagnostics();
+
+    let by_name = workbook.grid(name.as_str()).unwrap().unwrap();
+    assert_eq!(by_name.name(), name);
+    let after_hit = workbook.semantic_cache_diagnostics();
+    assert_eq!(after_hit.hits, before.hits + 1);
+    assert!(workbook.grid("missing").unwrap().is_none());
+
+    let inserted = Reference::new(10_001, 100).unwrap();
+    let package = workbook.to_package();
+    let mut edit = package
+        .edit_cell_values(name.as_str())
+        .unwrap()
+        .resolve()
+        .unwrap()
+        .expect("worksheet selector");
+    edit.insert(inserted, StyleIndex::new(0).unwrap(), Value::Number(1.0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    workbook = commit.into_package().owned_workbook().unwrap();
+
+    assert!(
+        old_grid
+            .worksheet()
+            .get_cell(inserted.row(), inserted.column())
+            .is_none()
+    );
+    let new_grid = workbook.grid(0_usize).unwrap().unwrap();
+    assert_eq!(
+        new_grid
+            .worksheet()
+            .get_cell(inserted.row(), inserted.column())
+            .unwrap()
+            .value(),
+        &CellValue::Float(1.0)
+    );
+}
+
+#[test]
+fn case_variant_duplicate_sheet_targets_are_rejected() {
+    let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/SHEET1.bin");
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source.clone()))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+    assert!(matches!(
+        Workbook::new(Cursor::new(source)),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+}
+
+#[test]
+fn unique_case_variant_sheet_target_opens_and_materializes() {
+    let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/SHEET2.bin");
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
+    let selected = workbook.worksheet_by_index(1).unwrap().unwrap();
+    assert_eq!(
+        selected.name().unwrap(),
+        workbook.worksheet_names().unwrap()[1]
+    );
+    selected.materialize().unwrap();
+    let eager = Workbook::new(Cursor::new(source)).unwrap();
+    assert!(eager.grid(1).unwrap().is_some());
+}
+
+#[test]
+fn exact_duplicate_sheet_targets_are_rejected() {
+    let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/sheet1.bin");
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source.clone()))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+    assert!(matches!(
+        Workbook::new(Cursor::new(source)),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+}
+
+#[test]
+fn managed_package_handoff_checks_cancellation_before_catalog_construction() {
+    let (cancellation_source, context) = managed_context();
+    let package = SourceBackedPackage::from_read_at(
+        Arc::new(OwnedSource::new(fixture())),
+        SourceLimits::default(),
+        SourceCacheLimits::default(),
+        litchi_opc::SourceReadPolicy::exact(),
+        Some(context),
+    )
+    .unwrap();
+    cancellation_source.cancel();
+
+    assert!(matches!(
+        SourceBackedWorkbook::from_source_backed_package(package),
+        Err(PackageError::Opc(OpcError::Cancelled))
+    ));
+}
+
+#[test]
+fn unselected_malformed_sheet_remains_deferred() {
+    let source = rewrite_part("/xl/worksheets/sheet2.bin", vec![0xff; 8]);
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let before = workbook.read_tolerance_report().unwrap();
+    assert!(
+        workbook
+            .worksheet_by_index(0)
+            .unwrap()
+            .unwrap()
+            .materialize()
+            .is_ok()
+    );
+    assert!(
+        workbook
+            .worksheet_by_index(1)
+            .unwrap()
+            .unwrap()
+            .materialize()
+            .is_err()
+    );
+    assert_eq!(workbook.read_tolerance_report().unwrap(), before);
+}
+
+#[test]
+fn declared_part_read_limit_is_forwarded_at_catalog_open() {
+    let package = OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    let dependency_limit = [
+        "/xl/workbook.bin",
+        "/xl/styles.bin",
+        "/xl/sharedStrings.bin",
+        "/xl/worksheets/sheet1.bin",
+    ]
+    .iter()
+    .filter_map(|partname| package.get_part(&PackURI::new(*partname).unwrap()).ok())
+    .map(|part| part.blob().len())
+    .max()
+    .unwrap();
+    let oversized = vec![0xff; dependency_limit.saturating_add(1)];
+    let source = rewrite_part("/xl/worksheets/sheet2.bin", oversized);
+    let limits = SourceLimits::builder()
+        .max_part_bytes(u64::try_from(dependency_limit).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(
+        SourceBackedWorkbook::from_read_at_with_options(
+            Arc::new(OwnedSource::new(source)),
+            litchi_xlsb::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
+}
+
+#[test]
+fn missing_related_parts_are_rejected_during_catalog_construction() {
+    for partname in ["/xl/worksheets/sheet1.bin", "/xl/styles.bin"] {
+        let source = remove_part(partname);
+        assert!(
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_err(),
+            "accepted missing related part {partname}"
+        );
+    }
+}
+
+#[test]
+fn mismatched_binary_part_content_types_are_rejected() {
+    for partname in [
+        "/xl/worksheets/sheet1.bin",
+        "/xl/styles.bin",
+        "/xl/sharedStrings.bin",
+    ] {
+        let source = rewrite_content_type(partname, "application/octet-stream");
+        assert!(
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_err(),
+            "accepted mismatched content type for {partname}"
+        );
+    }
+}
+
+#[test]
+fn comments_content_type_is_checked_before_materialization() {
+    let source = add_comments_part("application/octet-stream");
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    assert!(
+        workbook
+            .worksheet_by_index(0)
+            .unwrap()
+            .unwrap()
+            .materialize()
+            .is_err()
+    );
+}
+
+#[test]
+fn recognized_nonworksheet_sheet_relationships_are_exact_and_typed() {
+    const RELATIONSHIPS: &[(&str, &str)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+            "application/vnd.ms-excel.intlmacrosheet",
+        ),
+    ];
+    for &(relationship_type, content_type) in RELATIONSHIPS {
+        let source = rewrite_sheet_relationship(relationship_type, content_type);
+        assert!(
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_ok(),
+            "rejected recognized sheet relationship {relationship_type}"
+        );
+    }
+}
+
+#[test]
+fn source_sheet_kind_covers_all_kinds_and_strict_relationship_namespaces() {
+    const RELATIONSHIPS: &[(&str, &str, Kind)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+            "application/vnd.ms-excel.worksheet",
+            Kind::Worksheet,
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet",
+            "application/vnd.ms-excel.worksheet",
+            Kind::Worksheet,
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+            Kind::Chart,
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+            Kind::Chart,
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+            Kind::Dialog,
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+            Kind::Dialog,
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+            Kind::Macro,
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+            "application/vnd.ms-excel.intlmacrosheet",
+            Kind::IntlMacro,
+        ),
+    ];
+    for &(relationship_type, content_type, expected_kind) in RELATIONSHIPS {
+        let source = rewrite_sheet_relationship(relationship_type, content_type);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let sheet = workbook.sheet(0_usize).unwrap().unwrap();
+        assert_eq!(sheet.kind().unwrap(), expected_kind, "{relationship_type}");
+        assert_eq!(sheet.state().unwrap(), State::Visible);
+    }
+}
+
+#[test]
+fn source_sheet_state_preserves_visible_hidden_and_very_hidden() {
+    for (raw, expected) in [
+        (0, State::Visible),
+        (1, State::Hidden),
+        (2, State::VeryHidden),
+    ] {
+        let source = rewrite_sheet_states(&[raw]);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let sheet = workbook.sheet(0_usize).unwrap().unwrap();
+        assert_eq!(sheet.state().unwrap(), expected);
+        assert_eq!(expected.is_visible(), raw == 0);
+        assert_eq!(expected.is_hidden(), raw != 0);
+        assert_eq!(expected.is_very_hidden(), raw == 2);
+    }
+}
+
+#[test]
+fn source_catalog_retains_a_very_hidden_unbound_tab_and_refuses_payload_access() {
+    let source = rewrite_null_relationship(0, 2);
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let selected = workbook.sheet(0_usize).unwrap().unwrap();
+    assert_eq!(selected.kind().unwrap(), Kind::Unbound);
+    assert_eq!(selected.state().unwrap(), State::VeryHidden);
+    assert_eq!(selected.workbook_position().unwrap(), 0);
+    assert!(matches!(
+        selected.materialize(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+    assert!(matches!(
+        selected.indexed_values(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+    assert!(
+        workbook
+            .worksheets()
+            .unwrap()
+            .iter()
+            .all(|sheet| sheet.workbook_position().unwrap() != 0)
+    );
+}
+
+#[test]
+fn source_catalog_rejects_unbound_tabs_that_are_not_very_hidden() {
+    for state in [0, 1] {
+        let source = rewrite_null_relationship(0, state);
+        assert!(SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_err());
+    }
+}
+
+#[test]
+fn source_sheet_rejects_malformed_bundle_state_before_catalog_open() {
+    let source = rewrite_sheet_states(&[3]);
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))),
+        Err(PackageError::Unrecognized { typ, .. }) if typ == "BrtBundleSh hsState"
+    ));
+}
+
+#[test]
+fn source_sheet_selector_is_position_or_case_insensitive_name() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    let name = workbook.sheet_names().unwrap().remove(0);
+    let lower = name.to_lowercase();
+    assert_eq!(
+        workbook.sheet(0_usize).unwrap().unwrap().name().unwrap(),
+        name
+    );
+    assert_eq!(
+        workbook.sheet(lower).unwrap().unwrap().name().unwrap(),
+        name
+    );
+    assert!(workbook.sheet("missing").unwrap().is_none());
+}
+
+#[test]
+fn recognized_nonworksheet_sheet_relationships_require_binary_content_types() {
+    const RELATIONSHIPS: &[&str] = &[
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+        "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+        "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+    ];
+    for &relationship_type in RELATIONSHIPS {
+        let source = rewrite_sheet_relationship(relationship_type, "application/octet-stream");
+        assert!(
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_err(),
+            "accepted mismatched content type for {relationship_type}"
+        );
+    }
+}
+
+#[test]
+fn full_sheet_catalog_preserves_nonworksheet_tabs_and_worksheet_selectors() {
+    const RELATIONSHIPS: &[(&str, &str)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+        ),
+    ];
+    for &(relationship_type, content_type) in RELATIONSHIPS {
+        let source = rewrite_sheet_relationship(relationship_type, content_type);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let names = workbook.sheet_names().unwrap();
+        assert_eq!(workbook.sheet_count().unwrap(), names.len());
+        assert!(names.len() >= 2);
+
+        let sheets = workbook.sheets().unwrap();
+        assert_eq!(sheets.len(), names.len());
+        for (position, sheet) in sheets.iter().enumerate() {
+            assert_eq!(sheet.name().unwrap(), names[position].as_str());
+            assert_eq!(sheet.workbook_position().unwrap(), position);
+            assert_eq!(sheet.state().unwrap(), State::Visible);
+        }
+        let expected_kind = match relationship_type {
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet" => {
+                Kind::Chart
+            },
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet" => {
+                Kind::Dialog
+            },
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet" => Kind::Macro,
+            _ => unreachable!("recognized mixed-tab relationship"),
+        };
+        assert_eq!(sheets[0].kind().unwrap(), expected_kind);
+        assert_eq!(sheets[1].kind().unwrap(), Kind::Worksheet);
+        assert!(matches!(
+            sheets[0].materialize(),
+            Err(PackageError::UnsupportedFeature(_))
+        ));
+
+        assert_eq!(workbook.worksheet_count().unwrap(), names.len() - 1);
+        assert_eq!(workbook.worksheet_names().unwrap(), names[1..].to_vec());
+        assert_eq!(
+            workbook
+                .worksheet_by_index(0)
+                .unwrap()
+                .unwrap()
+                .workbook_position()
+                .unwrap(),
+            1
+        );
+        assert!(workbook.sheet_by_name(&names[0]).unwrap().is_some());
+        assert!(workbook.sheet_by_index(names.len()).unwrap().is_none());
+    }
+}
+
+#[test]
+fn source_text_matches_legacy_terminal_newline_and_reports_progress() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    let expected = workbook.text().unwrap();
+    let mut output = Vec::new();
+    let report = workbook
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap();
+
+    let mut expected_without_terminal = expected.into_bytes();
+    expected_without_terminal.pop();
+    assert_eq!(output, expected_without_terminal);
+    assert!(report.objects_written() > 0);
+    assert_eq!(report.bytes_written(), output.len() as u64);
+}
+
+#[test]
+fn source_text_respects_output_limit() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    let mut output = Vec::new();
+    let error = workbook
+        .write_text_to(&mut output, TextOutputOptions::new("\n", "\n\n", 1, 1))
+        .unwrap_err();
+
+    assert!(matches!(
+        &error,
+        TextOutputError::Limit { limit, progress }
+            if limit.kind() == TextOutputLimitKind::OutputBytes
+                && limit.limit() == 1
+                && limit.observed() > 1
+                && progress.bytes_written() == 0
+                && progress.objects_written() == 0
+    ));
+    assert!(output.len() <= 1);
+}
+
+#[test]
+fn source_text_rejects_stale_source_before_output() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    source.change();
+
+    let text_error = workbook.text().unwrap_err();
+    assert!(matches!(
+        text_error,
+        PackageError::Opc(OpcError::SourceChanged { .. })
+    ));
+
+    let mut output = Vec::new();
+    let sink_error = workbook
+        .write_text_to(&mut output, TextOutputOptions::default())
+        .unwrap_err();
+    assert!(matches!(
+        sink_error,
+        TextOutputError::Document {
+            source: PackageError::Opc(OpcError::SourceChanged { .. }),
+            progress,
+        } if progress.bytes_written() == 0 && progress.objects_written() == 0
+    ));
+    assert!(output.is_empty());
+}
+
+#[test]
+fn source_text_skips_known_nonworksheet_tabs_and_preserves_worksheet_text() {
+    const RELATIONSHIPS: &[(&str, &str)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+            "application/vnd.ms-excel.intlmacrosheet",
+        ),
+    ];
+    let expected_stream = "\n";
+    let expected_text = "\n\n";
+    for &(relationship_type, content_type) in RELATIONSHIPS {
+        let source =
+            rewrite_sheet_relationship_with_blob(relationship_type, content_type, vec![0xff; 8]);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let before = workbook.cache_diagnostics();
+        let mut output = Vec::new();
+        let report = workbook
+            .write_text_to(&mut output, TextOutputOptions::default())
+            .unwrap();
+
+        assert!(report.objects_written() > 0);
+        assert_eq!(String::from_utf8(output).unwrap(), expected_stream);
+        assert_eq!(workbook.text().unwrap(), expected_text);
+        assert!(
+            workbook
+                .worksheet_by_index(0)
+                .unwrap()
+                .unwrap()
+                .workbook_position()
+                .unwrap()
+                > 0
+        );
+        assert!(workbook.cache_diagnostics().cold_loads > before.cold_loads);
+    }
+}
+
+#[test]
+fn date1904_flag_is_retained_in_source_catalog() {
+    let source = set_date1904();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    assert!(workbook.is_1904_date_system().unwrap());
+}
+
+#[test]
+fn unknown_sheet_relationship_suffix_is_rejected() {
+    let source = rewrite_sheet_relationship(
+        "https://attacker.invalid/relationships/chartsheet",
+        "application/vnd.ms-excel.chartsheet",
+    );
+    assert!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_err(),
+        "accepted an unknown chartsheet relationship authority"
+    );
+}
+
+#[test]
+fn finite_cache_policy_is_forwarded_to_deferred_parts() {
+    let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(fixture())),
+        litchi_xlsb::OpenOptions::new().cache_limits(cache_limits),
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let before = workbook.cache_diagnostics().cold_loads;
+    let semantic_before = workbook.semantic_cache_diagnostics();
+    selected.materialize().unwrap();
+    let first = workbook.cache_diagnostics().cold_loads;
+    let semantic_first = workbook.semantic_cache_diagnostics();
+    selected.materialize().unwrap();
+    let second = workbook.cache_diagnostics().cold_loads;
+    let semantic_second = workbook.semantic_cache_diagnostics();
+    assert!(first > before);
+    assert_eq!(second, first);
+    assert!(semantic_first.builds > semantic_before.builds);
+    assert!(semantic_second.hits > semantic_first.hits);
+    assert_eq!(workbook.cache_diagnostics().retained_entries, 0);
+}
+
+fn wide_string(value: &str) -> Vec<u8> {
+    let mut data = (value.encode_utf16().count() as u32).to_le_bytes().to_vec();
+    for unit in value.encode_utf16() {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    data
+}
+
+fn nullable_wide_string(value: Option<&str>) -> Vec<u8> {
+    value.map_or_else(|| u32::MAX.to_le_bytes().to_vec(), wide_string)
+}
+
+fn table_header_payload(id: u32, display_name: &str) -> Vec<u8> {
+    let mut data = Vec::new();
+    for value in [0_u32, 1, 0, 0, 0, id, 1, 0, 0] {
+        data.extend_from_slice(&value.to_le_bytes());
+    }
+    for _ in 0..6 {
+        data.extend_from_slice(&u32::MAX.to_le_bytes());
+    }
+    data.extend_from_slice(&0_u32.to_le_bytes());
+    data.extend_from_slice(&nullable_wide_string(Some(display_name)));
+    data.extend_from_slice(&nullable_wide_string(Some(display_name)));
+    for _ in 0..4 {
+        data.extend_from_slice(&nullable_wide_string(None));
+    }
+    data
+}
+
+fn table_column_payload(caption: &str) -> Vec<u8> {
+    let mut data = Vec::new();
+    for value in [1_u32, 0, u32::MAX, u32::MAX, u32::MAX, 0] {
+        data.extend_from_slice(&value.to_le_bytes());
+    }
+    data.extend_from_slice(&nullable_wide_string(None));
+    data.extend_from_slice(&nullable_wide_string(Some(caption)));
+    for _ in 0..4 {
+        data.extend_from_slice(&nullable_wide_string(None));
+    }
+    data
+}
+
+fn table_part_payload(id: u32, display_name: &str) -> Vec<u8> {
+    let mut data = Vec::new();
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
+    writer
+        .write_record(kind::BEGIN_LIST, &table_header_payload(id, display_name))
+        .unwrap();
+    writer
+        .write_record(kind::BEGIN_LIST_COLS, &1_u32.to_le_bytes())
+        .unwrap();
+    writer
+        .write_record(kind::BEGIN_LIST_COL, &table_column_payload("Amount"))
+        .unwrap();
+    writer.write_record(kind::END_LIST_COL, &[]).unwrap();
+    writer.write_record(kind::END_LIST_COLS, &[]).unwrap();
+    writer.write_record(kind::END_LIST, &[]).unwrap();
+    data
+}
+
+fn malformed_table_part_payload() -> Vec<u8> {
+    let mut data = Vec::new();
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
+    writer.write_record(kind::BEGIN_LIST, &[0; 8]).unwrap();
+    data
+}
+
+fn resident_table_formula(table_id: u32) -> (Vec<u8>, Vec<u8>) {
+    let mut rgce = vec![0x18, 0x19, 0, 0, 0x19, 0];
+    rgce.extend_from_slice(&table_id.to_le_bytes());
+    rgce.extend_from_slice(&0_u16.to_le_bytes());
+    rgce.extend_from_slice(&0_u16.to_le_bytes());
+    let mut formula = (u32::try_from(rgce.len()).unwrap()).to_le_bytes().to_vec();
+    formula.extend_from_slice(&rgce);
+    formula.extend_from_slice(&0_u32.to_le_bytes());
+    (formula, rgce)
+}
+
+fn worksheet_with_table(table_relationship_id: Option<&str>, formula: Option<&[u8]>) -> Vec<u8> {
+    let mut data = Vec::new();
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
+    let mut dimensions = Vec::new();
+    for value in [0_u32, 1, 0, 0] {
+        dimensions.extend_from_slice(&value.to_le_bytes());
+    }
+    writer.write_record(kind::WS_DIM, &dimensions).unwrap();
+    if let Some(relationship_id) = table_relationship_id {
+        writer
+            .write_record(kind::BEGIN_LIST_PARTS, &1_u32.to_le_bytes())
+            .unwrap();
+        writer
+            .write_record(kind::LIST_PART, &wide_string(relationship_id))
+            .unwrap();
+        writer.write_record(kind::END_LIST_PARTS, &[]).unwrap();
+    }
+    writer.write_record(kind::BEGIN_SHEET_DATA, &[]).unwrap();
+    if let Some(formula) = formula {
+        let mut row = 0_u32.to_le_bytes().to_vec();
+        row.extend_from_slice(&0_u32.to_le_bytes());
+        row.extend_from_slice(&0_u16.to_le_bytes());
+        row.extend_from_slice(&[0, 0, 0]);
+        row.extend_from_slice(&0_u32.to_le_bytes());
+        writer.write_record(kind::ROW_HDR, &row).unwrap();
+
+        let mut cell = 0_u32.to_le_bytes().to_vec();
+        cell.extend_from_slice(&[0, 0, 0, 0]);
+        cell.extend_from_slice(&42_f64.to_le_bytes());
+        cell.extend_from_slice(&0_u16.to_le_bytes());
+        cell.extend_from_slice(formula);
+        writer.write_record(kind::FMLA_NUM, &cell).unwrap();
+    }
+    writer.write_record(kind::END_SHEET_DATA, &[]).unwrap();
+    writer.write_record(kind::END_SHEET, &[]).unwrap();
+    data
+}
+
+fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
+    let mut data = 0_u32.to_le_bytes().to_vec();
+    data.extend_from_slice(&id.to_le_bytes());
+    data.extend_from_slice(&wide_string(relationship_id));
+    data.extend_from_slice(&wide_string(name));
+    data
+}
+
+fn two_sheet_workbook_payload() -> Vec<u8> {
+    let mut data = Vec::new();
+    let mut writer = Encoder::new(&mut data, litchi_xlsb::raw::Limits::DEFAULT);
+    writer
+        .write_record(kind::BUNDLE_SH, &bundle_sheet_payload(1, "rId1", "Sheet1"))
+        .unwrap();
+    writer
+        .write_record(kind::BUNDLE_SH, &bundle_sheet_payload(2, "rId2", "Sheet2"))
+        .unwrap();
+    writer.write_record(kind::SUP_SELF, &[]).unwrap();
+    let mut extern_sheet = 1_u32.to_le_bytes().to_vec();
+    extern_sheet.extend_from_slice(&0_u32.to_le_bytes());
+    extern_sheet.extend_from_slice(&1_u32.to_le_bytes());
+    extern_sheet.extend_from_slice(&1_u32.to_le_bytes());
+    writer
+        .write_record(kind::EXTERN_SHEET, &extern_sheet)
+        .unwrap();
+    data
+}
+
+fn table_workbook_source(
+    first: Option<(String, Vec<u8>, bool)>,
+    second: Option<(String, Vec<u8>, bool)>,
+    formula: Option<Vec<u8>>,
+) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(fixture()), SourceLimits::default()).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/workbook.bin").unwrap())
+        .unwrap()
+        .set_blob(two_sheet_workbook_payload());
+
+    let first_relationship_id = first.as_ref().map(|_| "rIdTable1");
+    let second_relationship_id = second.as_ref().map(|_| "rIdTable2");
+    package
+        .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
+        .unwrap()
+        .set_blob(worksheet_with_table(
+            first_relationship_id,
+            formula.as_deref(),
+        ));
+    package
+        .get_part_mut(&PackURI::new("/xl/worksheets/sheet2.bin").unwrap())
+        .unwrap()
+        .set_blob(worksheet_with_table(second_relationship_id, None));
+
+    if let Some((content_type, payload, external)) = first {
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                relationship_type::TABLE.to_owned(),
+                if external {
+                    "https://example.invalid/table1.bin".to_owned()
+                } else {
+                    "../tables/table1.bin".to_owned()
+                },
+                "rIdTable1".to_owned(),
+                external,
+            );
+        if !external {
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/tables/table1.bin").unwrap(),
+                content_type,
+                payload,
+            )));
+        }
+    }
+    if let Some((content_type, payload, external)) = second {
+        package
+            .get_part_mut(&PackURI::new("/xl/worksheets/sheet2.bin").unwrap())
+            .unwrap()
+            .rels_mut()
+            .add_relationship(
+                relationship_type::TABLE.to_owned(),
+                if external {
+                    "https://example.invalid/table2.bin".to_owned()
+                } else {
+                    "../tables/table2.bin".to_owned()
+                },
+                "rIdTable2".to_owned(),
+                external,
+            );
+        if !external {
+            package.add_part(Box::new(BlobPart::new(
+                PackURI::new("/xl/tables/table2.bin").unwrap(),
+                content_type,
+                payload,
+            )));
+        }
+    }
+
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn add_pivot_relationship(source: Vec<u8>) -> Vec<u8> {
+    let mut package =
+        OpcPackage::from_reader(Cursor::new(source), SourceLimits::default()).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/worksheets/sheet1.bin").unwrap())
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            relationship_type::PIVOT_TABLE.to_owned(),
+            "../pivotTables/pivotTable1.bin".to_owned(),
+            "rIdPivot".to_owned(),
+            true,
+        );
+    let mut output = Vec::new();
+    package.write_to(&mut output).unwrap();
+    output
+}
+
+fn zip_member_payload_range(bytes: &[u8], member: &str) -> (usize, usize) {
+    const CENTRAL_HEADER_LEN: usize = 46;
+    const LOCAL_HEADER_LEN: usize = 30;
+
+    for offset in 0..=bytes.len().saturating_sub(CENTRAL_HEADER_LEN) {
+        if bytes.get(offset..offset + 4) != Some(b"PK\x01\x02") {
+            continue;
+        }
+        let central_name_length = usize::from(u16::from_le_bytes(
+            bytes[offset + 28..offset + 30].try_into().unwrap(),
+        ));
+        let central_extra_length = usize::from(u16::from_le_bytes(
+            bytes[offset + 30..offset + 32].try_into().unwrap(),
+        ));
+        let central_comment_length = usize::from(u16::from_le_bytes(
+            bytes[offset + 32..offset + 34].try_into().unwrap(),
+        ));
+        let central_name_start = offset.checked_add(CENTRAL_HEADER_LEN).unwrap_or_else(|| {
+            panic!("ZIP member {member:?} central-directory name offset overflows")
+        });
+        let central_name_end = central_name_start
+            .checked_add(central_name_length)
+            .unwrap_or_else(|| {
+                panic!("ZIP member {member:?} central-directory name length overflows")
+            });
+        let central_end = central_name_end
+            .checked_add(central_extra_length)
+            .and_then(|end| end.checked_add(central_comment_length))
+            .unwrap_or_else(|| {
+                panic!("ZIP member {member:?} central-directory entry length overflows")
+            });
+        if central_end > bytes.len() {
+            panic!("ZIP member {member:?} has a truncated central-directory entry");
+        }
+        if bytes.get(central_name_start..central_name_end) != Some(member.as_bytes()) {
+            continue;
+        }
+
+        let compressed_size = usize::try_from(u32::from_le_bytes(
+            bytes[offset + 20..offset + 24].try_into().unwrap(),
+        ))
+        .unwrap_or_else(|_| panic!("ZIP member {member:?} compressed size does not fit usize"));
+        let local_header_offset = usize::try_from(u32::from_le_bytes(
+            bytes[offset + 42..offset + 46].try_into().unwrap(),
+        ))
+        .unwrap_or_else(|_| panic!("ZIP member {member:?} local-header offset does not fit usize"));
+        let local_header_end = local_header_offset
+            .checked_add(LOCAL_HEADER_LEN)
+            .unwrap_or_else(|| panic!("ZIP member {member:?} local-header offset overflows"));
+        let local_header = bytes
+            .get(local_header_offset..local_header_end)
+            .unwrap_or_else(|| panic!("ZIP member {member:?} has a truncated local header"));
+        if local_header.get(..4) != Some(b"PK\x03\x04") {
+            panic!("ZIP member {member:?} central entry points to a non-local header");
+        }
+        let local_name_length =
+            usize::from(u16::from_le_bytes(local_header[26..28].try_into().unwrap()));
+        let local_extra_length =
+            usize::from(u16::from_le_bytes(local_header[28..30].try_into().unwrap()));
+        let payload_start = local_header_end
+            .checked_add(local_name_length)
+            .and_then(|start| start.checked_add(local_extra_length))
+            .unwrap_or_else(|| panic!("ZIP member {member:?} payload offset overflows"));
+        let payload_end = payload_start
+            .checked_add(compressed_size)
+            .unwrap_or_else(|| panic!("ZIP member {member:?} payload length overflows"));
+        if payload_end > bytes.len() {
+            panic!("ZIP member {member:?} has a truncated compressed payload");
+        }
+        return (payload_start, payload_end);
+    }
+    panic!("ZIP member {member:?} has no central-directory entry");
+}
+
+struct TablePayloadSource {
+    bytes: Vec<u8>,
+    table_ranges: Vec<(usize, usize)>,
+    table_payload_reads: Vec<AtomicUsize>,
+    cancellation_source: Option<CancellationSource>,
+    cancel_table_index: AtomicUsize,
+    mutate_table_index: AtomicUsize,
+    revision: AtomicU64,
+}
+
+impl TablePayloadSource {
+    fn new(
+        bytes: Vec<u8>,
+        table_members: &[&str],
+        cancellation_source: Option<CancellationSource>,
+    ) -> Self {
+        let table_ranges = table_members
+            .iter()
+            .map(|member| zip_member_payload_range(&bytes, member))
+            .collect();
+        let table_payload_reads = table_members.iter().map(|_| AtomicUsize::new(0)).collect();
+        Self {
+            bytes,
+            table_ranges,
+            table_payload_reads,
+            cancellation_source,
+            cancel_table_index: AtomicUsize::new(usize::MAX),
+            mutate_table_index: AtomicUsize::new(usize::MAX),
+            revision: AtomicU64::new(0),
+        }
+    }
+
+    fn table_payload_reads(&self) -> usize {
+        self.table_payload_reads
+            .iter()
+            .map(|counter| counter.load(Ordering::SeqCst))
+            .sum()
+    }
+
+    fn table_payload_reads_for(&self, index: usize) -> usize {
+        self.table_payload_reads
+            .get(index)
+            .map_or(0, |counter| counter.load(Ordering::SeqCst))
+    }
+
+    fn arm_cancel_on_table(&self, index: usize) {
+        self.cancel_table_index.store(index, Ordering::SeqCst);
+    }
+
+    fn arm_mutation_on_table(&self, index: usize) {
+        self.mutate_table_index.store(index, Ordering::SeqCst);
+    }
+
+    fn reset_revision(&self) {
+        self.revision.store(0, Ordering::SeqCst);
+    }
+}
+
+impl ReadAt for TablePayloadSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_error| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        let table_index = self
+            .table_ranges
+            .iter()
+            .position(|(start, finish)| offset < *finish && *start < end);
+        if let Some(table_index) = table_index {
+            self.table_payload_reads[table_index].fetch_add(1, Ordering::SeqCst);
+            if self
+                .cancel_table_index
+                .compare_exchange(table_index, usize::MAX, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+                && let Some(cancellation_source) = &self.cancellation_source
+            {
+                cancellation_source.cancel();
+            }
+            if self
+                .mutate_table_index
+                .compare_exchange(table_index, usize::MAX, Ordering::SeqCst, Ordering::SeqCst)
+                .is_ok()
+            {
+                self.revision.fetch_add(1, Ordering::SeqCst);
+            }
+        }
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x5442_4c45,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
+#[test]
+fn source_catalog_defers_table_payload_and_materializes_cross_sheet_reference() {
+    let (formula, rgce) = resident_table_formula(8);
+    let bytes = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "LocalTable"),
+            false,
+        )),
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(8, "SalesTable"),
+            false,
+        )),
+        Some(formula),
+    );
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &["xl/tables/table1.bin", "xl/tables/table2.bin"],
+        None,
+    ));
+    let cache_limits = SourceCacheLimits::new(1, 1).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new().cache_limits(cache_limits),
+    )
+    .unwrap();
+    assert_eq!(source.table_payload_reads(), 0);
+    let catalog = workbook.cache_diagnostics();
+    assert_eq!(catalog.cold_loads, 1);
+
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let worksheet = selected.materialize().unwrap();
+    assert!(source.table_payload_reads() > 0);
+    let cell = worksheet.get_cell(0, 0).unwrap();
+    assert!(matches!(
+        cell.value(),
+        CellValue::Formula { formula, .. } if formula == "SalesTable[[#Headers],[#Data],[Amount]]"
+    ));
+    assert_eq!(cell.cached_value(), Some(&CellValue::Float(42.0)));
+    assert_eq!(cell.formula_bytes(), Some(rgce.as_slice()));
+    assert_eq!(cell.raw_formula_bytes(), None);
+
+    let first = source.table_payload_reads();
+    let first_diagnostics = workbook.cache_diagnostics();
+    let first_semantic = workbook.semantic_cache_diagnostics();
+    selected.materialize().unwrap();
+    assert_eq!(source.table_payload_reads(), first);
+    let second_diagnostics = workbook.cache_diagnostics();
+    let second_semantic = workbook.semantic_cache_diagnostics();
+    assert_eq!(second_diagnostics.cold_loads, first_diagnostics.cold_loads);
+    assert!(second_semantic.hits > first_semantic.hits);
+    assert_eq!(second_diagnostics.retained_entries, 0);
+}
+
+#[test]
+fn selected_source_tables_do_not_parse_an_unselected_table_part() {
+    let source = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "LocalTable"),
+            false,
+        )),
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            vec![0xff; 8],
+            false,
+        )),
+        None,
+    );
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let tables = selected.tables().unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].display_name.as_deref(), Some("LocalTable"));
+}
+
+#[test]
+fn source_table_wrong_content_type_is_rejected_during_catalog_open() {
+    let source = table_workbook_source(
+        Some((
+            "application/octet-stream".to_owned(),
+            table_part_payload(7, "SalesTable"),
+            false,
+        )),
+        None,
+        None,
+    );
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))),
+        Err(PackageError::InvalidContentType { .. })
+    ));
+}
+
+#[test]
+fn source_malformed_and_duplicate_tables_fail_during_materialization() {
+    let malformed = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            malformed_table_part_payload(),
+            false,
+        )),
+        None,
+        None,
+    );
+    let malformed_workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(malformed))).unwrap();
+    let error = malformed_workbook
+        .worksheet_by_index(0)
+        .unwrap()
+        .unwrap()
+        .materialize()
+        .unwrap_err();
+    assert!(
+        matches!(error, PackageError::InvalidLength { .. }),
+        "unexpected malformed-table error: {error:?}"
+    );
+
+    for (first_id, first_name, second_id, second_name) in [
+        (7, "SalesTable", 7, "OtherTable"),
+        (7, "SalesTable", 8, "SalesTable"),
+    ] {
+        let duplicate = table_workbook_source(
+            Some((
+                "application/vnd.ms-excel.table".to_owned(),
+                table_part_payload(first_id, first_name),
+                false,
+            )),
+            Some((
+                "application/vnd.ms-excel.table".to_owned(),
+                table_part_payload(second_id, second_name),
+                false,
+            )),
+            None,
+        );
+        let duplicate_workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(duplicate))).unwrap();
+        assert!(matches!(
+            duplicate_workbook
+                .worksheet_by_index(0)
+                .unwrap()
+                .unwrap()
+                .materialize(),
+            Err(PackageError::InvalidFormula(_))
+        ));
+    }
+}
+
+#[test]
+fn source_table_cancellation_does_not_publish_partial_cache() {
+    let bytes = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "LocalTable"),
+            false,
+        )),
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(8, "SalesTable"),
+            false,
+        )),
+        None,
+    );
+    let (cancellation_source, context) = managed_context();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &["xl/tables/table1.bin", "xl/tables/table2.bin"],
+        Some(cancellation_source),
+    ));
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    source.arm_cancel_on_table(1);
+    assert_cancelled(selected.materialize());
+    assert!(source.table_payload_reads_for(0) > 0);
+    assert!(source.table_payload_reads_for(1) > 0);
+}
+
+#[test]
+fn source_table_mutation_does_not_publish_partial_cache_and_retry_succeeds() {
+    let (formula, _rgce) = resident_table_formula(8);
+    let bytes = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "LocalTable"),
+            false,
+        )),
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(8, "SalesTable"),
+            false,
+        )),
+        Some(formula),
+    );
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &["xl/tables/table1.bin", "xl/tables/table2.bin"],
+        None,
+    ));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    source.arm_mutation_on_table(1);
+    assert!(matches!(
+        selected.materialize(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    let failed_reads = source.table_payload_reads();
+    assert!(source.table_payload_reads_for(0) > 0);
+    assert!(source.table_payload_reads_for(1) > 0);
+    let failed_second_reads = source.table_payload_reads_for(1);
+
+    source.reset_revision();
+    let worksheet = selected.materialize().unwrap();
+    assert!(source.table_payload_reads() > failed_reads);
+    assert!(source.table_payload_reads_for(1) > failed_second_reads);
+    assert!(worksheet.get_cell(0, 0).unwrap().is_formula());
+}
+
+#[test]
+fn source_external_and_pivot_table_dependencies_remain_typed_refusals() {
+    let external = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "SalesTable"),
+            true,
+        )),
+        None,
+        None,
+    );
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(external))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+
+    let pivot = add_pivot_relationship(table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "SalesTable"),
+            false,
+        )),
+        None,
+        None,
+    ));
+    let pivot_workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(pivot))).unwrap();
+    assert!(matches!(
+        pivot_workbook
+            .worksheet_by_index(0)
+            .unwrap()
+            .unwrap()
+            .materialize(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+}
+
+#[test]
+fn source_external_link_catalog_is_payload_lazy_and_target_inert() {
+    let bytes = external_link_fixture();
+    let eager = Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+
+    assert_eq!(workbook.external_link_count().unwrap(), 1);
+    let links = workbook.external_links().unwrap();
+    assert_eq!(links.len(), 1);
+    assert_eq!(links[0].metadata(), eager.external_link(0).unwrap());
+    let worksheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let source_worksheet = worksheet.materialize().unwrap();
+    let eager_worksheet = eager.worksheet(0).unwrap();
+    let (min_row, min_column, max_row, max_column) = source_worksheet.dimensions().unwrap();
+    let mut formula_count = 0usize;
+    for row in min_row..=max_row {
+        for column in min_column..=max_column {
+            let Some(source_cell) = source_worksheet.get_cell(row - 1, column - 1) else {
+                continue;
+            };
+            if source_cell.is_formula() {
+                formula_count += 1;
+                let eager_cell = eager_worksheet.get_cell(row - 1, column - 1).unwrap();
+                assert_eq!(source_cell.value(), eager_cell.value());
+            }
+        }
+    }
+    assert!(formula_count > 0);
+}
+
+#[test]
+fn source_external_link_declared_size_is_lazily_bounded() {
+    let limits = ExternalLinkLimits::builder()
+        .max_part_bytes(0)
+        .max_total_part_bytes(0)
+        .build()
+        .unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(external_link_fixture())),
+        litchi_xlsb::OpenOptions::new().external_link_limits(limits),
+    )
+    .unwrap();
+
+    assert_eq!(workbook.external_link_count().unwrap(), 1);
+    let worksheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+    assert!(matches!(
+        worksheet.materialize(),
+        Err(PackageError::ExternalLinkLimitExceeded { .. })
+    ));
+}
+
+#[test]
+fn source_external_link_parts_share_one_aggregate_budget() {
+    let (bytes, part_bytes) = two_external_link_fixture();
+    let rejecting_limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes)
+        .build()
+        .unwrap();
+    let rejecting = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes.clone())),
+        litchi_xlsb::OpenOptions::new().external_link_limits(rejecting_limits),
+    )
+    .unwrap();
+    assert_eq!(rejecting.external_link_count().unwrap(), 2);
+    assert!(matches!(
+        rejecting.external_links(),
+        Err(PackageError::ExternalLinkLimitExceeded { .. })
+    ));
+
+    let exact_limits = ExternalLinkLimits::builder()
+        .max_part_bytes(part_bytes)
+        .max_total_part_bytes(part_bytes.checked_mul(2).unwrap())
+        .build()
+        .unwrap();
+    let exact = SourceBackedWorkbook::from_read_at_with_options(
+        Arc::new(OwnedSource::new(bytes)),
+        litchi_xlsb::OpenOptions::new().external_link_limits(exact_limits),
+    )
+    .unwrap();
+    let links = exact.external_links().unwrap();
+    assert_eq!(links.len(), 2);
+    assert_eq!(links[0].metadata(), links[1].metadata());
+}
+
+#[test]
+fn source_external_link_mutation_does_not_publish_partial_cache_and_retries() {
+    let (bytes, _) = two_external_link_fixture();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        None,
+    ));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    source.arm_mutation_on_table(1);
+    assert!(matches!(
+        workbook.external_links(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(source.table_payload_reads_for(0) > 0);
+    assert!(source.table_payload_reads_for(1) > 0);
+    let failed_first_reads = source.table_payload_reads_for(0);
+    let failed_second_reads = source.table_payload_reads_for(1);
+
+    source.reset_revision();
+    let links = workbook.external_links().unwrap();
+    assert_eq!(links.len(), 2);
+    assert_eq!(source.table_payload_reads_for(0), failed_first_reads);
+    assert!(source.table_payload_reads_for(1) > failed_second_reads);
+}
+
+#[test]
+fn source_external_link_second_part_cancellation_is_typed() {
+    let (bytes, _) = two_external_link_fixture();
+    let (cancellation_source, context) = managed_context();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        Some(cancellation_source),
+    ));
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
+        source.clone(),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
+    )
+    .unwrap();
+    source.arm_cancel_on_table(1);
+    assert_cancelled(workbook.external_links());
+    assert!(source.table_payload_reads_for(0) > 0);
+    assert!(source.table_payload_reads_for(1) > 0);
+}
+
+#[test]
+fn source_external_link_semantic_cache_survives_physical_eviction() {
+    let (bytes, _) = two_external_link_fixture();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        None,
+    ));
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::new(1, 1).unwrap(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+    assert_eq!(workbook.external_links().unwrap().len(), 2);
+    let first_reads = source.table_payload_reads_for(0);
+    let second_reads = source.table_payload_reads_for(1);
+    assert!(first_reads > 0);
+    assert!(second_reads > 0);
+
+    assert_eq!(workbook.external_links().unwrap().len(), 2);
+    assert_eq!(source.table_payload_reads_for(0), first_reads);
+    assert_eq!(source.table_payload_reads_for(1), second_reads);
+}
+
+#[test]
+fn source_external_link_owner_graph_is_validated_at_catalog_open() {
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
+
+    let mut wrong_relationship = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        SourceLimits::default(),
+    )
+    .unwrap();
+    let (relationship_id, target, external) = wrong_relationship
+        .get_part(&workbook_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            relationship
+                .target_partname()
+                .is_ok_and(|partname| partname == external_uri)
+                .then(|| {
+                    (
+                        relationship.r_id().to_owned(),
+                        relationship.target_ref().to_owned(),
+                        relationship.is_external(),
+                    )
+                })
+        })
+        .unwrap();
+    wrong_relationship
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .remove(&relationship_id)
+        .unwrap();
+    wrong_relationship
+        .get_part_mut(&workbook_uri)
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            relationship_type::STYLES.to_owned(),
+            target,
+            relationship_id,
+            external,
+        );
+    let mut bytes = Vec::new();
+    wrong_relationship.write_to(&mut bytes).unwrap();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+
+    let mut wrong_content = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        SourceLimits::default(),
+    )
+    .unwrap();
+    wrong_content
+        .get_part_mut(&external_uri)
+        .unwrap()
+        .set_content_type("application/octet-stream".to_owned())
+        .unwrap();
+    let mut bytes = Vec::new();
+    wrong_content.write_to(&mut bytes).unwrap();
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))),
+        Err(PackageError::InvalidContentType { .. })
+    ));
+}
+
+#[test]
+fn source_external_link_payload_failures_remain_deferred_and_typed() {
+    let external_uri = PackURI::new("/xl/externalLinks/externalLink1.bin").unwrap();
+
+    let mut malformed = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        SourceLimits::default(),
+    )
+    .unwrap();
+    malformed
+        .get_part_mut(&external_uri)
+        .unwrap()
+        .set_blob(vec![0]);
+    let mut bytes = Vec::new();
+    malformed.write_to(&mut bytes).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    assert!(matches!(
+        workbook.external_links(),
+        Err(PackageError::Wire(_))
+    ));
+
+    let mut missing_inner = OpcPackage::from_reader(
+        Cursor::new(external_link_fixture()),
+        SourceLimits::default(),
+    )
+    .unwrap();
+    let relationship_id = missing_inner
+        .get_part(&external_uri)
+        .unwrap()
+        .rels()
+        .iter()
+        .next()
+        .unwrap()
+        .r_id()
+        .to_owned();
+    missing_inner
+        .get_part_mut(&external_uri)
+        .unwrap()
+        .rels_mut()
+        .remove(&relationship_id)
+        .unwrap();
+    let mut bytes = Vec::new();
+    missing_inner.write_to(&mut bytes).unwrap();
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(bytes))).unwrap();
+    assert!(matches!(
+        workbook.external_links(),
+        Err(PackageError::InvalidFormula(_))
+    ));
+}
+
+#[test]
+fn source_external_link_successful_initialization_is_single_flight() {
+    let (bytes, _) = two_external_link_fixture();
+    let source = Arc::new(TablePayloadSource::new(
+        bytes,
+        &[
+            "xl/externalLinks/externalLink1.bin",
+            "xl/externalLinks/externalLink2.bin",
+        ],
+        None,
+    ));
+    let package = SourceBackedPackage::from_read_at(
+        source.clone(),
+        SourceLimits::default(),
+        SourceCacheLimits::new(1, 1).unwrap(),
+        litchi_opc::SourceReadPolicy::exact(),
+        None,
+    )
+    .unwrap();
+    let workbook = SourceBackedWorkbook::from_source_backed_package(package).unwrap();
+    let first = workbook.clone();
+    let second = workbook.clone();
+    let first = std::thread::spawn(move || first.external_links().unwrap().len());
+    let second = std::thread::spawn(move || second.external_links().unwrap().len());
+    assert_eq!(first.join().unwrap(), 2);
+    assert_eq!(second.join().unwrap(), 2);
+    assert_eq!(source.table_payload_reads_for(0), 1);
+    assert_eq!(source.table_payload_reads_for(1), 1);
+
+    assert_eq!(workbook.external_links().unwrap().len(), 2);
+    assert_eq!(source.table_payload_reads_for(0), 1);
+    assert_eq!(source.table_payload_reads_for(1), 1);
+}

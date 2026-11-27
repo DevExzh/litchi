@@ -1,0 +1,26 @@
+[package]
+name = "litchi-ods"
+description = "Layered OpenDocument Spreadsheet reader, model, and authoring API for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[dependencies]
+fast-float2 = { workspace = true }
+litchi-core = { workspace = true }
+litchi-odf-common = { workspace = true }
+phf = { workspace = true }
+quick-xml = { workspace = true }
+serde_json = { workspace = true }
+smallvec = { workspace = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+tempfile = { workspace = true }
+zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

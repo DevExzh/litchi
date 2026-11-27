@@ -1,0 +1,80 @@
+use litchi_odg::{Builder, Package, layer::Layer, page::Page};
+
+const COMPACT_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">"#,
+    r#"<office:body><office:drawing><text:p>compact</text:p></office:drawing></office:body>"#,
+    r#"</office:document-content>"#,
+);
+
+const NONCOMPACT_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" office:version="1.3">"#,
+    "\n<office:body><office:drawing/></office:body></office:document-content>",
+);
+
+const SEMANTIC_WHITESPACE_CONTENT: &str = concat!(
+    r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content "#,
+    r#"xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" "#,
+    r#"xmlns:text="urn:oasis:names:tc:opendocument:xmlns:text:1.0" office:version="1.3">"#,
+    "<office:body><office:drawing><text:p>line one\n  line two</text:p></office:drawing>",
+    "</office:body></office:document-content>",
+);
+
+#[test]
+fn focused_modules_are_the_canonical_semantic_api() {
+    assert_eq!(Page::new("Page 1").name(), Some("Page 1"));
+    assert_eq!(Layer::new("Foreground").name(), "Foreground");
+
+    let drawing = Builder::new().build().unwrap();
+    let reopened = Package::from_bytes(drawing.as_bytes()).unwrap();
+    assert_eq!(reopened.as_bytes(), drawing.as_bytes());
+    assert!(drawing.content_xml().contains("<office:drawing"));
+}
+
+#[test]
+fn compact_authored_content_is_published_without_rewriting() {
+    let drawing = Builder::new().content_xml(COMPACT_CONTENT).build().unwrap();
+    assert_eq!(drawing.content_xml(), COMPACT_CONTENT);
+}
+
+#[test]
+fn noncompact_authored_content_returns_a_typed_error() {
+    assert!(matches!(
+        Builder::new()
+            .content_xml(NONCOMPACT_CONTENT)
+            .build()
+            .unwrap_err(),
+        litchi_odg::Error::Core(litchi_core::Error::XmlCompactness {
+            kind: litchi_core::xml::CompactnessKind::FormattingWhitespace,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn semantic_whitespace_is_preserved_exactly() {
+    let drawing = Builder::new()
+        .content_xml(SEMANTIC_WHITESPACE_CONTENT)
+        .build()
+        .unwrap();
+    assert_eq!(drawing.content_xml(), SEMANTIC_WHITESPACE_CONTENT);
+}
+
+#[test]
+fn otg_templates_are_explicit_and_preserved_across_edits() {
+    let built = Builder::new().build_template().unwrap();
+    assert!(Package::from_bytes(built.as_bytes()).is_err());
+    let template = Package::from_template_bytes(built.as_bytes()).unwrap();
+    assert!(template.is_template());
+    let mut edit = template.edit();
+    edit.add_page(Page::new("Template page")).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.package().is_template());
+    assert_eq!(commit.package().pages()[0].name(), Some("Template page"));
+    let durable = commit.patch().durable().unwrap();
+    let reopened = durable.apply(&template).unwrap();
+    assert!(reopened.is_template());
+    assert_eq!(reopened.as_bytes(), commit.package().as_bytes());
+}

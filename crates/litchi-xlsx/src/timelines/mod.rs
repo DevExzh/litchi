@@ -1,0 +1,126 @@
+//! Layered `SpreadsheetML` timeline cache and worksheet timeline owners.
+//!
+//! Semantic values live in [`model`], bounded XML conversion in [`codec`],
+//! and OPC relationship/part ownership in [`package`]. The public contextual
+//! owner is [`crate::timeline`]; this module is a private grammar core used by
+//! that facade and the shared feature transaction implementation.
+
+mod codec;
+mod model;
+mod package;
+
+#[cfg(test)]
+mod tests;
+
+use crate::error::{Error, Result};
+
+pub(super) const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+pub(super) const STRICT_SML: &str = "http://purl.oclc.org/ooxml/spreadsheetml/main";
+pub(super) const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+pub(super) const STRICT_REL: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships";
+pub(super) const X15: &str = "http://schemas.microsoft.com/office/spreadsheetml/2010/11/main";
+pub(super) const XR10: &str = "http://schemas.microsoft.com/office/spreadsheetml/2016/revision10";
+
+pub const TIMELINE_CACHE_CONTENT_TYPE: &str = "application/vnd.ms-excel.timelineCache+xml";
+pub const TIMELINE_CACHE_RELATIONSHIP_TYPE: &str =
+    "http://schemas.microsoft.com/office/2011/relationships/timelineCache";
+pub const TIMELINES_CONTENT_TYPE: &str = "application/vnd.ms-excel.timeline+xml";
+pub const TIMELINES_RELATIONSHIP_TYPE: &str =
+    "http://schemas.microsoft.com/office/2011/relationships/timeline";
+
+// Native Excel uses the 2011/lowercase spellings. Keep the documented 2010
+// spellings, also emitted by earlier Litchi versions, as exact read aliases.
+fn is_cache_relationship(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINE_CACHE_RELATIONSHIP_TYPE
+            | "http://schemas.microsoft.com/office/2010/relationships/TimelineCache"
+    )
+}
+fn is_views_relationship(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINES_RELATIONSHIP_TYPE
+            | "http://schemas.microsoft.com/office/2010/relationships/Timeline"
+    )
+}
+fn is_cache_content(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINE_CACHE_CONTENT_TYPE | "application/vnd.ms-excel.TimelineCache+xml"
+    )
+}
+fn is_views_content(value: &str) -> bool {
+    matches!(
+        value,
+        TIMELINES_CONTENT_TYPE | "application/vnd.ms-excel.Timeline+xml"
+    )
+}
+pub const TIMELINE_CACHE_EXTENSION_URI: &str = "{D0CA8CA8-9F24-4464-BF8E-62219DCF47F9}";
+pub const TIMELINES_EXTENSION_URI: &str = "{7E03D99C-DC04-49d9-9315-930204A7B6E9}";
+
+pub(super) const MAX_XML_BYTES: usize = 16 * 1024 * 1024;
+pub(super) const MAX_REWRITE_BYTES: usize = 32 * 1024 * 1024;
+pub(super) const MAX_OPAQUE_BYTES: usize = 4 * 1024 * 1024;
+pub(super) const MAX_TOTAL_OPAQUE_BYTES: usize = 16 * 1024 * 1024;
+pub(super) const MAX_STRING_BYTES: usize = 1024 * 1024;
+pub(super) const MAX_NODES: usize = 250_000;
+pub(super) const MAX_DEPTH: usize = 128;
+pub(super) const MAX_CACHES: usize = 4096;
+pub(super) const MAX_TIMELINES: usize = 16_384;
+pub(super) const MAX_PIVOT_TABLES: usize = 65_536;
+
+pub(super) fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+
+pub(super) fn limit(name: &str) -> Error {
+    invalid(format!("Timeline {name} limit exceeded"))
+}
+
+pub(super) fn xml_error(error: impl std::fmt::Display) -> Error {
+    Error::Xml(litchi_ooxml_common::XmlError::Malformed(error.to_string()))
+}
+
+pub(super) fn bounded(value: &str, name: &str) -> Result<()> {
+    if value.len() <= MAX_STRING_BYTES {
+        Ok(())
+    } else {
+        Err(limit(name))
+    }
+}
+
+pub(super) fn bounded_nonempty(value: &str, name: &str) -> Result<()> {
+    if value.is_empty() {
+        return Err(invalid(format!("{name} cannot be empty")));
+    }
+    bounded(value, name)
+}
+
+pub use codec::{
+    parse_timeline_cache_definition, parse_timelines, write_timeline_cache_definition,
+    write_timelines,
+};
+
+pub(crate) fn write_timeline_cache_definition_limited(
+    value: &CacheDefinition,
+    maximum: usize,
+) -> Result<Vec<u8>> {
+    codec::write_timeline_cache_definition_limited(value, maximum)
+}
+
+pub(crate) fn write_timelines_limited(value: &Views, maximum: usize) -> Result<Vec<u8>> {
+    codec::write_timelines_limited(value, maximum)
+}
+pub use model::{
+    Cache, CacheDefinition, CachePivotTable, FilterType, Level, OpaqueXml, Part, PivotFilter,
+    Range, State, View, Views,
+};
+pub use package::{load_timeline_caches, load_timelines};
+pub(crate) use package::{
+    load_timeline_caches_limited, load_timelines_limited, store_timeline_caches,
+    store_timeline_caches_limited, store_timeline_caches_prepared_limited,
+    store_timeline_caches_prepared_limited_with_budget, store_worksheet_timelines,
+    store_worksheet_timelines_limited, store_worksheet_timelines_prepared_limited,
+    store_worksheet_timelines_prepared_limited_with_budget,
+};

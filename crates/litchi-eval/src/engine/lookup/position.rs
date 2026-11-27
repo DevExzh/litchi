@@ -4,7 +4,7 @@ use litchi_core::sheet::{CellValue, Result};
 use super::super::{EvalCtx, flatten_range_expr};
 use super::helpers::{ReferenceLookup, first_cell_from_expr};
 
-pub(crate) async fn eval_column(
+pub(crate) fn eval_column(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -25,7 +25,7 @@ pub(crate) async fn eval_column(
             },
         }
     } else {
-        match first_cell_from_expr(ctx, current_sheet, &args[0]).await? {
+        match first_cell_from_expr(ctx, current_sheet, &args[0])? {
             ReferenceLookup::Point((_row, col)) => col,
             ReferenceLookup::NameError(msg) => {
                 return Ok(CellValue::Error(msg));
@@ -41,11 +41,7 @@ pub(crate) async fn eval_column(
     Ok(CellValue::Int(col as i64))
 }
 
-pub(crate) async fn eval_row(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_row(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() > 1 {
         return Ok(CellValue::Error(
             "ROW expects at most 1 argument".to_string(),
@@ -62,7 +58,7 @@ pub(crate) async fn eval_row(
             },
         }
     } else {
-        match first_cell_from_expr(ctx, current_sheet, &args[0]).await? {
+        match first_cell_from_expr(ctx, current_sheet, &args[0])? {
             ReferenceLookup::Point((row, _col)) => row,
             ReferenceLookup::NameError(msg) => {
                 return Ok(CellValue::Error(msg));
@@ -78,22 +74,18 @@ pub(crate) async fn eval_row(
     Ok(CellValue::Int(row as i64))
 }
 
-pub(crate) async fn eval_rows(
-    ctx: EvalCtx<'_>,
-    current_sheet: &str,
-    args: &[Expr],
-) -> Result<CellValue> {
+pub(crate) fn eval_rows(ctx: EvalCtx<'_>, current_sheet: &str, args: &[Expr]) -> Result<CellValue> {
     if args.len() != 1 {
         return Ok(CellValue::Error(
             "ROWS expects exactly 1 argument (array)".to_string(),
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
     Ok(CellValue::Int(range.rows as i64))
 }
 
-pub(crate) async fn eval_columns(
+pub(crate) fn eval_columns(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     args: &[Expr],
@@ -104,7 +96,7 @@ pub(crate) async fn eval_columns(
         ));
     }
 
-    let range = flatten_range_expr(ctx, current_sheet, &args[0]).await?;
+    let range = flatten_range_expr(ctx, current_sheet, &args[0])?;
     Ok(CellValue::Int(range.cols as i64))
 }
 
@@ -133,8 +125,8 @@ mod tests {
         })
     }
 
-    #[tokio::test]
-    async fn test_eval_column_with_reference() {
+    #[test]
+    fn test_eval_column_with_reference() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -143,12 +135,12 @@ mod tests {
 
         // COLUMN() without args should return current column (3)
         let args: Vec<Expr> = vec![];
-        let result = eval_column(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_column(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(3));
     }
 
-    #[tokio::test]
-    async fn test_eval_row_with_reference() {
+    #[test]
+    fn test_eval_row_with_reference() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -157,12 +149,12 @@ mod tests {
 
         // ROW() without args should return current row (5)
         let args: Vec<Expr> = vec![];
-        let result = eval_row(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_row(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(5));
     }
 
-    #[tokio::test]
-    async fn test_eval_rows() {
+    #[test]
+    fn test_eval_rows() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -178,12 +170,12 @@ mod tests {
 
         // ROWS(Sheet1!A1:B3) should return 3
         let args = vec![range_expr("Sheet1", 1, 1, 3, 2)];
-        let result = eval_rows(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rows(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(3));
     }
 
-    #[tokio::test]
-    async fn test_eval_columns() {
+    #[test]
+    fn test_eval_columns() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
@@ -199,30 +191,30 @@ mod tests {
 
         // COLUMNS(Sheet1!A1:C2) should return 3
         let args = vec![range_expr("Sheet1", 1, 1, 2, 3)];
-        let result = eval_columns(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_columns(ctx, "Sheet1", &args).unwrap();
         assert_eq!(result, CellValue::Int(3));
     }
 
-    #[tokio::test]
-    async fn test_eval_rows_wrong_args() {
+    #[test]
+    fn test_eval_rows_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args = vec![num_expr(1.0), num_expr(2.0)];
-        let result = eval_rows(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_rows(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects exactly 1")),
             _ => panic!("Expected Error"),
         }
     }
 
-    #[tokio::test]
-    async fn test_eval_columns_wrong_args() {
+    #[test]
+    fn test_eval_columns_wrong_args() {
         let engine = TestEngine::new();
         let ctx = engine.ctx();
 
         let args: Vec<Expr> = vec![];
-        let result = eval_columns(ctx, "Sheet1", &args).await.unwrap();
+        let result = eval_columns(ctx, "Sheet1", &args).unwrap();
         match result {
             CellValue::Error(e) => assert!(e.contains("expects exactly 1")),
             _ => panic!("Expected Error"),

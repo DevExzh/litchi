@@ -1,0 +1,1395 @@
+use litchi_core::Position;
+use litchi_rtf::edit::{CompositionError, DurableComposition, DurableMergePlan, MergeResolution};
+use litchi_rtf::{
+    Alignment, CharacterBaseline, EditOptions, Package, SemanticLimits, UnderlineStyle,
+    edit::TextSpan,
+};
+use std::num::NonZeroU16;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
+
+fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
+    litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(0, 0, 0),
+        1024 * 1024,
+        max_operations,
+        8,
+        64 * 1024,
+        256 * 1024,
+    )
+}
+
+fn reversible_payload_limits() -> litchi_core::patch::PatchLimits {
+    litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(0, 0, 0),
+        300_000,
+        8,
+        8,
+        256 * 1024,
+        256 * 1024,
+    )
+}
+
+fn replace(
+    source: &Package,
+    span: TextSpan,
+    value: &str,
+    max_operations: usize,
+) -> litchi_core::patch::Patch<litchi_core::patch::Reversible> {
+    let mut edit = source.edit();
+    edit.replace_text(span, value).unwrap();
+    edit.commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(max_operations))
+        .unwrap()
+}
+
+#[test]
+fn durable_composition_replays_outline_and_composes_disjoint_or_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut outline_edit = source.edit();
+    outline_edit
+        .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let outline = outline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(outline.operations()[0].op, "character-outline.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(outline.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    assert!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .outline()
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .outline()
+    );
+
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(restored.body().runs().all(|run| !run.format().outline()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut overlapping_edit = source.edit();
+    overlapping_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping = overlapping_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(outline).unwrap();
+    assert!(matches!(
+        overlap.join(overlapping),
+        Err(CompositionError::Conflicts(_))
+    ));
+}
+
+#[test]
+fn disjoint_durable_join_replays_and_derives_combined_inverse() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 8);
+    let second = replace(&source, TextSpan::new(6, 12).unwrap(), "Bravo", 8);
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(first).unwrap();
+    composition.join(second).unwrap();
+    let combined = composition.finish().unwrap();
+    let target = source.apply_durable(&combined).unwrap().into_package();
+    assert_eq!(target.text(), "Alpha Bravo");
+    let restored = target
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+}
+
+#[test]
+fn durable_join_is_order_independent_and_rejects_unequal_character_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 8);
+    let second = replace(&source, TextSpan::new(6, 12).unwrap(), "Bravo", 8);
+
+    let mut forward = DurableComposition::new(&source, limits(8));
+    forward.join(first.clone()).unwrap();
+    forward.join(second.clone()).unwrap();
+    let mut reverse = DurableComposition::new(&source, limits(8));
+    reverse.join(second).unwrap();
+    reverse.join(first).unwrap();
+    assert_eq!(
+        forward.finish().unwrap().to_deterministic_json().unwrap(),
+        reverse.finish().unwrap().to_deterministic_json().unwrap()
+    );
+
+    let mut bold = source.edit();
+    bold.set_text_bold(TextSpan::new(0, 7).unwrap(), true)
+        .unwrap();
+    let bold = bold
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut italic = source.edit();
+    italic
+        .set_text_italic(TextSpan::new(6, 12).unwrap(), true)
+        .unwrap();
+    let italic = italic
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut character = DurableComposition::new(&source, limits(8));
+    character.join(bold.clone()).unwrap();
+    let formatting = character.finish().unwrap();
+    let formatted = source.apply_durable(&formatting).unwrap().into_package();
+    let inverse = formatting.inverse();
+    let formatted_bytes = formatted.to_bytes().unwrap();
+    let formatted_hash = litchi_core::patch::BlobId::of(&formatted_bytes).as_hex();
+    assert!(inverse.operations().iter().all(|operation| {
+        operation
+            .preconditions
+            .get("artifact_sha256")
+            .and_then(serde_json::Value::as_str)
+            == Some(formatted_hash.as_str())
+    }));
+    let restored = formatted.apply_durable(&inverse).unwrap().into_package();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| !run.format().bold()));
+
+    let mut character = DurableComposition::new(&source, limits(8));
+    character.join(bold).unwrap();
+    assert!(character.join(italic).is_err());
+}
+
+#[test]
+fn durable_composition_replays_and_inverts_exact_underline_styles() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::DoubleWave)
+        .unwrap();
+    let branch = edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(branch.operations()[0].op, "character-underline.set");
+    assert_eq!(
+        branch.operations()[0].value,
+        serde_json::Value::String("double-wave".into())
+    );
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(branch).unwrap();
+    let combined = composition.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::DoubleWave
+    );
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| { run.format().underline() == UnderlineStyle::None })
+    );
+
+    let mut invalid_edit = source.edit();
+    invalid_edit
+        .set_text_underline(TextSpan::new(7, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let invalid_branch = invalid_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(combined).unwrap();
+    assert!(composition.join(invalid_branch).is_err());
+}
+
+#[test]
+fn durable_composition_replays_strike_and_composes_disjoint_or_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut strike_edit = source.edit();
+    strike_edit
+        .set_text_strike(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let strike = strike_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(strike.operations()[0].op, "character-strike.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(strike.clone()).unwrap();
+    disjoint.join(underline.clone()).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    assert!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .strike()
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(restored.body().runs().all(|run| !run.format().strike()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(strike).unwrap();
+    let mut overlapping_underline = source.edit();
+    overlapping_underline
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
+fn durable_composition_replays_hidden_and_composes_disjoint_or_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut hidden_edit = source.edit();
+    hidden_edit
+        .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let hidden = hidden_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(hidden.operations()[0].op, "character-hidden.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(hidden.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    assert!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .hidden()
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(restored.body().runs().all(|run| !run.format().hidden()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(hidden).unwrap();
+    let mut overlapping_underline_edit = source.edit();
+    overlapping_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
+fn durable_composition_replays_small_caps_and_composes_disjoint_or_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut small_caps_edit = source.edit();
+    small_caps_edit
+        .set_text_small_caps(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let small_caps = small_caps_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(small_caps.operations()[0].op, "character-small-caps.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(small_caps.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    assert!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .small_caps()
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(restored.body().runs().all(|run| !run.format().small_caps()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(small_caps).unwrap();
+    let mut overlapping_edit = source.edit();
+    overlapping_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping = overlapping_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping).is_err());
+}
+
+#[test]
+fn durable_composition_replays_all_caps_and_composes_disjoint_or_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut all_caps_edit = source.edit();
+    all_caps_edit
+        .set_text_all_caps(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let all_caps = all_caps_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(all_caps.operations()[0].op, "character-all-caps.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(all_caps.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    let all_caps_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().all_caps())
+        .map(|run| run.text())
+        .collect::<String>();
+    let underlined_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().underline() == UnderlineStyle::Single)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(all_caps_text.contains("First"));
+    assert!(!all_caps_text.contains("Second"));
+    assert!(underlined_text.contains("Second"));
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| !run.format().all_caps()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(all_caps).unwrap();
+    let mut overlapping_underline_edit = source.edit();
+    overlapping_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
+fn durable_composition_replays_double_strike_and_composes_disjoint_or_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi\strike First Second}").unwrap();
+    let mut double_strike_edit = source.edit();
+    double_strike_edit
+        .set_text_double_strike(TextSpan::new(0, 5).unwrap(), true)
+        .unwrap();
+    let double_strike = double_strike_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(
+        double_strike.operations()[0].op,
+        "character-double-strike.set"
+    );
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(double_strike.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    let double_strike_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().double_strike())
+        .map(|run| run.text())
+        .collect::<String>();
+    let single_strike_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().strike())
+        .map(|run| run.text())
+        .collect::<String>();
+    let underlined_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().underline() == UnderlineStyle::Single)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(double_strike_text.contains("First"));
+    assert!(!double_strike_text.contains("Second"));
+    assert!(single_strike_text.contains("First"));
+    assert!(single_strike_text.contains("Second"));
+    assert!(underlined_text.contains("Second"));
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| run.format().strike()));
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| !run.format().double_strike())
+    );
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(double_strike).unwrap();
+    let mut overlapping_underline_edit = source.edit();
+    overlapping_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
+fn durable_join_preflights_combined_reversible_payload_before_mutation() {
+    let left_text = "a".repeat(100_000);
+    let right_text = "b".repeat(100_000);
+    let input = format!(r"{{\rtf1\ansi {} {}}}", left_text, right_text);
+    let source = Package::parse(&input).unwrap();
+    let second_start = left_text.len().saturating_add(1);
+    let first = {
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
+        edit.replace_text(TextSpan::new(0, left_text.len()).unwrap(), "A")
+            .unwrap();
+        edit.commit()
+            .unwrap()
+            .patch()
+            .to_durable(reversible_payload_limits())
+            .unwrap()
+    };
+    let second = {
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
+        edit.replace_text(
+            TextSpan::new(second_start, second_start.saturating_add(right_text.len())).unwrap(),
+            "B",
+        )
+        .unwrap();
+        edit.commit()
+            .unwrap()
+            .patch()
+            .to_durable(reversible_payload_limits())
+            .unwrap()
+    };
+    let mut composition = DurableComposition::new(&source, reversible_payload_limits());
+    composition.join(first).unwrap();
+    assert!(composition.join(second).is_err());
+    assert_eq!(composition.len(), 1);
+}
+
+#[test]
+fn durable_inverse_projects_formatting_through_longer_and_shorter_replacements() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    for (replacement, expected_text, bold) in
+        [("Longer", "Longer Second", true), ("X", "X Second", false)]
+    {
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(4)));
+        edit.replace_text(TextSpan::new(0, 5).unwrap(), replacement)
+            .unwrap();
+        if bold {
+            edit.set_text_bold(TextSpan::new(6, 12).unwrap(), true)
+                .unwrap();
+        } else {
+            edit.set_text_italic(TextSpan::new(6, 12).unwrap(), true)
+                .unwrap();
+        }
+        let patch = edit
+            .commit()
+            .unwrap()
+            .patch()
+            .to_durable(limits(8))
+            .unwrap();
+
+        let mut composition = DurableComposition::new(&source, limits(8));
+        composition.join(patch).unwrap();
+        let combined = composition.finish().unwrap();
+        let target = source.apply_durable(&combined).unwrap().into_package();
+        assert_eq!(target.text(), expected_text);
+        let restored = target
+            .apply_durable(&combined.inverse())
+            .unwrap()
+            .into_package();
+        assert_eq!(restored.text(), source.text());
+        if bold {
+            assert!(restored.body().runs().all(|run| !run.format().bold()));
+        } else {
+            assert!(restored.body().runs().all(|run| !run.format().italic()));
+        }
+    }
+}
+
+#[test]
+fn durable_three_way_requires_explicit_choice_and_refuses_stale_or_foreign() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let left_patch = replace(&source, TextSpan::new(0, 5).unwrap(), "Left", 8);
+    let right_patch = replace(&source, TextSpan::new(0, 5).unwrap(), "Right", 8);
+    let mut left = DurableComposition::new(&source, limits(8));
+    left.join(left_patch.clone()).unwrap();
+    let mut right = DurableComposition::new(&source, limits(8));
+    right.join(right_patch).unwrap();
+    let mut plan = DurableMergePlan::new(left, right).unwrap();
+    assert_eq!(plan.conflicts().len(), 1);
+    plan = *plan.finish().unwrap_err();
+    plan.resolve(MergeResolution::Right);
+    let merged = plan.finish().unwrap().finish().unwrap();
+    let result = source.apply_durable(&merged).unwrap().into_package();
+    assert_eq!(result.text(), "Right Second");
+
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
+    assert!(matches!(
+        foreign.apply_durable(&merged),
+        Err(litchi_rtf::edit::Error::PatchConflict)
+    ));
+}
+
+#[test]
+fn durable_join_respects_combined_operation_limit_without_publishing() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let first = replace(&source, TextSpan::new(0, 5).unwrap(), "Alpha", 1);
+    let second = replace(&source, TextSpan::new(6, 12).unwrap(), "Bravo", 1);
+    let mut composition = DurableComposition::new(&source, limits(1));
+    composition.join(first).unwrap();
+    assert!(composition.join(second).is_err());
+    assert_eq!(composition.len(), 1);
+    assert!(source.to_bytes().is_ok());
+}
+
+#[test]
+fn durable_replay_uses_the_exact_patch_operation_limit() {
+    const OPERATION_COUNT: usize = 257;
+    let input = format!(r"{{\rtf1\ansi {}}}", "a".repeat(OPERATION_COUNT));
+    let source = Package::parse(&input).unwrap();
+    let mut edit = source
+        .edit_with_options(EditOptions::new().semantic_limits(semantic_limits(OPERATION_COUNT)));
+    for position in 0..OPERATION_COUNT {
+        edit.replace_text(TextSpan::new(position, position + 1).unwrap(), "b")
+            .unwrap();
+    }
+    let patch = edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(OPERATION_COUNT))
+        .unwrap();
+    let target = source.apply_durable(&patch).unwrap().into_package();
+    assert_eq!(target.text(), "b".repeat(OPERATION_COUNT));
+    let restored = target
+        .apply_durable(&patch.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+}
+
+#[test]
+fn empty_body_boundary_group_still_compares_alignment_conflicts() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut left_edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
+    left_edit
+        .replace_text(TextSpan::new(5, 5).unwrap(), "Inserted")
+        .unwrap();
+    left_edit
+        .set_paragraph_alignment(Position::new(0), Alignment::Right)
+        .unwrap();
+    let left_patch = left_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(4))
+        .unwrap();
+
+    let mut right_edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
+    right_edit
+        .replace_text(TextSpan::new(0, 5).unwrap(), "Alpha")
+        .unwrap();
+    right_edit
+        .set_paragraph_alignment(Position::new(0), Alignment::Right)
+        .unwrap();
+    let right_patch = right_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(4))
+        .unwrap();
+
+    let mut left = DurableComposition::new(&source, limits(4));
+    left.join(left_patch).unwrap();
+    let mut right = DurableComposition::new(&source, limits(4));
+    right.join(right_patch).unwrap();
+    let mut plan = DurableMergePlan::new(left, right).unwrap();
+    assert!(!plan.conflicts().is_empty());
+    plan = *plan.finish().unwrap_err();
+    plan.resolve(MergeResolution::Left);
+    let merged = plan.finish().unwrap().finish().unwrap();
+    let result = source.apply_durable(&merged).unwrap().into_package();
+    assert_eq!(result.text(), "FirstInserted Second");
+    assert_eq!(
+        result
+            .body()
+            .paragraphs()
+            .next()
+            .unwrap()
+            .format()
+            .alignment(),
+        Alignment::Right
+    );
+}
+
+#[test]
+fn durable_positioning_schema_replays_inverses_and_rejects_stale_or_malformed() {
+    let source = Package::parse(r"{\rtf1\ansi\super First Second Third}").unwrap();
+    let mut edit = source.edit();
+    edit.set_text_expansion(
+        TextSpan::new(0, 5).unwrap(),
+        litchi_rtf::CharacterExpansion::Twips(-12),
+    )
+    .unwrap();
+    edit.set_text_horizontal_scale_percent(TextSpan::new(6, 12).unwrap(), 80)
+        .unwrap();
+    edit.set_text_kerning(TextSpan::new(13, 18).unwrap(), 8)
+        .unwrap();
+    let durable = edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    assert_eq!(durable.operations().len(), 3);
+    assert_eq!(durable.operations()[0].op, "character-expansion.set");
+    assert_eq!(
+        durable.operations()[0].preconditions["expansion"],
+        serde_json::json!("none")
+    );
+    assert_eq!(
+        durable.operations()[0].value,
+        serde_json::json!("twips:-12")
+    );
+    assert_eq!(durable.operations()[1].op, "character-horizontal-scale.set");
+    assert_eq!(
+        durable.operations()[1].preconditions["horizontal_scale_percent"],
+        serde_json::json!(100)
+    );
+    assert_eq!(durable.operations()[1].value, serde_json::json!(80));
+    assert_eq!(durable.operations()[2].op, "character-kerning.set");
+    assert_eq!(
+        durable.operations()[2].preconditions["kerning_half_points"],
+        serde_json::json!(0)
+    );
+    assert_eq!(durable.operations()[2].value, serde_json::json!(8));
+
+    let formatted = source.apply_durable(&durable).unwrap().into_package();
+    let first = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(
+        first.format().expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(first.format().baseline(), CharacterBaseline::Superscript);
+    let second = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Second"))
+        .unwrap();
+    assert_eq!(second.format().horizontal_scale_percent(), 80);
+    assert_eq!(second.format().baseline(), CharacterBaseline::Superscript);
+    let third = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Third"))
+        .unwrap();
+    assert_eq!(third.format().kerning_half_points(), 8);
+    assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
+
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text().contains("First"))
+            .unwrap()
+            .format()
+            .expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text().contains("Second"))
+            .unwrap()
+            .format()
+            .horizontal_scale_percent(),
+        80
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text().contains("Third"))
+            .unwrap()
+            .format()
+            .kerning_half_points(),
+        8
+    );
+
+    let restored = formatted
+        .apply_durable(&durable.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| {
+        run.format().expansion() == litchi_rtf::CharacterExpansion::None
+            && run.format().horizontal_scale_percent() == 100
+            && run.format().kerning_half_points() == 0
+            && run.format().baseline() == CharacterBaseline::Superscript
+    }));
+
+    let wire: serde_json::Value =
+        serde_json::from_slice(&durable.to_deterministic_json().unwrap()).unwrap();
+    let mut stale_wire = wire.clone();
+    stale_wire["operations"][0]["forward"]["preconditions"]["expansion"] =
+        serde_json::json!("twips:2");
+    let stale_bytes = serde_json::to_vec(&stale_wire).unwrap();
+    let stale =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &stale_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale),
+        Err(litchi_rtf::edit::Error::StalePrecondition(_))
+    ));
+
+    let mut stale_scale_wire = wire.clone();
+    stale_scale_wire["operations"][1]["forward"]["preconditions"]["horizontal_scale_percent"] =
+        serde_json::json!(99);
+    let stale_scale_bytes = serde_json::to_vec(&stale_scale_wire).unwrap();
+    let stale_scale =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &stale_scale_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale_scale),
+        Err(litchi_rtf::edit::Error::StalePrecondition(_))
+    ));
+
+    let mut stale_kerning_wire = wire.clone();
+    stale_kerning_wire["operations"][2]["forward"]["preconditions"]["kerning_half_points"] =
+        serde_json::json!(7);
+    let stale_kerning_bytes = serde_json::to_vec(&stale_kerning_wire).unwrap();
+    let stale_kerning =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &stale_kerning_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&stale_kerning),
+        Err(litchi_rtf::edit::Error::StalePrecondition(_))
+    ));
+
+    let mut malformed_wire = wire.clone();
+    malformed_wire["operations"][0]["forward"]["value"] = serde_json::json!("twips:invalid");
+    let malformed_bytes = serde_json::to_vec(&malformed_wire).unwrap();
+    let malformed =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed),
+        Err(litchi_rtf::edit::Error::DurablePatch(_))
+    ));
+
+    let mut malformed_scale_wire = wire.clone();
+    malformed_scale_wire["operations"][1]["forward"]["value"] = serde_json::json!(0);
+    let malformed_scale_bytes = serde_json::to_vec(&malformed_scale_wire).unwrap();
+    let malformed_scale =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_scale_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed_scale),
+        Err(litchi_rtf::edit::Error::DurablePatch(_))
+    ));
+
+    let mut malformed_kerning_wire = wire;
+    malformed_kerning_wire["operations"][2]["forward"]["value"] = serde_json::json!(32768);
+    let malformed_kerning_bytes = serde_json::to_vec(&malformed_kerning_wire).unwrap();
+    let malformed_kerning =
+        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+            &malformed_kerning_bytes,
+            limits(8),
+        )
+        .unwrap();
+    assert!(matches!(
+        source.apply_durable(&malformed_kerning),
+        Err(litchi_rtf::edit::Error::DurablePatch(_))
+    ));
+}
+
+#[test]
+fn durable_composition_replays_disjoint_positioning_and_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi\super\kerning2 First Second Third}").unwrap();
+    let mut expansion_edit = source.edit();
+    expansion_edit
+        .set_text_expansion(
+            TextSpan::new(0, 5).unwrap(),
+            litchi_rtf::CharacterExpansion::Twips(-12),
+        )
+        .unwrap();
+    let expansion = expansion_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut scale_edit = source.edit();
+    scale_edit
+        .set_text_horizontal_scale_percent(TextSpan::new(6, 12).unwrap(), 80)
+        .unwrap();
+    let scale = scale_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut kerning_edit = source.edit();
+    kerning_edit
+        .set_text_kerning(TextSpan::new(13, 18).unwrap(), 8)
+        .unwrap();
+    let kerning = kerning_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(expansion.clone()).unwrap();
+    composition.join(scale).unwrap();
+    composition.join(kerning).unwrap();
+    let combined = composition.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    let first = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("First"))
+        .unwrap();
+    assert_eq!(
+        first.format().expansion(),
+        litchi_rtf::CharacterExpansion::Twips(-12)
+    );
+    assert_eq!(first.format().baseline(), CharacterBaseline::Superscript);
+    assert_eq!(first.format().kerning_half_points(), 2);
+    let second = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Second"))
+        .unwrap();
+    assert_eq!(second.format().horizontal_scale_percent(), 80);
+    assert_eq!(second.format().baseline(), CharacterBaseline::Superscript);
+    assert_eq!(second.format().kerning_half_points(), 2);
+    let third = formatted
+        .body()
+        .runs()
+        .find(|run| run.text().contains("Third"))
+        .unwrap();
+    assert_eq!(third.format().kerning_half_points(), 8);
+    assert_eq!(third.format().baseline(), CharacterBaseline::Superscript);
+
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert_eq!(restored.text(), source.text());
+    assert!(restored.body().runs().all(|run| {
+        run.format().expansion() == litchi_rtf::CharacterExpansion::None
+            && run.format().horizontal_scale_percent() == 100
+            && run.format().kerning_half_points() == 2
+            && run.format().baseline() == CharacterBaseline::Superscript
+    }));
+
+    let mut overlap_edit = source.edit();
+    overlap_edit
+        .set_text_kerning(TextSpan::new(0, 5).unwrap(), 8)
+        .unwrap();
+    let overlap_patch = overlap_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(expansion).unwrap();
+    assert!(overlap.join(overlap_patch).is_err());
+}
+
+#[test]
+fn durable_composition_replays_font_size_with_disjoint_facets_and_rejects_overlap() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut size_edit = source.edit();
+    size_edit
+        .set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
+        .unwrap();
+    let size = size_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(size.operations()[0].op, "character-font-size.set");
+    assert_eq!(
+        size.operations()[0].preconditions["font_size_half_points"],
+        serde_json::Value::Number(serde_json::Number::from(24_u64))
+    );
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut composition = DurableComposition::new(&source, limits(8));
+    composition.join(size.clone()).unwrap();
+    composition.join(underline.clone()).unwrap();
+    let combined = composition.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    let size_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().size().get() == 23)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(size_text.contains("First"));
+    let underlined_text = formatted
+        .body()
+        .runs()
+        .filter(|run| run.format().underline() == UnderlineStyle::Single)
+        .map(|run| run.text())
+        .collect::<String>();
+    assert!(underlined_text.contains("Second"));
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().size().get() == 24)
+    );
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+    let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened_restored.text(), source.text());
+
+    let mut overlapping_underline_edit = source.edit();
+    overlapping_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let overlapping_underline = overlapping_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(size).unwrap();
+    assert!(overlap.join(overlapping_underline).is_err());
+}
+
+#[test]
+fn durable_composition_replays_baseline_and_rejects_overlapping_baseline_edits() {
+    let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let mut baseline_edit = source.edit();
+    baseline_edit
+        .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
+        .unwrap();
+    let baseline = baseline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    assert_eq!(baseline.operations()[0].op, "character-baseline.set");
+
+    let mut underline_edit = source.edit();
+    underline_edit
+        .set_text_underline(TextSpan::new(6, 12).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let underline = underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+
+    let mut disjoint = DurableComposition::new(&source, limits(8));
+    disjoint.join(baseline.clone()).unwrap();
+    disjoint.join(underline).unwrap();
+    let combined = disjoint.finish().unwrap();
+    let formatted = source.apply_durable(&combined).unwrap().into_package();
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .baseline(),
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        formatted
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let reopened = Package::from_bytes(&formatted.to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), source.text());
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "First")
+            .unwrap()
+            .format()
+            .baseline(),
+        CharacterBaseline::Superscript
+    );
+    assert_eq!(
+        reopened
+            .body()
+            .runs()
+            .find(|run| run.text() == "Second")
+            .unwrap()
+            .format()
+            .underline(),
+        UnderlineStyle::Single
+    );
+    let restored = formatted
+        .apply_durable(&combined.inverse())
+        .unwrap()
+        .into_package();
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().baseline() == CharacterBaseline::Normal)
+    );
+    assert!(
+        restored
+            .body()
+            .runs()
+            .all(|run| run.format().underline() == UnderlineStyle::None)
+    );
+
+    let mut overlapping_edit = source.edit();
+    overlapping_edit
+        .set_text_baseline(TextSpan::new(0, 4).unwrap(), CharacterBaseline::Subscript)
+        .unwrap();
+    let overlapping = overlapping_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut overlap = DurableComposition::new(&source, limits(8));
+    overlap.join(baseline.clone()).unwrap();
+    assert!(matches!(
+        overlap.join(overlapping),
+        Err(CompositionError::Conflicts(_))
+    ));
+
+    let mut same_span_underline_edit = source.edit();
+    same_span_underline_edit
+        .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
+        .unwrap();
+    let same_span_underline = same_span_underline_edit
+        .commit()
+        .unwrap()
+        .patch()
+        .to_durable(limits(8))
+        .unwrap();
+    let mut cross_property_overlap = DurableComposition::new(&source, limits(8));
+    cross_property_overlap.join(baseline).unwrap();
+    assert!(matches!(
+        cross_property_overlap.join(same_span_underline),
+        Err(CompositionError::Conflicts(_))
+    ));
+}

@@ -1,0 +1,727 @@
+use super::{
+    Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, HashSet,
+    HeaderItem, HeaderItems, MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParsedDocument, Parser, Range,
+    RefCell, SectionPhase, SmallVec, SourceLimits, State, Token, control_symbol_text,
+    disables_body_block_reservation, initial_body_block_capacity,
+};
+
+impl<'a> Parser<'a> {
+    pub(crate) fn new_with_source(
+        tokens: &'a [Token<'a>],
+        token_spans: &'a [Range<usize>],
+        source: &'a str,
+        arena: &'a Bump,
+        limits: SourceLimits,
+    ) -> Self {
+        Self::new_inner(tokens, Some(token_spans), Some(source), arena, limits)
+    }
+
+    /// Seed the parser's report with the repairs the lexer already applied,
+    /// so the document reports both phases in discovery order.
+    pub(crate) fn with_tolerance_report(
+        mut self,
+        report: crate::leniency::ToleranceReport,
+    ) -> Self {
+        self.tolerance.append(report);
+        self
+    }
+
+    fn new_inner(
+        tokens: &'a [Token<'a>],
+        token_spans: Option<&'a [Range<usize>]>,
+        source: Option<&'a str>,
+        arena: &'a Bump,
+        limits: SourceLimits,
+    ) -> Self {
+        Self {
+            tokens,
+            token_spans,
+            source,
+            limits,
+            parse_provenance: crate::validation::ParseProvenance {
+                syntax_valid: false,
+                root_valid: false,
+                document_valid: false,
+            },
+            tolerance: crate::leniency::ToleranceReport::default(),
+            unmapped_charset_fonts: HashMap::new(),
+            unmapped_charset_uses: RefCell::new(Vec::new()),
+            opaque_nodes: Vec::new(),
+            opaque_bytes: 0,
+            unknown_syntax_markers: 0,
+            pos: 0,
+            states: vec![State::default()],
+            font_table: RefCell::new(FontTable::new()),
+            header_items: HeaderItems::default(),
+            file_table: None,
+            unicode_alternate_depth: 0,
+            color_table: RefCell::new(ColorTable::new()),
+            blocks: Vec::new(),
+            flushed_body_text: false,
+            body_block_capacity_hint: 0,
+            arena,
+            tables: Vec::new(),
+            current_table: None,
+            current_row: None,
+            current_cell_text: SmallVec::new(),
+            current_cell_paragraphs: Vec::new(),
+            current_cell_paragraph_start: 0,
+            current_cell_paragraph_frame: None,
+            current_cell_nested: Vec::new(),
+            current_cell_drawings: DrawingStoryCapture::default(),
+            current_cell_story_events: Vec::new(),
+            nested_table_builders: Vec::new(),
+            logical_table_count: 0,
+            pictures: Vec::new(),
+            picture_compatibility_records: Vec::new(),
+            fields: Vec::new(),
+            field_safety: Vec::new(),
+            field_nesting_depth: 0,
+            field_drawing_captures: Vec::new(),
+            form_fields: Vec::new(),
+            form_field_statuses: Vec::new(),
+            form_field_text_bytes: 0,
+            generator: None,
+            revision_save_ids: Vec::new(),
+            revision_save_root: None,
+            xml_namespaces: Vec::new(),
+            xml_namespace_text_bytes: 0,
+            custom_xml_tags: Vec::new(),
+            open_custom_xml_tags: Vec::new(),
+            custom_xml_spans: Vec::new(),
+            pending_custom_xml_attribute: None,
+            next_custom_xml_order: 0,
+            custom_xml_text_bytes: 0,
+            smart_tags: Vec::new(),
+            open_smart_tags: Vec::new(),
+            smart_tag_spans: Vec::new(),
+            open_move_bookmarks: HashMap::new(),
+            move_bookmark_spans: Vec::new(),
+            completed_move_bookmarks: HashSet::new(),
+            move_bookmarks: Vec::new(),
+            unmatched_move_bookmarks: false,
+            math_zones: Vec::new(),
+            math_text_bytes: 0,
+            protection_ranges: Vec::new(),
+            open_protection_ranges: HashMap::new(),
+            protection_range_spans: Vec::new(),
+            next_protection_range_order: 0,
+            editable_regions: Vec::new(),
+            open_editable_regions: Vec::new(),
+            editable_region_spans: Vec::new(),
+            next_editable_region_order: 0,
+            protection_users: Vec::new(),
+            protection_user_text_bytes: 0,
+            hyphenation: crate::DocumentHyphenation::default(),
+            hyphenation_seen: 0,
+            external_references: crate::DocumentExternalReferences::default(),
+            external_reference_spans: crate::metadata::DocumentExternalReferenceSpans::default(),
+            document_view: crate::DocumentView::default(),
+            document_view_seen: 0,
+            review_display: crate::DocumentReviewDisplay::default(),
+            review_display_seen: 0,
+            window_caption: None,
+            kinsoku: crate::DocumentKinsoku::default(),
+            xsl_transform: None,
+            xsl_transform_usage: crate::DocumentXslTransformUsage::default(),
+            style_list_filter: None,
+            style_sort_method: None,
+            save_preferences: crate::DocumentSavePreferences::default(),
+            save_preferences_seen: 0,
+            write_reservations: crate::DocumentWriteReservations::default(),
+            origin_metadata: crate::DocumentOriginMetadata::default(),
+            file_settings: crate::DocumentFileSettings::default(),
+            file_settings_seen: 0,
+            output_settings: crate::DocumentOutputSettings::default(),
+            output_settings_seen: 0,
+            rendering_settings: crate::DocumentRenderingSettings::default(),
+            rendering_settings_seen: 0,
+            processing_settings: crate::DocumentProcessingSettings::default(),
+            processing_settings_seen: 0,
+            drawing_grid: crate::DocumentDrawingGrid::default(),
+            drawing_grid_seen: 0,
+            print_layout_settings: crate::DocumentPrintLayoutSettings::default(),
+            print_layout_settings_seen: 0,
+            section_gutter_overrides: Vec::new(),
+            document_page_defaults: crate::SectionProperties::default(),
+            section_geometry_overrides: Vec::new(),
+            theme_languages: crate::DocumentThemeLanguages::default(),
+            theme_languages_seen: 0,
+            xml_policies: crate::DocumentXmlPolicies::default(),
+            xml_policies_seen: 0,
+            embedding_policies: crate::DocumentEmbeddingPolicies::default(),
+            embedding_policies_seen: 0,
+            revision_policies: crate::DocumentRevisionPolicies::default(),
+            revision_policies_seen: 0,
+            style_policies: crate::DocumentStylePolicies::default(),
+            style_policies_seen: 0,
+            style_restrictions: crate::DocumentStyleRestrictions::default(),
+            style_restrictions_seen: 0,
+            booklet_printing: crate::DocumentBookletPrinting::default(),
+            booklet_printing_seen: 0,
+            privacy_policies: crate::DocumentPrivacyPolicies::default(),
+            privacy_policies_seen: 0,
+            line_spacing_compatibility: crate::DocumentLineSpacingCompatibility::default(),
+            line_spacing_compatibility_seen: 0,
+            east_asian_compatibility: crate::DocumentEastAsianCompatibility::default(),
+            east_asian_compatibility_seen: 0,
+            table_layout_compatibility: crate::DocumentTableLayoutCompatibility::default(),
+            table_layout_compatibility_seen: 0,
+            legacy_layout_compatibility: crate::DocumentLegacyLayoutCompatibility::default(),
+            legacy_layout_compatibility_seen: 0,
+            asian_grid_compatibility: crate::DocumentAsianGridCompatibility::default(),
+            asian_grid_compatibility_seen: 0,
+            compatibility_policy: crate::DocumentCompatibilityPolicy::default(),
+            compatibility_policy_seen: 0,
+            word_2003_compatibility: crate::DocumentWord2003Compatibility::default(),
+            word_2003_compatibility_seen: 0,
+            theme_data: None,
+            color_scheme_mapping: None,
+            latent_styles: None,
+            data_store: None,
+            mail_merge: None,
+            math_properties: None,
+            default_tab_width_twips: None,
+            language_defaults: crate::DocumentLanguageDefaults::default(),
+            default_formatting: crate::DocumentDefaultFormatting::default(),
+            default_font_selectors_seen: 0,
+            document_direction: None,
+            gutter_on_right: false,
+            objects: Vec::new(),
+            document_variables: Vec::new(),
+            document_variable_text_bytes: 0,
+            user_properties: Vec::new(),
+            user_property_text_bytes: 0,
+            navigation_entries: Vec::new(),
+            navigation_entry_text_bytes: 0,
+            generated_list_markers: Vec::new(),
+            generated_list_marker_text_bytes: 0,
+            list_table: super::super::super::list::ListTable::new(),
+            list_override_table: super::super::super::list::ListOverrideTable::new(),
+            legacy_section_numbering: crate::LegacySectionNumbering::new(),
+            legacy_paragraph_numbering: Vec::new(),
+            paragraph_group_table: None,
+            sections: Vec::new(),
+            section_properties_active: false,
+            section_phase: SectionPhase::Prefix { format_run: false },
+            bookmarks: super::super::super::bookmark::BookmarkTable::new(),
+            open_bookmarks: HashMap::new(),
+            bookmark_spans: Vec::new(),
+            body_text_len: 0,
+            body_paragraph_breaks: 0,
+            body_after_last_paragraph_break: 0,
+            body_boundaries: Vec::new(),
+            next_bookmark_order: 0,
+            next_smart_tag_order: 0,
+            next_move_bookmark_order: 0,
+            shapes: Vec::new(),
+            drawing_order: Vec::new(),
+            body_story_events: Vec::new(),
+            revision_event_indices: Vec::new(),
+            background_shape_index: None,
+            legacy_text_boxes: Vec::new(),
+            legacy_drawings: Vec::new(),
+            legacy_text_box_text_bytes: 0,
+            legacy_drawing_primitives: 0,
+            legacy_drawing_points: 0,
+            shape_groups: Vec::new(),
+            stylesheet: super::super::super::stylesheet::StyleSheet::new(),
+            info: super::super::super::info::DocumentInfo::new(),
+            annotations: Vec::new(),
+            annotation_ranges: HashMap::new(),
+            pending_annotation: super::PendingAnnotation::default(),
+            notes: Vec::new(),
+            note_options: crate::NoteOptions::default(),
+            note_options_closed: false,
+            note_separators: crate::NoteSeparatorTable::new(),
+            current_note_separator_active: false,
+            current_note_separator_elements: Vec::new(),
+            current_note_separator_drawings: DrawingStoryCapture::default(),
+            revisions: Vec::new(),
+            revision_authors: Vec::new(),
+            revision_author_text_bytes: 0,
+            revision_text_bytes: 0,
+            current_header_footer: None,
+            current_note_buffer: SmallVec::new(),
+            current_note_shapes: Vec::new(),
+            current_note_shape_groups: Vec::new(),
+            current_note_drawing_order: Vec::new(),
+            current_note_story_events: Vec::new(),
+            current_hf_shapes: Vec::new(),
+            current_hf_shape_groups: Vec::new(),
+            current_hf_drawing_order: Vec::new(),
+            current_hf_story_events: Vec::new(),
+            current_hf_story_offset: 0,
+            current_hf_type: None,
+            text_origin: 0,
+            current_cell_text_tokens: None,
+            current_hf_text_tokens: None,
+            current_hf_paragraph_sources: Vec::new(),
+            current_note_text_tokens: None,
+            text_provenance: crate::model::provenance::TextProvenance::default(),
+        }
+    }
+
+    /// Parse the token stream into a document.
+    pub(crate) fn parse(mut self) -> crate::Result<ParsedDocument<'a>> {
+        // Validate document structure
+        #[derive(Clone, Copy)]
+        struct NoteGuardContext {
+            body_flow: bool,
+            visible_field_result: bool,
+            visible_section_format: bool,
+            direct_header_footer: bool,
+            direct_field_instruction: bool,
+            inert_section_format: bool,
+        }
+
+        if self.tokens.is_empty() {
+            return Err(crate::Error::MalformedDocument(
+                "Empty token stream".to_string(),
+            ));
+        }
+        // A parser can only produce a report after proving that this is one
+        // complete RTF root.  In particular, a leading brace alone is not
+        // enough: reject fragments, unsupported RTF versions, and multiple
+        // roots before semantic dispatch can retain partial state.
+        if !matches!(self.tokens.first(), Some(Token::OpenBrace))
+            || !matches!(
+                self.tokens.get(1),
+                Some(Token::Control(ControlWord::Rtf(1)))
+            )
+        {
+            return Err(crate::Error::MalformedDocument(
+                "RTF document must begin with the supported \\rtf1 root header".to_string(),
+            ));
+        }
+        self.parse_provenance.syntax_valid = true;
+        self.parse_provenance.root_valid = true;
+        let mut contexts: Vec<NoteGuardContext> = Vec::new();
+        let mut ordinary_body_start = None;
+        let mut ordinary_body_end = None;
+        let mut ordinary_body_cacheable = true;
+        let mut potential_root_body_blocks = 0usize;
+        let mut body_block_reservation_eligible = self
+            .source
+            .is_some_and(|source| source.len() >= MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES);
+        for (index, token) in self.tokens.iter().enumerate() {
+            match token {
+                Token::OpenBrace => {
+                    if contexts.len() == 1 && ordinary_body_start.is_some() {
+                        ordinary_body_cacheable = false;
+                    }
+                    if let Some(parent) = contexts.last_mut() {
+                        parent.inert_section_format = false;
+                    }
+                    let parent = contexts.last().copied().unwrap_or(NoteGuardContext {
+                        body_flow: true,
+                        visible_field_result: false,
+                        visible_section_format: false,
+                        direct_header_footer: false,
+                        direct_field_instruction: false,
+                        inert_section_format: false,
+                    });
+                    let mut destination_index = index + 1;
+                    let starred = matches!(
+                        self.tokens.get(destination_index),
+                        Some(Token::Control(ControlWord::IgnorableDestination))
+                    );
+                    if starred {
+                        destination_index += 1;
+                    }
+                    let destination = match self.tokens.get(destination_index) {
+                        Some(Token::Control(control)) => Some(control),
+                        _ => None,
+                    };
+                    let context = match destination {
+                        Some(ControlWord::FieldResult) if parent.body_flow => NoteGuardContext {
+                            body_flow: true,
+                            visible_field_result: true,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        Some(ControlWord::Field) => NoteGuardContext {
+                            body_flow: parent.body_flow,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        Some(ControlWord::SectionDefault) if parent.body_flow && !starred => {
+                            NoteGuardContext {
+                                body_flow: true,
+                                visible_field_result: parent.visible_field_result,
+                                visible_section_format: true,
+                                direct_header_footer: false,
+                                direct_field_instruction: false,
+                                inert_section_format: false,
+                            }
+                        },
+                        Some(
+                            ControlWord::Header
+                            | ControlWord::HeaderFirst
+                            | ControlWord::HeaderLeft
+                            | ControlWord::HeaderRight
+                            | ControlWord::Footer
+                            | ControlWord::FooterFirst
+                            | ControlWord::FooterLeft
+                            | ControlWord::FooterRight,
+                        ) => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: true,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        Some(ControlWord::FieldInstruction) => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: true,
+                            inert_section_format: false,
+                        },
+                        Some(
+                            ControlWord::Annotation
+                            | ControlWord::Footnote
+                            | ControlWord::Endnote
+                            | ControlWord::Object
+                            | ControlWord::Result
+                            | ControlWord::Picture
+                            | ControlWord::Shape(_)
+                            | ControlWord::ShapeGroup(_),
+                        ) => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        _ if starred => NoteGuardContext {
+                            body_flow: false,
+                            visible_field_result: false,
+                            visible_section_format: false,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                        _ => NoteGuardContext {
+                            body_flow: parent.body_flow,
+                            visible_field_result: parent.visible_field_result,
+                            visible_section_format: parent.visible_section_format,
+                            direct_header_footer: false,
+                            direct_field_instruction: false,
+                            inert_section_format: false,
+                        },
+                    };
+                    contexts.push(context);
+                },
+                Token::CloseBrace => {
+                    if contexts.len() == 1 {
+                        ordinary_body_end = self
+                            .token_spans
+                            .and_then(|spans| spans.get(index))
+                            .map(|span| span.start);
+                    }
+                    contexts.pop();
+                    if contexts.is_empty() {
+                        break;
+                    }
+                },
+                Token::Control(ControlWord::SectionDefault) => {
+                    if let Some(context) = contexts.last_mut()
+                        && (context.direct_header_footer || context.direct_field_instruction)
+                    {
+                        context.inert_section_format = true;
+                    }
+                },
+                Token::Control(ControlWord::SectionBreak) => {
+                    if let Some(context) = contexts.last_mut() {
+                        context.inert_section_format = false;
+                    }
+                },
+                Token::Text(text) if !text.is_empty() => {
+                    if contexts.len() == 1 && text.bytes().any(|b| !matches!(b, b'\r' | b'\n')) {
+                        potential_root_body_blocks += 1;
+                        if ordinary_body_start.is_none() {
+                            ordinary_body_start = self
+                                .token_spans
+                                .and_then(|spans| spans.get(index))
+                                .map(|span| span.start);
+                        }
+                    }
+                    if let Some(context) = contexts.last_mut() {
+                        context.inert_section_format = false;
+                    }
+                },
+                Token::Control(control)
+                    if matches!(
+                        control,
+                        ControlWord::Par
+                            | ControlWord::Line
+                            | ControlWord::Tab
+                            | ControlWord::Unicode(_)
+                    ) || control_symbol_text(control).is_some() =>
+                {
+                    if let Some(context) = contexts.last_mut() {
+                        context.inert_section_format = false;
+                    }
+                },
+                Token::Control(
+                    ControlWord::NoteKinds(_)
+                    | ControlWord::FootnotePlacement(_)
+                    | ControlWord::EndnotePlacement(_)
+                    | ControlWord::FootnoteStart(_)
+                    | ControlWord::EndnoteStart(_)
+                    | ControlWord::FootnoteRestart(_)
+                    | ControlWord::EndnoteRestart(_)
+                    | ControlWord::FootnoteNumbering(_)
+                    | ControlWord::EndnoteNumbering(_),
+                ) if contexts.len() != 1 => {
+                    return Err(crate::Error::MalformedDocument(
+                        "RTF note options must be root document-format controls".to_string(),
+                    ));
+                },
+                Token::Control(
+                    ControlWord::SectionFootnotePlacement(_)
+                    | ControlWord::SectionFootnoteStart(_)
+                    | ControlWord::SectionEndnoteStart(_)
+                    | ControlWord::SectionFootnoteRestart(_)
+                    | ControlWord::SectionEndnoteRestart(_)
+                    | ControlWord::SectionFootnoteNumbering(_)
+                    | ControlWord::SectionEndnoteNumbering(_),
+                ) if contexts.len() != 1
+                    && !contexts.last().is_some_and(|context| {
+                        context.visible_field_result
+                            || context.visible_section_format
+                            || context.inert_section_format
+                    }) =>
+                {
+                    return Err(crate::Error::MalformedDocument(
+                        "RTF section note options must be root controls or visible field-result formatting"
+                            .to_string(),
+                    ));
+                },
+                Token::Control(control)
+                    if body_block_reservation_eligible
+                        && contexts.len() == 1
+                        && disables_body_block_reservation(control) =>
+                {
+                    body_block_reservation_eligible = false;
+                },
+                Token::Binary(_) if contexts.len() == 1 => ordinary_body_cacheable = false,
+                Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
+            }
+        }
+        let ordinary_body_source_span = if ordinary_body_cacheable {
+            ordinary_body_start
+                .zip(ordinary_body_end)
+                .and_then(|(start, end)| (start < end).then_some(start..end))
+        } else {
+            None
+        };
+
+        if body_block_reservation_eligible {
+            self.body_block_capacity_hint = initial_body_block_capacity(
+                self.source.map(str::len),
+                potential_root_body_blocks,
+                self.limits.max_events(),
+            );
+        }
+
+        // Parse document content
+        self.parse_group()?;
+        while let Some(token) = self.tokens.get(self.pos) {
+            match token {
+                // Some producer fixtures terminate the transport with NUL
+                // padding after the root group. Treat only whitespace and
+                // NUL as inert transport padding; any other trailing token
+                // remains a typed malformed-document error.
+                Token::Text(text)
+                    if text
+                        .chars()
+                        .all(|character| character == '\0' || character.is_whitespace()) =>
+                {
+                    self.pos += 1;
+                },
+                _ => {
+                    return Err(crate::Error::MalformedDocument(
+                        "RTF document contains trailing non-whitespace tokens".to_string(),
+                    ));
+                },
+            }
+        }
+        // Finalize any remaining table
+        self.finalize_table()?;
+        self.finalize_bookmarks()?;
+        self.finalize_custom_xml_tags()?;
+        self.finalize_smart_tags()?;
+        self.finalize_move_bookmarks()?;
+        self.finalize_protection_ranges()?;
+        self.finalize_editable_regions()?;
+        self.finalize_annotations()?;
+        crate::story::validate_boundaries(&self.blocks, &self.body_boundaries)?;
+        let body_paragraph_count = self
+            .body_paragraph_breaks
+            .checked_add(usize::from(
+                self.body_text_len > self.body_after_last_paragraph_break,
+            ))
+            .ok_or_else(|| {
+                crate::Error::MalformedDocument("RTF body paragraph count overflow".to_string())
+            })?;
+        let body_story_events = self.finalize_body_story_events()?;
+        self.resolve_document_page_defaults();
+
+        let revision_save = if self.header_items.has(HeaderItem::RevisionSaveTable)
+            || self.header_items.has(HeaderItem::RevisionSaveRoot)
+        {
+            Some(crate::RevisionSaveMetadata::new(
+                self.revision_save_ids,
+                self.revision_save_root,
+            )?)
+        } else {
+            None
+        };
+        let theme = match (self.theme_data, self.color_scheme_mapping) {
+            (Some(data), mapping) => Some(crate::DocumentTheme::new(
+                Cow::Owned(data),
+                mapping.map(Cow::Owned),
+            )?),
+            (None, Some(_)) => {
+                return Err(crate::Error::MalformedDocument(
+                    "RTF color-scheme mapping is orphaned without theme data".to_string(),
+                ));
+            },
+            (None, None) => None,
+        };
+        let data_store = self
+            .data_store
+            .map(|data| crate::DocumentDataStore::new(Cow::Owned(data)))
+            .transpose()?;
+        let protection_user_table = self
+            .header_items
+            .has(HeaderItem::ProtectionUserTable)
+            .then(|| crate::ProtectionUserTable::new(self.protection_users))
+            .transpose()?;
+
+        for section in &self.sections {
+            section.properties.columns.validate()?;
+        }
+        self.parse_provenance.document_valid = true;
+
+        for (_, offset) in self.unmapped_charset_uses.take() {
+            self.tolerance
+                .record(crate::leniency::FontDefect::UnmappedCharset, offset);
+        }
+        Ok(ParsedDocument {
+            tolerance_report: self.tolerance,
+            ordinary_body_source_span,
+            font_table: self.font_table.into_inner(),
+            file_table: self.file_table,
+            color_table: self.color_table.into_inner(),
+            blocks: self.blocks,
+            opaque_nodes: self.opaque_nodes,
+            unknown_syntax_markers: self.unknown_syntax_markers,
+            tables: self.tables,
+            text_provenance: self.text_provenance,
+            pictures: self.pictures,
+            picture_compatibility_records: self.picture_compatibility_records,
+            fields: self.fields,
+            field_safety: self.field_safety,
+            parse_provenance: self.parse_provenance,
+            form_fields: self.form_fields,
+            form_field_statuses: self.form_field_statuses,
+            generator: self.generator,
+            revision_save,
+            xml_namespaces: self.xml_namespaces,
+            saw_xml_namespace_table: self.header_items.has(HeaderItem::XmlNamespaceTable),
+            custom_xml_tags: self.custom_xml_tags,
+            smart_tags: self.smart_tags,
+            unmatched_move_bookmarks: self.unmatched_move_bookmarks,
+            math_zones: self.math_zones,
+            protection_ranges: self.protection_ranges,
+            editable_regions: self.editable_regions,
+            protection_user_table,
+            hyphenation: self.hyphenation,
+            external_references: self.external_references,
+            external_reference_spans: self.external_reference_spans,
+            document_view: self.document_view,
+            review_display: self.review_display,
+            window_caption: self.window_caption,
+            kinsoku: self.kinsoku,
+            xsl_transform: self.xsl_transform,
+            xsl_transform_usage: self.xsl_transform_usage,
+            style_list_filter: self.style_list_filter,
+            style_sort_method: self.style_sort_method,
+            save_preferences: self.save_preferences,
+            write_reservations: self.write_reservations,
+            origin_metadata: self.origin_metadata,
+            file_settings: self.file_settings,
+            output_settings: self.output_settings,
+            rendering_settings: self.rendering_settings,
+            processing_settings: self.processing_settings,
+            drawing_grid: self.drawing_grid,
+            print_layout_settings: self.print_layout_settings,
+            theme_languages: self.theme_languages,
+            xml_policies: self.xml_policies,
+            embedding_policies: self.embedding_policies,
+            revision_policies: self.revision_policies,
+            style_policies: self.style_policies,
+            style_restrictions: self.style_restrictions,
+            booklet_printing: self.booklet_printing,
+            privacy_policies: self.privacy_policies,
+            line_spacing_compatibility: self.line_spacing_compatibility,
+            east_asian_compatibility: self.east_asian_compatibility,
+            table_layout_compatibility: self.table_layout_compatibility,
+            legacy_layout_compatibility: self.legacy_layout_compatibility,
+            asian_grid_compatibility: self.asian_grid_compatibility,
+            compatibility_policy: self.compatibility_policy,
+            word_2003_compatibility: self.word_2003_compatibility,
+            theme,
+            latent_styles: self.latent_styles,
+            data_store,
+            mail_merge: self.mail_merge,
+            math_properties: self.math_properties,
+            default_tab_width_twips: self.default_tab_width_twips,
+            language_defaults: self.language_defaults,
+            default_formatting: self.default_formatting,
+            document_direction: self.document_direction,
+            gutter_on_right: self.gutter_on_right,
+            objects: self.objects,
+            document_variables: self.document_variables,
+            user_properties: self.user_properties,
+            navigation_entries: self.navigation_entries,
+            generated_list_markers: self.generated_list_markers,
+            list_table: self.list_table,
+            list_override_table: self.list_override_table,
+            legacy_section_numbering: self.legacy_section_numbering,
+            legacy_paragraph_numbering: self.legacy_paragraph_numbering,
+            paragraph_group_table: self.paragraph_group_table,
+            sections: self.sections,
+            bookmarks: self.bookmarks,
+            move_bookmarks: self.move_bookmarks,
+            shapes: self.shapes,
+            drawing_order: self.drawing_order,
+            body_paragraph_count,
+            body_boundaries: self.body_boundaries,
+            body_story_events,
+            background_shape_index: self.background_shape_index,
+            legacy_text_boxes: self.legacy_text_boxes,
+            legacy_drawings: self.legacy_drawings,
+            shape_groups: self.shape_groups,
+            stylesheet: self.stylesheet,
+            info: self.info,
+            annotations: self.annotations,
+            notes: self.notes,
+            note_options: self.note_options,
+            note_separators: self.note_separators,
+            revisions: self.revisions,
+            revision_authors: self.revision_authors,
+        })
+    }
+}

@@ -1,0 +1,928 @@
+//! Lossless XML discovery for `[MS-PPTX]` media track metadata.
+//!
+//! This codec deliberately discovers only the typed `p173:tracksInfo` and
+//! `p15:isNarration` islands.  Every other child of the media/shape extension
+//! lists remains opaque and is retained by range-based edits in `transaction`.
+
+use std::ops::Range;
+
+use litchi_core::xml::ReaderOrigin;
+use quick_xml::XmlVersion;
+use quick_xml::encoding::Decoder;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+
+use super::codec::Limits;
+use super::model::MediaKey;
+use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
+pub(crate) const PML: &[u8] = b"http://schemas.openxmlformats.org/presentationml/2006/main";
+pub(crate) const PML_STRICT: &[u8] = b"http://purl.oclc.org/ooxml/presentationml/main";
+pub(crate) const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+pub(crate) const P15: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2012/main";
+pub(crate) const P173: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2017/3/main";
+pub const TRACKS_INFO_URI: &str = "{3AFAAA56-56D3-431D-BCD4-E75A35582382}";
+pub const NARRATION_URI: &str = "{42D2F446-02D8-4167-A562-619A0277C38B}";
+
+pub(crate) const MAX_SLIDE_BYTES: usize = 64 * 1024 * 1024;
+pub(crate) const MAX_XML_NODES: usize = 1_000_000;
+pub(crate) const MAX_TRACKS: usize = 4_096;
+pub(crate) const MAX_STRING_BYTES: usize = 1024 * 1024;
+
+#[derive(Debug, Clone)]
+pub(crate) struct Attr {
+    pub(crate) value: String,
+    pub(crate) span: Range<usize>,
+    pub(crate) full_span: Range<usize>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Track {
+    pub(crate) id: Attr,
+    pub(crate) label: Attr,
+    pub(crate) language: Option<Attr>,
+    pub(crate) embed: Option<Attr>,
+    pub(crate) link: Option<Attr>,
+    pub(crate) opening_insert: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct TracksInfo {
+    pub(crate) display_location: Attr,
+    pub(crate) tracks: Vec<Track>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Narration {
+    pub(crate) value: Option<Attr>,
+    pub(crate) opening_insert: usize,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Media {
+    pub(crate) embed: Option<Attr>,
+    pub(crate) link: Option<Attr>,
+    pub(crate) tracks_info: Option<TracksInfo>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Found {
+    pub(crate) key: MediaKey,
+    pub(crate) media: Media,
+    pub(crate) narration: Option<Narration>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum NamespaceKind {
+    Pml,
+    P14,
+    P15,
+    P173,
+    Other,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Kind {
+    Shape,
+    Media,
+    TracksInfo,
+    Track,
+    Narration,
+    Other,
+}
+
+#[derive(Debug)]
+struct Open {
+    kind: Kind,
+    track: Option<Track>,
+}
+
+#[derive(Debug)]
+struct Shape {
+    id: Option<u32>,
+    media: Option<Media>,
+    narration: Option<Narration>,
+}
+
+/// Where the media-track search is among the top-level elements of the slide.
+///
+/// ```text
+/// Prolog --any start or empty-element tag--> Open
+/// Open   --top-level empty-element tag-----> Open
+/// Open   --end tag of a top-level element--> Closed
+/// Closed --top-level element---------------> Closed (accepted: read as slide content)
+/// any    --declaration, comment, text, CDATA--> unchanged
+/// ```
+///
+/// The search is lenient about the envelope. The first element's name is not
+/// checked, and a later top-level element is read exactly like the first: its
+/// shapes are candidates too. The last line holds in every phase: a
+/// declaration is accepted anywhere and content outside every element is
+/// ignored. Refused: a processing instruction, DOCTYPE or general reference
+/// anywhere, and the end of input before `Closed` or inside an element, so an
+/// empty-element tag alone is not a document.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// An element has been read; no top-level element has ended yet.
+    Open,
+    /// A top-level element has ended.
+    Closed,
+}
+
+pub(crate) fn discover(xml: &[u8], key: &MediaKey, limits: Limits) -> Result<Option<Found>> {
+    if xml.is_empty() {
+        return Err(invalid("slide XML is empty"));
+    }
+    if xml.len() > limits.max_slide_xml_bytes() {
+        return Err(limit(
+            crate::error::CodecLimitKind::InputBytes,
+            xml.len(),
+            limits.max_slide_xml_bytes(),
+        ));
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().trim_text(false);
+    let mut stack = Vec::new();
+    let mut shape = None;
+    let mut found = None;
+    let mut phase = RootPhase::Prolog;
+    let mut nodes = 0usize;
+
+    loop {
+        let start = position(&reader, origin)?;
+        let decoder = reader.decoder();
+        let (namespace, event) = reader.read_resolved_event().map_err(xml_error)?;
+        let namespace = namespace_kind(namespace);
+        let end = position(&reader, origin)?;
+        let event = event.into_owned();
+
+        match event {
+            Event::Start(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_xml_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_xml_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes(),
+                    ));
+                }
+                let kind = classify(
+                    namespace,
+                    element.local_name().as_ref(),
+                    &stack,
+                    shape.as_ref(),
+                );
+                match phase {
+                    RootPhase::Prolog => phase = RootPhase::Open,
+                    // A child of an open element, or a top-level empty-element
+                    // tag after another one.
+                    RootPhase::Open => {},
+                    // A later top-level element, or one nested in it: read
+                    // like the content of the first.
+                    RootPhase::Closed => {},
+                }
+                match kind {
+                    Kind::Shape => {
+                        if shape.is_some() {
+                            return Err(invalid(
+                                "nested PresentationML media shapes are unsupported",
+                            ));
+                        }
+                        shape = Some(Shape {
+                            id: None,
+                            media: None,
+                            narration: None,
+                        });
+                    },
+                    Kind::Media => {
+                        let current = shape
+                            .as_mut()
+                            .ok_or_else(|| invalid("media extension is outside a shape"))?;
+                        if current.media.is_some() {
+                            return Err(invalid(
+                                "media shape contains duplicate p14:media elements",
+                            ));
+                        }
+                        current.media = Some(Media {
+                            embed: attr(&element, b"embed", Some(b"r"), decoder, start, limits)?,
+                            link: attr(&element, b"link", Some(b"r"), decoder, start, limits)?,
+                            tracks_info: None,
+                        });
+                    },
+                    Kind::TracksInfo => {
+                        let current = shape
+                            .as_mut()
+                            .and_then(|value| value.media.as_mut())
+                            .ok_or_else(|| invalid("tracksInfo is outside p14:media"))?;
+                        if current.tracks_info.is_some() {
+                            return Err(invalid("media contains duplicate tracksInfo elements"));
+                        }
+                        current.tracks_info = Some(TracksInfo {
+                            display_location: required_attr(
+                                &element,
+                                b"displayLoc",
+                                None,
+                                decoder,
+                                start,
+                                "tracksInfo displayLoc",
+                                limits,
+                            )?,
+                            tracks: Vec::new(),
+                        });
+                    },
+                    Kind::Track => {
+                        let current = shape
+                            .as_mut()
+                            .and_then(|value| value.media.as_mut())
+                            .and_then(|value| value.tracks_info.as_mut())
+                            .ok_or_else(|| invalid("track is outside tracksInfo"))?;
+                        if current.tracks.len() >= limits.max_tracks() {
+                            return Err(limit(
+                                crate::error::CodecLimitKind::CaptionTracks,
+                                current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                limits.max_tracks(),
+                            ));
+                        }
+                        let track = Track {
+                            id: required_attr(
+                                &element, b"id", None, decoder, start, "track id", limits,
+                            )?,
+                            label: required_attr(
+                                &element,
+                                b"label",
+                                None,
+                                decoder,
+                                start,
+                                "track label",
+                                limits,
+                            )?,
+                            language: attr(&element, b"lang", None, decoder, start, limits)?,
+                            embed: attr(&element, b"embed", Some(b"r"), decoder, start, limits)?,
+                            link: attr(&element, b"link", Some(b"r"), decoder, start, limits)?,
+                            opening_insert: opening_insert(&element, start)?,
+                        };
+                        if track.embed.is_none() && track.link.is_none() {
+                            return Err(invalid("track requires r:embed or r:link"));
+                        }
+                        let open = Open {
+                            kind,
+                            track: Some(track),
+                        };
+                        stack.push(open);
+                        continue;
+                    },
+                    Kind::Narration => {
+                        let current = shape
+                            .as_mut()
+                            .ok_or_else(|| invalid("isNarration is outside a shape"))?;
+                        if current.narration.is_some() {
+                            return Err(invalid("shape contains duplicate isNarration elements"));
+                        }
+                        current.narration = Some(Narration {
+                            value: attr(&element, b"val", None, decoder, start, limits)?,
+                            opening_insert: opening_insert(&element, start)?,
+                        });
+                    },
+                    Kind::Other => {},
+                }
+                if namespace == NamespaceKind::Pml
+                    && element.local_name().as_ref() == b"cNvPr"
+                    && shape.as_ref().is_some_and(|value| value.id.is_none())
+                {
+                    let id = parse_shape_id(&element, decoder, start, limits)?;
+                    if let Some(current) = shape.as_mut() {
+                        current.id = id;
+                    }
+                }
+                stack.push(Open { kind, track: None });
+            },
+            Event::Empty(element) => {
+                nodes = nodes.checked_add(1).ok_or_else(|| {
+                    limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        usize::MAX,
+                        limits.max_xml_nodes(),
+                    )
+                })?;
+                if nodes > limits.max_xml_nodes() {
+                    return Err(limit(
+                        crate::error::CodecLimitKind::XmlNodes,
+                        nodes,
+                        limits.max_xml_nodes(),
+                    ));
+                }
+                let kind = classify(
+                    namespace,
+                    element.local_name().as_ref(),
+                    &stack,
+                    shape.as_ref(),
+                );
+                match phase {
+                    RootPhase::Prolog => phase = RootPhase::Open,
+                    // A child of an open element, or a top-level empty-element
+                    // tag after another one.
+                    RootPhase::Open => {},
+                    // A later top-level element, or one nested in it: read
+                    // like the content of the first.
+                    RootPhase::Closed => {},
+                }
+                match kind {
+                    Kind::Shape => {
+                        let candidate = Shape {
+                            id: parse_shape_id(&element, decoder, start, limits)?,
+                            media: None,
+                            narration: None,
+                        };
+                        if candidate.id == Some(key.shape_id) {
+                            return Err(invalid("selected media shape has no p14:media element"));
+                        }
+                    },
+                    Kind::Media => {
+                        let current = shape
+                            .as_mut()
+                            .ok_or_else(|| invalid("media extension is outside a shape"))?;
+                        if current.media.is_some() {
+                            return Err(invalid(
+                                "media shape contains duplicate p14:media elements",
+                            ));
+                        }
+                        current.media = Some(Media {
+                            embed: attr(&element, b"embed", Some(b"r"), decoder, start, limits)?,
+                            link: attr(&element, b"link", Some(b"r"), decoder, start, limits)?,
+                            tracks_info: None,
+                        });
+                    },
+                    Kind::TracksInfo => {
+                        let current = shape
+                            .as_mut()
+                            .and_then(|value| value.media.as_mut())
+                            .ok_or_else(|| invalid("tracksInfo is outside p14:media"))?;
+                        if current.tracks_info.is_some() {
+                            return Err(invalid("media contains duplicate tracksInfo elements"));
+                        }
+                        current.tracks_info = Some(TracksInfo {
+                            display_location: required_attr(
+                                &element,
+                                b"displayLoc",
+                                None,
+                                decoder,
+                                start,
+                                "tracksInfo displayLoc",
+                                limits,
+                            )?,
+                            tracks: Vec::new(),
+                        });
+                    },
+                    Kind::Track => {
+                        let current = shape
+                            .as_mut()
+                            .and_then(|value| value.media.as_mut())
+                            .and_then(|value| value.tracks_info.as_mut())
+                            .ok_or_else(|| invalid("track is outside tracksInfo"))?;
+                        if current.tracks.len() >= limits.max_tracks() {
+                            return Err(limit(
+                                crate::error::CodecLimitKind::CaptionTracks,
+                                current.tracks.len().checked_add(1).unwrap_or(usize::MAX),
+                                limits.max_tracks(),
+                            ));
+                        }
+                        let track = parse_track(&element, decoder, start, limits)?;
+                        current.tracks.push(track);
+                    },
+                    Kind::Narration => {
+                        let current = shape
+                            .as_mut()
+                            .ok_or_else(|| invalid("isNarration is outside a shape"))?;
+                        if current.narration.is_some() {
+                            return Err(invalid("shape contains duplicate isNarration elements"));
+                        }
+                        current.narration = Some(Narration {
+                            value: attr(&element, b"val", None, decoder, start, limits)?,
+                            opening_insert: opening_insert(&element, start)?,
+                        });
+                    },
+                    Kind::Other => {},
+                }
+                if namespace == NamespaceKind::Pml
+                    && element.local_name().as_ref() == b"cNvPr"
+                    && shape.as_ref().is_some_and(|value| value.id.is_none())
+                {
+                    let id = parse_shape_id(&element, decoder, start, limits)?;
+                    if let Some(current) = shape.as_mut() {
+                        current.id = id;
+                    }
+                }
+            },
+            Event::End(element) => {
+                let open = stack
+                    .pop()
+                    .ok_or_else(|| invalid("slide XML element stack underflow"))?;
+                if element.local_name().as_ref().is_empty() {
+                    return Err(invalid("slide XML element has an empty name"));
+                }
+                match open.kind {
+                    Kind::Track => {
+                        let current = shape
+                            .as_mut()
+                            .and_then(|value| value.media.as_mut())
+                            .and_then(|value| value.tracks_info.as_mut())
+                            .ok_or_else(|| invalid("track closed outside tracksInfo"))?;
+                        if let Some(track) = open.track {
+                            current.tracks.push(track);
+                        }
+                    },
+                    Kind::Shape => {
+                        let candidate = shape
+                            .take()
+                            .ok_or_else(|| invalid("shape state disappeared before close"))?;
+                        if candidate.id == Some(key.shape_id) {
+                            if found.is_some() {
+                                return Err(invalid(
+                                    "multiple media shapes have the selected shape ID",
+                                ));
+                            }
+                            let media = candidate.media.ok_or_else(|| {
+                                invalid("selected shape has no p14:media element")
+                            })?;
+                            found = Some(Found {
+                                key: key.clone(),
+                                media,
+                                narration: candidate.narration,
+                            });
+                        }
+                    },
+                    Kind::Media | Kind::TracksInfo | Kind::Narration | Kind::Other => {},
+                }
+                if stack.is_empty() {
+                    phase = RootPhase::Closed;
+                }
+            },
+            Event::Text(text) => {
+                let value = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                if !value.trim().is_empty()
+                    && stack.iter().any(|open| {
+                        matches!(open.kind, Kind::TracksInfo | Kind::Track | Kind::Narration)
+                    })
+                {
+                    return Err(invalid("media track metadata cannot contain text"));
+                }
+            },
+            Event::CData(text) => {
+                if !text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                    && stack.iter().any(|open| {
+                        matches!(open.kind, Kind::TracksInfo | Kind::Track | Kind::Narration)
+                    })
+                {
+                    return Err(invalid("media track metadata cannot contain CDATA"));
+                }
+            },
+            Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
+                return Err(invalid("unsupported XML construct in slide media metadata"));
+            },
+            // Accepted in every phase, including after a top-level element.
+            Event::Comment(_) | Event::Decl(_) => {},
+            Event::Eof => break,
+        }
+
+        if end > xml.len() {
+            return Err(invalid("slide XML event range is outside its source"));
+        }
+    }
+
+    match phase {
+        RootPhase::Closed if stack.is_empty() => {},
+        RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+            return Err(invalid("slide XML is not one complete document"));
+        },
+    }
+    Ok(found)
+}
+
+fn classify(namespace: NamespaceKind, local: &[u8], stack: &[Open], shape: Option<&Shape>) -> Kind {
+    if namespace == NamespaceKind::Pml && local == b"pic" && shape.is_none() {
+        return Kind::Shape;
+    }
+    if namespace == NamespaceKind::P14 && local == b"media" && shape.is_some() {
+        return Kind::Media;
+    }
+    if namespace == NamespaceKind::P173
+        && local == b"tracksInfo"
+        && stack.iter().any(|open| open.kind == Kind::Media)
+    {
+        return Kind::TracksInfo;
+    }
+    if namespace == NamespaceKind::P173
+        && local == b"track"
+        && stack.iter().any(|open| open.kind == Kind::TracksInfo)
+    {
+        return Kind::Track;
+    }
+    if namespace == NamespaceKind::P15 && local == b"isNarration" && shape.is_some() {
+        return Kind::Narration;
+    }
+    Kind::Other
+}
+
+fn parse_track(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    start: usize,
+    limits: Limits,
+) -> Result<Track> {
+    let track = Track {
+        id: required_attr(element, b"id", None, decoder, start, "track id", limits)?,
+        label: required_attr(
+            element,
+            b"label",
+            None,
+            decoder,
+            start,
+            "track label",
+            limits,
+        )?,
+        language: attr(element, b"lang", None, decoder, start, limits)?,
+        embed: attr(element, b"embed", Some(b"r"), decoder, start, limits)?,
+        link: attr(element, b"link", Some(b"r"), decoder, start, limits)?,
+        opening_insert: opening_insert(element, start)?,
+    };
+    if track.embed.is_none() && track.link.is_none() {
+        return Err(invalid("track requires r:embed or r:link"));
+    }
+    Ok(track)
+}
+
+fn parse_shape_id(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    start: usize,
+    limits: Limits,
+) -> Result<Option<u32>> {
+    attr(element, b"id", None, decoder, start, limits)?
+        .map(|value| {
+            value
+                .value
+                .parse::<u32>()
+                .map_err(|_err| invalid("media shape cNvPr/@id is not an unsigned integer"))
+        })
+        .transpose()
+}
+
+fn required_attr(
+    element: &BytesStart<'_>,
+    local: &[u8],
+    prefix: Option<&[u8]>,
+    decoder: Decoder,
+    start: usize,
+    label: &str,
+    limits: Limits,
+) -> Result<Attr> {
+    attr(element, local, prefix, decoder, start, limits)?
+        .ok_or_else(|| invalid(format!("{label} is missing")))
+}
+
+fn attr(
+    element: &BytesStart<'_>,
+    local: &[u8],
+    prefix: Option<&[u8]>,
+    decoder: Decoder,
+    start: usize,
+    limits: Limits,
+) -> Result<Option<Attr>> {
+    let mut result = None;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let raw_key = attribute.key.as_ref();
+        let colon = raw_key.iter().position(|byte| *byte == b':');
+        let actual_prefix = colon.map(|offset| &raw_key[..offset]);
+        let actual_local = colon.map_or(raw_key, |offset| &raw_key[offset + 1..]);
+        if actual_local != local || actual_prefix != prefix {
+            continue;
+        }
+        if result.is_some() {
+            return Err(invalid(format!(
+                "duplicate media track attribute '{}'",
+                String::from_utf8_lossy(local)
+            )));
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(xml_error)?
+            .into_owned();
+        if value.len() > limits.max_string_bytes() {
+            return Err(limit(
+                crate::error::CodecLimitKind::StringBytes,
+                value.len(),
+                limits.max_string_bytes(),
+            ));
+        }
+        let local_span = attribute_span(element.as_ref(), attribute.key.as_ref())?;
+        let value_start = start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(local_span.value_start))
+            .ok_or_else(|| invalid("media track attribute offset overflow"))?;
+        let value_end = start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(local_span.value_end))
+            .ok_or_else(|| invalid("media track attribute offset overflow"))?;
+        let full_start = start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(local_span.name_start))
+            .ok_or_else(|| invalid("media track attribute offset overflow"))?;
+        let full_end = start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(local_span.end))
+            .ok_or_else(|| invalid("media track attribute offset overflow"))?;
+        result = Some(Attr {
+            value,
+            span: value_start..value_end,
+            full_span: full_start..full_end,
+        });
+    }
+    Ok(result)
+}
+
+struct LocalAttrSpan {
+    name_start: usize,
+    value_start: usize,
+    value_end: usize,
+    end: usize,
+}
+
+fn attribute_span(raw: &[u8], key: &[u8]) -> Result<LocalAttrSpan> {
+    let mut index = 0usize;
+    while index < raw.len()
+        && !raw[index].is_ascii_whitespace()
+        && !matches!(raw[index], b'>' | b'/')
+    {
+        index += 1;
+    }
+    while index < raw.len() {
+        while index < raw.len() && raw[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= raw.len() || raw[index] == b'>' || raw[index] == b'/' {
+            break;
+        }
+        let name_start = index;
+        while index < raw.len()
+            && !raw[index].is_ascii_whitespace()
+            && !matches!(raw[index], b'=' | b'>' | b'/')
+        {
+            index += 1;
+        }
+        let name = &raw[name_start..index];
+        while index < raw.len() && raw[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        if index >= raw.len() || raw[index] != b'=' {
+            return Err(invalid("media track attribute has no value"));
+        }
+        index += 1;
+        while index < raw.len() && raw[index].is_ascii_whitespace() {
+            index += 1;
+        }
+        let quote = *raw
+            .get(index)
+            .ok_or_else(|| invalid("media track attribute value is unterminated"))?;
+        if quote != b'"' && quote != b'\'' {
+            return Err(invalid("media track attribute value is not quoted"));
+        }
+        index += 1;
+        let value_start = index;
+        while index < raw.len() && raw[index] != quote {
+            index += 1;
+        }
+        if index >= raw.len() {
+            return Err(invalid("media track attribute value is unterminated"));
+        }
+        if name == key {
+            return Ok(LocalAttrSpan {
+                name_start,
+                value_start,
+                value_end: index,
+                end: index + 1,
+            });
+        }
+        index += 1;
+    }
+    Err(invalid(format!(
+        "media track attribute '{}' has no source span",
+        String::from_utf8_lossy(key)
+    )))
+}
+
+fn opening_insert(element: &BytesStart<'_>, start: usize) -> Result<usize> {
+    let raw = element.as_ref();
+    let Some(close) = raw.iter().rposition(|byte| *byte == b'>') else {
+        return start
+            .checked_add(1)
+            .and_then(|value| value.checked_add(raw.len()))
+            .ok_or_else(|| invalid("media track opening offset overflow"));
+    };
+    let insert = if close > 0 && raw[close - 1] == b'/' {
+        close - 1
+    } else {
+        close
+    };
+    start
+        .checked_add(1)
+        .and_then(|value| value.checked_add(insert))
+        .ok_or_else(|| invalid("media track opening offset overflow"))
+}
+
+fn namespace_kind(value: ResolveResult<'_>) -> NamespaceKind {
+    match value {
+        ResolveResult::Bound(Namespace(value)) if value == PML || value == PML_STRICT => {
+            NamespaceKind::Pml
+        },
+        ResolveResult::Bound(Namespace(value)) if value == P14 => NamespaceKind::P14,
+        ResolveResult::Bound(Namespace(value)) if value == P15 => NamespaceKind::P15,
+        ResolveResult::Bound(Namespace(value)) if value == P173 => NamespaceKind::P173,
+        _ => NamespaceKind::Other,
+    }
+}
+
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("media tracks XML offset does not fit usize"))
+}
+
+fn xml_error(error: quick_xml::Error) -> Error {
+    Error::Xml(error.to_string())
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::Invalid(message.into())
+}
+
+fn limit(kind: crate::error::CodecLimitKind, observed: usize, maximum: usize) -> Error {
+    Error::Limit {
+        kind: crate::error::LimitKind::Codec(kind),
+        observed,
+        maximum,
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the media-track search accepts before, around and after `p:sld`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The search of one slide for a media shape.
+    #[test]
+    fn media_track_search_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"slide XML is empty\")",
+                "whitespace only: Invalid(\"slide XML is not one complete document\")",
+                "declaration only: Invalid(\"slide XML is not one complete document\")",
+                "empty-element root: Invalid(\"slide XML is not one complete document\")",
+                "start and end root: Ok(false)",
+                "root then whitespace: Ok(false)",
+                "root then comment: Ok(false)",
+                "root then PI: Invalid(\"unsupported XML construct in slide media metadata\")",
+                "root then text: Ok(false)",
+                "root then second root: Ok(false)",
+                "root then foreign start: Ok(false)",
+                "root then foreign empty: Ok(false)",
+                "declaration after root: Ok(false)",
+                "two declarations: Ok(false)",
+                "comment before declaration: Ok(false)",
+                "text before root: Ok(false)",
+                "unterminated root: Invalid(\"slide XML is not one complete document\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"unsupported XML construct in slide media metadata\")",
+                "top-level CDATA: Ok(false)",
+                "declaration then root: Ok(false)",
+                "whitespace before declaration: Ok(false)",
+                "PI before declaration: Invalid(\"unsupported XML construct in slide media metadata\")",
+                "comment then root: Ok(false)",
+                "PI then root: Invalid(\"unsupported XML construct in slide media metadata\")",
+                "root then text then second root: Ok(false)",
+                "empty-element root then root: Ok(false)",
+                "declaration after empty-element root: Invalid(\"slide XML is not one complete document\")",
+            ],
+            |xml| {
+                outcome(
+                    super::discover(
+                        xml,
+                        &super::MediaKey {
+                            slide_part_name: "/ppt/slides/slide1.xml".into(),
+                            shape_id: 7,
+                        },
+                        super::Limits::DEFAULT,
+                    ),
+                    |found| found.is_some().to_string(),
+                )
+            },
+        );
+    }
+}

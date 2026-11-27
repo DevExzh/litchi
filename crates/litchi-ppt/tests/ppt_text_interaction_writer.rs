@@ -1,0 +1,176 @@
+use litchi_ppt::writer::text_format::{Paragraph, TextRun};
+use litchi_ppt::writer::{Builder, Hyperlink};
+use litchi_ppt::{
+    Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
+    TextInteraction, TextRange, raw::Reader,
+};
+use std::io::Cursor;
+
+fn write(writer: &mut Builder) -> Vec<u8> {
+    let mut output = Cursor::new(Vec::new());
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
+    output.into_inner()
+}
+
+#[test]
+fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
+    let mut writer = Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer.add_textbox(slide, 10, 10, 240, 40, "A😀BC").unwrap();
+
+    let hyperlink_id = writer.add_hyperlink(Hyperlink::url("https://example.invalid/text"));
+    writer
+        .set_last_shape_text_hyperlink(slide, TextRange::new(1, 3).unwrap(), hyperlink_id)
+        .unwrap();
+    let hover = TextInteraction::new(
+        TextRange::new(3, 5).unwrap(),
+        Interaction::new(
+            InteractionTrigger::MouseOver,
+            InteractionAction::RunProgram,
+            InteractionLinkTarget::OtherFile,
+        )
+        .with_macro_name("viewer.exe")
+        .unwrap(),
+    )
+    .unwrap();
+    writer
+        .set_last_shape_text_interaction(slide, hover.clone())
+        .unwrap();
+
+    let mut shape_action = Interaction::new(
+        InteractionTrigger::Click,
+        InteractionAction::Jump,
+        InteractionLinkTarget::NextSlide,
+    );
+    shape_action.jump = InteractionJump::NextSlide;
+    writer
+        .set_last_shape_interaction(slide, shape_action.clone())
+        .unwrap();
+
+    writer
+        .add_rich_textbox(
+            slide,
+            10,
+            60,
+            240,
+            60,
+            vec![
+                Paragraph::with_runs(vec![TextRun::new("Hi😀").bold()]),
+                Paragraph::new("there"),
+            ],
+        )
+        .unwrap();
+    let rich = TextInteraction::new(
+        TextRange::new(5, 10).unwrap(),
+        Interaction::new(
+            InteractionTrigger::Click,
+            InteractionAction::Macro,
+            InteractionLinkTarget::Nil,
+        )
+        .with_macro_name("FormatSecondParagraph")
+        .unwrap(),
+    )
+    .unwrap();
+    writer
+        .set_last_shape_text_interaction(slide, rich.clone())
+        .unwrap();
+
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let presentation = package.presentation().unwrap();
+    let hyperlinks = presentation.hyperlinks().unwrap();
+    let read_slide = &presentation.slides().unwrap()[0];
+    let entries = read_slide.shape_text_interactions().unwrap();
+    assert_eq!(entries.len(), 2);
+
+    let paired = entries
+        .iter()
+        .find(|entry| entry.interactions.len() == 2)
+        .unwrap();
+    assert_eq!(paired.interactions[0].range, TextRange::new(1, 3).unwrap());
+    assert_eq!(
+        paired.interactions[0]
+            .interaction
+            .hyperlink(&hyperlinks)
+            .unwrap()
+            .target
+            .as_deref(),
+        Some("https://example.invalid/text")
+    );
+    assert_eq!(paired.interactions[1], hover);
+    assert!(
+        entries
+            .iter()
+            .any(|entry| entry.interactions.as_slice() == std::slice::from_ref(&rich))
+    );
+
+    let shape_entries = read_slide.shape_interactions().unwrap();
+    assert_eq!(shape_entries.len(), 1);
+    assert_eq!(shape_entries[0].interactions, [shape_action]);
+}
+
+#[test]
+fn invalid_text_ranges_references_and_limits_are_atomic() {
+    let mut writer = Builder::new();
+    let slide = writer.add_slide().unwrap();
+    writer.add_textbox(slide, 10, 10, 240, 40, "ABCDE").unwrap();
+    let existing = TextInteraction::new(
+        TextRange::new(1, 3).unwrap(),
+        Interaction::new(
+            InteractionTrigger::Click,
+            InteractionAction::Macro,
+            InteractionLinkTarget::Nil,
+        )
+        .with_macro_name("Existing")
+        .unwrap(),
+    )
+    .unwrap();
+    writer
+        .set_last_shape_text_interaction(slide, existing.clone())
+        .unwrap();
+
+    let outside = TextInteraction::new(
+        TextRange::new(0, 7).unwrap(),
+        Interaction::new(
+            InteractionTrigger::Click,
+            InteractionAction::NoAction,
+            InteractionLinkTarget::Nil,
+        ),
+    )
+    .unwrap();
+    assert!(
+        writer
+            .set_last_shape_text_interaction(slide, outside)
+            .is_err()
+    );
+
+    let mut dangling_action = Interaction::new(
+        InteractionTrigger::MouseOver,
+        InteractionAction::Hyperlink,
+        InteractionLinkTarget::Url,
+    );
+    dangling_action.hyperlink_id = 99;
+    let dangling = TextInteraction::new(TextRange::new(3, 5).unwrap(), dangling_action).unwrap();
+    assert!(
+        writer
+            .set_last_shape_text_interaction(slide, dangling)
+            .is_err()
+    );
+
+    assert!(
+        !writer
+            .clear_last_shape_text_interaction(
+                slide,
+                TextRange::new(3, 5).unwrap(),
+                InteractionTrigger::MouseOver,
+            )
+            .unwrap()
+    );
+
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let presentation = package.presentation().unwrap();
+    let entries = presentation.slides().unwrap()[0]
+        .shape_text_interactions()
+        .unwrap();
+    assert_eq!(entries.len(), 1);
+    assert_eq!(entries[0].interactions, [existing]);
+}

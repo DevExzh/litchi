@@ -1,0 +1,87 @@
+<p:grpSp xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:nvGrpSpPr>
+    <p:cNvPr id="100" name="OLE objects"/>
+    <p:cNvGrpSpPr/>
+    <p:nvPr/>
+  </p:nvGrpSpPr>
+  <p:grpSpPr/>
+  <p:graphicFrame>
+    <p:nvGraphicFramePr>
+      <p:cNvPr id="101" name="Embedded workbook"/>
+      <p:cNvGraphicFramePr/>
+      <p:nvPr/>
+    </p:nvGraphicFramePr>
+    <p:xfrm>
+      <a:off x="0" y="0"/>
+      <a:ext cx="914400" cy="457200"/>
+    </p:xfrm>
+    <a:graphic>
+      <a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">
+        <p:oleObj spid="_x0000_s1025" name="Workbook" progId="Excel.Sheet.12" r:id="rIdOle" imgW="914400" imgH="457200" showAsIcon="1">
+          <p:embed/>
+          <p:pic>
+            <p:nvPicPr>
+              <p:cNvPr id="0" name="Workbook icon"/>
+              <p:cNvPicPr/>
+              <p:nvPr/>
+            </p:nvPicPr>
+            <p:blipFill>
+              <a:blip r:embed="rIdPreview"/>
+              <a:stretch><a:fillRect/></a:stretch>
+            </p:blipFill>
+            <p:spPr>
+              <a:prstGeom prst="rect"><a:avLst/></a:prstGeom>
+            </p:spPr>
+          </p:pic>
+        </p:oleObj>
+      </a:graphicData>
+    </a:graphic>
+  </p:graphicFrame>
+  <p:graphicFrame>
+    <p:nvGraphicFramePr>
+      <p:cNvPr id="102" name="Embedded package"/>
+      <p:cNvGraphicFramePr/>
+      <p:nvPr/>
+    </p:nvGraphicFramePr>
+    <p:xfrm>
+      <a:off x="914400" y="0"/>
+      <a:ext cx="914400" cy="457200"/>
+    </p:xfrm>
+    <a:graphic>
+      <a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">
+        <p:oleObj spid="_x0000_s1026" name="Document package" progId="Package" r:id="rIdPackage">
+          <p:embed/>
+        </p:oleObj>
+      </a:graphicData>
+    </a:graphic>
+  </p:graphicFrame>
+  <p:graphicFrame>
+    <p:nvGraphicFramePr>
+      <p:cNvPr id="103" name="Linked document"/>
+      <p:cNvGraphicFramePr/>
+      <p:nvPr/>
+    </p:nvGraphicFramePr>
+    <p:xfrm>
+      <a:off x="1828800" y="0"/>
+      <a:ext cx="914400" cy="457200"/>
+    </p:xfrm>
+    <a:graphic>
+      <a:graphicData uri="http://schemas.openxmlformats.org/presentationml/2006/ole">
+        <mc:AlternateContent xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:v="urn:example:unsupported">
+          <mc:Choice Requires="v">
+            <p:oleObj name="Ignored choice" r:id="rIdIgnored">
+              <p:embed/>
+            </p:oleObj>
+          </mc:Choice>
+          <mc:Fallback>
+            <p:oleObj spid="_x0000_s1027" name="Linked document" progId="Word.Document.12" r:id="rIdLinked">
+              <p:link/>
+            </p:oleObj>
+          </mc:Fallback>
+        </mc:AlternateContent>
+      </a:graphicData>
+    </a:graphic>
+  </p:graphicFrame>
+</p:grpSp>

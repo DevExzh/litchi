@@ -1,0 +1,536 @@
+//! Immutable web-template package ownership and bounded content replacement.
+
+use litchi_core::{Error, Metadata, Result};
+use litchi_odf_common::core::{
+    OwnedPackage, PackageWriter, XmlSourcePart, XmlSplicePublication, family::Package,
+};
+use litchi_odf_common::{OpenOptions, SemanticLimitKind};
+use std::{
+    path::Path,
+    sync::{Arc, Mutex, OnceLock},
+};
+
+pub(crate) const MIMETYPE: &str = "application/vnd.oasis.opendocument.text-web";
+// The common package shell requires a cheap marker before this family applies
+// its namespace-aware structural contract below. A literal prefix is not a
+// valid ODF namespace check, so it must remain deliberately non-semantic.
+const PRELIMINARY_XML_MARKER: &str = "<";
+const MAX_OUTPUT_BYTES: usize = 256 * 1024 * 1024;
+
+struct State {
+    bookmarks: Vec<crate::bookmark::Bookmark>,
+    forms: Vec<crate::form::Form>,
+    forms_site: Option<crate::codec::ReplacementSite>,
+    headings: Vec<crate::heading::Heading>,
+    heading_content_sites: Vec<crate::codec::ReplacementSite>,
+    heading_full_sites: Vec<crate::codec::ReplacementSite>,
+    heading_inline_replaceable: Vec<bool>,
+    heading_replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
+    lists: Vec<crate::list::List>,
+    list_sites: Vec<crate::codec::ReplacementSite>,
+    meta_xml: Option<String>,
+    order: Vec<crate::codec::BlockOrder>,
+    package: Package,
+    paragraphs: Vec<crate::paragraph::Paragraph>,
+    paragraph_content_sites: Vec<crate::codec::ReplacementSite>,
+    paragraph_full_sites: Vec<crate::codec::ReplacementSite>,
+    paragraph_inline_replaceable: Vec<bool>,
+    replacement_sites: Vec<Option<crate::codec::ReplacementSite>>,
+    resources: Vec<crate::resource::Resource>,
+    resource_sites: Vec<crate::codec::ReplacementSite>,
+    styles: Vec<crate::style::Style>,
+    structures: OnceLock<Arc<crate::codec::BodyStructures>>,
+    structures_gate: Mutex<()>,
+    text_close: usize,
+}
+
+/// An immutable, validated package snapshot.
+#[derive(Clone)]
+pub(crate) struct Snapshot(Arc<State>);
+
+impl Snapshot {
+    /// The retained physical package (metadata transactions).
+    pub(crate) fn owned_package(&self) -> &OwnedPackage {
+        self.0.package.package()
+    }
+
+    pub(crate) fn is_same(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+    pub(crate) fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package =
+            Package::open_with_options(path, options, MIMETYPE, PRELIMINARY_XML_MARKER, "OTH")?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package = Package::from_reader_with_options(
+            reader,
+            options,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes_with_options(
+        bytes: Vec<u8>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package = Package::from_bytes_with_options(
+            bytes,
+            options,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_owned_package_with_options(
+        archive: OwnedPackage,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package = Package::from_owned_package_with_options(
+            archive,
+            options,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?;
+        Self::from_package_with_options(package, options)
+    }
+
+    pub(crate) fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
+        Self::from_package(Package::from_bytes(
+            bytes,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?)
+    }
+
+    pub(crate) fn from_shared_bytes(bytes: Arc<Vec<u8>>) -> Result<Self> {
+        Self::from_package(Package::from_shared_bytes(
+            bytes,
+            MIMETYPE,
+            PRELIMINARY_XML_MARKER,
+            "OTH",
+        )?)
+    }
+
+    /// Project the package, then bound its top-level body blocks by the
+    /// semantic `units` limit.
+    fn from_package_with_options(
+        package: Package,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let snapshot = Self::from_package(package)?;
+        options.semantic_limits_value().check(
+            SemanticLimitKind::Units,
+            u64::try_from(snapshot.order().len()).unwrap_or(u64::MAX),
+        )?;
+        Ok(snapshot)
+    }
+
+    pub(crate) fn tolerance_report(&self) -> &litchi_odf_common::leniency::ToleranceReport {
+        self.0.package.tolerance_report()
+    }
+
+    fn from_package(package: Package) -> Result<Self> {
+        let meta_xml = if package.package().has_file("meta.xml")? {
+            Some(
+                String::from_utf8(package.package().get_file("meta.xml")?).map_err(|error| {
+                    Error::InvalidFormat(format!("invalid OTH meta.xml UTF-8: {error}"))
+                })?,
+            )
+        } else {
+            None
+        };
+        let projection = crate::codec::project(package.content_xml())?;
+        let resource_sites = crate::codec::resource_sites(package.content_xml())?;
+        if resource_sites.len() != projection.resources.len() {
+            return Err(Error::InvalidFormat(
+                "OTH resource projection/site count differs".to_string(),
+            ));
+        }
+        let mut headings = Vec::new();
+        let mut heading_content_sites = Vec::new();
+        let mut heading_full_sites = Vec::new();
+        let mut heading_inline_replaceable = Vec::new();
+        let mut heading_replacement_sites = Vec::new();
+        headings
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading snapshot",
+                source,
+            })?;
+        heading_content_sites
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading content edit sites",
+                source,
+            })?;
+        heading_full_sites
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading full source sites",
+                source,
+            })?;
+        heading_inline_replaceable
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading inline edit flags",
+                source,
+            })?;
+        heading_replacement_sites
+            .try_reserve(projection.headings.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH heading edit sites",
+                source,
+            })?;
+        for site in projection.headings {
+            heading_content_sites.push(site.content);
+            heading_full_sites.push(site.full);
+            heading_inline_replaceable.push(site.inline_replaceable);
+            headings.push(site.value);
+            heading_replacement_sites.push(site.replacement);
+        }
+        let mut paragraphs = Vec::new();
+        let mut paragraph_content_sites = Vec::new();
+        let mut paragraph_full_sites = Vec::new();
+        let mut paragraph_inline_replaceable = Vec::new();
+        let mut replacement_sites = Vec::new();
+        paragraphs
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph snapshot",
+                source,
+            })?;
+        paragraph_content_sites
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph content edit sites",
+                source,
+            })?;
+        paragraph_full_sites
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph full source sites",
+                source,
+            })?;
+        paragraph_inline_replaceable
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph inline edit flags",
+                source,
+            })?;
+        replacement_sites
+            .try_reserve(projection.paragraphs.len())
+            .map_err(|source| Error::Allocation {
+                resource: "OTH paragraph edit sites",
+                source,
+            })?;
+        for site in projection.paragraphs {
+            paragraph_content_sites.push(site.content);
+            paragraph_full_sites.push(site.full);
+            paragraph_inline_replaceable.push(site.inline_replaceable);
+            paragraphs.push(site.value);
+            replacement_sites.push(site.replacement);
+        }
+        let mut styles =
+            crate::codec::project_styles(package.content_xml(), crate::style::Origin::Content)?;
+        if let Some(styles_xml) = package.styles_xml() {
+            styles.extend(crate::codec::project_styles(
+                styles_xml,
+                crate::style::Origin::Styles,
+            )?);
+        }
+        Ok(Self(Arc::new(State {
+            bookmarks: projection.bookmarks,
+            forms: projection.forms,
+            forms_site: projection.forms_site,
+            headings,
+            heading_content_sites,
+            heading_full_sites,
+            heading_inline_replaceable,
+            heading_replacement_sites,
+            lists: projection.lists,
+            list_sites: projection.list_sites,
+            meta_xml,
+            order: projection.order,
+            package,
+            paragraphs,
+            paragraph_content_sites,
+            paragraph_full_sites,
+            paragraph_inline_replaceable,
+            replacement_sites,
+            resources: projection.resources,
+            resource_sites,
+            styles,
+            structures: OnceLock::new(),
+            structures_gate: Mutex::new(()),
+            text_close: projection.text_close,
+        })))
+    }
+
+    pub(crate) fn content_xml(&self) -> &str {
+        self.0.package.content_xml()
+    }
+
+    pub(crate) fn styles_xml(&self) -> Option<&str> {
+        self.0.package.styles_xml()
+    }
+
+    pub(crate) fn metadata(&self) -> Option<&Metadata> {
+        self.0.package.metadata()
+    }
+
+    pub(crate) fn meta_xml(&self) -> Option<&str> {
+        self.0.meta_xml.as_deref()
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        self.0.package.as_bytes()
+    }
+
+    pub(crate) fn files(&self) -> Result<Vec<String>> {
+        self.0.package.files()
+    }
+
+    pub(crate) fn paragraphs(&self) -> &[crate::paragraph::Paragraph] {
+        &self.0.paragraphs
+    }
+
+    pub(crate) fn headings(&self) -> &[crate::heading::Heading] {
+        &self.0.headings
+    }
+
+    pub(crate) fn bookmarks(&self) -> &[crate::bookmark::Bookmark] {
+        &self.0.bookmarks
+    }
+
+    fn structures(&self) -> Result<&crate::codec::BodyStructures> {
+        if let Some(structures) = self.0.structures.get() {
+            return Ok(structures);
+        }
+        let _gate =
+            self.0.structures_gate.lock().map_err(|_| {
+                Error::Other("OTH structure projection lock was poisoned".to_string())
+            })?;
+        if let Some(structures) = self.0.structures.get() {
+            return Ok(structures);
+        }
+        let structures = Arc::new(crate::codec::project_structures(self.content_xml())?);
+        let _ = self.0.structures.set(structures);
+        self.0
+            .structures
+            .get()
+            .map(Arc::as_ref)
+            .ok_or_else(|| Error::Other("OTH structure projection was not initialized".to_string()))
+    }
+
+    pub(crate) fn annotations(&self) -> Result<&[crate::annotation::Annotation]> {
+        Ok(&self.structures()?.annotations)
+    }
+
+    pub(crate) fn changes(&self) -> Result<&[crate::change::Change]> {
+        Ok(&self.structures()?.changes)
+    }
+
+    pub(crate) fn change_tracking(&self) -> Result<Option<&crate::change::ChangeTracking>> {
+        Ok(self.structures()?.change_tracking.as_ref())
+    }
+
+    pub(crate) fn frames(&self) -> Result<&[crate::frame::Frame]> {
+        Ok(&self.structures()?.frames)
+    }
+
+    pub(crate) fn indexes(&self) -> Result<&[crate::index::Index]> {
+        Ok(&self.structures()?.indexes)
+    }
+
+    pub(crate) fn lists(&self) -> &[crate::list::List] {
+        &self.0.lists
+    }
+
+    pub(crate) fn notes(&self) -> Result<&[crate::note::Note]> {
+        Ok(&self.structures()?.notes)
+    }
+
+    pub(crate) fn list_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.list_sites.get(index)
+    }
+
+    pub(crate) fn resources(&self) -> &[crate::resource::Resource] {
+        &self.0.resources
+    }
+
+    pub(crate) fn rubies(&self) -> Result<&[crate::ruby::Ruby]> {
+        Ok(&self.structures()?.rubies)
+    }
+
+    pub(crate) fn sections(&self) -> Result<&[crate::section::Section]> {
+        Ok(&self.structures()?.sections)
+    }
+
+    pub(crate) fn resource_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.resource_sites.get(index)
+    }
+
+    pub(crate) fn resource_sites(&self) -> &[crate::codec::ReplacementSite] {
+        &self.0.resource_sites
+    }
+
+    pub(crate) fn member(&self, path: &str) -> Result<Option<Vec<u8>>> {
+        self.0
+            .package
+            .package()
+            .has_file(path)?
+            .then(|| self.0.package.package().get_file(path))
+            .transpose()
+    }
+
+    pub(crate) fn member_media_type(&self, path: &str) -> Result<Option<String>> {
+        let package = self.0.package.package().package()?;
+        Ok(package.manifest().get_media_type(path).map(str::to_owned))
+    }
+
+    pub(crate) fn forms(&self) -> &[crate::form::Form] {
+        &self.0.forms
+    }
+
+    pub(crate) fn forms_site(&self) -> Option<&crate::codec::ReplacementSite> {
+        self.0.forms_site.as_ref()
+    }
+
+    pub(crate) fn styles(&self) -> &[crate::style::Style] {
+        &self.0.styles
+    }
+
+    pub(crate) fn tables(&self) -> Result<&[crate::table::Table]> {
+        Ok(&self.structures()?.tables)
+    }
+
+    pub(crate) fn order(&self) -> &[crate::codec::BlockOrder] {
+        &self.0.order
+    }
+
+    pub(crate) fn replacement_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.replacement_sites.get(index).and_then(Option::as_ref)
+    }
+
+    pub(crate) fn heading_replacement_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0
+            .heading_replacement_sites
+            .get(index)
+            .and_then(Option::as_ref)
+    }
+
+    pub(crate) fn paragraph_content_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0.paragraph_content_sites.get(index)
+    }
+
+    pub(crate) fn heading_content_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0.heading_content_sites.get(index)
+    }
+
+    pub(crate) fn paragraph_full_site(
+        &self,
+        index: usize,
+    ) -> Option<&crate::codec::ReplacementSite> {
+        self.0.paragraph_full_sites.get(index)
+    }
+
+    pub(crate) fn heading_full_site(&self, index: usize) -> Option<&crate::codec::ReplacementSite> {
+        self.0.heading_full_sites.get(index)
+    }
+
+    pub(crate) fn paragraph_inline_replaceable(&self, index: usize) -> bool {
+        self.0
+            .paragraph_inline_replaceable
+            .get(index)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn heading_inline_replaceable(&self, index: usize) -> bool {
+        self.0
+            .heading_inline_replaceable
+            .get(index)
+            .copied()
+            .unwrap_or(false)
+    }
+
+    pub(crate) fn text_close(&self) -> usize {
+        self.0.text_close
+    }
+
+    pub(crate) fn rebuild_with_parts(
+        &self,
+        content: &str,
+        metadata: &crate::facade::PartChange,
+        styles: &crate::facade::PartChange,
+        members: &[crate::facade::MemberChange],
+    ) -> Result<Self> {
+        let files = self.files()?;
+        if files.iter().any(|path| {
+            matches!(
+                path.as_str(),
+                "META-INF/documentsignatures.xml" | "META-INF/macrosignatures.xml"
+            )
+        }) {
+            return Err(Error::InvalidFormat(
+                "OTH package edits refuse signed packages".to_string(),
+            ));
+        }
+        let mut writer = PackageWriter::new_bounded(
+            MAX_OUTPUT_BYTES,
+            litchi_odf_common::core::StreamingArchiveLimits::default(),
+        );
+        writer.set_mimetype(MIMETYPE)?;
+        writer.add_file("content.xml", content.as_bytes())?;
+        for (path, change) in [("meta.xml", metadata), ("styles.xml", styles)] {
+            match change {
+                crate::facade::PartChange::Set(xml) => {
+                    let compact = crate::codec::compact_for_publication(xml)?;
+                    writer.add_file(path, compact.as_bytes())?;
+                },
+                crate::facade::PartChange::Keep if self.0.package.package().has_file(path)? => {
+                    let source = XmlSourcePart::load(self.0.package.package(), path)?;
+                    XmlSplicePublication::new(source).publish(&mut writer)?;
+                },
+                crate::facade::PartChange::Keep | crate::facade::PartChange::Remove => {},
+            }
+        }
+        for change in members {
+            if let Some(bytes) = &change.after {
+                writer.add_file_with_media_type(&change.path, bytes, &change.media_type)?;
+            }
+        }
+        let mut excluded_paths = vec![
+            "content.xml".to_string(),
+            "meta.xml".to_string(),
+            "styles.xml".to_string(),
+        ];
+        excluded_paths.extend(members.iter().map(|change| change.path.clone()));
+        writer.copy_auxiliary_files_from_except(self.0.package.package(), &excluded_paths, &[])?;
+        Self::from_bytes(writer.finish_to_bounded_bytes()?)
+    }
+}

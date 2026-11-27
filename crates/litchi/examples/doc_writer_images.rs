@@ -8,14 +8,15 @@
 //!
 //! Run with: cargo run --example doc_writer_images
 
-use litchi::ole::doc::writer::{CharacterFormatting, DocWriter, ParagraphFormatting};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with images...");
 
     // Create a new DOC writer
-    let mut writer = DocWriter::new();
+    let mut writer = Builder::new();
 
     // Add document title
     let title_char = CharacterFormatting {
@@ -68,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the document
     let output_path = "output/doc_images.doc";
-    writer.save(output_path)?;
+    writer.build()?.save(output_path)?;
 
     println!("\n✅ Document saved to: {}", output_path);
     println!("\n📝 Open this file in Microsoft Word to verify:");

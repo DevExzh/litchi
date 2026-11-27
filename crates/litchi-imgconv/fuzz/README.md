@@ -1,0 +1,105 @@
+# litchi-imgconv fuzzing
+
+Each target drives one bounded entry point of the metafile-image pipeline with
+small explicit budgets, so one execution terminates quickly and a hang is a
+finding rather than an accident:
+
+| Target | Entry point | Budget |
+| --- | --- | --- |
+| `emf_svg` | `convert_metafile(Emf, Svg)` and `(Emf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
+| `emf_png` | `convert_metafile(Emf, Png)` | 128x128 render, 1 MiB output, 20 000 records |
+| `wmf_svg` | `convert_metafile(Wmf, Svg)` and `(Wmf, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
+| `wmf_png` | `convert_metafile(Wmf, Png)` | 128x128 render, 1 MiB output, 20 000 records |
+| `pict_png` | `pict::PictParser` + `PictConverter::convert_to_png` | 128x128 bitmap, 1 MiB output |
+| `pict_convert` | `pict::convert_pict_with_options`, at the source size or, for odd-length input, at a requested width | 128x128 render, 1 MiB output, 20 000 records |
+| `pict_svg` | `convert_metafile(Pict, Svg)` and `(Pict, Auto)` | 256x256 render, 1 MiB output, 20 000 records |
+| `blip_convert` | `image::Blip::parse` + `decode_data` + `to_png`/`to_svg`, and `File::extract` for native kinds | 1 MiB BLIP, 128x128 render |
+| `odraw_scan` | `image::scan`/`store`/`get`/`all`/`delay`/`record` | 20 000 records, 1 MiB record body |
+| `emfplus_stream` | `EmfPlusRecordIter`, `validate_complete_stream`, `try_extract_emfplus_comment_body` | 1 MiB, 20 000 records |
+| `emfplus_render` | `EmfPlusSvgRenderer::push_payload` + `finish`, and the same payload as one `EMR_COMMENT_EMFPLUS` inside a synthetic EMF | 1 MiB, 20 000 records |
+| `bitmap_op` | `metafile_bitmap::BitmapOp::parse_emf`/`parse_wmf` and the blit, composite and brush-pattern helpers behind them | 256x256, 1 MiB |
+| `dib_decode` | `dib::Dib::parse_with_usage` + `to_bmp`/`to_dynamic_image*`/`to_png`, and `parse_parts` | 256x256, 1 MiB |
+
+The first input byte of `dib_decode` selects the color usage and alpha
+interpretation; `emfplus_render` wraps arbitrary bytes as the payload of a
+single `EMR_COMMENT_EMFPLUS` (MS-EMF 2.3.2.7) so EMF+ playback receives
+mutation-shaped record streams from a valid outer metafile.
+
+The targets also assert invariants that are cheap to check per execution:
+encoded output never exceeds the requested `max_output_bytes`, SVG output is
+well-formed XML with an `svg` root, PNG output decodes within the render
+budget, a repeated SVG conversion (a quarter of the inputs) gives the same
+output, and a parsed BLIP copies and parses again unchanged (`odraw_scan`).
+
+`emf_*`, `wmf_*`, `emfplus_render` and `emfplus_stream` register a custom
+mutator (`fuzz_targets/common/mutate.rs`) that edits whole records and single
+fields and rewrites the size fields, so mutants keep their framing instead of
+dying in the first size check; inputs that are not framed fall back to byte
+mutation.
+
+`bitmap_op` takes eight bytes of selector, stretch policy and colors, then the
+record payload: a selector with `% 4 == 0` parses an EMF bitmap record
+(`selector / 4` picks the type), `% 4 == 1` a WMF bitmap function, and any
+other value reads a DIB brush through `parse_emf_object_dib` after four
+little-endian offset/size words.
+
+## Building
+
+`cargo +nightly fuzz build` builds every target with libFuzzer and the address
+sanitizer. The build output lives under `target/`, which is ignored. The
+release profile also enables arithmetic overflow checks: a conversion that
+overflows is a panic in a debug build even when it wraps silently in release,
+so the campaigns must see it too.
+
+## Running
+
+Put build output, corpora and artifacts outside the checkout, and keep the
+input length and wall time bounded. The commands below run from the repository
+root; the corpus directory is seeded first (see below):
+
+```sh
+fuzz_root="$(mktemp -d "${TMPDIR:-/tmp}/litchi-imgconv-fuzz.XXXXXX")"
+mkdir -p "$fuzz_root/artifacts" "$fuzz_root/corpus/emf_png"
+find test-data -type f -iname '*.emf' -size -64k \
+  -exec cp {} "$fuzz_root/corpus/emf_png/" \;
+cd crates/litchi-imgconv/fuzz
+CARGO_TARGET_DIR="$fuzz_root/target" cargo +nightly fuzz run \
+  emf_png "$fuzz_root/corpus/emf_png" -- \
+  -artifact_prefix="$fuzz_root/artifacts/" -max_total_time=2400 \
+  -max_len=262144 -timeout=10 -rss_limit_mb=2048
+```
+
+`-fork=N` splits one campaign across `N` processes; adding
+`-ignore_crashes=1 -ignore_ooms=1 -ignore_timeouts=1` keeps a campaign running
+after a finding, so one run collects every distinct artifact. Keep `N` at or
+below the number of cores the machine can spare. `cargo +nightly fuzz list` and
+`cargo +nightly fuzz check <target>` inspect the registered targets without
+starting a campaign.
+
+## Seeding
+
+Real metafiles make far better seeds than random bytes. Small files (below
+64 KiB) from `test-data/` exercise the same records that Office documents
+produce. Copy them into the corpus directory of `emf_svg`/`emf_png`
+(`*.emf`) or `wmf_svg`/`wmf_png` (`*.wmf`); the `find` command above does this
+for one target. Further seeds come from the metafiles an Office document
+carries: extract them from your own documents and keep them below 64 KiB.
+
+A seed set drawn only from small vector pictures never mutates into the
+records that carry bitmaps, brushes, clipping or the EMF+ track selection. Add
+seeds that already contain those records: dual-mode EMF+ metafiles with and
+without `EmfPlusGetDC`, bitmap and pattern-brush records, and WMF files whose
+bitmap functions use raster operations other than `SRCCOPY`. Select them by
+record coverage, not by size alone, and keep both the small pictures and the
+larger feature-bearing ones.
+
+Targets with a structured input take these seeds:
+
+- `emfplus_render` and `emfplus_stream` take bare EMF+ record streams:
+  concatenate the `EMR_COMMENT_EMFPLUS` payloads of a dual-mode metafile in
+  file order.
+- `pict_png` and `pict_convert` take raw PICT data, with or without the
+  512-byte header.
+- `blip_convert` and `odraw_scan` take complete OfficeArt BLIP records.
+- `dib_decode` takes one selector byte followed by the packed DIB whose pixels
+  follow its header, masks and color table.

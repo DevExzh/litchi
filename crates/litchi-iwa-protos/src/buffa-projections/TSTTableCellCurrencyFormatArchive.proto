@@ -1,0 +1,16 @@
+// Narrow scalar projection for one native Numbers currency format.
+//
+// The complete TSK.FormatStructArchive remains source-authoritative. This
+// sidecar exists only to parity-check the selected scalar fields after the
+// handwritten codec has performed its complete bounded wire preflight.
+syntax = "proto2";
+package LitchiIwaNumbersTableCellCurrencyFormatProjection;
+
+message FormatStructArchive {
+  optional uint32 format_type = 1;
+  optional uint32 decimal_places = 2;
+  optional string currency_code = 3;
+  optional uint32 negative_style = 4;
+  optional bool show_thousands_separator = 5;
+  optional bool use_accounting_style = 6;
+}

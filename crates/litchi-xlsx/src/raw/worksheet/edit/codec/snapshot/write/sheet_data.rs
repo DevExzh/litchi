@@ -1,0 +1,1137 @@
+//! Row and cell snapshot writer.
+
+use std::collections::BTreeMap;
+
+use litchi_core::xml::escape_xml;
+use litchi_opc::ReplacementSpan;
+use litchi_sheet::{Cell as Address, Row};
+
+use super::super::super::wire::{
+    sibling_name, write_attribute, write_cell_tag, write_close, write_tag,
+};
+use super::super::model::{CellSlot, RowFact, RowSlot, SheetData, SourceFacts, Span, Tag};
+use crate::cell::{Content, Value};
+use crate::error::{Result, invalid};
+use crate::outline::Outline;
+use crate::raw::strings::encode_spreadsheet_text;
+use crate::raw::worksheet::edit::model::{
+    Action, DescentEffect, HeightEffect, Payload, RowAction, StyleEffect,
+};
+use crate::raw::worksheet::edit::{MAX_REPLACEMENT_SPANS, OmittedCells};
+
+pub(crate) fn write_sheet_data(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    data: &SheetData,
+    cells: BTreeMap<Address, Action>,
+    rows: BTreeMap<Row, RowAction>,
+    descent_name: &str,
+) -> Result<()> {
+    let mut by_row = BTreeMap::<u32, RowEdits>::new();
+    for (address, action) in cells {
+        by_row
+            .entry(address.row().get() + 1)
+            .or_default()
+            .cells
+            .insert(address, action);
+    }
+    for (row, action) in rows {
+        by_row.entry(row.get() + 1).or_default().row = Some(action);
+    }
+
+    if data.empty {
+        write_tag(output, &data.tag, false, &[], &[]);
+        for (number, edits) in by_row {
+            write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+        }
+        write_close(output, &data.tag.name);
+        return Ok(());
+    }
+
+    output.extend_from_slice(&source[data.span.start..data.tag_end]);
+    let mut cursor = data.tag_end;
+    let mut pending = by_row.into_iter().peekable();
+    for row in &data.rows {
+        output.extend_from_slice(&source[cursor..row.span.start]);
+        while pending
+            .peek()
+            .is_some_and(|(number, _)| *number < row.number)
+        {
+            if let Some((number, edits)) = pending.next() {
+                write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+            }
+        }
+        if pending
+            .peek()
+            .is_some_and(|(number, _)| *number == row.number)
+        {
+            let (_, edits) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
+            write_row(output, source, row, &edits, descent_name)?;
+        } else {
+            output.extend_from_slice(&source[row.span.start..row.span.end]);
+        }
+        cursor = row.span.end;
+    }
+    output.extend_from_slice(&source[cursor..data.close_start]);
+    for (number, edits) in pending {
+        write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+    }
+    output.extend_from_slice(&source[data.close_start..data.span.end]);
+    Ok(())
+}
+
+/// Write the complete ordinary output and retain the actual output spans of
+/// cell bodies that a reduced semantic readback may omit. This is a separate
+/// value-only route; callers that need row, column, or default effects keep
+/// using [`write_sheet_data`].
+pub(crate) fn write_sheet_data_with_provenance(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    data: &SheetData,
+    cells: BTreeMap<Address, Action>,
+    rows: BTreeMap<Row, RowAction>,
+    descent_name: &str,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
+) -> Result<Box<[OmittedCells]>> {
+    let mut by_row = BTreeMap::<u32, RowEdits>::new();
+    for (address, action) in cells {
+        let number = address
+            .row()
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
+        by_row
+            .entry(number)
+            .or_default()
+            .cells
+            .insert(address, action);
+    }
+    for (row, action) in rows {
+        let number = row
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
+        by_row.entry(number).or_default().row = Some(action);
+    }
+    let mut omitted = Vec::new();
+    let mut recording = omitted.try_reserve(data.rows.len()).is_ok();
+    if !recording {
+        omitted.clear();
+    }
+
+    if data.empty {
+        write_tag(output, &data.tag, false, &[], &[]);
+        for (number, edits) in by_row {
+            write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+        }
+        write_close(output, &data.tag.name);
+        return Ok(if recording {
+            omitted.into_boxed_slice()
+        } else {
+            Box::new([])
+        });
+    }
+
+    output.extend_from_slice(&source[data.span.start..data.tag_end]);
+    let mut cursor = data.tag_end;
+    let mut pending = by_row.into_iter().peekable();
+    for row in &data.rows {
+        output.extend_from_slice(&source[cursor..row.span.start]);
+        while pending
+            .peek()
+            .is_some_and(|(number, _)| *number < row.number)
+        {
+            if let Some((number, edits)) = pending.next() {
+                write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+            }
+        }
+        if pending
+            .peek()
+            .is_some_and(|(number, _)| *number == row.number)
+        {
+            let (_, edits) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet row edit ordering was lost"))?;
+            let membership_changed = edits.cells.iter().any(|(address, action)| {
+                let exists = row
+                    .cells
+                    .binary_search_by_key(address, |cell| cell.address)
+                    .is_ok();
+                !exists || matches!(action, Action::Remove)
+            });
+            if membership_changed || edits.row.is_some() || row.empty {
+                write_row(output, source, row, &edits, descent_name)?;
+            } else {
+                write_replacement_row(
+                    output,
+                    source,
+                    row,
+                    &edits,
+                    &mut omitted,
+                    &mut recording,
+                    spans,
+                    recording_spans,
+                )?;
+            }
+        } else {
+            output.extend_from_slice(&source[row.span.start..row.tag_end]);
+            let body_start = output.len();
+            output.extend_from_slice(&source[row.tag_end..row.close_start]);
+            let body_end = output.len();
+            record_omitted_row(&mut omitted, &mut recording, row, body_start, body_end)?;
+            output.extend_from_slice(&source[row.close_start..row.span.end]);
+        }
+        cursor = row.span.end;
+    }
+    output.extend_from_slice(&source[cursor..data.close_start]);
+    for (number, edits) in pending {
+        write_new_row(output, &data.tag.name, number, &edits, descent_name)?;
+    }
+    output.extend_from_slice(&source[data.close_start..data.span.end]);
+    Ok(if recording {
+        omitted.into_boxed_slice()
+    } else {
+        Box::new([])
+    })
+}
+
+/// Write the complete value-only output from the compact planning facts.
+///
+/// This is the byte-for-byte counterpart of
+/// [`write_sheet_data_with_provenance`] for the narrow shape the fact route
+/// admits: every action updates a cell that already exists in the row the
+/// facts recorded, so no row or cell is ever created, removed or re-tagged.
+/// `slots` carries the scanner slot of each changed cell, materialized from
+/// its retained span before the first byte of output was written, so this
+/// function can no longer decline.
+pub(crate) fn write_sheet_data_from_facts(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    facts: &SourceFacts,
+    cells: BTreeMap<Address, Action>,
+    slots: &BTreeMap<Address, CellSlot>,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
+) -> Result<Box<[OmittedCells]>> {
+    let mut by_row = BTreeMap::<u32, BTreeMap<Address, Action>>::new();
+    for (address, action) in cells {
+        let number = address
+            .row()
+            .get()
+            .checked_add(1)
+            .ok_or_else(|| invalid("worksheet edit row overflows u32"))?;
+        by_row.entry(number).or_default().insert(address, action);
+    }
+    let mut omitted = Vec::new();
+    let mut recording = omitted.try_reserve(facts.rows.len()).is_ok();
+    if !recording {
+        omitted.clear();
+    }
+
+    output.extend_from_slice(&source[facts.sheet_data.start..facts.sheet_data_tag_end]);
+    let mut cursor = facts.sheet_data_tag_end;
+    for row in &*facts.rows {
+        let start = usize::try_from(row.start)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        let end = usize::try_from(row.end)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        let tag_end = usize::try_from(row.tag_end)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        let close_start = usize::try_from(row.close_start)
+            .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+        output.extend_from_slice(&source[cursor..start]);
+        match by_row.remove(&row.number) {
+            Some(edits) => {
+                write_replacement_row_from_facts(
+                    output,
+                    source,
+                    facts,
+                    row,
+                    &edits,
+                    slots,
+                    &mut omitted,
+                    &mut recording,
+                    spans,
+                    recording_spans,
+                )?;
+            },
+            None => {
+                output.extend_from_slice(&source[start..tag_end]);
+                let body_start = output.len();
+                output.extend_from_slice(&source[tag_end..close_start]);
+                let body_end = output.len();
+                record_omitted_facts(
+                    &mut omitted,
+                    &mut recording,
+                    facts,
+                    row,
+                    body_start,
+                    body_end,
+                )?;
+                output.extend_from_slice(&source[close_start..end]);
+            },
+        }
+        cursor = end;
+    }
+    if !by_row.is_empty() {
+        return Err(invalid("worksheet fact rewrite lost a staged row"));
+    }
+    output.extend_from_slice(&source[cursor..facts.sheet_data_close_start]);
+    output.extend_from_slice(&source[facts.sheet_data_close_start..facts.sheet_data.end]);
+    Ok(if recording {
+        omitted.into_boxed_slice()
+    } else {
+        Box::new([])
+    })
+}
+
+fn write_replacement_row_from_facts(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    facts: &SourceFacts,
+    row: &RowFact,
+    edits: &BTreeMap<Address, Action>,
+    slots: &BTreeMap<Address, CellSlot>,
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
+) -> Result<()> {
+    let start = usize::try_from(row.start)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    let end = usize::try_from(row.end)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    let tag_end = usize::try_from(row.tag_end)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    let close_start = usize::try_from(row.close_start)
+        .map_err(|_source| invalid("worksheet row fact does not fit usize"))?;
+    output.extend_from_slice(&source[start..tag_end]);
+    let mut cursor = tag_end;
+    let mut run = None::<(usize, Address, Address)>;
+    let row_cells = facts
+        .row_cells(row)
+        .ok_or_else(|| invalid("worksheet row fact has no cell range"))?;
+    for cell in row_cells {
+        let cell_span_start = usize::try_from(cell.start)
+            .map_err(|_source| invalid("worksheet cell fact does not fit usize"))?;
+        let cell_span_end = usize::try_from(cell.end)
+            .map_err(|_source| invalid("worksheet cell fact does not fit usize"))?;
+        output.extend_from_slice(&source[cursor..cell_span_start]);
+        let cell_start = output.len();
+        if let Some(action) = edits.get(&cell.address) {
+            if let Some((start, first, last)) = run.take() {
+                record_omitted(omitted, recording, first, last, start, cell_start)?;
+            }
+            let slot = slots
+                .get(&cell.address)
+                .ok_or_else(|| invalid("worksheet changed cell lost its materialized slot"))?;
+            let replacement_start = output.len();
+            match action {
+                Action::Update { .. } => write_cell(output, source, slot, action)?,
+                Action::Remove => {
+                    return Err(invalid("fact rewrite unexpectedly removes a cell"));
+                },
+            }
+            record_replacement_span(
+                spans,
+                recording_spans,
+                Span {
+                    start: cell_span_start,
+                    end: cell_span_end,
+                },
+                replacement_start,
+                output.len(),
+            );
+        } else {
+            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
+            let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
+            run = Some((start, first, cell.address));
+            output.extend_from_slice(&source[cell_span_start..cell_span_end]);
+        }
+        cursor = cell_span_end;
+    }
+    output.extend_from_slice(&source[cursor..close_start]);
+    if let Some((start, first, last)) = run {
+        record_omitted(omitted, recording, first, last, start, output.len())?;
+    }
+    output.extend_from_slice(&source[close_start..end]);
+    Ok(())
+}
+
+fn record_omitted_facts(
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    facts: &SourceFacts,
+    row: &RowFact,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    let cells = facts
+        .row_cells(row)
+        .ok_or_else(|| invalid("worksheet row fact has no cell range"))?;
+    let Some(first) = cells.first() else {
+        return Ok(());
+    };
+    let last = cells
+        .last()
+        .ok_or_else(|| invalid("worksheet row fact lost its last cell"))?;
+    record_omitted(omitted, recording, first.address, last.address, start, end)
+}
+
+fn write_replacement_row(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    row: &RowSlot,
+    edits: &RowEdits,
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    spans: &mut Vec<ReplacementSpan>,
+    recording_spans: &mut bool,
+) -> Result<()> {
+    output.extend_from_slice(&source[row.span.start..row.tag_end]);
+    let mut cursor = row.tag_end;
+    let mut pending = edits.cells.iter().peekable();
+    let mut run = None::<(usize, Address, Address)>;
+    for cell in &row.cells {
+        output.extend_from_slice(&source[cursor..cell.span.start]);
+        let cell_start = output.len();
+        while pending
+            .peek()
+            .is_some_and(|(address, _)| **address < cell.address)
+        {
+            let (address, action) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            if let Some((start, first, last)) = run.take() {
+                record_omitted(omitted, recording, first, last, start, cell_start)?;
+            }
+            write_new_action(output, &row.tag.name, *address, action)?;
+        }
+        if pending
+            .peek()
+            .is_some_and(|(address, _)| **address == cell.address)
+        {
+            let (_, action) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            #[cfg(test)]
+            let cell_start =
+                fault::reemit_changed_into_run(output, source, cell, &mut run, cell_start);
+            if let Some((start, first, last)) = run.take() {
+                record_omitted(omitted, recording, first, last, start, cell_start)?;
+            }
+            let replacement_start = output.len();
+            match action {
+                Action::Update { .. } => write_cell(output, source, cell, action)?,
+                Action::Remove => {
+                    return Err(invalid("replacement row unexpectedly removes a cell"));
+                },
+            }
+            record_replacement_span(
+                spans,
+                recording_spans,
+                cell.span,
+                replacement_start,
+                output.len(),
+            );
+        } else {
+            let start = run.map(|(start, _, _)| start).unwrap_or(cell_start);
+            let first = run.map(|(_, first, _)| first).unwrap_or(cell.address);
+            run = Some((start, first, cell.address));
+            output.extend_from_slice(&source[cell.span.start..cell.span.end]);
+        }
+        cursor = cell.span.end;
+    }
+    output.extend_from_slice(&source[cursor..row.close_start]);
+    if let Some((start, first, last)) = run {
+        record_omitted(omitted, recording, first, last, start, output.len())?;
+    }
+    output.extend_from_slice(&source[row.close_start..row.span.end]);
+    Ok(())
+}
+
+/// Test-only fault injection into the provenance writer.
+///
+/// With the fault active, a replaced cell's old record is also copied into
+/// the preceding omitted run before the new record is written, so the
+/// published row holds two records at one address while the provenance
+/// claims the old one is a verbatim source record. The complete parse
+/// refuses that as a duplicate; a reduced readback must not accept it.
+#[cfg(test)]
+pub(crate) mod fault {
+    use std::cell::Cell;
+
+    use litchi_sheet::Cell as Address;
+
+    use super::super::super::model::CellSlot;
+
+    thread_local! {
+        static ACTIVE: Cell<bool> = const { Cell::new(false) };
+    }
+
+    /// Run `work` with the fault active on this thread.
+    pub(crate) fn with_reemitted_changed_cells<T>(work: impl FnOnce() -> T) -> T {
+        struct Restore(bool);
+        impl Drop for Restore {
+            fn drop(&mut self) {
+                ACTIVE.with(|active| active.set(self.0));
+            }
+        }
+        let _restore = Restore(ACTIVE.with(|active| active.replace(true)));
+        work()
+    }
+
+    /// Apply the fault to the replaced `cell`, returning where the omitted
+    /// run now ends.
+    pub(super) fn reemit_changed_into_run(
+        output: &mut Vec<u8>,
+        source: &[u8],
+        cell: &CellSlot,
+        run: &mut Option<(usize, Address, Address)>,
+        cell_start: usize,
+    ) -> usize {
+        if !ACTIVE.with(Cell::get) {
+            return cell_start;
+        }
+        let start = run.map_or(cell_start, |(start, _, _)| start);
+        let first = run.map_or(cell.address, |(_, first, _)| first);
+        *run = Some((start, first, cell.address));
+        output.extend_from_slice(&source[cell.span.start..cell.span.end]);
+        output.len()
+    }
+}
+
+fn record_omitted_row(
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    row: &RowSlot,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    let Some(first) = row.cells.first() else {
+        return Ok(());
+    };
+    let last = row
+        .cells
+        .last()
+        .ok_or_else(|| invalid("worksheet row cell provenance lost its last cell"))?;
+    record_omitted(omitted, recording, first.address, last.address, start, end)
+}
+
+fn record_omitted(
+    omitted: &mut Vec<OmittedCells>,
+    recording: &mut bool,
+    first: Address,
+    last: Address,
+    start: usize,
+    end: usize,
+) -> Result<()> {
+    if start >= end {
+        return Ok(());
+    }
+    if first.row() != last.row() || first.column() > last.column() {
+        return Err(invalid(
+            "worksheet cell provenance has an invalid address range",
+        ));
+    }
+    if !*recording {
+        return Ok(());
+    }
+    if omitted.try_reserve(1).is_err() {
+        *recording = false;
+        omitted.clear();
+        return Ok(());
+    }
+    omitted.push(OmittedCells {
+        row: first.row().get(),
+        first_column: first.column().get(),
+        last_column: last.column().get(),
+        start,
+        end,
+    });
+    Ok(())
+}
+
+fn record_replacement_span(
+    spans: &mut Vec<ReplacementSpan>,
+    recording: &mut bool,
+    original: Span,
+    replacement_start: usize,
+    replacement_end: usize,
+) {
+    if !*recording {
+        return;
+    }
+    if original.start >= original.end
+        || replacement_start >= replacement_end
+        || spans.len() >= MAX_REPLACEMENT_SPANS
+        || spans.try_reserve(1).is_err()
+    {
+        *recording = false;
+        spans.clear();
+        return;
+    }
+    spans.push(ReplacementSpan {
+        original: original.start..original.end,
+        replacement: replacement_start..replacement_end,
+    });
+}
+
+#[derive(Debug, Default)]
+struct RowEdits {
+    cells: BTreeMap<Address, Action>,
+    row: Option<RowAction>,
+}
+
+fn write_row(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    row: &RowSlot,
+    edits: &RowEdits,
+    descent_name: &str,
+) -> Result<()> {
+    let actions = &edits.cells;
+    let membership_changed = actions.iter().any(|(address, action)| {
+        let exists = row
+            .cells
+            .binary_search_by_key(address, |cell| cell.address)
+            .is_ok();
+        (!exists && action.creates_missing()) || (exists && matches!(action, Action::Remove))
+    });
+
+    if row.empty {
+        let creates_cell = actions.values().any(Action::creates_missing);
+        let mut removed = Vec::new();
+        let mut appended = Vec::new();
+        if creates_cell {
+            removed.extend(["spans", "r"]);
+            appended.push(("r", row.number.to_string()));
+        }
+        if let Some(action) = edits.row {
+            row_effect_attributes(
+                action,
+                row.descent_attribute.as_deref().unwrap_or(descent_name),
+                &mut removed,
+                &mut appended,
+            );
+        }
+        write_tag(output, &row.tag, !creates_cell, &removed, &appended);
+        if !creates_cell {
+            return Ok(());
+        }
+        for (address, action) in actions {
+            write_new_action(output, &row.tag.name, *address, action)?;
+        }
+        write_close(output, &row.tag.name);
+        return Ok(());
+    }
+
+    if membership_changed || edits.row.is_some() {
+        let mut removed = Vec::new();
+        let mut appended = Vec::new();
+        if membership_changed {
+            removed.push("spans");
+        }
+        if let Some(action) = edits.row {
+            row_effect_attributes(
+                action,
+                row.descent_attribute.as_deref().unwrap_or(descent_name),
+                &mut removed,
+                &mut appended,
+            );
+        }
+        write_tag(output, &row.tag, false, &removed, &appended);
+    } else {
+        output.extend_from_slice(&source[row.span.start..row.tag_end]);
+    }
+    let mut cursor = row.tag_end;
+    let mut pending = actions.iter().peekable();
+    for cell in &row.cells {
+        output.extend_from_slice(&source[cursor..cell.span.start]);
+        while pending
+            .peek()
+            .is_some_and(|(address, _)| **address < cell.address)
+        {
+            let (address, action) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            write_new_action(output, &row.tag.name, *address, action)?;
+        }
+        if pending
+            .peek()
+            .is_some_and(|(address, _)| **address == cell.address)
+        {
+            let (_, action) = pending
+                .next()
+                .ok_or_else(|| invalid("worksheet cell edit ordering was lost"))?;
+            match action {
+                Action::Update { .. } => write_cell(output, source, cell, action)?,
+                Action::Remove => {},
+            }
+        } else {
+            output.extend_from_slice(&source[cell.span.start..cell.span.end]);
+        }
+        cursor = cell.span.end;
+    }
+    output.extend_from_slice(&source[cursor..row.close_start]);
+    for (address, action) in pending {
+        write_new_action(output, &row.tag.name, *address, action)?;
+    }
+    output.extend_from_slice(&source[row.close_start..row.span.end]);
+    Ok(())
+}
+
+fn write_new_row(
+    output: &mut Vec<u8>,
+    sheet_data_name: &str,
+    number: u32,
+    edits: &RowEdits,
+    descent_name: &str,
+) -> Result<()> {
+    let creates_cell = edits.cells.values().any(Action::creates_missing);
+    let materializes = edits.row.is_some_and(RowAction::materializes);
+    if !creates_cell && !materializes {
+        return Ok(());
+    }
+    let name = sibling_name(sheet_data_name, "row");
+    if let Some(action) = edits.row {
+        let tag = Tag {
+            name: name.clone().into_boxed_str(),
+            attributes: Box::new([]),
+        };
+        let mut appended = vec![("r", number.to_string())];
+        let mut removed = Vec::new();
+        row_effect_attributes(action, descent_name, &mut removed, &mut appended);
+        write_tag(output, &tag, !creates_cell, &removed, &appended);
+    } else {
+        // A row with no row-level effect: the same bytes `write_tag` writes
+        // for its one `r` attribute, without the per-row tag and list.
+        output.push(b'<');
+        output.extend_from_slice(name.as_bytes());
+        output.extend_from_slice(b" r=\"");
+        output.extend_from_slice(number.to_string().as_bytes());
+        output.extend_from_slice(if creates_cell { b"\">" } else { b"\"/>" });
+    }
+    if !creates_cell {
+        return Ok(());
+    }
+    let cell_name = sibling_name(&name, "c");
+    for (address, action) in &edits.cells {
+        write_new_cell(output, &cell_name, *address, action)?;
+    }
+    write_close(output, &name);
+    Ok(())
+}
+
+fn row_effect_attributes<'a>(
+    action: RowAction,
+    descent_name: &'a str,
+    removed: &mut Vec<&'a str>,
+    appended: &mut Vec<(&'a str, String)>,
+) {
+    if let Some(hidden) = action.hidden {
+        removed.push("hidden");
+        if hidden {
+            appended.push(("hidden", "1".to_owned()));
+        }
+    }
+    if let Some(height) = action.height {
+        removed.extend(["ht", "customHeight"]);
+        if let HeightEffect::Set(height) = height {
+            appended.push(("ht", height.get().to_string()));
+            appended.push(("customHeight", "1".to_owned()));
+        }
+    }
+    if let Some(descent) = action.descent {
+        removed.push(descent_name);
+        if let DescentEffect::Set(value) = descent {
+            appended.push((descent_name, value.get().to_string()));
+        }
+    }
+    if let Some(style) = action.style {
+        removed.extend(["s", "customFormat"]);
+        if let StyleEffect::Set(key) = style {
+            appended.push(("s", key.to_string()));
+            appended.push(("customFormat", "1".to_owned()));
+        }
+    }
+    if let Some(outline) = action.outline {
+        removed.push("outlineLevel");
+        if outline != Outline::NONE {
+            appended.push(("outlineLevel", outline.get().to_string()));
+        }
+    }
+    for (value, name) in [
+        (action.collapsed, "collapsed"),
+        (action.thick_top, "thickTop"),
+        (action.thick_bottom, "thickBot"),
+        (action.phonetic, "ph"),
+    ] {
+        if let Some(value) = value {
+            removed.push(name);
+            if value {
+                appended.push((name, "1".to_owned()));
+            }
+        }
+    }
+}
+
+fn write_cell(output: &mut Vec<u8>, source: &[u8], cell: &CellSlot, action: &Action) -> Result<()> {
+    let Action::Update { payload, style } = action else {
+        return Err(invalid("cannot rewrite a removed cell"));
+    };
+    let content = payload.as_ref().filter(|payload| {
+        matches!(
+            payload,
+            Payload::Set(_)
+                | Payload::SharedString { .. }
+                | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
+                | Payload::Cache(_)
+        )
+    });
+    let cell_type = content.and_then(payload_type);
+    let mut removed = vec!["r"];
+    if payload.is_some() {
+        removed.push("t");
+    }
+    if style.is_some() {
+        removed.push("s");
+    }
+    let mut appended = vec![("r", cell.address.a1())];
+    if let Some(cell_type) = cell_type {
+        appended.push(("t", cell_type.to_owned()));
+    }
+    if let Some(StyleEffect::Set(key)) = style {
+        appended.push(("s", key.to_string()));
+    }
+    let remains_empty = cell.empty && payload.is_none();
+    let cell_name = if let Some(tag) = cell.tag.as_ref() {
+        write_tag(output, tag, remains_empty, &removed, &appended);
+        tag.name.as_ref()
+    } else {
+        write_cell_tag(output, remains_empty, &appended);
+        "c"
+    };
+    if remains_empty {
+        return Ok(());
+    }
+    match content {
+        Some(Payload::Cache(value)) => write_cache(output, source, cell, cell_name, value)?,
+        Some(content) => write_payload(output, cell_name, content)?,
+        None => {},
+    }
+    if !cell.empty {
+        if payload.is_some() {
+            copy_without(
+                output,
+                source,
+                cell.tag_end,
+                cell.close_start,
+                cell.primary.as_slice(),
+            );
+        } else {
+            output.extend_from_slice(&source[cell.tag_end..cell.close_start]);
+        }
+    }
+    write_close(output, cell_name);
+    Ok(())
+}
+
+fn write_new_action(
+    output: &mut Vec<u8>,
+    row_name: &str,
+    address: Address,
+    action: &Action,
+) -> Result<()> {
+    write_new_cell(output, &sibling_name(row_name, "c"), address, action)
+}
+
+/// Write one created cell. `name` is the cell element's qualified name (the
+/// row's prefix and `c`); the tag is written directly, byte-identical to
+/// `write_tag` with the same attributes, without a per-cell tag, attribute
+/// list or address string.
+fn write_new_cell(
+    output: &mut Vec<u8>,
+    name: &str,
+    address: Address,
+    action: &Action,
+) -> Result<()> {
+    let Action::Update { payload, style } = action else {
+        return Ok(());
+    };
+    if !action.creates_missing() {
+        return Ok(());
+    }
+    let content = payload.as_ref().filter(|payload| {
+        matches!(
+            payload,
+            Payload::Set(_)
+                | Payload::SharedString { .. }
+                | Payload::SharedFormula { .. }
+                | Payload::Rich(_)
+        )
+    });
+    output.push(b'<');
+    output.extend_from_slice(name.as_bytes());
+    // An A1 label is letters and digits: XML escaping leaves it unchanged.
+    output.extend_from_slice(b" r=\"");
+    address.append_a1(output);
+    output.push(b'"');
+    if let Some(cell_type) = content.and_then(payload_type) {
+        write_attribute(output, "t", cell_type);
+    }
+    if let Some(StyleEffect::Set(key)) = style {
+        write_attribute(output, "s", &key.to_string());
+    }
+    let empty = content.is_none();
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
+    if let Some(content) = content {
+        write_payload(output, name, content)?;
+        write_close(output, name);
+    }
+    Ok(())
+}
+
+fn content_type(content: &Content) -> Option<&'static str> {
+    match content {
+        Content::Value(Value::Bool(_)) => Some("b"),
+        Content::Value(Value::Text(_)) => Some("inlineStr"),
+        Content::Value(Value::Date(_)) => Some("d"),
+        Content::Value(Value::Error(_)) => Some("e"),
+        Content::Value(Value::Number(_)) | Content::Formula(_) => None,
+    }
+}
+
+fn payload_type(payload: &Payload) -> Option<&'static str> {
+    match payload {
+        Payload::Set(content) => content_type(content),
+        Payload::SharedString { .. } => Some("s"),
+        Payload::Rich(_) => Some("inlineStr"),
+        Payload::SharedFormula { .. } => None,
+        Payload::Cache(value) => match value {
+            Value::Bool(_) => Some("b"),
+            Value::Text(_) => Some("str"),
+            Value::Date(_) => Some("d"),
+            Value::Error(_) => Some("e"),
+            Value::Number(_) => None,
+        },
+        Payload::Clear | Payload::ClearIfPresent => None,
+    }
+}
+
+fn write_payload(output: &mut Vec<u8>, cell_name: &str, payload: &Payload) -> Result<()> {
+    match payload {
+        Payload::Set(content) => write_content(output, cell_name, content),
+        Payload::SharedString { index, .. } => {
+            write_text_element(output, cell_name, "v", &index.to_string());
+            Ok(())
+        },
+        Payload::SharedFormula {
+            index,
+            reference,
+            formula,
+        } => write_shared_formula(output, cell_name, *index, reference, formula.as_ref()),
+        Payload::Rich(rich) => write_rich(output, cell_name, rich),
+        Payload::Clear | Payload::ClearIfPresent | Payload::Cache(_) => Ok(()),
+    }
+}
+
+/// Write an existing formula cell's `f` element unchanged, then its new
+/// cached result.
+fn write_cache(
+    output: &mut Vec<u8>,
+    source: &[u8],
+    cell: &CellSlot,
+    cell_name: &str,
+    value: &Value,
+) -> Result<()> {
+    let formula = cell
+        .primary
+        .as_slice()
+        .iter()
+        .find(|span| {
+            let bytes = &source[span.start..span.end];
+            let name_end = bytes[1..]
+                .iter()
+                .position(|byte| matches!(*byte, b' ' | b'>' | b'/' | b'\t' | b'\n' | b'\r'))
+                .map_or(bytes.len(), |offset| offset + 1);
+            let name = &bytes[1..name_end];
+            name == b"f" || name.ends_with(b":f")
+        })
+        .ok_or_else(|| invalid("a formula cache needs a stored formula"))?;
+    output.extend_from_slice(&source[formula.start..formula.end]);
+    match value {
+        Value::Bool(value) => {
+            write_text_element(output, cell_name, "v", if *value { "1" } else { "0" });
+        },
+        Value::Number(value) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Value::Text(value) => {
+            require_xml_text(value.as_str())?;
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Value::Date(value) => {
+            require_xml_text(value)?;
+            write_text_element(output, cell_name, "v", &escape_xml(value));
+        },
+        Value::Error(value) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+    }
+    Ok(())
+}
+
+fn write_shared_formula(
+    output: &mut Vec<u8>,
+    cell_name: &str,
+    index: u32,
+    reference: &str,
+    formula: Option<&crate::formula::Formula>,
+) -> Result<()> {
+    require_xml_text(reference)?;
+    if let Some(formula) = formula {
+        require_xml_text(formula.text())?;
+    }
+    let name = sibling_name(cell_name, "f");
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(name.as_bytes());
+    write_attribute(output, "t", "shared");
+    if formula.is_some() {
+        write_attribute(output, "ref", reference);
+    }
+    write_attribute(output, "si", &index.to_string());
+    if let Some(formula) = formula {
+        output.extend_from_slice(b">");
+        output.extend_from_slice(escape_xml(formula.text()).as_bytes());
+        write_close(output, &name);
+    } else {
+        output.extend_from_slice(b"/>");
+    }
+    Ok(())
+}
+
+fn write_content(output: &mut Vec<u8>, cell_name: &str, content: &Content) -> Result<()> {
+    match content {
+        Content::Value(Value::Bool(value)) => {
+            write_text_element(output, cell_name, "v", if *value { "1" } else { "0" });
+        },
+        Content::Value(Value::Number(value)) => {
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Content::Value(Value::Text(value)) => {
+            let inline = sibling_name(cell_name, "is");
+            let text = sibling_name(cell_name, "t");
+            output.extend_from_slice(b"<");
+            output.extend_from_slice(inline.as_bytes());
+            output.extend_from_slice(b"><");
+            output.extend_from_slice(text.as_bytes());
+            output.extend_from_slice(b" xml:space=\"preserve\">");
+            output.extend_from_slice(escape_xml(&encode_spreadsheet_text(value)).as_bytes());
+            output.extend_from_slice(b"</");
+            output.extend_from_slice(text.as_bytes());
+            output.extend_from_slice(b"></");
+            output.extend_from_slice(inline.as_bytes());
+            output.extend_from_slice(b">");
+        },
+        Content::Value(Value::Date(value)) => {
+            require_xml_text(value)?;
+            write_text_element(output, cell_name, "v", &escape_xml(value));
+        },
+        Content::Value(Value::Error(value)) => {
+            require_xml_text(value.as_str())?;
+            write_text_element(output, cell_name, "v", &escape_xml(value.as_str()));
+        },
+        Content::Formula(formula) => {
+            require_xml_text(formula.text())?;
+            write_text_element(output, cell_name, "f", &escape_xml(formula.text()));
+        },
+    }
+    Ok(())
+}
+
+/// Write `rich` as an inline string: one `r` per run, its `rPr` children
+/// re-emitted with the cell's namespace prefix and their attributes as
+/// stored.
+fn write_rich(output: &mut Vec<u8>, cell_name: &str, rich: &crate::cell::RichText) -> Result<()> {
+    let inline = sibling_name(cell_name, "is");
+    let run = sibling_name(cell_name, "r");
+    let properties = sibling_name(cell_name, "rPr");
+    let text = sibling_name(cell_name, "t");
+    let open = |output: &mut Vec<u8>, name: &str| {
+        output.push(b'<');
+        output.extend_from_slice(name.as_bytes());
+        output.push(b'>');
+    };
+    let close = |output: &mut Vec<u8>, name: &str| {
+        output.extend_from_slice(b"</");
+        output.extend_from_slice(name.as_bytes());
+        output.push(b'>');
+    };
+    open(output, &inline);
+    for item in rich.runs() {
+        require_xml_text(item.text())?;
+        open(output, &run);
+        if let Some(children) = item.properties.as_deref() {
+            open(output, &properties);
+            for (local, attributes) in children {
+                let name = sibling_name(cell_name, local);
+                output.push(b'<');
+                output.extend_from_slice(name.as_bytes());
+                if !attributes.is_empty() {
+                    output.push(b' ');
+                    output.extend_from_slice(attributes.as_bytes());
+                }
+                output.extend_from_slice(b"/>");
+            }
+            close(output, &properties);
+        }
+        output.push(b'<');
+        output.extend_from_slice(text.as_bytes());
+        output.extend_from_slice(b" xml:space=\"preserve\">");
+        output.extend_from_slice(escape_xml(&encode_spreadsheet_text(item.text())).as_bytes());
+        close(output, &text);
+        close(output, &run);
+    }
+    close(output, &inline);
+    Ok(())
+}
+
+fn write_text_element(output: &mut Vec<u8>, cell_name: &str, local: &str, value: &str) {
+    let name = sibling_name(cell_name, local);
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(name.as_bytes());
+    output.extend_from_slice(b">");
+    output.extend_from_slice(value.as_bytes());
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(name.as_bytes());
+    output.extend_from_slice(b">");
+}
+
+fn require_xml_text(value: &str) -> Result<()> {
+    if value.chars().all(|character| {
+        matches!(character, '\u{9}' | '\u{A}' | '\u{D}')
+            || ('\u{20}'..='\u{D7FF}').contains(&character)
+            || ('\u{E000}'..='\u{FFFD}').contains(&character)
+            || ('\u{10000}'..='\u{10FFFF}').contains(&character)
+    }) {
+        Ok(())
+    } else {
+        Err(invalid(
+            "cell content contains a character forbidden by XML 1.0",
+        ))
+    }
+}
+
+fn copy_without(output: &mut Vec<u8>, source: &[u8], start: usize, end: usize, removed: &[Span]) {
+    let mut cursor = start;
+    for span in removed {
+        output.extend_from_slice(&source[cursor..span.start]);
+        cursor = span.end;
+    }
+    output.extend_from_slice(&source[cursor..end]);
+}

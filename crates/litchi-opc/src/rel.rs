@@ -4,9 +4,54 @@
 //! including internal and external relationships.
 
 use crate::error::{OpcError, Result};
+use crate::leniency::RelationshipDefect;
 use crate::packuri::PackURI;
 use litchi_core::xml::escape_xml;
-use std::collections::HashMap;
+use std::collections::{HashMap, hash_map::Entry};
+use std::fmt::Write as _;
+use std::sync::Arc;
+
+/// Whether a relationship target is inside or outside the OPC package.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TargetMode {
+    /// A target resolved relative to the relationship source part.
+    Internal,
+    /// An external URI reference preserved without package resolution.
+    External,
+}
+
+impl TargetMode {
+    /// Read a source `TargetMode` value the way Apache POI does: ASCII
+    /// case-insensitively, with any other value read as
+    /// `External` so it can never cause part resolution. The second element
+    /// names the repair applied, if any.
+    pub(crate) fn parse_tolerant(value: &str) -> (Self, Option<RelationshipDefect>) {
+        match value {
+            "Internal" => (Self::Internal, None),
+            "External" => (Self::External, None),
+            _ if value.eq_ignore_ascii_case("Internal") => (
+                Self::Internal,
+                Some(RelationshipDefect::NonCanonicalTargetMode),
+            ),
+            _ if value.eq_ignore_ascii_case("External") => (
+                Self::External,
+                Some(RelationshipDefect::NonCanonicalTargetMode),
+            ),
+            _ => (
+                Self::External,
+                Some(RelationshipDefect::UnrecognizedTargetMode),
+            ),
+        }
+    }
+
+    #[inline]
+    fn as_xml_value(self) -> &'static str {
+        match self {
+            Self::Internal => "Internal",
+            Self::External => "External",
+        }
+    }
+}
 
 /// A single relationship from a source part to a target.
 ///
@@ -27,8 +72,17 @@ pub struct Relationship {
     /// Base URI for resolving relative references
     base_uri: String,
 
-    /// Whether this is an external relationship
-    is_external: bool,
+    /// Full source part URI, when known.
+    source_uri: Option<String>,
+
+    /// Typed target mode.
+    target_mode: TargetMode,
+
+    /// Whether `r_id` was read from a source manifest, where an `Id` that is
+    /// not an XML ID is admitted verbatim. Canonical
+    /// serialization carries such an `Id` forward; authored relationships
+    /// keep the XML ID check.
+    source_admitted_id: bool,
 }
 
 impl Relationship {
@@ -40,6 +94,7 @@ impl Relationship {
     /// * `target_ref` - Target reference (part URI or external URL)
     /// * `base_uri` - Base URI for resolving relative references
     /// * `is_external` - Whether this is an external relationship
+    #[must_use]
     pub fn new(
         r_id: String,
         reltype: String,
@@ -47,23 +102,68 @@ impl Relationship {
         base_uri: String,
         is_external: bool,
     ) -> Self {
+        Self::new_with_source(
+            r_id,
+            reltype,
+            target_ref,
+            base_uri,
+            None,
+            if is_external {
+                TargetMode::External
+            } else {
+                TargetMode::Internal
+            },
+        )
+    }
+
+    /// Create a relationship with an explicit target mode.
+    #[must_use]
+    pub fn new_with_mode(
+        r_id: String,
+        reltype: String,
+        target_ref: String,
+        base_uri: String,
+        target_mode: TargetMode,
+    ) -> Self {
+        Self::new_with_source(r_id, reltype, target_ref, base_uri, None, target_mode)
+    }
+
+    fn new_with_source(
+        r_id: String,
+        reltype: String,
+        target_ref: String,
+        base_uri: String,
+        source_uri: Option<String>,
+        target_mode: TargetMode,
+    ) -> Self {
         Self {
             r_id,
             reltype,
             target_ref,
             base_uri,
-            is_external,
+            source_uri,
+            target_mode,
+            source_admitted_id: false,
         }
+    }
+
+    /// Whether this relationship's `Id` was admitted from a source manifest
+    /// rather than authored.
+    #[inline]
+    pub(crate) fn has_source_admitted_id(&self) -> bool {
+        self.source_admitted_id
     }
 
     /// Get the relationship ID.
     #[inline]
+    #[must_use]
     pub fn r_id(&self) -> &str {
         &self.r_id
     }
 
     /// Get the relationship type.
     #[inline]
+    #[must_use]
     pub fn reltype(&self) -> &str {
         &self.reltype
     }
@@ -73,40 +173,162 @@ impl Relationship {
     /// For internal relationships, this is a relative part reference.
     /// For external relationships, this is an absolute URL.
     #[inline]
+    #[must_use]
     pub fn target_ref(&self) -> &str {
         &self.target_ref
     }
 
+    /// Get the stored base URI used to resolve an internal target.
+    #[inline]
+    #[must_use]
+    pub fn base_uri(&self) -> &str {
+        &self.base_uri
+    }
+
+    /// Get the stored source part URI, when this relationship belongs to one.
+    #[inline]
+    #[must_use]
+    pub fn source_uri(&self) -> Option<&str> {
+        self.source_uri.as_deref()
+    }
+
+    /// Return the path component of the original target URI reference.
+    #[must_use]
+    pub fn target_path(&self) -> &str {
+        relationship_target_components(&self.target_ref).0
+    }
+
+    /// Return the query component without the leading `?`.
+    #[must_use]
+    pub fn target_query(&self) -> Option<&str> {
+        relationship_target_components(&self.target_ref).1
+    }
+
+    /// Return the fragment component without the leading `#`.
+    #[must_use]
+    pub fn target_fragment(&self) -> Option<&str> {
+        relationship_target_components(&self.target_ref).2
+    }
+
+    /// Return the typed target mode.
+    #[inline]
+    #[must_use]
+    pub fn target_mode(&self) -> TargetMode {
+        self.target_mode
+    }
+
     /// Check if this is an external relationship.
     #[inline]
+    #[must_use]
     pub fn is_external(&self) -> bool {
-        self.is_external
+        self.target_mode == TargetMode::External
     }
 
     /// Get the absolute target partname for internal relationships.
     ///
     /// Returns an error if this is an external relationship.
+    ///
+    /// # Errors
+    /// Returns an error if this is an external relationship, if the target has
+    /// no part path and no source URI is known, or if the resolved partname is
+    /// not a valid pack URI.
     pub fn target_partname(&self) -> Result<PackURI> {
-        if self.is_external {
+        if self.is_external() {
             return Err(OpcError::InvalidRelationship(
                 "Cannot get target_partname for external relationship".to_string(),
             ));
         }
-        PackURI::from_rel_ref(&self.base_uri, &self.target_ref).map_err(OpcError::InvalidPackUri)
+        let path = self.target_path();
+        if path.is_empty() {
+            return self
+                .source_uri
+                .as_deref()
+                .filter(|source| *source != "/")
+                .ok_or_else(|| {
+                    OpcError::InvalidRelationship(
+                        "Internal relationship target has no part path".to_string(),
+                    )
+                })
+                .and_then(|source| PackURI::new(source).map_err(OpcError::InvalidPackUri));
+        }
+        PackURI::from_rel_ref(&self.base_uri, path).map_err(OpcError::InvalidPackUri)
     }
 }
 
 /// Collection of relationships from a single source.
 ///
-/// Uses a HashMap for O(1) lookup by relationship ID while maintaining
+/// Uses a `HashMap` for O(1) lookup by relationship ID while maintaining
 /// efficient memory usage by storing references rather than cloning data.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Relationships {
     /// Base URI for resolving relative references
     base_uri: String,
 
+    /// Full source part URI, when this collection belongs to a concrete part.
+    source_uri: Option<String>,
+
     /// Map of relationship ID to Relationship
     rels: HashMap<String, Relationship>,
+
+    /// Canonical serialization captured when the owning package was opened.
+    ///
+    /// Publication planning compares this handle by pointer identity against
+    /// the preservation provenance that produced it. A match proves the
+    /// collection still holds the value that was serialized at open, so the
+    /// source member can be copied without reserializing or auditing bytes
+    /// that would be discarded. Every method that changes the collection
+    /// clears the handle, and a handle moved into a different collection
+    /// cannot match another part's provenance, so the proof never outlives the
+    /// value it describes.
+    ///
+    /// A call that establishes nothing does not clear it. [`Self::get_or_add`]
+    /// reusing a relationship the collection already carries, and
+    /// [`Self::add_relationship`] naming an identifier that is already taken,
+    /// both return the established relationship without replacing it: the
+    /// value is the value that was serialized at open, so the proof still
+    /// holds. The conservative direction is preserved — the handle is cleared
+    /// on every path that could have changed the value, and a cleared handle
+    /// only costs the serialize-and-compare route.
+    source_capture: Option<Arc<PreservedRelationshipsXml>>,
+}
+
+/// The `.rels` bytes one relationship collection was opened from.
+///
+/// Captured while a package is opened and retained by the preservation
+/// provenance. [`Self::Source`] is the admitted source member itself, kept so
+/// an unchanged collection republishes its producer's exact bytes even when
+/// they are not this library's canonical serialization. Without a retained
+/// source member, [`Self::Empty`] avoids owning a buffer for the common empty
+/// collection and [`Self::Owned`] holds the bytes
+/// [`Relationships::try_to_xml_bytes`] produces for the same value.
+#[derive(Debug)]
+pub(crate) enum PreservedRelationshipsXml {
+    /// The admitted source member's exact bytes.
+    Source(Arc<Vec<u8>>),
+    /// The collection held no relationships.
+    Empty,
+    /// The canonical serialized bytes of a non-empty collection.
+    Owned(Vec<u8>),
+}
+
+pub(crate) const EMPTY_RELATIONSHIPS_XML: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
+
+impl PreservedRelationshipsXml {
+    pub(crate) fn from_relationships(relationships: &Relationships) -> Option<Self> {
+        if relationships.is_empty() {
+            Some(Self::Empty)
+        } else {
+            Some(Self::Owned(relationships.try_to_xml_bytes().ok()?))
+        }
+    }
+
+    pub(crate) fn as_bytes(&self) -> &[u8] {
+        match self {
+            Self::Source(bytes) => bytes.as_slice(),
+            Self::Empty => EMPTY_RELATIONSHIPS_XML,
+            Self::Owned(bytes) => bytes.as_slice(),
+        }
+    }
 }
 
 impl Relationships {
@@ -114,11 +336,65 @@ impl Relationships {
     ///
     /// # Arguments
     /// * `base_uri` - Base URI for resolving relative references
+    #[must_use]
     pub fn new(base_uri: String) -> Self {
         Self {
             base_uri,
+            source_uri: None,
             rels: HashMap::new(),
+            source_capture: None,
         }
+    }
+
+    /// Create a relationship collection owned by a concrete source part.
+    pub(crate) fn for_source(source: &PackURI) -> Self {
+        Self {
+            base_uri: source.base_uri().to_string(),
+            source_uri: Some(source.as_str().to_string()),
+            rels: HashMap::new(),
+            source_capture: None,
+        }
+    }
+
+    /// Record the canonical serialization captured for this collection at open.
+    pub(crate) fn set_source_capture(&mut self, capture: Arc<PreservedRelationshipsXml>) {
+        self.source_capture = Some(capture);
+    }
+
+    /// The capture recorded at open, if no mutation has run since.
+    pub(crate) fn source_capture(&self) -> Option<&Arc<PreservedRelationshipsXml>> {
+        self.source_capture.as_ref()
+    }
+
+    /// Whether both collections still point at the same admitted source
+    /// capture. A clone keeps this handle until a relationship mutation
+    /// invalidates it, so pointer equality proves the semantic graph has not
+    /// changed and avoids rebinding every relationship entry.
+    pub(crate) fn same_source_capture(&self, other: &Self) -> bool {
+        self.source_capture
+            .as_ref()
+            .zip(other.source_capture.as_ref())
+            .is_some_and(|(left, right)| Arc::ptr_eq(left, right))
+    }
+
+    /// Compare the semantic relationship collection while ignoring its
+    /// publication provenance handle.
+    pub(crate) fn semantically_eq(&self, other: &Self) -> bool {
+        self.base_uri == other.base_uri
+            && self.source_uri == other.source_uri
+            && self.rels.len() == other.rels.len()
+            && self.rels.iter().all(|(id, relationship)| {
+                other.rels.get(id).is_some_and(|candidate| {
+                    relationship.reltype() == candidate.reltype()
+                        && relationship.target_ref() == candidate.target_ref()
+                        && relationship.target_mode() == candidate.target_mode()
+                })
+            })
+    }
+
+    /// Drop the open-time proof because this collection is about to change.
+    fn invalidate_source_capture(&mut self) {
+        self.source_capture = None;
     }
 
     /// Add a relationship to the collection.
@@ -131,6 +407,10 @@ impl Relationships {
     ///
     /// # Returns
     /// Reference to the newly added relationship
+    ///
+    /// An established identifier is returned unchanged — this method never
+    /// replaces one — so such a call leaves the collection's value, and the
+    /// open-time proof that describes it, exactly as they were.
     pub fn add_relationship(
         &mut self,
         reltype: String,
@@ -138,29 +418,181 @@ impl Relationships {
         r_id: String,
         is_external: bool,
     ) -> &Relationship {
-        let rel = Relationship::new(
-            r_id.clone(),
-            reltype,
-            target_ref,
-            self.base_uri.clone(),
-            is_external,
-        );
-        self.rels.insert(r_id.clone(), rel);
-        // Safe to unwrap since we just inserted it
-        self.rels.get(r_id.as_str()).unwrap()
+        // Preserve compatibility for existing writer call sites without ever
+        // replacing an established relationship. New code that needs duplicate
+        // diagnostics should use `try_add_relationship`.
+        //
+        // The entry decides both the value and the proof. An occupied entry is
+        // returned as it stands, so the collection is not modified and the
+        // open-time capture still describes it; only the vacant arm inserts,
+        // and only the vacant arm drops the capture. Building the relationship
+        // inside that arm also keeps the argument strings out of the occupied
+        // path, where they were previously copied into a value that was then
+        // discarded.
+        let Self {
+            base_uri,
+            source_uri,
+            rels,
+            source_capture,
+        } = self;
+        match rels.entry(r_id) {
+            Entry::Occupied(entry) => entry.into_mut(),
+            Entry::Vacant(entry) => {
+                *source_capture = None;
+                let id = entry.key().clone();
+                entry.insert(Relationship::new_with_source(
+                    id,
+                    reltype,
+                    target_ref,
+                    base_uri.clone(),
+                    source_uri.clone(),
+                    if is_external {
+                        TargetMode::External
+                    } else {
+                        TargetMode::Internal
+                    },
+                ))
+            },
+        }
+    }
+
+    /// Add a relationship without replacing an existing ID.
+    ///
+    /// # Errors
+    /// Returns an error if a relationship with the given ID already exists.
+    pub fn try_add_relationship(
+        &mut self,
+        reltype: String,
+        target_ref: String,
+        r_id: String,
+        target_mode: TargetMode,
+    ) -> Result<&Relationship> {
+        self.try_insert_relationship(reltype, target_ref, r_id, target_mode, false)
+    }
+
+    /// Add a relationship read from a source manifest (or carried over from
+    /// one), whose `Id` was admitted at ingress even when it is not an XML ID.
+    pub(crate) fn try_add_source_relationship(
+        &mut self,
+        reltype: String,
+        target_ref: String,
+        r_id: String,
+        target_mode: TargetMode,
+    ) -> Result<&Relationship> {
+        self.try_insert_relationship(reltype, target_ref, r_id, target_mode, true)
+    }
+
+    fn try_insert_relationship(
+        &mut self,
+        reltype: String,
+        target_ref: String,
+        r_id: String,
+        target_mode: TargetMode,
+        source_admitted_id: bool,
+    ) -> Result<&Relationship> {
+        if self.rels.contains_key(&r_id) {
+            return Err(OpcError::DuplicateRelationshipId(r_id));
+        }
+        self.try_reserve(1)?;
+        self.invalidate_source_capture();
+        let base_uri = self.base_uri.clone();
+        let source_uri = self.source_uri.clone();
+        match self.rels.entry(r_id) {
+            Entry::Occupied(entry) => Err(OpcError::DuplicateRelationshipId(entry.key().clone())),
+            Entry::Vacant(entry) => {
+                let id = entry.key().clone();
+                let mut relationship = Relationship::new_with_source(
+                    id,
+                    reltype,
+                    target_ref,
+                    base_uri,
+                    source_uri,
+                    target_mode,
+                );
+                relationship.source_admitted_id = source_admitted_id;
+                Ok(entry.insert(relationship))
+            },
+        }
+    }
+
+    /// Reserve capacity for a bounded batch of relationship insertions.
+    ///
+    /// Eager package unmarshal uses this before moving its validated source
+    /// relationships into the in-memory collection, so map growth remains a
+    /// typed allocation error rather than an infallible insertion side effect.
+    pub(crate) fn try_reserve(&mut self, additional: usize) -> Result<()> {
+        self.invalidate_source_capture();
+        self.rels
+            .try_reserve(additional)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationships",
+                source,
+            })
     }
 
     /// Get a relationship by its ID.
     #[inline]
+    #[must_use]
     pub fn get(&self, r_id: &str) -> Option<&Relationship> {
         self.rels.get(r_id)
     }
 
+    /// The identifier of the relationship that reuse selects.
+    ///
+    /// A source may legitimately own several relationships that share a type,
+    /// a target, and a target mode under different identifiers: two runs
+    /// hyperlinking the same URL, or two mail-merge references to one data
+    /// file, are the shapes this repository's own corpus carries. Reuse must
+    /// therefore not stop at whichever candidate the map happens to visit
+    /// first, because `rels` is a `HashMap` whose iteration order is seeded per
+    /// instance, and the caller writes the returned identifier into part markup
+    /// ([`crate::Part::relate_to`], [`crate::Part::relate_to_ext`]).
+    ///
+    /// The smallest identifier in byte order is chosen, which is the one
+    /// [`Self::try_to_xml_bytes`] emits first in the serialized `.rels` member,
+    /// so reuse selects "the first matching relationship in the published
+    /// member" and the result is a function of the collection.
+    fn reuse_candidate(
+        &self,
+        reltype: &str,
+        target_ref: &str,
+        target_mode: TargetMode,
+    ) -> Option<&str> {
+        self.rels
+            .values()
+            .filter(|relationship| {
+                relationship.reltype() == reltype
+                    && relationship.target_ref() == target_ref
+                    && relationship.target_mode() == target_mode
+            })
+            .map(Relationship::r_id)
+            .min()
+    }
+
+    /// Get the stored base URI used by this relationship collection.
+    #[inline]
+    #[must_use]
+    pub fn base_uri(&self) -> &str {
+        &self.base_uri
+    }
+
+    /// Get the stored source part URI, when this collection belongs to one.
+    #[inline]
+    #[must_use]
+    pub fn source_uri(&self) -> Option<&str> {
+        self.source_uri.as_deref()
+    }
+
     /// Get or add a relationship to a target part.
     ///
-    /// If a relationship of the given type to the target already exists,
-    /// returns that relationship. Otherwise, creates a new one with the
-    /// next available rId.
+    /// If an internal relationship of the given type to the target already
+    /// exists, returns that relationship; when several match, the one with the
+    /// smallest rId in byte order is reused. Otherwise, creates a new one with
+    /// the next available rId.
+    ///
+    /// Reuse changes nothing, so it keeps the open-time source capture and the
+    /// collection's `.rels` member is still published from the source archive
+    /// rather than reserialized into the same decision.
     ///
     /// # Arguments
     /// * `reltype` - Relationship type URI
@@ -169,17 +601,10 @@ impl Relationships {
     /// # Returns
     /// Reference to the relationship (existing or newly created)
     pub fn get_or_add(&mut self, reltype: &str, target_ref: &str) -> &Relationship {
-        // Check if matching relationship already exists
-        for rel in self.rels.values() {
-            if rel.reltype() == reltype && rel.target_ref() == target_ref && !rel.is_external() {
-                // Return the rId to look it up again (to avoid borrow checker issues)
-                let r_id = rel.r_id().to_string();
-                return self.rels.get(&r_id).unwrap();
-            }
-        }
-
-        // Create new relationship with next available rId
-        let r_id = self.next_r_id();
+        let r_id = match self.reuse_candidate(reltype, target_ref, TargetMode::Internal) {
+            Some(existing) => existing.to_string(),
+            None => self.next_r_id(),
+        };
         self.add_relationship(reltype.to_string(), target_ref.to_string(), r_id, false)
     }
 
@@ -187,11 +612,9 @@ impl Relationships {
     ///
     /// Similar to `get_or_add` but for external relationships.
     pub fn get_or_add_ext_rel(&mut self, reltype: &str, target_ref: &str) -> String {
-        // Check if matching relationship already exists
-        for rel in self.rels.values() {
-            if rel.reltype() == reltype && rel.target_ref() == target_ref && rel.is_external() {
-                return rel.r_id().to_string();
-            }
+        // Reuse the established relationship when one already matches.
+        if let Some(existing) = self.reuse_candidate(reltype, target_ref, TargetMode::External) {
+            return existing.to_string();
         }
 
         // Create new relationship with next available rId
@@ -208,7 +631,7 @@ impl Relationships {
     /// Get the next available relationship ID.
     ///
     /// Generates IDs in the format "rId1", "rId2", etc., filling in gaps
-    /// if any exist. Uses efficient integer parsing with atoi_simd.
+    /// if any exist. Uses efficient integer parsing with `atoi_simd`.
     fn next_r_id(&self) -> String {
         // Find the highest existing rId number and any gaps
         let mut used_numbers: Vec<u32> = self
@@ -237,13 +660,17 @@ impl Relationships {
             }
         }
 
-        format!("rId{}", next_num)
+        format!("rId{next_num}")
     }
 
     /// Get the relationship of a specific type.
     ///
     /// Returns an error if no relationship of the type is found,
     /// or if multiple relationships of the type exist.
+    ///
+    /// # Errors
+    /// Returns an error if no relationship of the type is found, or if multiple
+    /// relationships of the type exist.
     pub fn part_with_reltype(&self, reltype: &str) -> Result<&Relationship> {
         let matching: Vec<&Relationship> = self
             .rels
@@ -253,13 +680,11 @@ impl Relationships {
 
         match matching.len() {
             0 => Err(OpcError::RelationshipNotFound(format!(
-                "No relationship of type '{}'",
-                reltype
+                "No relationship of type '{reltype}'"
             ))),
             1 => Ok(matching[0]),
             _ => Err(OpcError::InvalidRelationship(format!(
-                "Multiple relationships of type '{}'",
-                reltype
+                "Multiple relationships of type '{reltype}'"
             ))),
         }
     }
@@ -270,27 +695,66 @@ impl Relationships {
         self.rels.values()
     }
 
+    /// Whether both collections hold the same relationships: the same IDs
+    /// with the same types, target references and target modes.
+    #[must_use]
+    pub fn same_entries(&self, other: &Self) -> bool {
+        self.rels.len() == other.rels.len()
+            && self.rels.iter().all(|(id, relationship)| {
+                other.rels.get(id).is_some_and(|candidate| {
+                    candidate.reltype == relationship.reltype
+                        && candidate.target_ref == relationship.target_ref
+                        && candidate.target_mode == relationship.target_mode
+                })
+            })
+    }
+
     /// Get the number of relationships in the collection.
     #[inline]
+    #[must_use]
     pub fn len(&self) -> usize {
         self.rels.len()
     }
 
     /// Check if the collection is empty.
     #[inline]
+    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.rels.is_empty()
     }
 
     /// Remove a relationship by its ID.
     pub fn remove(&mut self, r_id: &str) -> Option<Relationship> {
+        self.invalidate_source_capture();
         self.rels.remove(r_id)
+    }
+
+    /// Change the target reference of an existing relationship without
+    /// changing its identifier, type, or target mode.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `r_id` does not identify a relationship in this
+    /// collection.
+    pub fn retarget(&mut self, r_id: &str, target_ref: String) -> Result<()> {
+        self.invalidate_source_capture();
+        let relationship = self.rels.get_mut(r_id).ok_or_else(|| {
+            OpcError::RelationshipNotFound(format!("relationship '{r_id}' was not found"))
+        })?;
+        relationship.target_ref = target_ref;
+        Ok(())
+    }
+
+    pub(crate) fn retain(&mut self, mut keep: impl FnMut(&Relationship) -> bool) {
+        self.invalidate_source_capture();
+        self.rels.retain(|_, relationship| keep(relationship));
     }
 
     /// Serialize relationships to XML format.
     ///
     /// Generates the XML for a .rels file, with relationships sorted by rId
     /// for consistent output.
+    #[must_use]
     pub fn to_xml(&self) -> String {
         let mut xml = String::with_capacity(1024);
 
@@ -304,31 +768,141 @@ impl Relationships {
         rels.sort_by_key(|rel| rel.r_id());
 
         for rel in rels {
-            let target_mode = if rel.is_external() {
-                r#" TargetMode="External""#
-            } else {
-                ""
+            let target_mode = match rel.target_mode() {
+                TargetMode::Internal => "",
+                mode @ TargetMode::External => match mode.as_xml_value() {
+                    "External" => r#" TargetMode="External""#,
+                    _ => "",
+                },
             };
 
-            xml.push_str(&format!(
+            let _ignored = write!(
+                xml,
                 r#"<Relationship Id="{}" Type="{}" Target="{}"{}/>"#,
                 escape_xml(rel.r_id()),
                 escape_xml(rel.reltype()),
                 escape_xml(rel.target_ref()),
                 target_mode
-            ));
+            );
         }
 
         xml.push_str("</Relationships>");
 
         xml
     }
+
+    /// Serialize relationships to XML bytes through fallible allocation paths.
+    ///
+    /// This crate-private form is used by publication and source-preservation
+    /// code. It preserves the byte output of [`Self::to_xml`] without relying on
+    /// infallible `String` growth or temporary escaped strings.
+    pub(crate) fn try_to_xml_bytes(&self) -> Result<Vec<u8>> {
+        // Reserve once from the checked escaped size. Reserving each emitted
+        // fragment exactly otherwise requests progressively larger reallocations
+        // for every relationship in a large owner.
+        let xml_len = crate::source_backed::canonical_relationship_xml_len(self)?;
+        let mut xml = Vec::new();
+        xml.try_reserve_exact(xml_len)
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship XML",
+                source,
+            })?;
+        self.for_each_canonical_xml_chunk(|chunk| append_relationship_xml_bytes(&mut xml, chunk))?;
+        Ok(xml)
+    }
+
+    /// Visit the canonical XML serialization in bounded chunks without
+    /// allocating the serialized byte buffer.  Source-backed topology
+    /// planning uses this for an exact lexical comparison before aggregate
+    /// output admission; the same ordering and escaping helpers drive the
+    /// normal fallible serializer above.
+    pub(crate) fn for_each_canonical_xml_chunk<F>(&self, mut visit: F) -> Result<()>
+    where
+        F: FnMut(&[u8]) -> Result<()>,
+    {
+        const HEADER: &[u8] = br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">"#;
+        const FOOTER: &[u8] = b"</Relationships>";
+
+        let mut rels = Vec::new();
+        rels.try_reserve_exact(self.rels.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC relationship XML comparison references",
+                source,
+            })?;
+        rels.extend(self.rels.values());
+        rels.sort_unstable_by_key(|rel| rel.r_id());
+
+        visit(HEADER)?;
+        for rel in rels {
+            visit(br#"<Relationship Id=""#)?;
+            visit_escaped_xml(&mut visit, rel.r_id())?;
+            visit(br#"" Type=""#)?;
+            visit_escaped_xml(&mut visit, rel.reltype())?;
+            visit(br#"" Target=""#)?;
+            visit_escaped_xml(&mut visit, rel.target_ref())?;
+            if rel.target_mode() == TargetMode::External {
+                visit(br#"" TargetMode="External"/>"#)?;
+            } else {
+                visit(br#""/>"#)?;
+            }
+        }
+        visit(FOOTER)
+    }
+}
+
+fn visit_escaped_xml<F>(visit: &mut F, value: &str) -> Result<()>
+where
+    F: FnMut(&[u8]) -> Result<()>,
+{
+    let bytes = value.as_bytes();
+    let mut cursor = 0;
+    for (index, byte) in bytes.iter().enumerate() {
+        let escaped = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            _ => None,
+        };
+        if let Some(escaped) = escaped {
+            visit(&bytes[cursor..index])?;
+            visit(escaped)?;
+            cursor = index + 1;
+        }
+    }
+    visit(&bytes[cursor..])
+}
+
+fn append_relationship_xml_bytes(output: &mut Vec<u8>, bytes: &[u8]) -> Result<()> {
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| OpcError::Allocation {
+            resource: "OPC relationship XML",
+            source,
+        })?;
+    output.extend_from_slice(bytes);
+    Ok(())
 }
 
 impl Default for Relationships {
     fn default() -> Self {
         Self::new("/".to_string())
     }
+}
+
+pub(crate) fn relationship_target_components(
+    reference: &str,
+) -> (&str, Option<&str>, Option<&str>) {
+    let (before_fragment, fragment) = reference
+        .split_once('#')
+        .map_or((reference, None), |(before, fragment)| {
+            (before, Some(fragment))
+        });
+    let (path, query) = before_fragment
+        .split_once('?')
+        .map_or((before_fragment, None), |(path, query)| (path, Some(query)));
+    (path, query, fragment)
 }
 
 #[cfg(test)]
@@ -370,17 +944,378 @@ mod tests {
 
     #[test]
     fn test_get_or_add() {
-        let mut rels = Relationships::new("/word".to_string());
+        let mut relationships = Relationships::new("/word".to_string());
 
-        let rel1 = rels.get_or_add("type1", "target1");
-        assert_eq!(rel1.r_id(), "rId1");
+        let first_rel = relationships.get_or_add("type1", "target1");
+        assert_eq!(first_rel.r_id(), "rId1");
 
         // Getting the same relationship should return the same rId
-        let rel2 = rels.get_or_add("type1", "target1");
-        assert_eq!(rel2.r_id(), "rId1");
+        let same_rel = relationships.get_or_add("type1", "target1");
+        assert_eq!(same_rel.r_id(), "rId1");
 
         // Different target should create new relationship
-        let rel3 = rels.get_or_add("type1", "target2");
-        assert_eq!(rel3.r_id(), "rId2");
+        let second_rel = relationships.get_or_add("type1", "target2");
+        assert_eq!(second_rel.r_id(), "rId2");
+    }
+
+    #[test]
+    fn target_components_are_preserved_while_the_path_resolves() {
+        let relationship = Relationship::new_with_mode(
+            "rId1".to_string(),
+            "urn:test".to_string(),
+            "../media/image.png?variant=2#preview".to_string(),
+            "/word/document".to_string(),
+            TargetMode::Internal,
+        );
+        assert_eq!(relationship.target_path(), "../media/image.png");
+        assert_eq!(relationship.target_query(), Some("variant=2"));
+        assert_eq!(relationship.target_fragment(), Some("preview"));
+        assert_eq!(
+            relationship.target_partname().unwrap().as_str(),
+            "/word/media/image.png"
+        );
+        assert_eq!(
+            relationship.target_ref(),
+            "../media/image.png?variant=2#preview"
+        );
+    }
+
+    #[test]
+    fn fallible_insertion_never_replaces_a_duplicate_id() {
+        let mut relationships = Relationships::new("/word".to_string());
+        relationships
+            .try_add_relationship(
+                "urn:first".to_string(),
+                "first.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        assert!(matches!(
+            relationships.try_add_relationship(
+                "urn:second".to_string(),
+                "second.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            ),
+            Err(OpcError::DuplicateRelationshipId(id)) if id == "rId1"
+        ));
+        assert_eq!(relationships.get("rId1").unwrap().target_ref(), "first.xml");
+    }
+
+    #[test]
+    fn every_value_mutation_drops_the_open_time_capture() {
+        let source = PackURI::new("/word/document.xml").expect("source URI");
+        let capture = || Arc::new(PreservedRelationshipsXml::Empty);
+
+        let mut relationships = Relationships::for_source(&source);
+        assert!(relationships.source_capture().is_none());
+        relationships.set_source_capture(capture());
+        assert!(relationships.source_capture().is_some());
+
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "https://example.com/first".to_owned(),
+            "rId1".to_owned(),
+            true,
+        );
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships
+            .try_add_relationship(
+                "urn:test".to_owned(),
+                "https://example.com/second".to_owned(),
+                "rId2".to_owned(),
+                TargetMode::External,
+            )
+            .expect("fallible insertion");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.get_or_add("urn:test", "target.xml");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.get_or_add_ext_rel("urn:test", "https://example.com/third");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships
+            .retarget("rId1", "https://example.com/moved".to_owned())
+            .expect("retarget");
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.retain(|_relationship| true);
+        assert!(relationships.source_capture().is_none());
+
+        relationships.set_source_capture(capture());
+        relationships.try_reserve(4).expect("reserve");
+        assert!(relationships.source_capture().is_none());
+
+        // A lookup that changes nothing still drops the proof, because the
+        // caller asked for a mutation; the proof is only ever conservative.
+        relationships.set_source_capture(capture());
+        assert!(relationships.remove("rIdAbsent").is_none());
+        assert!(relationships.source_capture().is_none());
+    }
+
+    #[test]
+    fn establishing_nothing_keeps_the_open_time_capture() {
+        let source = PackURI::new("/word/document.xml").expect("source URI");
+        let capture = || Arc::new(PreservedRelationshipsXml::Empty);
+
+        let mut relationships = Relationships::for_source(&source);
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "styles.xml".to_owned(),
+            "rId1".to_owned(),
+            false,
+        );
+        relationships.add_relationship(
+            "urn:link".to_owned(),
+            "https://example.com/first".to_owned(),
+            "rId2".to_owned(),
+            true,
+        );
+        let established = relationships.to_xml();
+
+        // `get_or_add` reusing an internal relationship the collection already
+        // carries returns the established identifier and leaves the value, so
+        // the proof still describes the collection.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships.get_or_add("urn:test", "styles.xml").r_id(),
+            "rId1"
+        );
+        assert!(relationships.source_capture().is_some());
+
+        // `get_or_add_ext_rel` already returned early on reuse; it is asserted
+        // here so the two reuse paths are covered by one test.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships.get_or_add_ext_rel("urn:link", "https://example.com/first"),
+            "rId2"
+        );
+        assert!(relationships.source_capture().is_some());
+
+        // `add_relationship` never replaces an established identifier, so an
+        // occupied identifier leaves both the value and the proof alone, even
+        // when the arguments describe something else entirely.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships
+                .add_relationship(
+                    "urn:other".to_owned(),
+                    "other.xml".to_owned(),
+                    "rId1".to_owned(),
+                    true,
+                )
+                .target_ref(),
+            "styles.xml"
+        );
+        assert!(relationships.source_capture().is_some());
+
+        // Nothing above changed the collection, so the serialization the proof
+        // stands for is still the serialization publication would write.
+        assert_eq!(relationships.to_xml(), established);
+        assert_eq!(relationships.len(), 2);
+
+        // A fresh target still establishes a relationship, and still drops it.
+        relationships.set_source_capture(capture());
+        assert_eq!(
+            relationships.get_or_add("urn:test", "numbering.xml").r_id(),
+            "rId3"
+        );
+        assert!(relationships.source_capture().is_none());
+        assert_eq!(relationships.len(), 3);
+    }
+
+    #[test]
+    fn a_captured_serialization_matches_what_publication_would_write() {
+        let source = PackURI::new("/word/document.xml").expect("source URI");
+        let mut relationships = Relationships::for_source(&source);
+        assert_eq!(
+            PreservedRelationshipsXml::from_relationships(&relationships)
+                .expect("empty capture")
+                .as_bytes(),
+            relationships.try_to_xml_bytes().expect("empty bytes")
+        );
+
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "https://example.com/first".to_owned(),
+            "rId1".to_owned(),
+            true,
+        );
+        relationships.add_relationship(
+            "urn:test".to_owned(),
+            "target.xml".to_owned(),
+            "rId2".to_owned(),
+            false,
+        );
+        assert_eq!(
+            PreservedRelationshipsXml::from_relationships(&relationships)
+                .expect("owned capture")
+                .as_bytes(),
+            relationships.try_to_xml_bytes().expect("owned bytes")
+        );
+    }
+
+    #[test]
+    fn fallible_relationship_xml_matches_the_canonical_literal() {
+        let mut relationships = Relationships::new("/word".to_string());
+        relationships
+            .try_add_relationship(
+                "urn:test:type<&>\"'".to_string(),
+                "target<&>\"'".to_string(),
+                "rId1".to_string(),
+                TargetMode::External,
+            )
+            .unwrap();
+
+        assert_eq!(
+            relationships.try_to_xml_bytes().unwrap(),
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="urn:test:type&lt;&amp;&gt;&quot;&apos;" Target="target&lt;&amp;&gt;&quot;&apos;" TargetMode="External"/></Relationships>"#
+        );
+    }
+
+    #[test]
+    fn canonical_chunks_match_serialization_without_collecting_output() {
+        let mut relationships = Relationships::new("/word".to_owned());
+        for (id, mode, target) in [
+            ("rId2", TargetMode::Internal, "../media/image.xml?x=1&y=2#z"),
+            (
+                "rId10",
+                TargetMode::External,
+                "https://example.invalid/é<&>\"'",
+            ),
+            ("rId1", TargetMode::External, ""),
+        ] {
+            relationships
+                .try_add_relationship(
+                    "urn:example".to_owned(),
+                    target.to_owned(),
+                    id.to_owned(),
+                    mode,
+                )
+                .unwrap();
+        }
+        for relationships in [Relationships::default(), relationships] {
+            let expected = relationships.to_xml();
+            let mut remaining = expected.as_bytes();
+            relationships
+                .for_each_canonical_xml_chunk(|chunk| {
+                    remaining = remaining
+                        .strip_prefix(chunk)
+                        .expect("chunk matches canonical bytes");
+                    Ok(())
+                })
+                .unwrap();
+            assert!(remaining.is_empty());
+            assert_eq!(
+                relationships.try_to_xml_bytes().unwrap(),
+                expected.as_bytes()
+            );
+        }
+    }
+
+    #[test]
+    fn canonical_chunk_visitor_stops_on_consumer_failure() {
+        let relationships = Relationships::default();
+        let mut calls = 0;
+        let result = relationships.for_each_canonical_xml_chunk(|_| {
+            calls += 1;
+            Err(OpcError::PartNotFound("consumer sentinel".to_owned()))
+        });
+        assert!(
+            matches!(result, Err(OpcError::PartNotFound(message)) if message == "consumer sentinel")
+        );
+        assert_eq!(calls, 1);
+    }
+
+    #[test]
+    fn fallible_relationship_xml_is_deterministic_across_insertion_order() {
+        let mut first = Relationships::new("/word".to_string());
+        first
+            .try_add_relationship(
+                "urn:type:two".to_string(),
+                "two.xml".to_string(),
+                "rId2".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        first
+            .try_add_relationship(
+                "urn:type:one".to_string(),
+                "one.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+
+        let mut second = Relationships::new("/word".to_string());
+        second
+            .try_add_relationship(
+                "urn:type:one".to_string(),
+                "one.xml".to_string(),
+                "rId1".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        second
+            .try_add_relationship(
+                "urn:type:two".to_string(),
+                "two.xml".to_string(),
+                "rId2".to_string(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+
+        assert_eq!(
+            first.try_to_xml_bytes().unwrap(),
+            second.try_to_xml_bytes().unwrap()
+        );
+        assert_eq!(first.try_to_xml_bytes().unwrap(), first.to_xml().as_bytes());
+    }
+
+    #[test]
+    fn fallible_relationship_xml_preserves_empty_output() {
+        let relationships = Relationships::new("/word".to_string());
+
+        assert_eq!(
+            relationships.try_to_xml_bytes().unwrap(),
+            br#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#
+        );
+        assert_eq!(
+            relationships.try_to_xml_bytes().unwrap(),
+            relationships.to_xml().as_bytes()
+        );
+    }
+
+    #[test]
+    fn sized_relationship_xml_matches_large_mixed_escaped_owner() {
+        let mut relationships = Relationships::new("/word".to_owned());
+        for index in (0..1024).rev() {
+            relationships
+                .try_add_relationship(
+                    format!("urn:example:类型<&>\"':{index}"),
+                    format!("target-é-{index}<&>\"'.xml"),
+                    format!("rId{index}"),
+                    if index % 2 == 0 {
+                        TargetMode::External
+                    } else {
+                        TargetMode::Internal
+                    },
+                )
+                .unwrap();
+        }
+        let bytes = relationships.try_to_xml_bytes().unwrap();
+        assert_eq!(bytes, relationships.to_xml().as_bytes());
+        assert_eq!(
+            bytes.len(),
+            crate::source_backed::canonical_relationship_xml_len(&relationships).unwrap()
+        );
     }
 }

@@ -1,0 +1,1023 @@
+#![expect(
+    clippy::expect_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+#![expect(
+    clippy::iter_not_returning_iterator,
+    reason = "the method name is retained for public API compatibility"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+#![expect(
+    clippy::struct_excessive_bools,
+    reason = "the public model preserves independent OOXML flags"
+)]
+#![expect(
+    clippy::struct_field_names,
+    reason = "the public model retains established field names"
+)]
+#![expect(
+    clippy::unwrap_used,
+    reason = "the invariant is established immediately before extraction"
+)]
+/// Styles - document styles and formatting definitions.
+use crate::error::{Error, Result};
+use crate::numbering::Paragraph;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use litchi_ooxml_common::xml::attributes::first_wins;
+use litchi_opc::part::Part;
+use quick_xml::events::Event;
+use quick_xml::{Reader, XmlVersion};
+use smallvec::SmallVec;
+use std::collections::HashSet;
+
+/// Source-preserving ownership and lifecycle APIs for the optional
+/// `stylesWithEffects` parts.
+pub mod effects;
+
+/// The located styles part: every style with its byte range, read and
+/// edited in place.
+pub mod catalog;
+
+/// Semantic kind of a Word style.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[repr(u8)]
+pub enum Type {
+    /// Paragraph style.
+    Paragraph = 1,
+    /// Character style.
+    Character = 2,
+    /// Table style.
+    Table = 3,
+    /// List (numbering) style.
+    List = 4,
+}
+
+impl Type {
+    /// Convert the style kind to its XML attribute value.
+    #[inline]
+    #[must_use]
+    pub const fn to_xml(self) -> &'static str {
+        match self {
+            Self::Paragraph => "paragraph",
+            Self::Character => "character",
+            Self::Table => "table",
+            Self::List => "numbering",
+        }
+    }
+
+    /// Parse a style kind from its XML attribute value.
+    #[inline]
+    #[must_use]
+    pub fn from_xml(value: &str) -> Option<Self> {
+        match value {
+            "paragraph" => Some(Self::Paragraph),
+            "character" => Some(Self::Character),
+            "table" => Some(Self::Table),
+            "numbering" => Some(Self::List),
+            _ => None,
+        }
+    }
+}
+
+impl Default for Type {
+    #[inline]
+    fn default() -> Self {
+        Self::Paragraph
+    }
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Paragraph => write!(formatter, "Paragraph"),
+            Self::Character => write!(formatter, "Character"),
+            Self::Table => write!(formatter, "Table"),
+            Self::List => write!(formatter, "List"),
+        }
+    }
+}
+
+/// A Word paragraph outline level tied to a built-in heading rank.
+///
+/// Word stores Heading 1 as wire level `0` and Heading 9 as wire level `8`.
+/// The enum keeps every public value inside that closed domain.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Outline {
+    H1 = 0,
+    H2 = 1,
+    H3 = 2,
+    H4 = 3,
+    H5 = 4,
+    H6 = 5,
+    H7 = 6,
+    H8 = 7,
+    H9 = 8,
+}
+
+impl Outline {
+    /// Convert a wire level into its typed heading rank.
+    #[must_use]
+    pub const fn new(level: u8) -> Option<Self> {
+        match level {
+            0 => Some(Self::H1),
+            1 => Some(Self::H2),
+            2 => Some(Self::H3),
+            3 => Some(Self::H4),
+            4 => Some(Self::H5),
+            5 => Some(Self::H6),
+            6 => Some(Self::H7),
+            7 => Some(Self::H8),
+            8 => Some(Self::H9),
+            _ => None,
+        }
+    }
+
+    /// Return the zero-based `WordprocessingML` wire level.
+    #[must_use]
+    pub const fn level(self) -> u8 {
+        self as u8
+    }
+}
+
+/// A collection of styles defined in a Word document.
+///
+/// Provides access to paragraph, character, table, and list styles.
+/// Supports iteration and lookup by style ID or name.
+///
+/// # Examples
+///
+/// ```rust,ignore
+/// use litchi_docx::Package;
+///
+/// let pkg = Package::open("document.docx")?;
+/// let doc = pkg.document()?;
+/// let styles = doc.styles()?;
+///
+/// println!("Document has {} styles", styles.len());
+/// for style in styles.iter() {
+///     println!("Style: {} (type: {})", style.name(), style.style_type());
+/// }
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub struct Styles<'a> {
+    /// Reference to the styles part
+    part: &'a dyn Part,
+    /// Cached list of styles
+    style_list: Option<SmallVec<[Style; 32]>>,
+    /// Repairs applied while the style list was loaded; see
+    /// [`crate::leniency::StyleDefect`].
+    tolerance: crate::leniency::ToleranceReport,
+}
+
+impl std::fmt::Debug for Styles<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Styles")
+            .field(
+                "style_count",
+                &self.style_list.as_ref().map_or(0, SmallVec::len),
+            )
+            .finish()
+    }
+}
+
+impl<'a> Styles<'a> {
+    /// Create a new Styles object from a styles part.
+    ///
+    /// This is typically called internally when accessing document styles.
+    #[inline]
+    pub fn from_part(part: &'a dyn Part) -> Self {
+        Self {
+            part,
+            style_list: None,
+            tolerance: crate::leniency::ToleranceReport::default(),
+        }
+    }
+
+    /// Repairs applied while the style list was loaded, in discovery order
+    /// (see [`crate::leniency::StyleDefect`]); empty when `styles.xml`
+    /// conformed. Loads the style list first.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the style list cannot be loaded.
+    pub fn tolerance_report(&mut self) -> Result<&crate::leniency::ToleranceReport> {
+        self.ensure_styles_loaded()?;
+        Ok(&self.tolerance)
+    }
+
+    /// The load repairs, when the style list has been loaded.
+    pub(crate) fn loaded_tolerance(&self) -> Option<&crate::leniency::ToleranceReport> {
+        self.style_list.as_ref().map(|_| &self.tolerance)
+    }
+
+    /// Get the number of styles in the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn len(&mut self) -> Result<usize> {
+        self.ensure_styles_loaded()?;
+        Ok(self.style_list.as_ref().map_or(0, SmallVec::len))
+    }
+
+    /// Check if there are no styles defined.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn is_empty(&mut self) -> Result<bool> {
+        Ok(self.len()? == 0)
+    }
+
+    /// Get an iterator over all styles.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn iter(&mut self) -> Result<std::slice::Iter<'_, Style>> {
+        self.ensure_styles_loaded()?;
+        Ok(self
+            .style_list
+            .as_ref()
+            .map_or([].iter(), |list| list.iter()))
+    }
+
+    /// Get a style by its ID.
+    ///
+    /// Returns `None` if no style with the given ID is found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn get_by_id(&mut self, style_id: &str) -> Result<Option<&Style>> {
+        self.ensure_styles_loaded()?;
+        Ok(self
+            .style_list
+            .as_ref()
+            .and_then(|list| list.iter().find(|s| s.style_id == style_id)))
+    }
+
+    /// Get a style by its name.
+    ///
+    /// Returns `None` if no style with the given name is found.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn get_by_name(&mut self, name: &str) -> Result<Option<&Style>> {
+        self.ensure_styles_loaded()?;
+        Ok(self
+            .style_list
+            .as_ref()
+            .and_then(|list| list.iter().find(|s| s.name.as_deref() == Some(name))))
+    }
+
+    /// Get the default style for a given style type.
+    ///
+    /// Returns `None` if no default style is defined for that type.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn get_default(&mut self, style_type: Type) -> Result<Option<&Style>> {
+        self.ensure_styles_loaded()?;
+        Ok(self.style_list.as_ref().and_then(|list| {
+            list.iter()
+                .find(|s| s.is_default && s.style_type == style_type)
+        }))
+    }
+
+    /// Resolve inherited paragraph numbering with a bounded, cycle-checked `basedOn` walk.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if an internal writer invariant is violated.
+    pub fn resolved_numbering(&mut self, style_id: &str) -> Result<Option<Paragraph>> {
+        self.ensure_styles_loaded()?;
+        let styles = self.style_list.as_ref().expect("styles loaded");
+        resolve_numbering(styles, style_id)
+    }
+
+    /// Ensure styles are loaded from XML.
+    fn ensure_styles_loaded(&mut self) -> Result<()> {
+        if self.style_list.is_some() {
+            return Ok(());
+        }
+
+        let xml_bytes = litchi_ooxml_common::mce::process_part(self.part)?;
+        let mut reader = Reader::from_reader(xml_bytes.as_ref());
+        reader.config_mut().trim_text(true);
+
+        let mut styles = SmallVec::new();
+        let mut current_style: Option<StyleBuilder> = None;
+        let mut in_ppr = false;
+        let mut in_num_pr = false;
+        let mut pending_num_id = None;
+        let mut pending_level = None;
+        let mut num_pr_offset = 0u64;
+        let mut tolerance = crate::leniency::ToleranceReport::default();
+
+        loop {
+            let raw_event = reader.read_event();
+            // Start-tag offset of a property leaf within the visible XML: the
+            // reader has consumed exactly `<`, the tag body, and `/>` (or `>`
+            // for a leaf expanded into a start/end pair).
+            let end = reader.buffer_position();
+            let mut expanded = false;
+            let event = match raw_event {
+                // Markup-compatibility processing re-serializes a part whose
+                // root declares `mc:Ignorable`, expanding every empty element
+                // into a start/end pair. Read a property leaf in either form.
+                Ok(Event::Start(e))
+                    if current_style.is_some()
+                        && is_style_property_leaf(e.local_name().as_ref()) =>
+                {
+                    expanded = true;
+                    Ok(Event::Empty(e))
+                },
+                other => other,
+            };
+            let tag_offset =
+                |body: usize| end.saturating_sub(body as u64 + if expanded { 2 } else { 3 });
+            match event {
+                Ok(Event::Start(e)) if e.local_name().as_ref() == b"style" => {
+                    // Start a new style
+                    let mut builder = StyleBuilder::default();
+
+                    // Parse attributes; a repeated name keeps its first value.
+                    for attr in first_wins(&e).flatten() {
+                        match attr.key.local_name().as_ref() {
+                            b"type" => {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
+                                    builder.style_type = Type::from_xml(&value).unwrap_or_default();
+                                }
+                            },
+                            b"styleId" => {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
+                                    builder.style_id = Some(value.to_string());
+                                }
+                            },
+                            b"default" => {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
+                                    builder.is_default = value == "1" || value == "true";
+                                }
+                            },
+                            b"customStyle" => {
+                                if let Ok(value) = attr.decoded_and_normalized_value(
+                                    XmlVersion::Implicit1_0,
+                                    reader.decoder(),
+                                ) {
+                                    builder.is_custom = value == "1" || value == "true";
+                                }
+                            },
+                            _ => {},
+                        }
+                    }
+
+                    current_style = Some(builder);
+                },
+                Ok(Event::Start(e))
+                    if current_style.is_some() && e.local_name().as_ref() == b"pPr" =>
+                {
+                    in_ppr = true;
+                },
+                Ok(Event::Start(e))
+                    if current_style.is_some() && in_ppr && e.local_name().as_ref() == b"numPr" =>
+                {
+                    if in_num_pr {
+                        return Err(Error::InvalidFormat("style has nested numPr".to_owned()));
+                    }
+                    in_num_pr = true;
+                    pending_num_id = None;
+                    pending_level = None;
+                    num_pr_offset = end.saturating_sub(e.len() as u64 + 2);
+                },
+                Ok(Event::Empty(e)) if current_style.is_some() => {
+                    let builder = current_style.as_mut().unwrap();
+                    match e.local_name().as_ref() {
+                        // An empty `w:numPr` names no numbering instance: the
+                        // style inherits its numbering, as above.
+                        b"numPr" if in_ppr && !in_num_pr => {
+                            tolerance.record(
+                                crate::leniency::StyleDefect::NumPrMissingNumId,
+                                end.saturating_sub(e.len() as u64 + 3),
+                            );
+                        },
+                        b"numId" if in_num_pr => {
+                            if pending_num_id.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "style has duplicate numId".to_owned(),
+                                ));
+                            }
+                            let raw = required_style_value(&e, reader.decoder())?;
+                            pending_num_id = Some(raw.parse::<u32>().map_err(|_source_error| {
+                                Error::InvalidFormat(format!("invalid style numId '{raw}'"))
+                            })?);
+                        },
+                        b"ilvl" if in_num_pr => {
+                            if pending_level.is_some() {
+                                return Err(Error::InvalidFormat(
+                                    "style has duplicate ilvl".to_owned(),
+                                ));
+                            }
+                            let raw = required_style_value(&e, reader.decoder())?;
+                            let (level, clamped) = crate::numbering::parse_list_level(&raw)
+                                .ok_or_else(|| {
+                                    Error::InvalidFormat(format!("invalid style ilvl '{raw}'"))
+                                })?;
+                            if clamped {
+                                tolerance.record(
+                                    crate::leniency::StyleDefect::LevelOutOfRange,
+                                    tag_offset(e.len()),
+                                );
+                            }
+                            pending_level = Some(level);
+                        },
+                        b"outlineLvl" if in_ppr => {
+                            if builder.saw_outline {
+                                return Err(Error::InvalidFormat(
+                                    "style has duplicate outlineLvl".to_owned(),
+                                ));
+                            }
+                            builder.saw_outline = true;
+                            let raw = required_style_value(&e, reader.decoder())?;
+                            let digits = raw.strip_prefix('+').unwrap_or(&raw);
+                            if digits.is_empty() || !digits.bytes().all(|b| b.is_ascii_digit()) {
+                                return Err(Error::InvalidFormat(format!(
+                                    "invalid style outlineLvl '{raw}'"
+                                )));
+                            }
+                            // 0-8 are heading levels and 9 is Word's body-text
+                            // level (no outline). Word ignores larger values
+                            // (LibreOffice `DomainMapper`: "invalid value is
+                            // ignored by MS Word"), so they are dropped and
+                            // recorded.
+                            match digits.parse::<u8>() {
+                                Ok(level) if level <= BODY_TEXT_OUTLINE_LEVEL => {
+                                    builder.outline = Outline::new(level);
+                                },
+                                _ => tolerance.record(
+                                    crate::leniency::StyleDefect::OutlineLevelOutOfRange,
+                                    tag_offset(e.len()),
+                                ),
+                            }
+                        },
+                        b"name" => {
+                            // Parse name attribute
+                            for attr in first_wins(&e).flatten() {
+                                if attr.key.local_name().as_ref() == b"val"
+                                    && let Ok(value) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
+                                {
+                                    builder.name = Some(value.to_string());
+                                }
+                            }
+                        },
+                        b"basedOn" => {
+                            // Parse basedOn attribute
+                            for attr in first_wins(&e).flatten() {
+                                if attr.key.local_name().as_ref() == b"val"
+                                    && let Ok(value) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
+                                {
+                                    builder.based_on = Some(value.to_string());
+                                }
+                            }
+                        },
+                        b"uiPriority" => {
+                            // Parse UI priority
+                            for attr in first_wins(&e).flatten() {
+                                if attr.key.local_name().as_ref() == b"val"
+                                    && let Ok(value) = attr.decoded_and_normalized_value(
+                                        XmlVersion::Implicit1_0,
+                                        reader.decoder(),
+                                    )
+                                    && let Ok(priority) = value.parse::<i32>()
+                                {
+                                    builder.priority = Some(priority);
+                                }
+                            }
+                        },
+                        b"qFormat" => {
+                            builder.is_quick_style = true;
+                        },
+                        b"semiHidden" => {
+                            builder.is_hidden = true;
+                        },
+                        b"locked" => {
+                            builder.is_locked = true;
+                        },
+                        _ => {},
+                    }
+                },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"numPr" && in_num_pr => {
+                    let builder = current_style.as_mut().expect("style checked");
+                    if let Some(num_id) = pending_num_id.take() {
+                        builder.numbering = Some(Paragraph {
+                            num_id,
+                            level: pending_level.take().unwrap_or(0),
+                        });
+                    } else {
+                        // `CT_NumPr` makes `w:numId` optional: the style
+                        // inherits its numbering along `basedOn`, with any
+                        // `w:ilvl` as a level override.
+                        builder.level_override = pending_level.take();
+                        tolerance.record(
+                            crate::leniency::StyleDefect::NumPrMissingNumId,
+                            num_pr_offset,
+                        );
+                    }
+                    in_num_pr = false;
+                },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"pPr" && in_ppr => {
+                    if in_num_pr {
+                        return Err(Error::InvalidFormat("unterminated style numPr".to_owned()));
+                    }
+                    in_ppr = false;
+                },
+                Ok(Event::End(e)) if e.local_name().as_ref() == b"style" => {
+                    // Finish current style
+                    if let Some(builder) = current_style.take()
+                        && let Some(style_id) = builder.style_id
+                    {
+                        styles.push(Style {
+                            style_id,
+                            name: builder.name,
+                            style_type: builder.style_type,
+                            is_default: builder.is_default,
+                            is_custom: builder.is_custom,
+                            based_on: builder.based_on,
+                            numbering: builder.numbering,
+                            level_override: builder.level_override,
+                            outline: builder.outline,
+                            declares_outline: builder.saw_outline,
+                            priority: builder.priority,
+                            is_quick_style: builder.is_quick_style,
+                            is_hidden: builder.is_hidden,
+                            is_locked: builder.is_locked,
+                        });
+                    }
+                },
+                Ok(Event::Eof) => break,
+                Err(e) => return Err(Error::Xml(e.to_string())),
+                _ => {},
+            }
+        }
+
+        self.style_list = Some(styles);
+        self.tolerance = tolerance;
+        Ok(())
+    }
+}
+
+/// Resolve a style's numbering through a bounded, cycle-checked `basedOn`
+/// walk.
+///
+/// The nearest style with a `w:numId` supplies the numbering. A style whose
+/// `w:numPr` has no `w:numId` ([`crate::leniency::StyleDefect::NumPrMissingNumId`])
+/// inherits it, and its `w:ilvl`, if any, overrides the inherited level; the
+/// nearest override wins, as Word resolves style properties one by one along
+/// `basedOn`.
+pub(crate) fn resolve_numbering(styles: &[Style], style_id: &str) -> Result<Option<Paragraph>> {
+    let mut current = style_id;
+    let mut visited = HashSet::new();
+    let mut level_override = None;
+    loop {
+        if !visited.insert(current.to_owned()) {
+            return Err(Error::InvalidFormat(format!(
+                "style basedOn cycle at '{current}'"
+            )));
+        }
+        if visited.len() > styles.len().saturating_add(1) {
+            return Err(Error::InvalidFormat(
+                "style inheritance exceeds the style table".to_owned(),
+            ));
+        }
+        let Some(style) = styles.iter().find(|style| style.style_id == current) else {
+            return Ok(None);
+        };
+        if let Some(mut numbering) = style.numbering {
+            if let Some(level) = level_override {
+                numbering.level = level;
+            }
+            return Ok(Some(numbering));
+        }
+        level_override = level_override.or(style.level_override);
+        let Some(parent) = style.based_on.as_deref() else {
+            return Ok(None);
+        };
+        current = parent;
+    }
+}
+
+/// Whether `name` is a style property the loader reads from an empty
+/// element (and so must also read from a start/end pair).
+fn is_style_property_leaf(name: &[u8]) -> bool {
+    matches!(
+        name,
+        b"numId"
+            | b"ilvl"
+            | b"outlineLvl"
+            | b"name"
+            | b"basedOn"
+            | b"uiPriority"
+            | b"qFormat"
+            | b"semiHidden"
+            | b"locked"
+    )
+}
+
+/// Builder for constructing Style objects during XML parsing.
+#[derive(Debug, Default)]
+struct StyleBuilder {
+    style_id: Option<String>,
+    name: Option<String>,
+    style_type: Type,
+    is_default: bool,
+    is_custom: bool,
+    based_on: Option<String>,
+    numbering: Option<Paragraph>,
+    level_override: Option<u8>,
+    outline: Option<Outline>,
+    /// Whether an `w:outlineLvl` was seen (a body-text or ignored value
+    /// leaves `outline` unset).
+    saw_outline: bool,
+    priority: Option<i32>,
+    is_quick_style: bool,
+    is_hidden: bool,
+    is_locked: bool,
+}
+
+/// The `w:outlineLvl` value Word writes for body text: no outline level.
+const BODY_TEXT_OUTLINE_LEVEL: u8 = 9;
+
+/// A single style definition in a Word document.
+///
+/// Represents a `<w:style>` element with its properties.
+/// Can be a paragraph, character, table, or list style.
+#[derive(Debug, Clone)]
+pub struct Style {
+    /// Style identifier (required)
+    style_id: String,
+    /// UI-visible name
+    name: Option<String>,
+    /// Type of style (paragraph, character, table, or list)
+    style_type: Type,
+    /// Whether this is the default style for its type
+    is_default: bool,
+    /// Whether this is a custom (user-defined) style
+    is_custom: bool,
+    /// ID of the style this is based on
+    based_on: Option<String>,
+    numbering: Option<Paragraph>,
+    /// The `w:ilvl` of a `w:numPr` without `w:numId`, which overrides the
+    /// level of the numbering the style inherits.
+    level_override: Option<u8>,
+    outline: Option<Outline>,
+    /// Whether the style declares `w:outlineLvl`, body text included.
+    declares_outline: bool,
+    /// UI priority for display ordering
+    priority: Option<i32>,
+    /// Whether to show in quick style gallery
+    is_quick_style: bool,
+    /// Whether hidden from UI
+    is_hidden: bool,
+    /// Whether locked (formatting protection)
+    is_locked: bool,
+}
+
+impl Style {
+    /// Get the style identifier.
+    #[inline]
+    #[must_use]
+    pub fn style_id(&self) -> &str {
+        &self.style_id
+    }
+
+    /// Get the style name.
+    ///
+    /// Returns `None` if no name is defined.
+    #[inline]
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Get the style type.
+    #[inline]
+    #[must_use]
+    pub fn style_type(&self) -> Type {
+        self.style_type
+    }
+
+    /// Check if this is the default style for its type.
+    #[inline]
+    #[must_use]
+    pub fn is_default(&self) -> bool {
+        self.is_default
+    }
+
+    /// Check if this is a built-in style.
+    ///
+    /// Returns `true` if this is a built-in Word style, `false` for custom styles.
+    #[inline]
+    #[must_use]
+    pub fn is_builtin(&self) -> bool {
+        !self.is_custom
+    }
+
+    /// Check if this is a custom (user-defined) style.
+    #[inline]
+    #[must_use]
+    pub fn is_custom(&self) -> bool {
+        self.is_custom
+    }
+
+    /// Get the ID of the style this is based on.
+    #[inline]
+    #[must_use]
+    pub fn based_on(&self) -> Option<&str> {
+        self.based_on.as_deref()
+    }
+
+    /// Direct paragraph numbering declared by this style.
+    #[inline]
+    #[must_use]
+    pub fn numbering(&self) -> Option<Paragraph> {
+        self.numbering
+    }
+
+    /// Direct outline level declared by this paragraph style.
+    #[inline]
+    #[must_use]
+    pub const fn outline(&self) -> Option<Outline> {
+        self.outline
+    }
+
+    /// Whether the style declares a `w:outlineLvl` of its own, including
+    /// the body-text level that [`Self::outline`] reports as `None`; such
+    /// a declaration overrides the level its based-on style would give.
+    #[inline]
+    #[must_use]
+    pub const fn declares_outline(&self) -> bool {
+        self.declares_outline
+    }
+
+    /// Get the UI priority for this style.
+    ///
+    /// Lower values appear first in style lists.
+    #[inline]
+    #[must_use]
+    pub fn priority(&self) -> Option<i32> {
+        self.priority
+    }
+
+    /// Check if this style appears in the quick style gallery.
+    #[inline]
+    #[must_use]
+    pub fn is_quick_style(&self) -> bool {
+        self.is_quick_style
+    }
+
+    /// Check if this style is hidden from the UI.
+    #[inline]
+    #[must_use]
+    pub fn is_hidden(&self) -> bool {
+        self.is_hidden
+    }
+
+    /// Check if this style is locked.
+    ///
+    /// Locked styles cannot be applied when formatting protection is enabled.
+    #[inline]
+    #[must_use]
+    pub fn is_locked(&self) -> bool {
+        self.is_locked
+    }
+}
+
+fn required_style_value(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<String> {
+    for attribute in element.unchecked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() == b"val" {
+            return attribute
+                .decoded_and_normalized_value(XmlVersion::Implicit1_0, decoder)
+                .map(std::borrow::Cow::into_owned)
+                .map_err(|error| Error::Xml(error.to_string()));
+        }
+    }
+    Err(Error::InvalidFormat(
+        "style property is missing val".to_owned(),
+    ))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use litchi_opc::PackURI;
+    use litchi_opc::part::BlobPart;
+
+    #[test]
+    fn test_style_type_default() {
+        let style_type = Type::default();
+        assert_eq!(style_type, Type::Paragraph);
+    }
+
+    #[test]
+    fn style_type_xml_and_display_round_trip() {
+        let values = [
+            (Type::Paragraph, "paragraph", "Paragraph", 1),
+            (Type::Character, "character", "Character", 2),
+            (Type::Table, "table", "Table", 3),
+            (Type::List, "numbering", "List", 4),
+        ];
+        for (value, xml, display, repr) in values {
+            assert_eq!(value.to_xml(), xml);
+            assert_eq!(Type::from_xml(xml), Some(value));
+            assert_eq!(value.to_string(), display);
+            assert_eq!(value as u8, repr);
+        }
+        assert_eq!(Type::from_xml("invalid"), None);
+    }
+
+    fn with_styles<T>(xml: &[u8], inspect: impl FnOnce(&mut Styles<'_>) -> T) -> T {
+        let part = BlobPart::new(
+            PackURI::new("/word/styles.xml").unwrap(),
+            "application/xml".to_owned(),
+            xml.to_vec(),
+        );
+        let mut styles = Styles::from_part(&part);
+        inspect(&mut styles)
+    }
+
+    #[test]
+    fn resolves_inherited_numbering_and_retains_cancellation() {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Base"><w:pPr><w:numPr><w:ilvl w:val="2"/><w:numId w:val="7"/></w:numPr></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Child"><w:basedOn w:val="Base"/></w:style><w:style w:type="paragraph" w:styleId="Cancel"><w:pPr><w:numPr><w:numId w:val="0"/></w:numPr></w:pPr></w:style></w:styles>"#, |value| {
+            assert_eq!(
+                value.resolved_numbering("Child").unwrap(),
+                Some(Paragraph { num_id: 7, level: 2 })
+            );
+            assert_eq!(
+                value.resolved_numbering("Cancel").unwrap(),
+                Some(Paragraph { num_id: 0, level: 0 })
+            );
+        });
+    }
+
+    /// Markup-compatibility processing expands empty elements into
+    /// start/end pairs; the properties must read the same either way.
+    #[test]
+    fn expanded_property_elements_read_like_empty_ones() {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:w14="http://schemas.microsoft.com/office/word/2010/wordml" mc:Ignorable="w14"><w:style w:type="paragraph" w:styleId="List"><w:name w:val="List Paragraph"/><w:basedOn w:val="Normal"/><w:uiPriority w:val="34"/><w:qFormat/><w:pPr><w:numPr><w:ilvl w:val="3"/><w:numId w:val="1"/></w:numPr><w:outlineLvl w:val="1"/></w:pPr></w:style></w:styles>"#, |styles| {
+            let style = styles.get_by_id("List").unwrap().unwrap();
+            assert_eq!(style.name(), Some("List Paragraph"));
+            assert_eq!(style.based_on(), Some("Normal"));
+            assert_eq!(style.priority(), Some(34));
+            assert!(style.is_quick_style());
+            assert_eq!(style.numbering(), Some(Paragraph { num_id: 1, level: 3 }));
+            assert_eq!(style.outline(), Some(Outline::H2));
+        });
+    }
+
+    #[test]
+    fn rejects_based_on_cycles_and_malformed_num_pr() {
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:basedOn w:val="B"/></w:style><w:style w:type="paragraph" w:styleId="B"><w:basedOn w:val="A"/></w:style></w:styles>"#, |cycle| {
+            assert!(cycle.resolved_numbering("A").is_err());
+        });
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="A"><w:pPr><w:numPr><w:ilvl w:val="x"/><w:numId w:val="1"/></w:numPr></w:pPr></w:style></w:styles>"#, |malformed| {
+            assert!(malformed.len().is_err());
+        });
+    }
+
+    #[test]
+    fn outline_levels_are_typed_and_malformed_values_are_rejected() {
+        assert_eq!(Outline::new(0), Some(Outline::H1));
+        assert_eq!(Outline::new(8), Some(Outline::H9));
+        assert_eq!(Outline::new(9), None);
+
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Heading1"><w:pPr><w:outlineLvl w:val="0"/></w:pPr></w:style></w:styles>"#, |styles| {
+            assert_eq!(
+                styles.get_by_id("Heading1").unwrap().unwrap().outline(),
+                Some(Outline::H1)
+            );
+        });
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Bad"><w:pPr><w:outlineLvl w:val="x"/></w:pPr></w:style></w:styles>"#, |styles| {
+            assert!(styles.len().is_err());
+        });
+        // 9 is Word's body-text level; larger values are ignored and recorded.
+        with_styles(br#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:style w:type="paragraph" w:styleId="Body"><w:pPr><w:outlineLvl w:val="9"/></w:pPr></w:style><w:style w:type="paragraph" w:styleId="Deep"><w:pPr><w:outlineLvl w:val="10"/></w:pPr></w:style></w:styles>"#, |styles| {
+            assert_eq!(styles.get_by_id("Body").unwrap().unwrap().outline(), None);
+            assert_eq!(styles.get_by_id("Deep").unwrap().unwrap().outline(), None);
+            assert_eq!(
+                styles
+                    .tolerance_report()
+                    .unwrap()
+                    .defects()
+                    .iter()
+                    .map(|tolerated| tolerated.defect)
+                    .collect::<Vec<_>>(),
+                [crate::leniency::Defect::Style(
+                    crate::leniency::StyleDefect::OutlineLevelOutOfRange
+                )]
+            );
+        });
+    }
+
+    /// ` n00000=""` to ` n19999=""`, then 20,000 repeats of the last name: a
+    /// tag quick-xml's checked iterator reads in `O(n²)` when every item is read.
+    fn repeated_attributes() -> String {
+        let mut attributes = String::new();
+        for index in 0..20_000 {
+            attributes.push_str(&format!(" n{index:05}=\"\""));
+        }
+        for _ in 0..20_000 {
+            attributes.push_str(" n19999=\"\"");
+        }
+        attributes
+    }
+
+    type Summary = (
+        String,
+        Type,
+        bool,
+        bool,
+        Option<String>,
+        Option<String>,
+        Option<i32>,
+    );
+
+    fn only_style(style: &str) -> Summary {
+        let xml = format!(
+            r#"<w:styles xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">{style}</w:styles>"#
+        );
+        with_styles(xml.as_bytes(), |styles| {
+            assert_eq!(styles.len().unwrap(), 1);
+            let style = styles.iter().unwrap().next().unwrap();
+            (
+                style.style_id().to_owned(),
+                style.style_type(),
+                style.is_default(),
+                style.is_custom(),
+                style.name().map(ToOwned::to_owned),
+                style.based_on().map(ToOwned::to_owned),
+                style.priority(),
+            )
+        })
+    }
+
+    #[test]
+    fn repeated_style_attributes_keep_their_first_value() {
+        let expected = (
+            "First".to_owned(),
+            Type::Character,
+            true,
+            true,
+            Some("Kept".to_owned()),
+            Some("Base".to_owned()),
+            Some(5),
+        );
+        assert_eq!(
+            only_style(
+                r#"<w:style w:type="character" w:styleId="First" w:default="1" w:customStyle="1"><w:name w:val="Kept"/><w:basedOn w:val="Base"/><w:uiPriority w:val="5"/></w:style>"#
+            ),
+            expected
+        );
+        assert_eq!(
+            only_style(
+                r#"<w:style w:type="character" w:styleId="First" w:default="1" w:customStyle="1" w:type="table" w:styleId="Second" w:default="0" w:customStyle="0"><w:name w:val="Kept" w:val="Dropped"/><w:basedOn w:val="Base" w:val="Other"/><w:uiPriority w:val="5" w:val="9"/></w:style>"#
+            ),
+            expected
+        );
+        let names = repeated_attributes();
+        assert_eq!(
+            only_style(&format!(
+                r#"<w:style w:type="character" w:styleId="First"{names} w:default="1" w:customStyle="1" w:styleId="Second"><w:name w:val="Kept"{names} w:val="Dropped"/><w:basedOn{names} w:val="Base"/><w:uiPriority{names} w:val="5" w:val="9"/></w:style>"#
+            )),
+            expected
+        );
+    }
+}

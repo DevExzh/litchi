@@ -1,0 +1,15 @@
+// Wire-only Buffa projection derived from
+// `../protos/TSWPArchives.proto` (`TSWP.StorageArchive`, field 3).
+//
+// This is deliberately not a second authoritative native schema.  The
+// canonical schema remains `TSWPArchives.proto`; this projection repeats only
+// the package-independent field number, cardinality, wire type, and UTF-8
+// interpretation needed by the archive-free text adapter.  Keep changes to
+// the canonical field and this projection in the same review.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message TSWPStorageArchive {
+  repeated string text = 3;
+}

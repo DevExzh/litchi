@@ -1,0 +1,533 @@
+//! Typed Keynote semantic models and bounded native package APIs.
+//!
+//! This crate owns the presentation vocabulary used by Keynote readers and
+//! editors plus the concrete `.key` package boundary. Archive objects,
+//! protobuf messages, native identifiers, and component names remain private.
+//!
+//! # Edit direct-drawable comments
+//!
+//! Direct comments use a slide selector, a source-order drawable selector,
+//! and an ordinal reply selector. Each edit stages exactly one operation and
+//! returns an immutable package plus an exact-source patch. A slide-owned
+//! drawable and its comment or reply storage may live in different package
+//! components. Edits preserve their storage locations and isolate shared
+//! threads through copy-on-write. A valid rooted annotation-author registry
+//! remains authoritative; when that optional reference is absent, discovery
+//! accepts one unambiguous registry elsewhere in the package. Malformed
+//! references and ambiguous ownership fail before a candidate is published.
+//!
+//! ```no_run
+//! use litchi_keynote::{DrawableSelector, Package, ReplySelector, SlideSelector};
+//!
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! let package = Package::open("input.key")?;
+//! let slide = SlideSelector::name("Overview");
+//! let drawable = DrawableSelector::index(0);
+//!
+//! let root = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .set("Root comment")?
+//!     .commit()?;
+//! let package = root.into_package();
+//! let _comment = package.slide_drawable_comment(slide, drawable)?;
+//! let _replies = package.slide_drawable_comment_replies(slide, drawable)?;
+//!
+//! let package = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .add_reply("First reply")?
+//!     .commit()?
+//!     .into_package();
+//! let package = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .set_reply(ReplySelector::index(0), "Edited reply")?
+//!     .commit()?
+//!     .into_package();
+//! let package = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .remove_reply(ReplySelector::index(0))?
+//!     .commit()?
+//!     .into_package();
+//!
+//! let cleared = package
+//!     .edit_slide_drawable_comment(slide, drawable)?
+//!     .clear()?
+//!     .commit()?;
+//! let restored = cleared
+//!     .package()
+//!     .apply_slide_drawable_comment(&cleared.patch().inverse())?;
+//! # let _ = restored;
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Edit slide playback state
+//!
+//! Select slides by an exact navigator name or a checked semantic position;
+//! native IWA identifiers never enter the public transaction.
+//!
+//! ```no_run
+//! use std::fs::OpenOptions;
+//!
+//! use litchi_keynote::{Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit();
+//! edit.skip_slide(SlideSelector::name("Appendix"))?;
+//! let commit = edit.commit()?;
+//! let mut output = OpenOptions::new()
+//!     .write(true)
+//!     .create_new(true)
+//!     .open("output.key")?;
+//! commit.package().write_to(&mut output)?;
+//! output.sync_all()?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Reorder slides
+//!
+//! The destination is a checked final position; the immutable source remains
+//! available and the commit carries an exact-source-checked inverse patch.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, Position, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_order();
+//! edit.move_slide(SlideSelector::name("Appendix"), Position::new(0))?;
+//! let commit = edit.commit()?;
+//! let restored = commit.package().apply_slide_order(&commit.patch().inverse())?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Delete one slide
+//!
+//! Deletion accepts only an exact navigator name or a checked semantic
+//! position. It refuses to delete the final slide, preserves unselected
+//! presentation content, and its inverse is accepted only by the exact
+//! committed package snapshot. It removes the selected slide and slide-node
+//! objects but does not garbage-collect media: data payloads remain preserved
+//! even when their former owner was on the deleted slide. Only the supported
+//! flat native ownership topology is admitted; a surviving child backlink or
+//! other inbound owner is refused as ambiguous ownership. A view state's
+//! weak selection reference to the deleted slide node is not ownership: its
+//! registry record is removed with the node.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_deletion();
+//! edit.remove_slide(SlideSelector::name("Appendix"))?;
+//! let commit = edit.commit()?;
+//! assert_eq!(commit.package().show()?.slides().len() + 1, package.show()?.slides().len());
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_deletion(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().show()?.slides().len(), package.show()?.slides().len());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Duplicate slides and add slides from layouts
+//!
+//! [`Package::edit_slide_creation`] stages any number of
+//! [`slide::creation::Edit::duplicate_slide`] and
+//! [`slide::creation::Edit::add_slide`] operations and commits them as one
+//! verified package. Selectors resolve against the base snapshot;
+//! destinations are final positions in the slide list as it is when each
+//! operation runs. A duplicate copies the slide's own component (its
+//! drawables, text and notes); a fresh slide materializes a theme layout
+//! ([`Package::slide_layouts`]) with empty title, body and notes. Slides
+//! whose content lives in other components (tables, charts, comments) are
+//! refused with a typed [`slide::creation::Refusal::UnsupportedContent`].
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, Position, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let mut edit = package.edit_slide_creation();
+//! edit.duplicate_slide(SlideSelector::index(0), Position::new(1))?
+//!     .add_slide("Title & Bullets", Position::new(2))?;
+//! let commit = edit.commit()?;
+//! assert_eq!(commit.package().slides()?.len(), package.slides()?.len() + 2);
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_creation(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slides()?.len(), package.slides()?.len());
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Slide drawables: inventory, geometry, removal, z-order and creation
+//!
+//! [`Package::slide_drawable_list`] reads the drawables a slide owns in
+//! source order (kind, frame, text, shape name, lock state and z-order
+//! position); [`DrawableSelector`] addresses that order. The
+//! [`slide::drawable`] family stages any number of
+//! [`slide::drawable::Edit::set_geometry`], [`slide::drawable::Edit::remove`],
+//! [`slide::drawable::Edit::move_to`], [`slide::drawable::Edit::add_text_box`],
+//! [`slide::drawable::Edit::add_shape`] and
+//! [`slide::drawable::Edit::add_image`] operations and commits them as one
+//! verified package; selectors resolve against the base snapshot. Removing
+//! tables, charts, groups, movies and placeholders, and character-style
+//! writes, are typed [`slide::drawable::Refusal::Unsupported`] refusals;
+//! [`Package::slide_drawable_text_runs`] reads character runs.
+//!
+//! ```no_run
+//! use litchi_keynote::slide::drawable::{Geometry, Preset};
+//! use litchi_keynote::{DrawableSelector, Package, SlideSelector};
+//!
+//! let package = Package::open("input.key")?;
+//! let slide = SlideSelector::index(0);
+//! let mut edit = package.edit_slide_drawables();
+//! edit.remove(slide, DrawableSelector::index(0))?
+//!     .add_shape(slide, Preset::Ellipse, Geometry::new(100.0, 100.0, 200.0, 200.0), "Hi")?;
+//! let commit = edit.commit()?;
+//! let created = commit.created()[0].drawable();
+//! let drawables = commit.package().slide_drawable_list(slide)?;
+//! assert_eq!(drawables[created.as_index()].text(), Some("Hi"));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_drawables(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_drawable_list(slide)?, package.slide_drawable_list(slide)?);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Edit presentation settings
+//!
+//! Read or stage dimensions and playback behavior without native identifiers
+//! or generated protobuf values. Commits retain an exact reversible patch.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, show::{Mode, Size}};
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package.show_settings()?;
+//! let edit = package.edit_show_settings()?;
+//! let mut settings = edit.settings();
+//! settings.set_size(Size::new(1920.0, 1080.0)?);
+//! settings.set_mode(Some(Mode::SelfPlaying))?;
+//! let commit = edit.set(settings).commit()?;
+//! assert_eq!(commit.package().show_settings()?.mode(), Some(Mode::SelfPlaying));
+//! let restored = commit
+//!     .package()
+//!     .apply_show_settings(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().show_settings()?, before);
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Edit soundtrack playback settings
+//!
+//! Soundtrack playback uses the direct [`soundtrack`] namespace. Reading
+//! `None` means the presentation has no existing soundtrack settings, whereas
+//! `Some(soundtrack::Settings::default())` means settings exist with both
+//! optional playback values absent. The transaction never creates a
+//! soundtrack, and it preserves the existing soundtrack media collection.
+//! Semantic value validation returns [`Error`]; package read/edit/apply
+//! failures use [`soundtrack::Error`].
+//!
+//! An unchanged commit is an exact no-op. A changed commit reopens its
+//! candidate without invalidating rendering previews. The inverse is accepted
+//! only by the exact committed package snapshot and restores the original
+//! package state.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{
+//!     Package,
+//!     soundtrack::{Mode, Settings},
+//! };
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .soundtrack_settings()?
+//!     .ok_or_else(|| io::Error::other("presentation has no soundtrack settings"))?;
+//!
+//! let mut replacement = before;
+//! replacement.set_volume(Some(0.35))?;
+//! replacement.set_mode(Some(Mode::Loop))?;
+//! let commit = package.edit_soundtrack_settings()?.set(replacement).commit()?;
+//! assert_eq!(commit.package().soundtrack_settings()?, Some(replacement));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_soundtrack_settings(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().soundtrack_settings()?, Some(before));
+//! let mut output = Vec::new();
+//! restored.package().write_to(&mut output)?;
+//! assert!(!output.is_empty());
+//! # let _ = Settings::default();
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! [`Package::write_to`] writes a bounded package to its sink but does not
+//! flush, sync, rename, or otherwise make filesystem publication durable or
+//! atomic.
+//!
+//! # Edit one slide transition
+//!
+//! Read, replace, or clear a modern transition with the same selector-first,
+//! exact-source transaction model. Clearing writes Keynote's native no-effect
+//! transition; it does not synthesize a transition envelope for a legacy-only
+//! slide. Patches are reversible against the exact committed package bytes.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{Package, transition::Effect};
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .slide_transition("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no modern transition"))?;
+//! let mut replacement = before.clone();
+//! replacement.set_effect(Some(Effect::Dissolve))?;
+//!
+//! let edit = package.edit_slide_transition("Appendix")?.set(replacement)?;
+//! let commit = edit.commit()?;
+//! assert_eq!(
+//!     commit.package().slide_transition("Appendix")?,
+//!     commit.patch().after().cloned(),
+//! );
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_transition(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_transition("Appendix")?, Some(before));
+//!
+//! let clear = restored.package().edit_slide_transition("Appendix")?.clear()?;
+//! let cleared = clear.commit()?;
+//! assert_eq!(cleared.package().slide_transition("Appendix")?.unwrap().effect(), Some(&Effect::None));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Edit speaker notes
+//!
+//! Existing notes storage can be edited by an exact slide name or checked
+//! position with notes-relative UTF-16 spans. A missing notes graph is kept
+//! distinct from an existing empty storage and is not synthesized implicitly.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{Package, TextSpan};
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .slide_notes("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no existing notes storage"))?;
+//! let mut edit = package.edit_slide_notes("Appendix")?;
+//! edit.replace(TextSpan::from_utf16_indexes(0, 0)?, "Draft: ")?;
+//! let commit = edit.commit()?;
+//! assert!(commit.package().slide_notes("Appendix")?.unwrap().starts_with("Draft: "));
+//!
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_notes(&commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_notes("Appendix")?, Some(before));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Edit slide title or body text
+//!
+//! Title and body placeholders are distinct semantic roles. Only an existing,
+//! exclusively owned placeholder storage is edited; this API never exposes or
+//! synthesizes native object identifiers. An absent role placeholder is `None`,
+//! while `Some("")` denotes an existing placeholder with empty storage.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{Package, TextSpan};
+//!
+//! let package = Package::open("input.key")?;
+//! let title_before = package
+//!     .slide_title("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no existing title storage"))?;
+//! let body_before = package
+//!     .slide_body("Appendix")?
+//!     .ok_or_else(|| io::Error::other("slide has no existing body storage"))?;
+//!
+//! let mut title = package.edit_slide_title("Appendix")?;
+//! title.replace(TextSpan::from_utf16_indexes(0, 0)?, "Draft: ")?;
+//! let title_commit = title.commit()?;
+//! let mut body = title_commit.package().edit_slide_body("Appendix")?;
+//! body.set("Draft body")?;
+//! let body_commit = body.commit()?;
+//! assert!(body_commit.package().slide_title("Appendix")?.unwrap().starts_with("Draft: "));
+//! assert_eq!(body_commit.package().slide_body("Appendix")?, Some("Draft body".to_owned()));
+//!
+//! let title_restored = body_commit
+//!     .package()
+//!     .apply_slide_text(&body_commit.patch().inverse())?;
+//! let restored = title_restored
+//!     .package()
+//!     .apply_slide_text(&title_commit.patch().inverse())?;
+//! assert_eq!(restored.package().slide_title("Appendix")?, Some(title_before));
+//! assert_eq!(restored.package().slide_body("Appendix")?, Some(body_before));
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Show or hide a per-slide placeholder
+//!
+//! Missing and hidden placeholders remain distinct: a read returns `None` for
+//! a missing role and `Some(State::Hidden)` for an existing role that does not
+//! display on the selected slide. Hidden title/body roles retain their text.
+//! `Kind::SlideNumber` controls only the selected slide's existing number
+//! placeholder; it is independent of the show-wide slide-number preference
+//! and is not accepted by the slide-text APIs.
+//!
+//! An unchanged edit is an exact no-op. A changed edit invalidates derived
+//! rendering state and removes stale package-root previews before a complete
+//! candidate reopen. Its inverse applies only to the exact committed package
+//! snapshot and restores the original package state.
+//!
+//! ```no_run
+//! use std::io;
+//!
+//! use litchi_keynote::{
+//!     Package,
+//!     slide::placeholder::{Kind, State},
+//! };
+//!
+//! let package = Package::open("input.key")?;
+//! let before = package
+//!     .slide_placeholder_visibility("Appendix", Kind::Title)?
+//!     .ok_or_else(|| io::Error::other("slide has no title placeholder"))?;
+//! let commit = package
+//!     .edit_slide_placeholder_visibility("Appendix", Kind::Title)?
+//!     .hide()
+//!     .commit()?;
+//! assert_eq!(
+//!     commit
+//!         .package()
+//!         .slide_placeholder_visibility("Appendix", Kind::Title)?,
+//!     Some(State::Hidden),
+//! );
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_placeholder_visibility(&commit.patch().inverse())?;
+//! assert_eq!(
+//!     restored
+//!         .package()
+//!         .slide_placeholder_visibility("Appendix", Kind::Title)?,
+//!     Some(before),
+//! );
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+//!
+//! # Physically sort one existing table
+//!
+//! Physical table sorting is separate from editing the persisted sort
+//! configuration. The operation executes the selected table's existing
+//! order, moves body rows as complete admitted row envelopes, and keeps
+//! headers and footers fixed. Full-table execution requires a persisted
+//! [`slide::table::sort::Scope::EntireTable`] order; selected-row execution
+//! requires [`slide::table::sort::Scope::SelectedRows`] and takes a checked,
+//! body-relative half-open [`slide::table::physical_sort::RowRange`].
+//!
+//! The current owner is intentionally narrow: every addressed key must be
+//! present, and each rule must see one scalar kind across the selected rows.
+//! The admitted kinds are text, finite number, boolean, date, and duration.
+//! Text uses Rust's ordinal string ordering, booleans sort `false < true`,
+//! and numeric/date/duration values use deterministic `f64::total_cmp`
+//! ordering except that signed zeroes compare equal and retain source order.
+//! Formulas, errors, rich text, unsupported values, mixed kinds,
+//! unsupported row-affine features, and unsupported table topologies fail
+//! before publication. This is not a general table editor or a guarantee of
+//! native Keynote acceptance for arbitrary producer-authored packages.
+//!
+//! ```no_run
+//! use litchi_keynote::{Package, SlideSelector, TableSelector};
+//! use litchi_keynote::slide::table::physical_sort::RowRange;
+//!
+//! let package = Package::open("input.key")?;
+//! let commit = package.execute_slide_table_sort_order(
+//!     SlideSelector::name("Data"),
+//!     TableSelector::index(0),
+//! )?;
+//! assert!(commit.diagnostics().full_reparse_performed() || commit.patch().is_noop());
+//!
+//! // A patch is exact-source bound. Its inverse is accepted by the committed
+//! // candidate and restores the original package artifact.
+//! let restored = commit
+//!     .package()
+//!     .apply_slide_table_physical_sort(&commit.patch().inverse())?;
+//! let mut bytes = Vec::new();
+//! restored.package().write_to(&mut bytes)?;
+//! assert!(!bytes.is_empty());
+//!
+//! // For a persisted SelectedRows order, use a body-relative range instead:
+//! // let commit = package.execute_slide_table_sort_order_to_rows(
+//! //     SlideSelector::name("Data"),
+//! //     TableSelector::index(0),
+//! //     RowRange::new(0, 10)?,
+//! // )?;
+//! # let _ = RowRange::new(0, 1)?;
+//! # Ok::<(), Box<dyn std::error::Error>>(())
+//! ```
+
+// Windows needs one FFI call to tell disk files from devices; every other
+// target forbids unsafe code outright.
+#![cfg_attr(not(windows), forbid(unsafe_code))]
+#![cfg_attr(windows, deny(unsafe_code))]
+
+mod error;
+mod package;
+mod selector;
+mod time;
+
+pub mod background;
+pub mod build;
+pub mod builder;
+pub mod chart;
+pub mod edit;
+pub mod identity;
+pub mod limits;
+pub mod presentation;
+pub mod show;
+pub mod slide;
+pub mod soundtrack;
+pub mod transition;
+
+pub use background::{Angle, Background, Gradient, Kind, Stop};
+pub use build::{AnimationType, Build};
+pub use builder::Builder;
+pub use chart::{
+    Axis, ChartArrangement, ChartCatalog, ChartDescriptor, ChartSelector, ChartSelectorError,
+};
+pub use error::{Error, Result};
+pub use identity::Identity;
+pub use limits::{
+    LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+};
+pub use litchi_core::Position;
+pub use litchi_iwa_common::chart::data::ChartData;
+/// Maximum canonical `Metadata/Properties.plist` bytes retained by
+/// archive-free [`Presentation`] ingress.
+pub use litchi_iwa_detect::MAX_PROPERTIES_BYTES as MAX_DOCUMENT_PROPERTIES_BYTES;
+pub use litchi_iwa_text::{TextPosition, TextSpan};
+pub use package::{
+    KEYNOTE_PHYSICAL_SORT_OWNER_ACTIVE, Package, PayloadLimitKind, ReadError, SaveError,
+    SemanticPath, Stats, TextStorageFailure, WriteError,
+};
+pub use presentation::Presentation;
+pub use selector::{
+    DrawableSelector, ReplySelector, SlideSelector, SlideSelectorError, SlideSelectorResult,
+};
+pub use slide::comment::{Comment, CommentAuthor, CommentTimestamp, DrawableKind, Reply};
+pub use slide::image::ImageSelector;
+pub use slide::media::{MediaProperties, MovieInfo, MovieKind};
+pub use slide::movie::MovieSelector;
+pub use slide::table::TableSelector;
+pub use slide::table::merge::Region;
+pub use slide::table::number_format::{
+    At, AtError, DecimalPlaces, FixedDecimalPlaces, NegativeStyle, Number, NumberError,
+    ThousandsSeparator,
+};
+pub use slide::{Slide, Transition};
+pub use time::Seconds;
+pub(crate) use transition::Effect;

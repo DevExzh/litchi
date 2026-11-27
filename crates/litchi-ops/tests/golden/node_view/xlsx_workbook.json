@@ -1,0 +1,26 @@
+{
+  "path": "/",
+  "type": "workbook",
+  "childCount": 2,
+  "format": {},
+  "children": [
+    {
+      "path": "/Sheet1",
+      "type": "sheet",
+      "preview": "Sheet1",
+      "format": {
+        "name": "Sheet1"
+      },
+      "children": []
+    },
+    {
+      "path": "/My Data",
+      "type": "sheet",
+      "preview": "My Data",
+      "format": {
+        "name": "My Data"
+      },
+      "children": []
+    }
+  ]
+}

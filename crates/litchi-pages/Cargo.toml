@@ -1,0 +1,99 @@
+[package]
+name        = "litchi-pages"
+description = "Pages semantic value models and document capabilities."
+version.workspace      = true
+edition.workspace      = true
+authors.workspace      = true
+license.workspace      = true
+repository.workspace   = true
+rust-version.workspace = true
+autoexamples = false
+
+[features]
+default = []
+
+[dependencies]
+litchi-core       = { workspace = true }
+litchi-iwa-archive = { workspace = true }
+litchi-iwa-common = { workspace = true }
+litchi-iwa-core   = { workspace = true }
+litchi-iwa-detect = { workspace = true }
+litchi-iwa-protos = { workspace = true }
+litchi-iwa-style = { workspace = true }
+litchi-iwa-table = { workspace = true }
+litchi-iwa-text = { workspace = true }
+litchi-iwa-text-wire = { workspace = true }
+litchi-numbers-wire = { workspace = true }
+plist           = { workspace = true }
+sha1            = { workspace = true }
+thiserror       = { workspace = true }
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2.191"
+
+[dev-dependencies]
+prost    = { workspace = true }
+tempfile = { workspace = true }
+
+[[example]]
+name = "body_chart_arrangement"
+path = "examples/body_chart_arrangement.rs"
+
+[[example]]
+name = "edit_body_chart_data"
+path = "examples/edit_body_chart_data.rs"
+
+[[example]]
+name = "edit_body_table_hidden_axes"
+path = "examples/edit_body_table_hidden_axes.rs"
+
+[[example]]
+name = "edit_body_table_title"
+path = "examples/edit_body_table_title.rs"
+
+[[example]]
+name = "edit_document_settings"
+path = "examples/edit_document_settings.rs"
+
+[[example]]
+name = "pages_edit_image_adjustments"
+path = "examples/edit_image_adjustments.rs"
+
+[[example]]
+name = "edit_page_layout"
+path = "examples/edit_page_layout.rs"
+
+[[example]]
+name = "edit_section_background"
+path = "examples/edit_section_background.rs"
+
+[[example]]
+name = "edit_section_lifecycle"
+path = "examples/edit_section_lifecycle.rs"
+
+[[example]]
+name = "edit_section_name"
+path = "examples/edit_section_name.rs"
+
+[[example]]
+name = "edit_section_pagination"
+path = "examples/edit_section_pagination.rs"
+
+[[example]]
+name = "edit_section_settings"
+path = "examples/edit_section_settings.rs"
+
+[[example]]
+name = "edit_section_text"
+path = "examples/edit_section_text.rs"
+
+[[example]]
+name = "pages_save_package"
+path = "examples/save_package.rs"
+
+[[example]]
+name = "generate_footnote_fixture"
+path = "examples/generate_footnote_fixture.rs"
+
+[lints]
+workspace = true

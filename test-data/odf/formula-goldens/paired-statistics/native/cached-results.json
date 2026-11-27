@@ -1,0 +1,9637 @@
+[
+  {
+    "function": "CORREL",
+    "source": "sc/qa/unit/data/functions/statistical/fods/correl.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=CORREL([.J1:.J50];[.K1:.K50])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 11,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 11,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 11,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 11,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 10,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 11,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 11,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 10,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 11,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 11,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 11,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 10,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 11,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 10,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 11,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 10,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 11,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 10,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 11,
+        "type": "number",
+        "value": "16"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "16"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 11,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 11,
+        "type": "number",
+        "value": "18"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "18"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 11,
+        "type": "number",
+        "value": "19"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 10,
+        "type": "number",
+        "value": "19"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 11,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 10,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 11,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 10,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 11,
+        "type": "number",
+        "value": "22"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 10,
+        "type": "number",
+        "value": "22"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 11,
+        "type": "number",
+        "value": "23"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 10,
+        "type": "number",
+        "value": "23"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 11,
+        "type": "number",
+        "value": "24"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 10,
+        "type": "number",
+        "value": "24"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 11,
+        "type": "number",
+        "value": "25"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 10,
+        "type": "number",
+        "value": "25"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 11,
+        "type": "number",
+        "value": "26"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 10,
+        "type": "number",
+        "value": "26"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 11,
+        "type": "number",
+        "value": "27"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 10,
+        "type": "number",
+        "value": "27"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 11,
+        "type": "number",
+        "value": "28"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 10,
+        "type": "number",
+        "value": "28"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 11,
+        "type": "number",
+        "value": "29"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 10,
+        "type": "number",
+        "value": "29"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 11,
+        "type": "number",
+        "value": "30"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 10,
+        "type": "number",
+        "value": "30"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 11,
+        "type": "number",
+        "value": "31"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 10,
+        "type": "number",
+        "value": "31"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 11,
+        "type": "number",
+        "value": "32"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 10,
+        "type": "number",
+        "value": "32"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 11,
+        "type": "number",
+        "value": "33"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 10,
+        "type": "number",
+        "value": "33"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 11,
+        "type": "number",
+        "value": "34"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 10,
+        "type": "number",
+        "value": "34"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 11,
+        "type": "number",
+        "value": "35"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 10,
+        "type": "number",
+        "value": "35"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 11,
+        "type": "number",
+        "value": "36"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 10,
+        "type": "number",
+        "value": "36"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 11,
+        "type": "number",
+        "value": "37"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 10,
+        "type": "number",
+        "value": "37"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 11,
+        "type": "number",
+        "value": "38"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 10,
+        "type": "number",
+        "value": "38"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 11,
+        "type": "number",
+        "value": "39"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 10,
+        "type": "number",
+        "value": "39"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 11,
+        "type": "number",
+        "value": "40"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 10,
+        "type": "number",
+        "value": "40"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 11,
+        "type": "number",
+        "value": "41"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 10,
+        "type": "number",
+        "value": "41"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 11,
+        "type": "number",
+        "value": "42"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 10,
+        "type": "number",
+        "value": "42"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 11,
+        "type": "number",
+        "value": "43"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 10,
+        "type": "number",
+        "value": "43"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 11,
+        "type": "number",
+        "value": "44"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 10,
+        "type": "number",
+        "value": "44"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 11,
+        "type": "number",
+        "value": "45"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 10,
+        "type": "number",
+        "value": "45"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 11,
+        "type": "number",
+        "value": "46"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 10,
+        "type": "number",
+        "value": "46"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 11,
+        "type": "number",
+        "value": "47"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 10,
+        "type": "number",
+        "value": "47"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 11,
+        "type": "number",
+        "value": "48"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 10,
+        "type": "number",
+        "value": "48"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 11,
+        "type": "number",
+        "value": "49"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 10,
+        "type": "number",
+        "value": "49"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 11,
+        "type": "number",
+        "value": "50"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 10,
+        "type": "number",
+        "value": "50"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 11,
+        "type": "number",
+        "value": "51"
+      }
+    ]
+  },
+  {
+    "function": "CORREL",
+    "source": "sc/qa/unit/data/functions/statistical/fods/correl.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=CORREL([.M2:.M6];[.N2:.N6])",
+    "cached": "0.997054485501582",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 14,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 14,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 14,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 14,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 14,
+        "type": "number",
+        "value": "17"
+      }
+    ]
+  },
+  {
+    "function": "CORREL",
+    "source": "sc/qa/unit/data/functions/statistical/fods/correl.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=CORREL({1;2.3;3};{7;16.8;77})",
+    "cached": "0.844340040960749",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "COVAR",
+    "source": "sc/qa/unit/data/functions/statistical/fods/covar.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=COVAR({1;2|3;4}; {5;6|7;8})",
+    "cached": "1.25",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "COVAR",
+    "source": "sc/qa/unit/data/functions/statistical/fods/covar.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=COVAR([.I1:.J2];[.L1:.M2])",
+    "cached": "15",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "33"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "8"
+      }
+    ]
+  },
+  {
+    "function": "COVAR",
+    "source": "sc/qa/unit/data/functions/statistical/fods/covar.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=COVAR([.O2:.O6]; [.P2:.P6])",
+    "cached": "5.2",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 15,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 15,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 15,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 15,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 15,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "17"
+      }
+    ]
+  },
+  {
+    "function": "PEARSON",
+    "source": "sc/qa/unit/data/functions/statistical/fods/pearson.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=PEARSON([.I3:.I7];[.J3:.J7])",
+    "cached": "0.699378606180235",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      }
+    ]
+  },
+  {
+    "function": "PEARSON",
+    "source": "sc/qa/unit/data/functions/statistical/fods/pearson.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=PEARSON([.L1:.L25];[.M1:.M25])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "16"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "18"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "19"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 12,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 13,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 12,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 13,
+        "type": "number",
+        "value": "22"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 12,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 13,
+        "type": "number",
+        "value": "23"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 12,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 13,
+        "type": "number",
+        "value": "24"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 12,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 13,
+        "type": "number",
+        "value": "25"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 12,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 13,
+        "type": "number",
+        "value": "26"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 12,
+        "type": "number",
+        "value": "16"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 13,
+        "type": "number",
+        "value": "27"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 12,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 13,
+        "type": "number",
+        "value": "28"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 12,
+        "type": "number",
+        "value": "18"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 13,
+        "type": "number",
+        "value": "29"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 12,
+        "type": "number",
+        "value": "19"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 13,
+        "type": "number",
+        "value": "30"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 12,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 13,
+        "type": "number",
+        "value": "31"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 12,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 13,
+        "type": "number",
+        "value": "32"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 12,
+        "type": "number",
+        "value": "22"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 13,
+        "type": "number",
+        "value": "33"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 12,
+        "type": "number",
+        "value": "23"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 13,
+        "type": "number",
+        "value": "34"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 12,
+        "type": "number",
+        "value": "24"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 13,
+        "type": "number",
+        "value": "35"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 12,
+        "type": "number",
+        "value": "25"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 13,
+        "type": "number",
+        "value": "36"
+      }
+    ]
+  },
+  {
+    "function": "PEARSON",
+    "source": "sc/qa/unit/data/functions/statistical/fods/pearson.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=PEARSON([.T2:.T101];[.U2:.U101])",
+    "cached": "-0.99844495050475",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 20,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 21,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 20,
+        "type": "number",
+        "value": "900000002"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 21,
+        "type": "number",
+        "value": "899999998"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 20,
+        "type": "number",
+        "value": "900000003"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 21,
+        "type": "number",
+        "value": "899999997"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 20,
+        "type": "number",
+        "value": "900000004"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 21,
+        "type": "number",
+        "value": "899999996"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 20,
+        "type": "number",
+        "value": "900000005"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 21,
+        "type": "number",
+        "value": "899999995"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 20,
+        "type": "number",
+        "value": "900000015"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 21,
+        "type": "number",
+        "value": "899999994"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 20,
+        "type": "number",
+        "value": "900000007"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 21,
+        "type": "number",
+        "value": "899999993"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 20,
+        "type": "number",
+        "value": "900000008"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 21,
+        "type": "number",
+        "value": "899999992"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 20,
+        "type": "number",
+        "value": "900000009"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 21,
+        "type": "number",
+        "value": "899999991"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 20,
+        "type": "number",
+        "value": "900000010"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 21,
+        "type": "number",
+        "value": "899999990"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 20,
+        "type": "number",
+        "value": "900000011"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 21,
+        "type": "number",
+        "value": "899999989"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 20,
+        "type": "number",
+        "value": "900000012"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 21,
+        "type": "number",
+        "value": "899999988"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 20,
+        "type": "number",
+        "value": "900000013"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 21,
+        "type": "number",
+        "value": "899999987"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 20,
+        "type": "number",
+        "value": "900000014"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 21,
+        "type": "number",
+        "value": "899999986"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 20,
+        "type": "number",
+        "value": "900000015"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 21,
+        "type": "number",
+        "value": "899999985"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 20,
+        "type": "number",
+        "value": "900000016"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 21,
+        "type": "number",
+        "value": "899999984"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 20,
+        "type": "number",
+        "value": "900000017"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 21,
+        "type": "number",
+        "value": "899999983"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 20,
+        "type": "number",
+        "value": "900000018"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 21,
+        "type": "number",
+        "value": "899999982"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 20,
+        "type": "number",
+        "value": "900000019"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 21,
+        "type": "number",
+        "value": "899999981"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 20,
+        "type": "number",
+        "value": "900000020"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 21,
+        "type": "number",
+        "value": "899999980"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 20,
+        "type": "number",
+        "value": "900000021"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 21,
+        "type": "number",
+        "value": "899999979"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 20,
+        "type": "number",
+        "value": "900000022"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 21,
+        "type": "number",
+        "value": "899999978"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 20,
+        "type": "number",
+        "value": "900000023"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 21,
+        "type": "number",
+        "value": "899999977"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 20,
+        "type": "number",
+        "value": "900000024"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 21,
+        "type": "number",
+        "value": "899999976"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 20,
+        "type": "number",
+        "value": "900000025"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 21,
+        "type": "number",
+        "value": "899999975"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 20,
+        "type": "number",
+        "value": "900000026"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 21,
+        "type": "number",
+        "value": "899999974"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 20,
+        "type": "number",
+        "value": "900000027"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 21,
+        "type": "number",
+        "value": "899999960"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 20,
+        "type": "number",
+        "value": "900000028"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 21,
+        "type": "number",
+        "value": "899999972"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 20,
+        "type": "number",
+        "value": "900000029"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 21,
+        "type": "number",
+        "value": "899999971"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 20,
+        "type": "number",
+        "value": "900000030"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 21,
+        "type": "number",
+        "value": "899999970"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 20,
+        "type": "number",
+        "value": "900000031"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 21,
+        "type": "number",
+        "value": "899999969"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 20,
+        "type": "number",
+        "value": "900000032"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 21,
+        "type": "number",
+        "value": "899999968"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 20,
+        "type": "number",
+        "value": "900000033"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 21,
+        "type": "number",
+        "value": "899999967"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 20,
+        "type": "number",
+        "value": "900000034"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 21,
+        "type": "number",
+        "value": "899999966"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 20,
+        "type": "number",
+        "value": "900000035"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 21,
+        "type": "number",
+        "value": "899999965"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 20,
+        "type": "number",
+        "value": "900000036"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 21,
+        "type": "number",
+        "value": "899999964"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 20,
+        "type": "number",
+        "value": "900000037"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 21,
+        "type": "number",
+        "value": "899999963"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 20,
+        "type": "number",
+        "value": "900000038"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 21,
+        "type": "number",
+        "value": "899999962"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 20,
+        "type": "number",
+        "value": "900000039"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 21,
+        "type": "number",
+        "value": "899999961"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 20,
+        "type": "number",
+        "value": "900000040"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 21,
+        "type": "number",
+        "value": "899999960"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 20,
+        "type": "number",
+        "value": "900000041"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 21,
+        "type": "number",
+        "value": "899999959"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 20,
+        "type": "number",
+        "value": "900000042"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 21,
+        "type": "number",
+        "value": "899999958"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 20,
+        "type": "number",
+        "value": "900000043"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 21,
+        "type": "number",
+        "value": "899999957"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 20,
+        "type": "number",
+        "value": "900000044"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 21,
+        "type": "number",
+        "value": "899999956"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 20,
+        "type": "number",
+        "value": "900000045"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 21,
+        "type": "number",
+        "value": "899999955"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 20,
+        "type": "number",
+        "value": "900000046"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 21,
+        "type": "number",
+        "value": "899999954"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 20,
+        "type": "number",
+        "value": "900000047"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 21,
+        "type": "number",
+        "value": "899999953"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 20,
+        "type": "number",
+        "value": "900000048"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 21,
+        "type": "number",
+        "value": "899999952"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 20,
+        "type": "number",
+        "value": "900000049"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 21,
+        "type": "number",
+        "value": "899999951"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 20,
+        "type": "number",
+        "value": "900000050"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 21,
+        "type": "number",
+        "value": "899999950"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 20,
+        "type": "number",
+        "value": "900000051"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 21,
+        "type": "number",
+        "value": "899999949"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 20,
+        "type": "number",
+        "value": "900000052"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 21,
+        "type": "number",
+        "value": "899999948"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 20,
+        "type": "number",
+        "value": "900000053"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 21,
+        "type": "number",
+        "value": "899999947"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 20,
+        "type": "number",
+        "value": "900000054"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 21,
+        "type": "number",
+        "value": "899999946"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 20,
+        "type": "number",
+        "value": "900000055"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 21,
+        "type": "number",
+        "value": "899999945"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 20,
+        "type": "number",
+        "value": "900000056"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 21,
+        "type": "number",
+        "value": "899999944"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 20,
+        "type": "number",
+        "value": "900000057"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 21,
+        "type": "number",
+        "value": "899999943"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 20,
+        "type": "number",
+        "value": "900000058"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 21,
+        "type": "number",
+        "value": "899999942"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 20,
+        "type": "number",
+        "value": "900000059"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 21,
+        "type": "number",
+        "value": "899999941"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 61,
+        "column": 20,
+        "type": "number",
+        "value": "900000060"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 61,
+        "column": 21,
+        "type": "number",
+        "value": "899999940"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 62,
+        "column": 20,
+        "type": "number",
+        "value": "900000061"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 62,
+        "column": 21,
+        "type": "number",
+        "value": "899999939"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 63,
+        "column": 20,
+        "type": "number",
+        "value": "900000062"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 63,
+        "column": 21,
+        "type": "number",
+        "value": "899999938"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 64,
+        "column": 20,
+        "type": "number",
+        "value": "900000063"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 64,
+        "column": 21,
+        "type": "number",
+        "value": "899999937"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 65,
+        "column": 20,
+        "type": "number",
+        "value": "900000064"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 65,
+        "column": 21,
+        "type": "number",
+        "value": "899999936"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 66,
+        "column": 20,
+        "type": "number",
+        "value": "900000065"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 66,
+        "column": 21,
+        "type": "number",
+        "value": "899999935"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 20,
+        "type": "number",
+        "value": "900000066"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 21,
+        "type": "number",
+        "value": "899999934"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 68,
+        "column": 20,
+        "type": "number",
+        "value": "900000067"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 68,
+        "column": 21,
+        "type": "number",
+        "value": "899999933"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 69,
+        "column": 20,
+        "type": "number",
+        "value": "900000068"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 69,
+        "column": 21,
+        "type": "number",
+        "value": "899999932"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 70,
+        "column": 20,
+        "type": "number",
+        "value": "900000069"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 70,
+        "column": 21,
+        "type": "number",
+        "value": "899999931"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 71,
+        "column": 20,
+        "type": "number",
+        "value": "900000070"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 71,
+        "column": 21,
+        "type": "number",
+        "value": "899999930"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 72,
+        "column": 20,
+        "type": "number",
+        "value": "900000071"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 72,
+        "column": 21,
+        "type": "number",
+        "value": "899999929"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 73,
+        "column": 20,
+        "type": "number",
+        "value": "900000072"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 73,
+        "column": 21,
+        "type": "number",
+        "value": "899999928"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 74,
+        "column": 20,
+        "type": "number",
+        "value": "900000073"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 74,
+        "column": 21,
+        "type": "number",
+        "value": "899999927"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 75,
+        "column": 20,
+        "type": "number",
+        "value": "900000074"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 75,
+        "column": 21,
+        "type": "number",
+        "value": "899999926"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 76,
+        "column": 20,
+        "type": "number",
+        "value": "900000075"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 76,
+        "column": 21,
+        "type": "number",
+        "value": "899999925"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 77,
+        "column": 20,
+        "type": "number",
+        "value": "900000076"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 77,
+        "column": 21,
+        "type": "number",
+        "value": "899999924"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 78,
+        "column": 20,
+        "type": "number",
+        "value": "900000077"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 78,
+        "column": 21,
+        "type": "number",
+        "value": "899999923"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 79,
+        "column": 20,
+        "type": "number",
+        "value": "900000078"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 79,
+        "column": 21,
+        "type": "number",
+        "value": "899999922"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 80,
+        "column": 20,
+        "type": "number",
+        "value": "900000079"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 80,
+        "column": 21,
+        "type": "number",
+        "value": "899999921"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 81,
+        "column": 20,
+        "type": "number",
+        "value": "900000080"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 81,
+        "column": 21,
+        "type": "number",
+        "value": "899999920"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 82,
+        "column": 20,
+        "type": "number",
+        "value": "900000081"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 82,
+        "column": 21,
+        "type": "number",
+        "value": "899999919"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 83,
+        "column": 20,
+        "type": "number",
+        "value": "900000082"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 83,
+        "column": 21,
+        "type": "number",
+        "value": "899999918"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 84,
+        "column": 20,
+        "type": "number",
+        "value": "900000083"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 84,
+        "column": 21,
+        "type": "number",
+        "value": "899999917"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 85,
+        "column": 20,
+        "type": "number",
+        "value": "900000084"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 85,
+        "column": 21,
+        "type": "number",
+        "value": "899999916"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 86,
+        "column": 20,
+        "type": "number",
+        "value": "900000085"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 86,
+        "column": 21,
+        "type": "number",
+        "value": "899999915"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 87,
+        "column": 20,
+        "type": "number",
+        "value": "900000086"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 87,
+        "column": 21,
+        "type": "number",
+        "value": "899999914"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 88,
+        "column": 20,
+        "type": "number",
+        "value": "900000087"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 88,
+        "column": 21,
+        "type": "number",
+        "value": "899999913"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 89,
+        "column": 20,
+        "type": "number",
+        "value": "900000088"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 89,
+        "column": 21,
+        "type": "number",
+        "value": "899999912"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 90,
+        "column": 20,
+        "type": "number",
+        "value": "900000089"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 90,
+        "column": 21,
+        "type": "number",
+        "value": "899999911"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 91,
+        "column": 20,
+        "type": "number",
+        "value": "900000090"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 91,
+        "column": 21,
+        "type": "number",
+        "value": "899999910"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 92,
+        "column": 20,
+        "type": "number",
+        "value": "900000091"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 92,
+        "column": 21,
+        "type": "number",
+        "value": "899999909"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 93,
+        "column": 20,
+        "type": "number",
+        "value": "900000092"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 93,
+        "column": 21,
+        "type": "number",
+        "value": "899999908"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 94,
+        "column": 20,
+        "type": "number",
+        "value": "900000093"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 94,
+        "column": 21,
+        "type": "number",
+        "value": "899999907"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 95,
+        "column": 20,
+        "type": "number",
+        "value": "900000094"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 95,
+        "column": 21,
+        "type": "number",
+        "value": "899999906"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 96,
+        "column": 20,
+        "type": "number",
+        "value": "900000095"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 96,
+        "column": 21,
+        "type": "number",
+        "value": "899999905"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 97,
+        "column": 20,
+        "type": "number",
+        "value": "900000096"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 97,
+        "column": 21,
+        "type": "number",
+        "value": "899999904"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 98,
+        "column": 20,
+        "type": "number",
+        "value": "900000097"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 98,
+        "column": 21,
+        "type": "number",
+        "value": "899999903"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 99,
+        "column": 20,
+        "type": "number",
+        "value": "900000098"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 99,
+        "column": 21,
+        "type": "number",
+        "value": "899999902"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 100,
+        "column": 20,
+        "type": "number",
+        "value": "900000099"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 100,
+        "column": 21,
+        "type": "number",
+        "value": "899999901"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 101,
+        "column": 20,
+        "type": "number",
+        "value": "900000100"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 101,
+        "column": 21,
+        "type": "number",
+        "value": "899999900"
+      }
+    ]
+  },
+  {
+    "function": "PEARSON",
+    "source": "sc/qa/unit/data/functions/statistical/fods/pearson.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=PEARSON([.I3:.I9];[.J3:.J9])",
+    "cached": "0.712309892320122",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 10,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 9,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "text",
+        "value": "a"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 10,
+        "type": "number",
+        "value": "0"
+      }
+    ]
+  },
+  {
+    "function": "RSQ",
+    "source": "sc/qa/unit/data/functions/statistical/fods/rsq.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=RSQ([.F1:.F11];[.G1:.G11])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 6,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 6,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 6,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 7,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 6,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 7,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 6,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 6,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 6,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 6,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 7,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 6,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 7,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 6,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 7,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 6,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "15"
+      }
+    ]
+  },
+  {
+    "function": "RSQ",
+    "source": "sc/qa/unit/data/functions/statistical/fods/rsq.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=RSQ([.I2:.I101];[.J2:.J101])",
+    "cached": "0.996892319188432",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "900000002"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "899999998"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "900000003"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "899999997"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "900000004"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "899999996"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "900000005"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "number",
+        "value": "899999995"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "number",
+        "value": "900000015"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 10,
+        "type": "number",
+        "value": "899999994"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 9,
+        "type": "number",
+        "value": "900000007"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "number",
+        "value": "899999993"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 9,
+        "type": "number",
+        "value": "900000008"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 10,
+        "type": "number",
+        "value": "899999992"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 9,
+        "type": "number",
+        "value": "900000009"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "number",
+        "value": "899999991"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 9,
+        "type": "number",
+        "value": "900000010"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "number",
+        "value": "899999990"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "number",
+        "value": "900000011"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 10,
+        "type": "number",
+        "value": "899999989"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "number",
+        "value": "900000012"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 10,
+        "type": "number",
+        "value": "899999988"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "number",
+        "value": "900000013"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 10,
+        "type": "number",
+        "value": "899999987"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "900000014"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 10,
+        "type": "number",
+        "value": "899999986"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 9,
+        "type": "number",
+        "value": "900000015"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "899999985"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 9,
+        "type": "number",
+        "value": "900000016"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "899999984"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 9,
+        "type": "number",
+        "value": "900000017"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "899999983"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 9,
+        "type": "number",
+        "value": "900000018"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 10,
+        "type": "number",
+        "value": "899999982"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 9,
+        "type": "number",
+        "value": "900000019"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 10,
+        "type": "number",
+        "value": "899999981"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 9,
+        "type": "number",
+        "value": "900000020"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 10,
+        "type": "number",
+        "value": "899999980"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 9,
+        "type": "number",
+        "value": "900000021"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 10,
+        "type": "number",
+        "value": "899999979"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 9,
+        "type": "number",
+        "value": "900000022"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 10,
+        "type": "number",
+        "value": "899999978"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 9,
+        "type": "number",
+        "value": "900000023"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 10,
+        "type": "number",
+        "value": "899999977"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 9,
+        "type": "number",
+        "value": "900000024"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 10,
+        "type": "number",
+        "value": "899999976"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 9,
+        "type": "number",
+        "value": "900000025"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 10,
+        "type": "number",
+        "value": "899999975"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 9,
+        "type": "number",
+        "value": "900000026"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 10,
+        "type": "number",
+        "value": "899999974"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 9,
+        "type": "number",
+        "value": "900000027"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 10,
+        "type": "number",
+        "value": "899999960"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 9,
+        "type": "number",
+        "value": "900000028"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 10,
+        "type": "number",
+        "value": "899999972"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 9,
+        "type": "number",
+        "value": "900000029"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 10,
+        "type": "number",
+        "value": "899999971"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 9,
+        "type": "number",
+        "value": "900000030"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 10,
+        "type": "number",
+        "value": "899999970"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 9,
+        "type": "number",
+        "value": "900000031"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 10,
+        "type": "number",
+        "value": "899999969"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 9,
+        "type": "number",
+        "value": "900000032"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 10,
+        "type": "number",
+        "value": "899999968"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 9,
+        "type": "number",
+        "value": "900000033"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 10,
+        "type": "number",
+        "value": "899999967"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 9,
+        "type": "number",
+        "value": "900000034"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 10,
+        "type": "number",
+        "value": "899999966"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 9,
+        "type": "number",
+        "value": "900000035"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 10,
+        "type": "number",
+        "value": "899999965"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 9,
+        "type": "number",
+        "value": "900000036"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 10,
+        "type": "number",
+        "value": "899999964"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 9,
+        "type": "number",
+        "value": "900000037"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 10,
+        "type": "number",
+        "value": "899999963"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 9,
+        "type": "number",
+        "value": "900000038"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 10,
+        "type": "number",
+        "value": "899999962"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 9,
+        "type": "number",
+        "value": "900000039"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 10,
+        "type": "number",
+        "value": "899999961"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 9,
+        "type": "number",
+        "value": "900000040"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 10,
+        "type": "number",
+        "value": "899999960"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 9,
+        "type": "number",
+        "value": "900000041"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 10,
+        "type": "number",
+        "value": "899999959"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 9,
+        "type": "number",
+        "value": "900000042"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 10,
+        "type": "number",
+        "value": "899999958"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 9,
+        "type": "number",
+        "value": "900000043"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 10,
+        "type": "number",
+        "value": "899999957"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 9,
+        "type": "number",
+        "value": "900000044"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 10,
+        "type": "number",
+        "value": "899999956"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 9,
+        "type": "number",
+        "value": "900000045"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 10,
+        "type": "number",
+        "value": "899999955"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 9,
+        "type": "number",
+        "value": "900000046"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 10,
+        "type": "number",
+        "value": "899999954"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 9,
+        "type": "number",
+        "value": "900000047"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 10,
+        "type": "number",
+        "value": "899999953"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 9,
+        "type": "number",
+        "value": "900000048"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 10,
+        "type": "number",
+        "value": "899999952"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 9,
+        "type": "number",
+        "value": "900000049"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 10,
+        "type": "number",
+        "value": "899999951"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 9,
+        "type": "number",
+        "value": "900000050"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 10,
+        "type": "number",
+        "value": "899999950"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 9,
+        "type": "number",
+        "value": "900000051"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 10,
+        "type": "number",
+        "value": "899999949"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 9,
+        "type": "number",
+        "value": "900000052"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 10,
+        "type": "number",
+        "value": "899999948"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 9,
+        "type": "number",
+        "value": "900000053"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 10,
+        "type": "number",
+        "value": "899999947"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 9,
+        "type": "number",
+        "value": "900000054"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 10,
+        "type": "number",
+        "value": "899999946"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 9,
+        "type": "number",
+        "value": "900000055"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 10,
+        "type": "number",
+        "value": "899999945"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 9,
+        "type": "number",
+        "value": "900000056"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 10,
+        "type": "number",
+        "value": "899999944"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 9,
+        "type": "number",
+        "value": "900000057"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 10,
+        "type": "number",
+        "value": "899999943"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 9,
+        "type": "number",
+        "value": "900000058"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 10,
+        "type": "number",
+        "value": "899999942"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 9,
+        "type": "number",
+        "value": "900000059"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 10,
+        "type": "number",
+        "value": "899999941"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 61,
+        "column": 9,
+        "type": "number",
+        "value": "900000060"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 61,
+        "column": 10,
+        "type": "number",
+        "value": "899999940"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 62,
+        "column": 9,
+        "type": "number",
+        "value": "900000061"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 62,
+        "column": 10,
+        "type": "number",
+        "value": "899999939"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 63,
+        "column": 9,
+        "type": "number",
+        "value": "900000062"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 63,
+        "column": 10,
+        "type": "number",
+        "value": "899999938"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 64,
+        "column": 9,
+        "type": "number",
+        "value": "900000063"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 64,
+        "column": 10,
+        "type": "number",
+        "value": "899999937"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 65,
+        "column": 9,
+        "type": "number",
+        "value": "900000064"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 65,
+        "column": 10,
+        "type": "number",
+        "value": "899999936"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 66,
+        "column": 9,
+        "type": "number",
+        "value": "900000065"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 66,
+        "column": 10,
+        "type": "number",
+        "value": "899999935"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 9,
+        "type": "number",
+        "value": "900000066"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 10,
+        "type": "number",
+        "value": "899999934"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 68,
+        "column": 9,
+        "type": "number",
+        "value": "900000067"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 68,
+        "column": 10,
+        "type": "number",
+        "value": "899999933"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 69,
+        "column": 9,
+        "type": "number",
+        "value": "900000068"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 69,
+        "column": 10,
+        "type": "number",
+        "value": "899999932"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 70,
+        "column": 9,
+        "type": "number",
+        "value": "900000069"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 70,
+        "column": 10,
+        "type": "number",
+        "value": "899999931"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 71,
+        "column": 9,
+        "type": "number",
+        "value": "900000070"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 71,
+        "column": 10,
+        "type": "number",
+        "value": "899999930"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 72,
+        "column": 9,
+        "type": "number",
+        "value": "900000071"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 72,
+        "column": 10,
+        "type": "number",
+        "value": "899999929"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 73,
+        "column": 9,
+        "type": "number",
+        "value": "900000072"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 73,
+        "column": 10,
+        "type": "number",
+        "value": "899999928"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 74,
+        "column": 9,
+        "type": "number",
+        "value": "900000073"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 74,
+        "column": 10,
+        "type": "number",
+        "value": "899999927"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 75,
+        "column": 9,
+        "type": "number",
+        "value": "900000074"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 75,
+        "column": 10,
+        "type": "number",
+        "value": "899999926"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 76,
+        "column": 9,
+        "type": "number",
+        "value": "900000075"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 76,
+        "column": 10,
+        "type": "number",
+        "value": "899999925"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 77,
+        "column": 9,
+        "type": "number",
+        "value": "900000076"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 77,
+        "column": 10,
+        "type": "number",
+        "value": "899999924"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 78,
+        "column": 9,
+        "type": "number",
+        "value": "900000077"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 78,
+        "column": 10,
+        "type": "number",
+        "value": "899999923"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 79,
+        "column": 9,
+        "type": "number",
+        "value": "900000078"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 79,
+        "column": 10,
+        "type": "number",
+        "value": "899999922"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 80,
+        "column": 9,
+        "type": "number",
+        "value": "900000079"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 80,
+        "column": 10,
+        "type": "number",
+        "value": "899999921"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 81,
+        "column": 9,
+        "type": "number",
+        "value": "900000080"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 81,
+        "column": 10,
+        "type": "number",
+        "value": "899999920"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 82,
+        "column": 9,
+        "type": "number",
+        "value": "900000081"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 82,
+        "column": 10,
+        "type": "number",
+        "value": "899999919"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 83,
+        "column": 9,
+        "type": "number",
+        "value": "900000082"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 83,
+        "column": 10,
+        "type": "number",
+        "value": "899999918"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 84,
+        "column": 9,
+        "type": "number",
+        "value": "900000083"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 84,
+        "column": 10,
+        "type": "number",
+        "value": "899999917"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 85,
+        "column": 9,
+        "type": "number",
+        "value": "900000084"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 85,
+        "column": 10,
+        "type": "number",
+        "value": "899999916"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 86,
+        "column": 9,
+        "type": "number",
+        "value": "900000085"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 86,
+        "column": 10,
+        "type": "number",
+        "value": "899999915"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 87,
+        "column": 9,
+        "type": "number",
+        "value": "900000086"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 87,
+        "column": 10,
+        "type": "number",
+        "value": "899999914"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 88,
+        "column": 9,
+        "type": "number",
+        "value": "900000087"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 88,
+        "column": 10,
+        "type": "number",
+        "value": "899999913"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 89,
+        "column": 9,
+        "type": "number",
+        "value": "900000088"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 89,
+        "column": 10,
+        "type": "number",
+        "value": "899999912"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 90,
+        "column": 9,
+        "type": "number",
+        "value": "900000089"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 90,
+        "column": 10,
+        "type": "number",
+        "value": "899999911"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 91,
+        "column": 9,
+        "type": "number",
+        "value": "900000090"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 91,
+        "column": 10,
+        "type": "number",
+        "value": "899999910"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 92,
+        "column": 9,
+        "type": "number",
+        "value": "900000091"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 92,
+        "column": 10,
+        "type": "number",
+        "value": "899999909"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 93,
+        "column": 9,
+        "type": "number",
+        "value": "900000092"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 93,
+        "column": 10,
+        "type": "number",
+        "value": "899999908"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 94,
+        "column": 9,
+        "type": "number",
+        "value": "900000093"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 94,
+        "column": 10,
+        "type": "number",
+        "value": "899999907"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 95,
+        "column": 9,
+        "type": "number",
+        "value": "900000094"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 95,
+        "column": 10,
+        "type": "number",
+        "value": "899999906"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 96,
+        "column": 9,
+        "type": "number",
+        "value": "900000095"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 96,
+        "column": 10,
+        "type": "number",
+        "value": "899999905"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 97,
+        "column": 9,
+        "type": "number",
+        "value": "900000096"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 97,
+        "column": 10,
+        "type": "number",
+        "value": "899999904"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 98,
+        "column": 9,
+        "type": "number",
+        "value": "900000097"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 98,
+        "column": 10,
+        "type": "number",
+        "value": "899999903"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 99,
+        "column": 9,
+        "type": "number",
+        "value": "900000098"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 99,
+        "column": 10,
+        "type": "number",
+        "value": "899999902"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 100,
+        "column": 9,
+        "type": "number",
+        "value": "900000099"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 100,
+        "column": 10,
+        "type": "number",
+        "value": "899999901"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 101,
+        "column": 9,
+        "type": "number",
+        "value": "900000100"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 101,
+        "column": 10,
+        "type": "number",
+        "value": "899999900"
+      }
+    ]
+  },
+  {
+    "function": "RSQ",
+    "source": "sc/qa/unit/data/functions/statistical/fods/rsq.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=RSQ([.L3:.L9]; [.M3:.M9])",
+    "cached": "0.0579501915708812",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "RSQ",
+    "source": "sc/qa/unit/data/functions/statistical/fods/rsq.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=RSQ([.L4:.L10]; [.M4:.M10])",
+    "cached": "0.0707602339181287",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 13,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "RSQ",
+    "source": "sc/qa/unit/data/functions/statistical/fods/rsq.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=RSQ([.L1:.L11]; [.M1:.M11])",
+    "cached": "0.0579501915708812",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "text",
+        "value": "Data "
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "text",
+        "value": "Known y "
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "text",
+        "value": "Known x "
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 13,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 13,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "RSQ",
+    "source": "sc/qa/unit/data/functions/statistical/fods/rsq.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=RSQ([.I1:.I5];[.J1:.J5])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "900000002"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "899999998"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "900000003"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "899999997"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "900000004"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "899999996"
+      }
+    ]
+  },
+  {
+    "function": "SLOPE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/slope.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=SLOPE([.F1:.F11];[.G1:.G11])",
+    "cached": "1",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 6,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 6,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 6,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 7,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 6,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 7,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 6,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 6,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 6,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 6,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 7,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 6,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 7,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 6,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 7,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 6,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "15"
+      }
+    ]
+  },
+  {
+    "function": "SLOPE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/slope.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=SLOPE([.L3:.L9];[.M3:.M9])",
+    "cached": "0.305555555555556",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "SLOPE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/slope.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=SLOPE([.R2:.R23];[.S2:.S23])",
+    "cached": "-0.0000322310164672783",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 18,
+        "type": "number",
+        "value": "1.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 19,
+        "type": "number",
+        "value": "13.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 18,
+        "type": "number",
+        "value": "2.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 19,
+        "type": "number",
+        "value": "65"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 18,
+        "type": "number",
+        "value": "3.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 19,
+        "type": "number",
+        "value": "15.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 18,
+        "type": "number",
+        "value": "-4.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 19,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 18,
+        "type": "number",
+        "value": "5.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 19,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 18,
+        "type": "number",
+        "value": "6.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 19,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 18,
+        "type": "number",
+        "value": "7.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 19,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 18,
+        "type": "number",
+        "value": "8.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 19,
+        "type": "number",
+        "value": "45"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 18,
+        "type": "number",
+        "value": "9.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 19,
+        "type": "number",
+        "value": "63521"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 18,
+        "type": "number",
+        "value": "10.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 18,
+        "type": "number",
+        "value": "11.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 19,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 18,
+        "type": "number",
+        "value": "12.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 19,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 18,
+        "type": "number",
+        "value": "13.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 19,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 18,
+        "type": "number",
+        "value": "14.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 18,
+        "type": "number",
+        "value": "15.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 19,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 18,
+        "type": "number",
+        "value": "16.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 19,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 18,
+        "type": "number",
+        "value": "17.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 19,
+        "type": "number",
+        "value": "29.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 18,
+        "type": "number",
+        "value": "18.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 18,
+        "type": "number",
+        "value": "19.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 19,
+        "type": "number",
+        "value": "54"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 18,
+        "type": "number",
+        "value": "20.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 19,
+        "type": "number",
+        "value": "58"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 18,
+        "type": "number",
+        "value": "21.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 19,
+        "type": "number",
+        "value": "56"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 18,
+        "type": "number",
+        "value": "22.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 19,
+        "type": "number",
+        "value": "96"
+      }
+    ]
+  },
+  {
+    "function": "SLOPE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/slope.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=SLOPE([.S2:.S23];[.T2:.T23])",
+    "cached": "-6.20182682721303",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 19,
+        "type": "number",
+        "value": "13.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 20,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 19,
+        "type": "number",
+        "value": "65"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 20,
+        "type": "number",
+        "value": "46"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 19,
+        "type": "number",
+        "value": "15.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 19,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 19,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 19,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 19,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 19,
+        "type": "number",
+        "value": "45"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 20,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 19,
+        "type": "number",
+        "value": "63521"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 20,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 19,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 20,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 19,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 19,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 20,
+        "type": "number",
+        "value": "-1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 19,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 20,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 19,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 19,
+        "type": "number",
+        "value": "29.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 20,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 19,
+        "type": "number",
+        "value": "54"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 20,
+        "type": "number",
+        "value": "65"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 19,
+        "type": "number",
+        "value": "58"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 20,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 19,
+        "type": "number",
+        "value": "56"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 20,
+        "type": "number",
+        "value": "321"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 19,
+        "type": "number",
+        "value": "96"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      }
+    ]
+  },
+  {
+    "function": "SLOPE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/slope.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=SLOPE([.R2:.R23];[.T2:.T23])",
+    "cached": "0.0117754486639321",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 18,
+        "type": "number",
+        "value": "1.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 20,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 18,
+        "type": "number",
+        "value": "2.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 20,
+        "type": "number",
+        "value": "46"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 18,
+        "type": "number",
+        "value": "3.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 18,
+        "type": "number",
+        "value": "-4.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 18,
+        "type": "number",
+        "value": "5.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 18,
+        "type": "number",
+        "value": "6.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 18,
+        "type": "number",
+        "value": "7.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 18,
+        "type": "number",
+        "value": "8.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 20,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 18,
+        "type": "number",
+        "value": "9.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 18,
+        "type": "number",
+        "value": "10.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 20,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 18,
+        "type": "number",
+        "value": "11.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 20,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 18,
+        "type": "number",
+        "value": "12.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 18,
+        "type": "number",
+        "value": "13.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 20,
+        "type": "number",
+        "value": "-1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 18,
+        "type": "number",
+        "value": "14.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 18,
+        "type": "number",
+        "value": "15.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 20,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 18,
+        "type": "number",
+        "value": "16.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 18,
+        "type": "number",
+        "value": "17.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 20,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 18,
+        "type": "number",
+        "value": "18.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 18,
+        "type": "number",
+        "value": "19.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 20,
+        "type": "number",
+        "value": "65"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 18,
+        "type": "number",
+        "value": "20.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 20,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 18,
+        "type": "number",
+        "value": "21.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 20,
+        "type": "number",
+        "value": "321"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 18,
+        "type": "number",
+        "value": "22.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      }
+    ]
+  },
+  {
+    "function": "SLOPE",
+    "source": "sc/qa/unit/data/functions/statistical/fods/slope.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=SLOPE([.R2:.T11];[.R12:.T21])",
+    "cached": "-2.12972600228688",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 18,
+        "type": "number",
+        "value": "1.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 19,
+        "type": "number",
+        "value": "13.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 20,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 18,
+        "type": "number",
+        "value": "2.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 19,
+        "type": "number",
+        "value": "65"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 20,
+        "type": "number",
+        "value": "46"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 18,
+        "type": "number",
+        "value": "3.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 19,
+        "type": "number",
+        "value": "15.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 18,
+        "type": "number",
+        "value": "-4.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 19,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 18,
+        "type": "number",
+        "value": "5.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 19,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 18,
+        "type": "number",
+        "value": "6.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 19,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 18,
+        "type": "number",
+        "value": "7.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 19,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 18,
+        "type": "number",
+        "value": "8.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 19,
+        "type": "number",
+        "value": "45"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 20,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 18,
+        "type": "number",
+        "value": "9.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 19,
+        "type": "number",
+        "value": "63521"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 20,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 18,
+        "type": "number",
+        "value": "10.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 20,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 18,
+        "type": "number",
+        "value": "11.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 19,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 20,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 18,
+        "type": "number",
+        "value": "12.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 19,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 20,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 18,
+        "type": "number",
+        "value": "13.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 19,
+        "type": "number",
+        "value": "17"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 20,
+        "type": "number",
+        "value": "-1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 18,
+        "type": "number",
+        "value": "14.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 18,
+        "type": "number",
+        "value": "15.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 19,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 20,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 18,
+        "type": "number",
+        "value": "16.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 19,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 18,
+        "type": "number",
+        "value": "17.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 19,
+        "type": "number",
+        "value": "29.55"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 20,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 18,
+        "type": "number",
+        "value": "18.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 19,
+        "type": "number",
+        "value": "654"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 20,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 18,
+        "type": "number",
+        "value": "19.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 19,
+        "type": "number",
+        "value": "54"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 20,
+        "type": "number",
+        "value": "65"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 18,
+        "type": "number",
+        "value": "20.8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 19,
+        "type": "number",
+        "value": "58"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 20,
+        "type": "number",
+        "value": "6"
+      }
+    ]
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=INTERCEPT([.I1:.I5];[.J1:.J5])",
+    "cached": "480882351.833333",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "900000000"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      }
+    ]
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=INTERCEPT([.J1:.J5];[.I1:.I5])",
+    "cached": "6.75000000513889",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "number",
+        "value": "900000000"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      }
+    ]
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=INTERCEPT({1;2;3;4}; {10;11;12;13})",
+    "cached": "-9",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=INTERCEPT({10;20;30}; {10;20;30})",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=INTERCEPT([.K2:.K6]; [.L2:.L6])",
+    "cached": "0.0483870967741922",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 11,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 11,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 11,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 11,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 11,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      }
+    ]
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 9,
+    "column": 1,
+    "formula": "of:=INTERCEPT([.J9:.J15];[.I9:.I15])",
+    "cached": "6.75000000513889",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 9,
+        "type": "number",
+        "value": "900000000"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 10,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      }
+    ]
+  },
+  {
+    "function": "INTERCEPT",
+    "source": "sc/qa/unit/data/functions/statistical/fods/intercept.fods",
+    "sheet": "Sheet2",
+    "row": 10,
+    "column": 1,
+    "formula": "of:=INTERCEPT([.J18:.J24];[.I18:.I24])",
+    "cached": "4.49999999259259",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 9,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 9,
+        "type": "number",
+        "value": "900000000"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 10,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 9,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 10,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 9,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 10,
+        "type": "number",
+        "value": "0"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 9,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 10,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 9,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 10,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 9,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 10,
+        "type": "number",
+        "value": "10"
+      }
+    ]
+  },
+  {
+    "function": "STEYX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=STEYX([.F1:.F11];[.G1:.G11])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 6,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 7,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 6,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 7,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 6,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 7,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 6,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 7,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 6,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 7,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 6,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 7,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 6,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 7,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 6,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 7,
+        "type": "number",
+        "value": "12"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 6,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 7,
+        "type": "number",
+        "value": "13"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 6,
+        "type": "number",
+        "value": "10"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 7,
+        "type": "number",
+        "value": "14"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 6,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 7,
+        "type": "number",
+        "value": "15"
+      }
+    ]
+  },
+  {
+    "function": "STEYX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=STEYX([.I2:.I101];[.J2:.J101])",
+    "cached": "1.60215046095659",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "900000002"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "899999998"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "900000003"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "899999997"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "900000004"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "899999996"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 9,
+        "type": "number",
+        "value": "900000005"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 10,
+        "type": "number",
+        "value": "899999995"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 9,
+        "type": "number",
+        "value": "900000015"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 10,
+        "type": "number",
+        "value": "899999994"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 9,
+        "type": "number",
+        "value": "900000007"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 10,
+        "type": "number",
+        "value": "899999993"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 9,
+        "type": "number",
+        "value": "900000008"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 10,
+        "type": "number",
+        "value": "899999992"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 9,
+        "type": "number",
+        "value": "900000009"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 10,
+        "type": "number",
+        "value": "899999991"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 9,
+        "type": "number",
+        "value": "900000010"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 10,
+        "type": "number",
+        "value": "899999990"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 9,
+        "type": "number",
+        "value": "900000011"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 12,
+        "column": 10,
+        "type": "number",
+        "value": "899999989"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 9,
+        "type": "number",
+        "value": "900000012"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 13,
+        "column": 10,
+        "type": "number",
+        "value": "899999988"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 9,
+        "type": "number",
+        "value": "900000013"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 14,
+        "column": 10,
+        "type": "number",
+        "value": "899999987"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 9,
+        "type": "number",
+        "value": "900000014"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 15,
+        "column": 10,
+        "type": "number",
+        "value": "899999986"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 9,
+        "type": "number",
+        "value": "900000015"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 16,
+        "column": 10,
+        "type": "number",
+        "value": "899999985"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 9,
+        "type": "number",
+        "value": "900000016"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 17,
+        "column": 10,
+        "type": "number",
+        "value": "899999984"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 9,
+        "type": "number",
+        "value": "900000017"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 18,
+        "column": 10,
+        "type": "number",
+        "value": "899999983"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 9,
+        "type": "number",
+        "value": "900000018"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 19,
+        "column": 10,
+        "type": "number",
+        "value": "899999982"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 9,
+        "type": "number",
+        "value": "900000019"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 20,
+        "column": 10,
+        "type": "number",
+        "value": "899999981"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 9,
+        "type": "number",
+        "value": "900000020"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 21,
+        "column": 10,
+        "type": "number",
+        "value": "899999980"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 9,
+        "type": "number",
+        "value": "900000021"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 22,
+        "column": 10,
+        "type": "number",
+        "value": "899999979"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 9,
+        "type": "number",
+        "value": "900000022"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 23,
+        "column": 10,
+        "type": "number",
+        "value": "899999978"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 9,
+        "type": "number",
+        "value": "900000023"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 24,
+        "column": 10,
+        "type": "number",
+        "value": "899999977"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 9,
+        "type": "number",
+        "value": "900000024"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 25,
+        "column": 10,
+        "type": "number",
+        "value": "899999976"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 9,
+        "type": "number",
+        "value": "900000025"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 26,
+        "column": 10,
+        "type": "number",
+        "value": "899999975"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 9,
+        "type": "number",
+        "value": "900000026"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 27,
+        "column": 10,
+        "type": "number",
+        "value": "899999974"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 9,
+        "type": "number",
+        "value": "900000027"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 28,
+        "column": 10,
+        "type": "number",
+        "value": "899999960"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 9,
+        "type": "number",
+        "value": "900000028"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 29,
+        "column": 10,
+        "type": "number",
+        "value": "899999972"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 9,
+        "type": "number",
+        "value": "900000029"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 30,
+        "column": 10,
+        "type": "number",
+        "value": "899999971"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 9,
+        "type": "number",
+        "value": "900000030"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 31,
+        "column": 10,
+        "type": "number",
+        "value": "899999970"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 9,
+        "type": "number",
+        "value": "900000031"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 32,
+        "column": 10,
+        "type": "number",
+        "value": "899999969"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 9,
+        "type": "number",
+        "value": "900000032"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 33,
+        "column": 10,
+        "type": "number",
+        "value": "899999968"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 9,
+        "type": "number",
+        "value": "900000033"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 34,
+        "column": 10,
+        "type": "number",
+        "value": "899999967"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 9,
+        "type": "number",
+        "value": "900000034"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 35,
+        "column": 10,
+        "type": "number",
+        "value": "899999966"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 9,
+        "type": "number",
+        "value": "900000035"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 36,
+        "column": 10,
+        "type": "number",
+        "value": "899999965"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 9,
+        "type": "number",
+        "value": "900000036"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 37,
+        "column": 10,
+        "type": "number",
+        "value": "899999964"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 9,
+        "type": "number",
+        "value": "900000037"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 38,
+        "column": 10,
+        "type": "number",
+        "value": "899999963"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 9,
+        "type": "number",
+        "value": "900000038"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 39,
+        "column": 10,
+        "type": "number",
+        "value": "899999962"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 9,
+        "type": "number",
+        "value": "900000039"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 40,
+        "column": 10,
+        "type": "number",
+        "value": "899999961"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 9,
+        "type": "number",
+        "value": "900000040"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 41,
+        "column": 10,
+        "type": "number",
+        "value": "899999960"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 9,
+        "type": "number",
+        "value": "900000041"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 42,
+        "column": 10,
+        "type": "number",
+        "value": "899999959"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 9,
+        "type": "number",
+        "value": "900000042"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 43,
+        "column": 10,
+        "type": "number",
+        "value": "899999958"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 9,
+        "type": "number",
+        "value": "900000043"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 44,
+        "column": 10,
+        "type": "number",
+        "value": "899999957"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 9,
+        "type": "number",
+        "value": "900000044"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 45,
+        "column": 10,
+        "type": "number",
+        "value": "899999956"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 9,
+        "type": "number",
+        "value": "900000045"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 46,
+        "column": 10,
+        "type": "number",
+        "value": "899999955"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 9,
+        "type": "number",
+        "value": "900000046"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 47,
+        "column": 10,
+        "type": "number",
+        "value": "899999954"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 9,
+        "type": "number",
+        "value": "900000047"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 48,
+        "column": 10,
+        "type": "number",
+        "value": "899999953"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 9,
+        "type": "number",
+        "value": "900000048"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 49,
+        "column": 10,
+        "type": "number",
+        "value": "899999952"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 9,
+        "type": "number",
+        "value": "900000049"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 50,
+        "column": 10,
+        "type": "number",
+        "value": "899999951"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 9,
+        "type": "number",
+        "value": "900000050"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 51,
+        "column": 10,
+        "type": "number",
+        "value": "899999950"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 9,
+        "type": "number",
+        "value": "900000051"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 52,
+        "column": 10,
+        "type": "number",
+        "value": "899999949"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 9,
+        "type": "number",
+        "value": "900000052"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 53,
+        "column": 10,
+        "type": "number",
+        "value": "899999948"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 9,
+        "type": "number",
+        "value": "900000053"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 54,
+        "column": 10,
+        "type": "number",
+        "value": "899999947"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 9,
+        "type": "number",
+        "value": "900000054"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 55,
+        "column": 10,
+        "type": "number",
+        "value": "899999946"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 9,
+        "type": "number",
+        "value": "900000055"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 56,
+        "column": 10,
+        "type": "number",
+        "value": "899999945"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 9,
+        "type": "number",
+        "value": "900000056"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 57,
+        "column": 10,
+        "type": "number",
+        "value": "899999944"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 9,
+        "type": "number",
+        "value": "900000057"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 58,
+        "column": 10,
+        "type": "number",
+        "value": "899999943"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 9,
+        "type": "number",
+        "value": "900000058"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 59,
+        "column": 10,
+        "type": "number",
+        "value": "899999942"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 9,
+        "type": "number",
+        "value": "900000059"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 60,
+        "column": 10,
+        "type": "number",
+        "value": "899999941"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 61,
+        "column": 9,
+        "type": "number",
+        "value": "900000060"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 61,
+        "column": 10,
+        "type": "number",
+        "value": "899999940"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 62,
+        "column": 9,
+        "type": "number",
+        "value": "900000061"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 62,
+        "column": 10,
+        "type": "number",
+        "value": "899999939"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 63,
+        "column": 9,
+        "type": "number",
+        "value": "900000062"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 63,
+        "column": 10,
+        "type": "number",
+        "value": "899999938"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 64,
+        "column": 9,
+        "type": "number",
+        "value": "900000063"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 64,
+        "column": 10,
+        "type": "number",
+        "value": "899999937"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 65,
+        "column": 9,
+        "type": "number",
+        "value": "900000064"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 65,
+        "column": 10,
+        "type": "number",
+        "value": "899999936"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 66,
+        "column": 9,
+        "type": "number",
+        "value": "900000065"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 66,
+        "column": 10,
+        "type": "number",
+        "value": "899999935"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 9,
+        "type": "number",
+        "value": "900000066"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 67,
+        "column": 10,
+        "type": "number",
+        "value": "899999934"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 68,
+        "column": 9,
+        "type": "number",
+        "value": "900000067"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 68,
+        "column": 10,
+        "type": "number",
+        "value": "899999933"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 69,
+        "column": 9,
+        "type": "number",
+        "value": "900000068"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 69,
+        "column": 10,
+        "type": "number",
+        "value": "899999932"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 70,
+        "column": 9,
+        "type": "number",
+        "value": "900000069"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 70,
+        "column": 10,
+        "type": "number",
+        "value": "899999931"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 71,
+        "column": 9,
+        "type": "number",
+        "value": "900000070"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 71,
+        "column": 10,
+        "type": "number",
+        "value": "899999930"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 72,
+        "column": 9,
+        "type": "number",
+        "value": "900000071"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 72,
+        "column": 10,
+        "type": "number",
+        "value": "899999929"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 73,
+        "column": 9,
+        "type": "number",
+        "value": "900000072"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 73,
+        "column": 10,
+        "type": "number",
+        "value": "899999928"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 74,
+        "column": 9,
+        "type": "number",
+        "value": "900000073"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 74,
+        "column": 10,
+        "type": "number",
+        "value": "899999927"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 75,
+        "column": 9,
+        "type": "number",
+        "value": "900000074"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 75,
+        "column": 10,
+        "type": "number",
+        "value": "899999926"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 76,
+        "column": 9,
+        "type": "number",
+        "value": "900000075"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 76,
+        "column": 10,
+        "type": "number",
+        "value": "899999925"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 77,
+        "column": 9,
+        "type": "number",
+        "value": "900000076"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 77,
+        "column": 10,
+        "type": "number",
+        "value": "899999924"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 78,
+        "column": 9,
+        "type": "number",
+        "value": "900000077"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 78,
+        "column": 10,
+        "type": "number",
+        "value": "899999923"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 79,
+        "column": 9,
+        "type": "number",
+        "value": "900000078"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 79,
+        "column": 10,
+        "type": "number",
+        "value": "899999922"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 80,
+        "column": 9,
+        "type": "number",
+        "value": "900000079"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 80,
+        "column": 10,
+        "type": "number",
+        "value": "899999921"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 81,
+        "column": 9,
+        "type": "number",
+        "value": "900000080"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 81,
+        "column": 10,
+        "type": "number",
+        "value": "899999920"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 82,
+        "column": 9,
+        "type": "number",
+        "value": "900000081"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 82,
+        "column": 10,
+        "type": "number",
+        "value": "899999919"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 83,
+        "column": 9,
+        "type": "number",
+        "value": "900000082"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 83,
+        "column": 10,
+        "type": "number",
+        "value": "899999918"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 84,
+        "column": 9,
+        "type": "number",
+        "value": "900000083"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 84,
+        "column": 10,
+        "type": "number",
+        "value": "899999917"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 85,
+        "column": 9,
+        "type": "number",
+        "value": "900000084"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 85,
+        "column": 10,
+        "type": "number",
+        "value": "899999916"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 86,
+        "column": 9,
+        "type": "number",
+        "value": "900000085"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 86,
+        "column": 10,
+        "type": "number",
+        "value": "899999915"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 87,
+        "column": 9,
+        "type": "number",
+        "value": "900000086"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 87,
+        "column": 10,
+        "type": "number",
+        "value": "899999914"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 88,
+        "column": 9,
+        "type": "number",
+        "value": "900000087"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 88,
+        "column": 10,
+        "type": "number",
+        "value": "899999913"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 89,
+        "column": 9,
+        "type": "number",
+        "value": "900000088"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 89,
+        "column": 10,
+        "type": "number",
+        "value": "899999912"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 90,
+        "column": 9,
+        "type": "number",
+        "value": "900000089"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 90,
+        "column": 10,
+        "type": "number",
+        "value": "899999911"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 91,
+        "column": 9,
+        "type": "number",
+        "value": "900000090"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 91,
+        "column": 10,
+        "type": "number",
+        "value": "899999910"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 92,
+        "column": 9,
+        "type": "number",
+        "value": "900000091"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 92,
+        "column": 10,
+        "type": "number",
+        "value": "899999909"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 93,
+        "column": 9,
+        "type": "number",
+        "value": "900000092"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 93,
+        "column": 10,
+        "type": "number",
+        "value": "899999908"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 94,
+        "column": 9,
+        "type": "number",
+        "value": "900000093"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 94,
+        "column": 10,
+        "type": "number",
+        "value": "899999907"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 95,
+        "column": 9,
+        "type": "number",
+        "value": "900000094"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 95,
+        "column": 10,
+        "type": "number",
+        "value": "899999906"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 96,
+        "column": 9,
+        "type": "number",
+        "value": "900000095"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 96,
+        "column": 10,
+        "type": "number",
+        "value": "899999905"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 97,
+        "column": 9,
+        "type": "number",
+        "value": "900000096"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 97,
+        "column": 10,
+        "type": "number",
+        "value": "899999904"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 98,
+        "column": 9,
+        "type": "number",
+        "value": "900000097"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 98,
+        "column": 10,
+        "type": "number",
+        "value": "899999903"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 99,
+        "column": 9,
+        "type": "number",
+        "value": "900000098"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 99,
+        "column": 10,
+        "type": "number",
+        "value": "899999902"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 100,
+        "column": 9,
+        "type": "number",
+        "value": "900000099"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 100,
+        "column": 10,
+        "type": "number",
+        "value": "899999901"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 101,
+        "column": 9,
+        "type": "number",
+        "value": "900000100"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 101,
+        "column": 10,
+        "type": "number",
+        "value": "899999900"
+      }
+    ]
+  },
+  {
+    "function": "STEYX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+    "sheet": "Sheet2",
+    "row": 4,
+    "column": 1,
+    "formula": "of:=STEYX([.L3:.L9]; [.M3:.M9])",
+    "cached": "3.30571895021004",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      }
+    ]
+  },
+  {
+    "function": "STEYX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+    "sheet": "Sheet2",
+    "row": 5,
+    "column": 1,
+    "formula": "of:=STEYX([.L4:.L10]; [.M4:.M10])",
+    "cached": "3.32185523799912",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 13,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "STEYX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+    "sheet": "Sheet2",
+    "row": 6,
+    "column": 1,
+    "formula": "of:=STEYX([.L1:.L11]; [.M1:.M11])",
+    "cached": "3.30571895021004",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 12,
+        "type": "text",
+        "value": "Data "
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 12,
+        "type": "text",
+        "value": "Known y "
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "text",
+        "value": "Known x "
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 12,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 12,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 12,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "11"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 12,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 13,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 12,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 7,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 12,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 8,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 12,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 9,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 10,
+        "column": 13,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 12,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 11,
+        "column": 13,
+        "type": "empty"
+      }
+    ]
+  },
+  {
+    "function": "STEYX",
+    "source": "sc/qa/unit/data/functions/statistical/fods/steyx.fods",
+    "sheet": "Sheet2",
+    "row": 7,
+    "column": 1,
+    "formula": "of:=STEYX([.I1:.I5];[.J1:.J5])",
+    "cached": "0",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 9,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 10,
+        "type": "empty"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 9,
+        "type": "number",
+        "value": "900000002"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 10,
+        "type": "number",
+        "value": "899999998"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 9,
+        "type": "number",
+        "value": "900000003"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 10,
+        "type": "number",
+        "value": "899999997"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 9,
+        "type": "number",
+        "value": "900000004"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 10,
+        "type": "number",
+        "value": "899999996"
+      }
+    ]
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 2,
+    "column": 1,
+    "formula": "of:=FORECAST(6; [.N1:.N5]; [.M1:.M5])",
+    "cached": "13",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 13,
+        "type": "number",
+        "value": "1"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 1,
+        "column": 14,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 13,
+        "type": "number",
+        "value": "2"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 14,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 13,
+        "type": "number",
+        "value": "3"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 14,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 13,
+        "type": "number",
+        "value": "4"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 14,
+        "type": "number",
+        "value": "8"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 13,
+        "type": "number",
+        "value": "5"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 14,
+        "type": "number",
+        "value": "11"
+      }
+    ]
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 3,
+    "column": 1,
+    "formula": "of:=FORECAST(30;[.P2:.P6];[.Q2:.Q6])",
+    "cached": "10.6072530864198",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "28"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "31"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 17,
+        "type": "number",
+        "value": "38"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 17,
+        "type": "number",
+        "value": "40"
+      }
+    ]
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 43,
+    "column": 1,
+    "formula": "of:=FORECAST(0;[.P2:.P6];[.Q2:.Q6])",
+    "cached": "-10.6658950617284",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "28"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "31"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 17,
+        "type": "number",
+        "value": "38"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 17,
+        "type": "number",
+        "value": "40"
+      }
+    ]
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 44,
+    "column": 1,
+    "formula": "of:=FORECAST(-30;[.P2:.P6];[.Q2:.Q6])",
+    "cached": "-31.9390432098765",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": [
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 16,
+        "type": "number",
+        "value": "6"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 2,
+        "column": 17,
+        "type": "number",
+        "value": "20"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 16,
+        "type": "number",
+        "value": "7"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 3,
+        "column": 17,
+        "type": "number",
+        "value": "28"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 16,
+        "type": "number",
+        "value": "9"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 4,
+        "column": 17,
+        "type": "number",
+        "value": "31"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 16,
+        "type": "number",
+        "value": "15"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 5,
+        "column": 17,
+        "type": "number",
+        "value": "38"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 16,
+        "type": "number",
+        "value": "21"
+      },
+      {
+        "sheet": "Sheet2",
+        "row": 6,
+        "column": 17,
+        "type": "number",
+        "value": "40"
+      }
+    ]
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 45,
+    "column": 1,
+    "formula": "of:=FORECAST(8; {1;2;3}; {4;5;6})",
+    "cached": "5",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 46,
+    "column": 1,
+    "formula": "of:=FORECAST(7; {5.8;-1}; {2;-5})",
+    "cached": "10.6571428571429",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  },
+  {
+    "function": "FORECAST",
+    "source": "sc/qa/unit/data/functions/statistical/fods/forecast.fods",
+    "sheet": "Sheet2",
+    "row": 47,
+    "column": 1,
+    "formula": "of:=FORECAST(50; {-1;-2;-3;-4}; {10;20;30;40})",
+    "cached": "-5",
+    "valid_modes": [
+      "scalar",
+      "matrix"
+    ],
+    "cells": []
+  }
+]

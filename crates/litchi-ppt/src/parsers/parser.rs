@@ -1,0 +1,391 @@
+//! PPT record parser - orchestrates document parsing and text extraction.
+//!
+//! Based on Apache POI's `HSLFSlideShow` and `QuickButCruddyTextExtractor`.
+
+use crate::consts::RecordType;
+use crate::package::{Error, Result, SourceLimits};
+use crate::records::Record;
+use crate::records::record::ParseBudget;
+use std::sync::{Arc, OnceLock};
+
+/// Parser for PPT binary format that extracts document structure and content.
+pub struct RecordParser {
+    /// All parsed records
+    records: Vec<Record>,
+    /// Slide text organized by `SlideAtomsSets` (following POI's architecture),
+    /// extracted on first use rather than at every parse.
+    slide_atoms_sets: OnceLock<Vec<Vec<u8>>>,
+}
+
+impl RecordParser {
+    /// Create a new PPT record parser.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            records: Vec::new(),
+            slide_atoms_sets: OnceLock::new(),
+        }
+    }
+
+    /// Parse a complete PPT document.
+    ///
+    /// This method follows POI's parsing approach:
+    /// 1. Parse all records in the document
+    /// 2. Find the Document record
+    /// 3. Extract text from all records
+    ///
+    /// Parse a complete PPT document with a shared finite record budget.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse_document(&mut self, data: &[u8], limits: &SourceLimits) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
+        let mut budget = ParseBudget::new(*limits, data.len())?;
+        self.parse_top_level(data.len(), &mut budget, |offset, budget| {
+            Record::parse_with_budget(data, offset, false, budget)
+        })
+    }
+
+    /// Parse a complete PPT document whose record payloads borrow `data`.
+    ///
+    /// The record tree is value-identical to [`Self::parse_document`]
+    /// on the same bytes; only the payload storage differs, so no payload byte
+    /// is copied at any nesting level.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn parse_shared_document_with_limits(
+        &mut self,
+        data: &Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<()> {
+        if data.is_empty() {
+            return Ok(());
+        }
+        let mut budget = ParseBudget::new(limits, data.len())?;
+        self.parse_top_level(data.len(), &mut budget, |offset, budget| {
+            Record::parse_shared_with_budget(data, offset, false, budget)
+        })
+    }
+
+    /// The lenient top-level record loop shared by both payload sources.
+    fn parse_top_level(
+        &mut self,
+        len: usize,
+        budget: &mut ParseBudget,
+        mut parse: impl FnMut(usize, &mut ParseBudget) -> Result<(Record, usize)>,
+    ) -> Result<()> {
+        let mut offset = 0;
+        while offset + 8 <= len {
+            match parse(offset, budget) {
+                Ok((record, consumed)) => {
+                    self.records
+                        .try_reserve(1)
+                        .map_err(|_err| Error::AllocationFailed("PPT top-level record table"))?;
+                    self.records.push(record);
+                    offset += consumed;
+
+                    if consumed == 0 {
+                        break;
+                    }
+                },
+                Err(
+                    error @ (Error::Limit { .. }
+                    | Error::InvalidLimit { .. }
+                    | Error::ResourceLimit(_)
+                    | Error::AllocationFailed(_)),
+                ) => {
+                    return Err(error);
+                },
+                Err(_) => {
+                    offset += 1;
+                    if offset + 8 > len {
+                        break;
+                    }
+                },
+            }
+        }
+
+        Ok(())
+    }
+
+    /// Parse only the validated live persist objects of an encrypted document,
+    /// borrowing their payloads from the decrypted stream.
+    #[cfg(feature = "encryption")]
+    pub(crate) fn parse_shared_document_at_offsets_with_limits(
+        &mut self,
+        data: &Arc<Vec<u8>>,
+        offsets: &[usize],
+        limits: SourceLimits,
+    ) -> Result<()> {
+        let mut budget = ParseBudget::new(limits, data.len())?;
+        for &offset in offsets {
+            let (record, _) = Record::parse_shared_with_budget(data, offset, true, &mut budget)?;
+            self.records
+                .try_reserve(1)
+                .map_err(|_err| Error::AllocationFailed("PPT live-record table"))?;
+            self.records.push(record);
+        }
+        Ok(())
+    }
+
+    /// Extract slide text from the document.
+    /// Based on POI's `QuickButCruddyTextExtractor` approach.
+    fn extract_slide_text_from_document(&self) -> Vec<Vec<u8>> {
+        // `extract_all_text` reports no failure of its own, so deferring it
+        // cannot defer a refusal.
+        let Ok(all_text) = self.extract_all_text() else {
+            return Vec::new();
+        };
+
+        // For now, treat all text as a single slide
+        // Note: Full slide association would require parsing SlideListWithText structure
+        if all_text.is_empty() || all_text == "No text content found" {
+            return Vec::new();
+        }
+        vec![all_text.into_bytes()]
+    }
+
+    /// Get all slide text data extracted from the document.
+    ///
+    /// The text is extracted on the first call and cached, rather than at every
+    /// parse; the value is the same either way.
+    #[must_use]
+    pub fn slides(&self) -> &[Vec<u8>] {
+        self.slide_atoms_sets
+            .get_or_init(|| self.extract_slide_text_from_document())
+    }
+
+    /// Get the number of slides in the document.
+    #[must_use]
+    pub fn slide_count(&self) -> usize {
+        self.slides().len()
+    }
+
+    /// Find a record of a specific type.
+    #[must_use]
+    pub fn find_record(&self, record_type: RecordType) -> Option<&Record> {
+        self.records
+            .iter()
+            .find(|record| record.record_type == record_type)
+    }
+
+    /// Get all records recursively as owned clones.
+    ///
+    /// This explicit copying view preserves the complete record tree for
+    /// callers that need ownership. Use [`Self::find_records_ref`] when a
+    /// zero-copy borrowed view is sufficient.
+    #[must_use]
+    pub fn find_records_owned(&self) -> Vec<Record> {
+        // Collect all records recursively
+        let mut all_records = Vec::new();
+        Self::collect_records_recursive(&self.records, &mut all_records);
+        all_records
+    }
+
+    /// Get all record references recursively (zero-copy version).
+    ///
+    /// # Performance
+    ///
+    /// - Zero-copy: returns references instead of cloning records
+    /// - Significantly faster than `find_records_owned()` for large presentations
+    /// - Preferred method for building persist mappings and iterating records
+    #[must_use]
+    pub fn find_records_ref(&self) -> Vec<&Record> {
+        let mut all_records = Vec::new();
+        Self::collect_records_recursive_ref(&self.records, &mut all_records);
+        all_records
+    }
+
+    /// Collect all record references with fallible traversal allocation.
+    pub(crate) fn try_find_records_ref(&self) -> Result<Vec<&Record>> {
+        let mut all_records = Vec::new();
+        let mut pending = Vec::new();
+        pending
+            .try_reserve_exact(self.records.len())
+            .map_err(|_err| Error::AllocationFailed("PPT record traversal stack"))?;
+        pending.extend(self.records.iter().rev());
+        while let Some(record) = pending.pop() {
+            all_records
+                .try_reserve(1)
+                .map_err(|_err| Error::AllocationFailed("PPT record reference table"))?;
+            all_records.push(record);
+            pending
+                .try_reserve(record.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT record traversal stack"))?;
+            pending.extend(record.children.iter().rev());
+        }
+        Ok(all_records)
+    }
+
+    /// Recursively collect all records including children (cloning version).
+    fn collect_records_recursive(records: &[Record], collector: &mut Vec<Record>) {
+        for record in records {
+            collector.push(record.clone());
+            if !record.children.is_empty() {
+                Self::collect_records_recursive(&record.children, collector);
+            }
+        }
+    }
+
+    /// Recursively collect all record references including children (zero-copy).
+    fn collect_records_recursive_ref<'a>(records: &'a [Record], collector: &mut Vec<&'a Record>) {
+        let mut pending: Vec<&Record> = records.iter().rev().collect();
+        while let Some(record) = pending.pop() {
+            collector.push(record);
+            pending.extend(record.children.iter().rev());
+        }
+    }
+
+    /// Find all records matching a specific type (filtered).
+    pub fn filter_records(&self, record_type: RecordType) -> impl Iterator<Item = &Record> {
+        self.records
+            .iter()
+            .filter(move |record| record.record_type == record_type)
+    }
+
+    /// Extract all text content from the document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn extract_all_text(&self) -> Result<String> {
+        let mut text_parts = Vec::new();
+
+        for record in &self.records {
+            if let Ok(record_text) = record.extract_text()
+                && !record_text.is_empty()
+            {
+                for line in record_text.lines() {
+                    let trimmed = line.trim();
+                    if !trimmed.is_empty() {
+                        text_parts.push(trimmed.to_string());
+                    }
+                }
+            }
+        }
+
+        if text_parts.is_empty() {
+            Ok("No text content found".to_string())
+        } else {
+            Ok(text_parts.join("\n"))
+        }
+    }
+
+    /// Extract text content from slide data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn extract_text_from_slide_data(slide_data: &[u8]) -> Result<String> {
+        if slide_data.is_empty() {
+            return Ok(String::new());
+        }
+
+        String::from_utf8(slide_data.to_vec())
+            .map_err(|e| Error::InvalidFormat(format!("Invalid UTF-8 in slide text: {e}")))
+    }
+}
+
+impl Default for RecordParser {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_parser_creation() {
+        let parser = RecordParser::new();
+        assert_eq!(parser.slide_count(), 0);
+        assert!(parser.slides().is_empty());
+    }
+
+    #[test]
+    fn owned_record_view_preserves_the_complete_clone_traversal() {
+        fn record(
+            record_type: RecordType,
+            version: u16,
+            instance: u16,
+            data: &[u8],
+            children: Vec<Record>,
+        ) -> Record {
+            Record {
+                record_type,
+                record_type_raw: record_type.as_u16(),
+                version,
+                instance,
+                data_length: u32::try_from(data.len()).expect("small test payload"),
+                data: data.into(),
+                children,
+            }
+        }
+
+        let text = record(RecordType::TextCharsAtom, 0, 0, &[0x41, 0x00], Vec::new());
+        let slide = record(RecordType::Slide, 0x0f, 2, &[], vec![text.clone()]);
+        let metadata = record(
+            RecordType::TextHeaderAtom,
+            0,
+            0,
+            &[0x09, 0x00, 0x00, 0x00],
+            Vec::new(),
+        );
+        let document = record(
+            RecordType::Document,
+            0x0f,
+            1,
+            &[],
+            vec![slide.clone(), metadata.clone()],
+        );
+        let expected = vec![document.clone(), slide, text, metadata];
+        let parser = RecordParser {
+            records: vec![document],
+            slide_atoms_sets: OnceLock::new(),
+        };
+
+        let owned = parser.find_records_owned();
+        drop(parser);
+
+        assert_eq!(owned, expected);
+        assert_eq!(owned[0].record_type, RecordType::Document);
+        assert_eq!(owned[0].children[0].record_type, RecordType::Slide);
+        assert_eq!(owned[2].record_type, RecordType::TextCharsAtom);
+        assert_eq!(owned[2].data.as_slice(), &[0x41, 0x00]);
+        assert_eq!(owned[3].record_type, RecordType::TextHeaderAtom);
+        assert_eq!(owned[3].data.as_slice(), &[0x09, 0x00, 0x00, 0x00]);
+    }
+
+    #[test]
+    fn document_parser_shares_count_across_top_level_records() {
+        let mut data = Vec::new();
+        for _ in 0..2 {
+            data.extend_from_slice(&0u16.to_le_bytes());
+            data.extend_from_slice(&0x2222u16.to_le_bytes());
+            data.extend_from_slice(&0u32.to_le_bytes());
+        }
+        let mut parser = RecordParser::new();
+        let error = parser
+            .parse_document(
+                &data,
+                &SourceLimits {
+                    max_records: 1,
+                    ..SourceLimits::default()
+                },
+            )
+            .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            }
+        ));
+    }
+}

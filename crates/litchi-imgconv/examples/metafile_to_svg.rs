@@ -1,19 +1,14 @@
-//! Convert an EMF or WMF metafile to SVG.
+//! Convert an EMF, WMF or PICT metafile to SVG.
 //!
-//! `litchi-imgconv` exposes two public, format-specific SVG entry points:
+//! `litchi-imgconv` exposes three public, format-specific SVG entry points:
 //!
 //!   - [`litchi_imgconv::emf::convert_emf_to_svg`] (`emf/mod.rs`)
 //!   - [`litchi_imgconv::wmf::convert_wmf_to_svg`] (`wmf/mod.rs`)
+//!   - [`litchi_imgconv::pict::convert_pict_to_svg`] (`pict/mod.rs`)
 //!
-//! Both walk the parsed metafile records and emit a minimal SVG document
-//! using the building blocks in the [`litchi_imgconv::svg`] module
-//! (`SvgBuilder`, `SvgPath`, `SvgRect`, `SvgEllipse`, `SvgText`,
-//! `SvgImage`). Embedded raster blits become base64 `data:image/png` URLs
-//! so the resulting SVG is fully self-contained.
-//!
-//! The PICT decoder does not currently expose a `convert_pict_to_svg`
-//! entry point - see `pict/mod.rs`, which only ships PNG/JPEG/WebP
-//! converters - so this example only handles EMF and WMF.
+//! Each walks the parsed metafile records and emits a bounded SVG document.
+//! Unsupported metafile operations are reported by the renderer rather than
+//! being replaced with a placeholder raster image.
 //!
 //! # Run
 //!
@@ -21,14 +16,14 @@
 //! # Use the bundled EMF sample:
 //! cargo run -p litchi-imgconv --example metafile_to_svg
 //!
-//! # Or pass any EMF/WMF file:
+//! # Or pass any EMF/WMF/PICT file:
 //! cargo run -p litchi-imgconv --example metafile_to_svg -- \
 //!     test-data/images/wmf/santa.wmf santa.svg
 //! ```
 
 use std::path::{Path, PathBuf};
 
-use litchi_imgconv::{emf, wmf};
+use litchi_imgconv::{emf, pict, wmf};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
@@ -55,14 +50,13 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let svg: String = match extension_lower(&input).as_deref() {
         Some("emf") => emf::convert_emf_to_svg(&bytes)?,
         Some("wmf") => wmf::convert_wmf_to_svg(&bytes)?,
-        Some("pict" | "pct") => {
-            // The pict module currently has no convert_pict_to_svg; raster-only.
-            return Err("PICT to SVG conversion is not exposed by litchi-imgconv; \
-                 use convert_pict (raster) instead"
-                .into());
-        },
+        Some("pict" | "pct") => pict::convert_pict_to_svg(&bytes)?,
         other => {
-            return Err(format!("unsupported extension {:?}; expected .emf or .wmf", other).into());
+            return Err(format!(
+                "unsupported extension {:?}; expected .emf, .wmf or .pict",
+                other
+            )
+            .into());
         },
     };
 

@@ -1,0 +1,1089 @@
+//! Exact-source transactions for Pages section names.
+
+use std::fmt;
+use std::mem::size_of;
+use std::num::NonZeroU64;
+use std::sync::Arc;
+
+use litchi_core::Position;
+use litchi_iwa_archive::package::EntryEdit;
+use litchi_iwa_common::{WireLimits, encode_varint_into, varint::encoded_len, wire::WireView};
+use litchi_iwa_core::{Archive, RawMessage, SnappyStream};
+use thiserror::Error as ThisError;
+
+use super::{
+    MAX_SECTIONS, NativeSectionReference, Package, PackageError, SECTION_MESSAGE_TYPE,
+    decode_body_storage, effective_text_limit, find_object, native_section_references,
+    root_references_with_limits,
+};
+use crate::{SectionSelector, section};
+
+const SECTION_NAME_FIELD: u32 = 26;
+
+/// A finite resource governed while a section name is rewritten or published.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Complete input package bytes.
+    InputBytes,
+    /// Complete rewritten package bytes.
+    OutputBytes,
+    /// ZIP members, IWA objects, or IWA messages.
+    Entries,
+    /// Bytes in one package member or IWA value.
+    EntryBytes,
+    /// Aggregate package or IWA bytes.
+    TotalBytes,
+    /// Aggregate retained section-name memory.
+    NameBytes,
+    /// Bytes in one protobuf payload.
+    WireBytes,
+    /// Parsed protobuf fields.
+    WireFields,
+    /// Protobuf nesting depth.
+    WireNesting,
+    /// Aggregate protobuf rewrite work.
+    WireWork,
+}
+
+impl fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str(match self {
+            Self::InputBytes => "input bytes",
+            Self::OutputBytes => "output bytes",
+            Self::Entries => "entries",
+            Self::EntryBytes => "entry bytes",
+            Self::TotalBytes => "total bytes",
+            Self::NameBytes => "section-name bytes",
+            Self::WireBytes => "wire bytes",
+            Self::WireFields => "wire fields",
+            Self::WireNesting => "wire nesting",
+            Self::WireWork => "wire work",
+        })
+    }
+}
+
+/// An error raised while selecting, staging, or publishing a section name.
+///
+/// Errors intentionally omit authored names, native identifiers, member
+/// names, raw bytes, and lower-layer diagnostic strings.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Error {
+    /// A well-formed request this route refuses; [`Refusal::kind`] classifies it.
+    #[error(transparent)]
+    Refused(Refusal),
+    /// The requested name violates a public semantic invariant.
+    #[error("invalid Pages section name: {0}")]
+    InvalidName(#[source] section::Error),
+    /// The selected native section cannot be rewritten without ambiguity.
+    #[error("the Pages source cannot be edited safely")]
+    InvalidSource,
+    /// A finite transaction resource ceiling was exceeded.
+    #[error("Pages section-name {kind} limit exceeded: observed {observed}, maximum {maximum}")]
+    Limit {
+        /// Resource category that exceeded its limit.
+        kind: LimitKind,
+        /// Observed or requested amount.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
+    /// A bounded destination allocation failed before publication.
+    #[error("could not allocate {amount} units for the Pages section-name transaction")]
+    Allocation {
+        /// Elements or bytes requested.
+        amount: usize,
+    },
+    /// Full semantic readback did not reproduce the requested change.
+    #[error("the edited Pages section name failed semantic verification")]
+    Verification,
+    /// The patch does not belong to this exact immutable package artifact.
+    #[error("the Pages section-name patch does not match the exact source package")]
+    PatchConflict,
+}
+
+/// A well-formed request this family's route refuses, classified by
+/// [`Refusal::kind`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ThisError)]
+#[non_exhaustive]
+pub enum Refusal {
+    /// More than one section matched an exact-name selector.
+    #[error(
+        "the Pages section-name selector is ambiguous at positions {first:?} and {duplicate:?}"
+    )]
+    AmbiguousSelector {
+        /// First matching source position.
+        first: Position,
+        /// Next matching source position.
+        duplicate: Position,
+    },
+    /// No section matched an exact-name selector.
+    #[error("the Pages section-name selector did not match a section")]
+    NameNotFound,
+    /// No section exists at the requested source position.
+    #[error("the Pages section position {position:?} does not exist")]
+    PositionNotFound {
+        /// Requested semantic source position.
+        position: Position,
+    },
+    /// The snapshot has no exact physical source suitable for a changed edit.
+    #[error("this Pages source does not support physical section-name edits")]
+    UnsupportedSource,
+}
+
+impl Refusal {
+    /// The shared refusal kind litchi-ops classifies this reason by.
+    #[must_use]
+    pub const fn kind(&self) -> litchi_core::edit::RefusalKind {
+        use litchi_core::edit::RefusalKind;
+        match self {
+            Self::AmbiguousSelector { .. } => RefusalKind::InvalidValue,
+            Self::NameNotFound { .. } | Self::PositionNotFound { .. } => RefusalKind::NotFound,
+            Self::UnsupportedSource { .. } => RefusalKind::UnsupportedContent,
+        }
+    }
+}
+
+impl From<Refusal> for Error {
+    fn from(refusal: Refusal) -> Self {
+        Self::Refused(refusal)
+    }
+}
+
+/// A mutable section-name value staged against one immutable Pages package.
+pub struct Edit<'a> {
+    source: &'a Package,
+    position: Position,
+    before: Option<String>,
+    name: Option<String>,
+}
+
+impl fmt::Debug for Edit<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("position", &self.position)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'a> Edit<'a> {
+    fn new<'selector>(
+        source: &'a Package,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<Self, Error> {
+        let selected_selector = selector.into();
+        let selected = source
+            .document_ref()
+            .select_section(selected_selector)
+            .map_err(map_selector_error)?
+            .ok_or(match selected_selector {
+                SectionSelector::Name(_) => Error::Refused(Refusal::NameNotFound),
+                SectionSelector::Position(position) => {
+                    Error::Refused(Refusal::PositionNotFound { position })
+                },
+            })?;
+        let position = Position::new(selected.index());
+        let before = selected.name().map(try_owned_name).transpose()?;
+        let name = before.clone();
+        Ok(Self {
+            source,
+            position,
+            before,
+            name,
+        })
+    }
+
+    /// Return the optional name that would be published by this edit.
+    #[must_use]
+    pub fn name(&self) -> Option<&str> {
+        self.name.as_deref()
+    }
+
+    /// Set or clear the producer-visible section name.
+    ///
+    /// `None` removes field presence while `Some("")` retains an explicitly
+    /// present empty native string.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::InvalidName`] when `name` contains NUL, or
+    /// a bounded allocation/limit error before the staged value changes.
+    pub fn set_name(&mut self, name: Option<&str>) -> Result<&mut Self, Error> {
+        if name.is_some_and(|candidate| candidate.contains('\0')) {
+            return Err(Error::InvalidName(section::Error::NameContainsNul));
+        }
+        let staged_name = name.map(try_owned_name).transpose()?;
+        validate_name_memory(self.source, self.position, staged_name.as_deref())?;
+        self.name = staged_name;
+        Ok(self)
+    }
+
+    /// Remove the producer-visible section name.
+    pub fn clear_name(&mut self) {
+        self.name = None;
+    }
+
+    /// Validate and atomically publish the staged immutable candidate.
+    ///
+    /// Exact semantic no-ops reuse the original source allocation, including
+    /// for normalized legacy packages. A changed edit requires exact ZIP
+    /// provenance and is published only after complete candidate reopening and
+    /// semantic verification under the retained limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error without modifying `source` when selection, source
+    /// topology, resource bounds, physical preservation, or readback fails.
+    pub fn commit(self) -> Result<Commit, Error> {
+        validate_name_memory(self.source, self.position, self.name.as_deref())?;
+        self.source.validate().map_err(map_package_error)?;
+        if section_name_at(self.source, self.position)? != self.before.as_deref() {
+            return Err(Error::InvalidSource);
+        }
+
+        let source_bytes = self.source.state.source.shared_source();
+        let source_fingerprint = fingerprint(&source_bytes);
+        if self.before == self.name {
+            return Ok(Commit {
+                package: self.source.clone(),
+                patch: Patch {
+                    source_bytes: Arc::clone(&source_bytes),
+                    target_bytes: source_bytes,
+                    source_fingerprint,
+                    target_fingerprint: source_fingerprint,
+                    position: self.position,
+                    before: self.before,
+                    after: self.name,
+                },
+                diagnostics: Diagnostics::unchanged(),
+            });
+        }
+
+        if !self.source.state.source.source_is_exact() {
+            return Err(Error::Refused(Refusal::UnsupportedSource));
+        }
+        let package = rewrite_package_name(
+            self.source,
+            self.position,
+            self.before.as_deref(),
+            self.name.as_deref(),
+        )?;
+        let target_bytes = package.state.source.shared_source();
+        let target_fingerprint = fingerprint(&target_bytes);
+        Ok(Commit {
+            package,
+            patch: Patch {
+                source_bytes,
+                target_bytes,
+                source_fingerprint,
+                target_fingerprint,
+                position: self.position,
+                before: self.before,
+                after: self.name,
+            },
+            diagnostics: Diagnostics::published(),
+        })
+    }
+}
+
+/// An exact-source-checked, reversible Pages section-name patch.
+///
+/// Native identifiers, member names, and exact source/target bytes remain
+/// private. Fingerprints are diagnostics only; exact byte comparison
+/// authorizes application.
+#[derive(Clone, PartialEq, Eq)]
+pub struct Patch {
+    source_bytes: Arc<[u8]>,
+    target_bytes: Arc<[u8]>,
+    source_fingerprint: u64,
+    target_fingerprint: u64,
+    position: Position,
+    before: Option<String>,
+    after: Option<String>,
+}
+
+impl fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("position", &self.position)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Patch {
+    /// Return the semantic source position selected by this patch.
+    #[must_use]
+    pub const fn position(&self) -> Position {
+        self.position
+    }
+
+    /// Borrow the optional name required from the patch source.
+    #[must_use]
+    pub fn before(&self) -> Option<&str> {
+        self.before.as_deref()
+    }
+
+    /// Borrow the optional name produced by the patch target.
+    #[must_use]
+    pub fn after(&self) -> Option<&str> {
+        self.after.as_deref()
+    }
+
+    /// Return the base package's compact diagnostic fingerprint.
+    #[must_use]
+    pub const fn source_fingerprint(&self) -> u64 {
+        self.source_fingerprint
+    }
+
+    /// Return the committed package's compact diagnostic fingerprint.
+    #[must_use]
+    pub const fn target_fingerprint(&self) -> u64 {
+        self.target_fingerprint
+    }
+
+    /// Return whether the patch preserves both the semantic name and bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+            && self.source_fingerprint == self.target_fingerprint
+            && self.source_bytes.as_ref() == self.target_bytes.as_ref()
+    }
+
+    /// Return an exact reversible patch from the target back to its source.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            source_bytes: Arc::clone(&self.target_bytes),
+            target_bytes: Arc::clone(&self.source_bytes),
+            source_fingerprint: self.target_fingerprint,
+            target_fingerprint: self.source_fingerprint,
+            position: self.position,
+            before: self.after.clone(),
+            after: self.before.clone(),
+        }
+    }
+}
+
+/// Compact evidence describing one section-name commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Diagnostics {
+    changed: bool,
+    touched_components: usize,
+    full_reparse_performed: bool,
+}
+
+impl Diagnostics {
+    const fn unchanged() -> Self {
+        Self {
+            changed: false,
+            touched_components: 0,
+            full_reparse_performed: false,
+        }
+    }
+
+    const fn published() -> Self {
+        Self {
+            changed: true,
+            touched_components: 1,
+            full_reparse_performed: true,
+        }
+    }
+
+    /// Return whether the committed package differs from its source.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
+    /// Return the number of physical IWA components rewritten.
+    #[must_use]
+    pub const fn touched_components(self) -> usize {
+        self.touched_components
+    }
+
+    /// Return whether the complete candidate was reopened before publication.
+    #[must_use]
+    pub const fn full_reparse_performed(self) -> bool {
+        self.full_reparse_performed
+    }
+}
+
+/// The fully verified result of one immutable section-name transaction.
+#[must_use = "a Pages section-name commit contains the validated package snapshot"]
+#[derive(Debug)]
+pub struct Commit {
+    package: Package,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+impl Commit {
+    /// Borrow the fully reopened immutable package snapshot.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.package
+    }
+
+    /// Consume the commit and return its immutable package snapshot.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consume the commit and return its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+
+    /// Borrow the reversible exact-source patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Borrow compact publication diagnostics.
+    #[must_use]
+    pub const fn diagnostics(&self) -> &Diagnostics {
+        &self.diagnostics
+    }
+}
+
+impl Package {
+    /// Read the optional producer-visible name from one semantically selected
+    /// section.
+    ///
+    /// The name is borrowed from this immutable package snapshot, so a read
+    /// does not allocate or retain any native package state. An explicitly
+    /// present empty name is returned as `Some("")`, while an absent field is
+    /// returned as `None`.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when an exact-name selector is ambiguous or when
+    /// the requested name or position does not identify a section.
+    pub fn section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<Option<&str>, Error> {
+        let selected_selector = selector.into();
+        let selected = self
+            .document_ref()
+            .select_section(selected_selector)
+            .map_err(map_selector_error)?
+            .ok_or(match selected_selector {
+                SectionSelector::Name(_) => Error::Refused(Refusal::NameNotFound),
+                SectionSelector::Position(position) => {
+                    Error::Refused(Refusal::PositionNotFound { position })
+                },
+            })?;
+        Ok(selected.name())
+    }
+
+    /// Set one semantically selected section's producer-visible name.
+    ///
+    /// This is the one-section convenience form of
+    /// [`Self::edit_section_name`]. Selector resolution, name validation,
+    /// exact-source preservation, and atomic publication remain owned by the
+    /// section-name transaction; this method does not introduce a second
+    /// native rewrite path.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, source, limit, preservation, or verification
+    /// error without modifying this package when publication is rejected.
+    pub fn set_section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+        name: Option<&str>,
+    ) -> Result<Commit, Error> {
+        let mut edit = self.edit_section_name(selector)?;
+        edit.set_name(name)?;
+        edit.commit()
+    }
+
+    /// Remove one semantically selected section's producer-visible name.
+    ///
+    /// Existing section text, boundaries, and unrelated native records remain
+    /// subject to the same exact-source transaction rules as
+    /// [`Self::set_section_name`]. Clearing an already absent name is an
+    /// exact semantic no-op and reuses the source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, source, limit, preservation, or verification
+    /// error before publication.
+    pub fn clear_section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<Commit, Error> {
+        let mut edit = self.edit_section_name(selector)?;
+        edit.clear_name();
+        edit.commit()
+    }
+
+    /// Start a selector-first edit of one producer-visible section name.
+    ///
+    /// The selector is resolved immediately against this immutable semantic
+    /// snapshot and only its typed source position is retained.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed error when the selector is ambiguous or does not match
+    /// a section, or when the existing name cannot be retained safely.
+    pub fn edit_section_name<'selector>(
+        &self,
+        selector: impl Into<SectionSelector<'selector>>,
+    ) -> Result<Edit<'_>, Error> {
+        Edit::new(self, selector)
+    }
+
+    /// Apply an exact-source-checked section-name patch.
+    ///
+    /// The retained target is fully reopened and semantically verified under
+    /// this package's original limits before it is published.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::PatchConflict`] unless this package is the
+    /// exact immutable source captured by `patch`, or another typed error when
+    /// the retained target cannot be safely published.
+    pub fn apply_section_name(&self, patch: &Patch) -> Result<Commit, Error> {
+        let source = &self.state.source;
+        let source_bytes = source.shared_source();
+        if fingerprint(source.source_bytes()) != patch.source_fingerprint
+            || source.source_bytes() != patch.source_bytes.as_ref()
+            || source_bytes.as_ref() != patch.source_bytes.as_ref()
+        {
+            return Err(Error::PatchConflict);
+        }
+        self.validate().map_err(map_package_error)?;
+        if section_name_at(self, patch.position)? != patch.before() {
+            return Err(Error::PatchConflict);
+        }
+
+        if patch.is_noop() {
+            return Ok(Commit {
+                package: self.clone(),
+                patch: patch.clone(),
+                diagnostics: Diagnostics::unchanged(),
+            });
+        }
+        if !source.source_is_exact() || fingerprint(&patch.target_bytes) != patch.target_fingerprint
+        {
+            return Err(Error::PatchConflict);
+        }
+
+        let candidate_source = source
+            .reopen(Arc::clone(&patch.target_bytes))
+            .map_err(map_archive_error)?;
+        let candidate =
+            Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
+        candidate.validate().map_err(map_package_error)?;
+        verify_candidate(self, &candidate, patch.position, patch.after())?;
+        Ok(Commit {
+            package: candidate,
+            patch: patch.clone(),
+            diagnostics: Diagnostics::published(),
+        })
+    }
+}
+
+fn rewrite_package_name(
+    source: &Package,
+    position: Position,
+    before: Option<&str>,
+    after: Option<&str>,
+) -> Result<Package, Error> {
+    let source_catalog = &source.state.source;
+    let identifier = section_identifier_at(source, position)?;
+    let mut matching_components = source_catalog
+        .components()
+        .iter()
+        .filter(|component| component.archive().object(identifier.get()).is_some());
+    let component = matching_components.next().ok_or(Error::InvalidSource)?;
+    if matching_components.next().is_some() {
+        return Err(Error::InvalidSource);
+    }
+    let component_name = component.name();
+    let entry = source_catalog
+        .package()
+        .iter()
+        .find(|entry| entry.name() == component_name)
+        .ok_or(Error::InvalidSource)?;
+    if entry.is_opaque() {
+        return Err(Error::InvalidSource);
+    }
+
+    let physical_limits = source_catalog.limits();
+    let snappy_limits = physical_limits.snappy_limits().map_err(map_archive_error)?;
+    let archive_limits = physical_limits
+        .effective_archive_limits()
+        .map_err(map_archive_error)?;
+    let stream = SnappyStream::decompress(
+        entry.data(),
+        physical_limits.snappy_limits().map_err(map_archive_error)?,
+    )
+    .map_err(map_core_error)?;
+    let mut archive = Archive::parse(stream.as_bytes(), archive_limits).map_err(map_core_error)?;
+    let object = archive
+        .object(identifier.get())
+        .ok_or(Error::InvalidSource)?;
+    let mut messages = object
+        .messages
+        .iter()
+        .enumerate()
+        .filter(|(_index, message)| message.type_ == SECTION_MESSAGE_TYPE);
+    let (message_index, message) = messages.next().ok_or(Error::InvalidSource)?;
+    if messages.next().is_some() {
+        return Err(Error::InvalidSource);
+    }
+
+    let wire_limits = wire_limits(source)?;
+    if strict_payload_name(&message.data, wire_limits)? != before {
+        return Err(Error::InvalidSource);
+    }
+    let rewritten = rewrite_name_payload(&message.data, before, after, wire_limits)?;
+    if strict_payload_name(&rewritten, wire_limits)? != after {
+        return Err(Error::Verification);
+    }
+
+    archive
+        .object_mut(identifier.get())
+        .ok_or(Error::InvalidSource)?
+        .replace_message_preserving_header(
+            message_index,
+            RawMessage {
+                type_: SECTION_MESSAGE_TYPE,
+                data: rewritten,
+            },
+            archive_limits,
+        )
+        .map_err(map_core_error)?;
+    let rewritten_archive = archive.to_bytes(archive_limits).map_err(map_core_error)?;
+    let compressed =
+        SnappyStream::compress(&rewritten_archive, snappy_limits).map_err(map_core_error)?;
+    let output = source_catalog
+        .package()
+        .reassemble_to_bytes(
+            &[EntryEdit::new(component_name, &compressed)],
+            physical_limits,
+        )
+        .map_err(map_archive_error)?;
+    let candidate_source = source_catalog
+        .reopen(output.into())
+        .map_err(map_archive_error)?;
+    let candidate = Package::from_source_catalog(candidate_source).map_err(map_package_error)?;
+    candidate.validate().map_err(map_package_error)?;
+    verify_candidate(source, &candidate, position, after)?;
+    Ok(candidate)
+}
+
+fn section_identifier_at(package: &Package, position: Position) -> Result<NonZeroU64, Error> {
+    let components = package.state.source.components();
+    let limits = package.state.source.limits();
+    let root = root_references_with_limits(components, limits).map_err(map_package_error)?;
+    let body_identifier = root
+        .body
+        .ok_or(Error::Refused(Refusal::UnsupportedSource))?;
+    let body = find_object(components, body_identifier.get()).ok_or(Error::InvalidSource)?;
+    let max_text_bytes = effective_text_limit(limits);
+    let (_storage, table_references) = decode_body_storage(
+        &body.messages,
+        body_identifier,
+        MAX_SECTIONS,
+        max_text_bytes,
+        limits,
+    )
+    .map_err(map_package_error)?;
+    let section_references =
+        native_section_references(table_references, root.initial_section, MAX_SECTIONS)
+            .map_err(map_package_error)?;
+    section_references
+        .get(position.get())
+        .copied()
+        .map(|NativeSectionReference { identifier, .. }| identifier)
+        .ok_or(Error::InvalidSource)
+}
+
+fn section_name_at(package: &Package, position: Position) -> Result<Option<&str>, Error> {
+    package
+        .sections()
+        .get(position.get())
+        .map(|section| section.name())
+        .ok_or(Error::Refused(Refusal::PositionNotFound { position }))
+}
+
+fn strict_payload_name(payload: &[u8], limits: WireLimits) -> Result<Option<&str>, Error> {
+    let view = WireView::parse(payload, limits).map_err(map_wire_error)?;
+    let mut name = None;
+    for field in view
+        .fields()
+        .filter(|field| field.number() == SECTION_NAME_FIELD)
+    {
+        if name.is_some() || field.wire_type() != 2 {
+            return Err(Error::InvalidSource);
+        }
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        name = Some(std::str::from_utf8(field.payload()).map_err(|_error| Error::InvalidSource)?);
+    }
+    Ok(name)
+}
+
+fn rewrite_name_payload(
+    source: &[u8],
+    before: Option<&str>,
+    after: Option<&str>,
+    limits: WireLimits,
+) -> Result<Vec<u8>, Error> {
+    let view = WireView::parse(source, limits).map_err(map_wire_error)?;
+    let mut existing_raw_length = 0usize;
+    let mut found = false;
+    for field in view
+        .fields()
+        .filter(|field| field.number() == SECTION_NAME_FIELD)
+    {
+        if found || field.wire_type() != 2 {
+            return Err(Error::InvalidSource);
+        }
+        found = true;
+        field.validate_canonical_framing().map_err(map_wire_error)?;
+        let decoded =
+            std::str::from_utf8(field.payload()).map_err(|_error| Error::InvalidSource)?;
+        if Some(decoded) != before {
+            return Err(Error::InvalidSource);
+        }
+        existing_raw_length = field.raw().len();
+    }
+    if found != before.is_some() {
+        return Err(Error::InvalidSource);
+    }
+
+    let replacement_length = after.map_or(0, encoded_name_length);
+    let output_length = source
+        .len()
+        .checked_sub(existing_raw_length)
+        .and_then(|length| length.checked_add(replacement_length))
+        .ok_or_else(|| output_limit_error(usize::MAX, limits))?;
+    if output_length > limits.max_output_bytes() {
+        return Err(output_limit_error(output_length, limits));
+    }
+    let output_fields = if found && after.is_none() {
+        view.len().saturating_sub(1)
+    } else if !found && after.is_some() {
+        view.len().checked_add(1).ok_or(Error::InvalidSource)?
+    } else {
+        view.len()
+    };
+    if output_fields > limits.max_fields() {
+        return Err(Error::Limit {
+            kind: LimitKind::WireFields,
+            observed: usize_to_u64(output_fields),
+            maximum: usize_to_u64(limits.max_fields()),
+        });
+    }
+    let work = view
+        .len()
+        .checked_add(output_fields)
+        .ok_or_else(|| work_limit_error(usize::MAX, limits))?;
+    if work > limits.max_rewrite_work() {
+        return Err(work_limit_error(work, limits));
+    }
+
+    let mut output = allocate_bytes(output_length)?;
+    let mut emitted = false;
+    for field in view.fields() {
+        if field.number() == SECTION_NAME_FIELD {
+            if let Some(name) = after {
+                append_name_field(&mut output, name);
+            }
+            emitted = true;
+        } else {
+            output.extend_from_slice(field.raw());
+        }
+    }
+    if !emitted && let Some(name) = after {
+        append_name_field(&mut output, name);
+    }
+    if output.len() != output_length {
+        return Err(Error::Verification);
+    }
+    Ok(output)
+}
+
+fn append_name_field(output: &mut Vec<u8>, name: &str) {
+    encode_varint_into(output, (u64::from(SECTION_NAME_FIELD) << 3) | 2);
+    encode_varint_into(output, usize_to_u64(name.len()));
+    output.extend_from_slice(name.as_bytes());
+}
+
+fn encoded_name_length(name: &str) -> usize {
+    let key = (u64::from(SECTION_NAME_FIELD) << 3) | 2;
+    encoded_len(key)
+        .saturating_add(encoded_len(usize_to_u64(name.len())))
+        .saturating_add(name.len())
+}
+
+fn wire_limits(package: &Package) -> Result<WireLimits, Error> {
+    let maximum = package
+        .state
+        .source
+        .limits()
+        .effective_archive_limits()
+        .map_err(map_archive_error)?
+        .max_message_bytes();
+    WireLimits::default()
+        .with_input_bytes(maximum)
+        .and_then(|limits| limits.with_output_bytes(maximum))
+        .map_err(map_wire_error)
+}
+
+fn validate_name_memory(
+    package: &Package,
+    position: Position,
+    replacement: Option<&str>,
+) -> Result<(), Error> {
+    let limit = effective_text_limit(package.state.source.limits());
+    let mut observed = package
+        .sections()
+        .len()
+        .checked_mul(size_of::<Option<Box<str>>>())
+        .ok_or_else(|| name_limit_error(usize::MAX, limit))?;
+    for section in package.sections() {
+        let length = if section.index() == position.get() {
+            replacement.map_or(0, str::len)
+        } else {
+            section.name().map_or(0, str::len)
+        };
+        observed = observed
+            .checked_add(length)
+            .ok_or_else(|| name_limit_error(usize::MAX, limit))?;
+    }
+    if observed > limit {
+        return Err(name_limit_error(observed, limit));
+    }
+    Ok(())
+}
+
+fn verify_candidate(
+    source: &Package,
+    candidate: &Package,
+    position: Position,
+    expected: Option<&str>,
+) -> Result<(), Error> {
+    if source.stats().total_objects() != candidate.stats().total_objects()
+        || source.sections().len() != candidate.sections().len()
+    {
+        return Err(Error::Verification);
+    }
+    for (index, (before, after)) in source
+        .sections()
+        .iter()
+        .zip(candidate.sections())
+        .enumerate()
+    {
+        let expected_name = if index == position.get() {
+            expected
+        } else {
+            before.name()
+        };
+        if after.name() != expected_name
+            || before.section_type() != after.section_type()
+            || before.heading() != after.heading()
+            || before.paragraphs() != after.paragraphs()
+            || before.text_storages() != after.text_storages()
+            || before.page_count() != after.page_count()
+        {
+            return Err(Error::Verification);
+        }
+    }
+    Ok(())
+}
+
+fn try_owned_name(name: &str) -> Result<String, Error> {
+    let mut owned = String::new();
+    owned
+        .try_reserve_exact(name.len())
+        .map_err(|_allocation| Error::Allocation { amount: name.len() })?;
+    owned.push_str(name);
+    Ok(owned)
+}
+
+fn allocate_bytes(capacity: usize) -> Result<Vec<u8>, Error> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|_allocation| Error::Allocation { amount: capacity })?;
+    Ok(output)
+}
+
+fn map_selector_error(selection_error: crate::SelectorError) -> Error {
+    match selection_error {
+        crate::SelectorError::EmptySectionName => Error::Refused(Refusal::NameNotFound),
+        crate::SelectorError::AmbiguousSectionName {
+            first, duplicate, ..
+        } => Error::Refused(Refusal::AmbiguousSelector {
+            first: Position::new(first),
+            duplicate: Position::new(duplicate),
+        }),
+    }
+}
+
+fn map_package_error(package_error: PackageError) -> Error {
+    match package_error {
+        PackageError::Archive(archive_error) => map_archive_error(archive_error),
+        PackageError::SectionNamesTooLarge { observed, limit } => name_limit_error(observed, limit),
+        PackageError::UnexpectedFormat { .. }
+        | PackageError::NotOfficeFile
+        | PackageError::MissingIdentity
+        | PackageError::InvalidLanguage(_)
+        | PackageError::InvalidLocale
+        | PackageError::InvalidTable { .. }
+        | PackageError::InvalidLimit { .. }
+        | PackageError::Limit { .. } => Error::Refused(Refusal::UnsupportedSource),
+        PackageError::PayloadLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::WireBytes,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::ObjectLimit { observed, limit } => Error::Limit {
+            kind: LimitKind::Entries,
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        PackageError::Allocation { amount } => Error::Allocation { amount },
+        PackageError::Io(_)
+        | PackageError::Detection(_)
+        | PackageError::InvalidFormat(_)
+        | PackageError::Semantic(_) => Error::InvalidSource,
+    }
+}
+
+fn map_archive_error(archive_error: litchi_iwa_archive::Error) -> Error {
+    match archive_error {
+        litchi_iwa_archive::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_archive::LimitKind::InputBytes => LimitKind::InputBytes,
+                litchi_iwa_archive::LimitKind::OutputBytes => LimitKind::OutputBytes,
+                litchi_iwa_archive::LimitKind::Entries => LimitKind::Entries,
+                litchi_iwa_archive::LimitKind::MemberNameBytes
+                | litchi_iwa_archive::LimitKind::MetadataBytes
+                | litchi_iwa_archive::LimitKind::CompressedEntryBytes
+                | litchi_iwa_archive::LimitKind::EntryBytes
+                | litchi_iwa_archive::LimitKind::IwaStreamBytes => LimitKind::EntryBytes,
+                litchi_iwa_archive::LimitKind::TotalBytes
+                | litchi_iwa_archive::LimitKind::IwaTotalBytes => LimitKind::TotalBytes,
+            },
+            observed,
+            maximum,
+        },
+        litchi_iwa_archive::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        litchi_iwa_archive::Error::Iwa(core_error) => map_core_error(core_error),
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_core_error(core_error: litchi_iwa_core::Error) -> Error {
+    match core_error {
+        litchi_iwa_core::Error::Limit {
+            kind,
+            observed,
+            maximum,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_core::LimitKind::Objects
+                | litchi_iwa_core::LimitKind::Messages
+                | litchi_iwa_core::LimitKind::MessagesPerObject
+                | litchi_iwa_core::LimitKind::MetadataItems => LimitKind::Entries,
+                litchi_iwa_core::LimitKind::MessageBytes => LimitKind::WireBytes,
+                litchi_iwa_core::LimitKind::HeaderFields => LimitKind::WireFields,
+                litchi_iwa_core::LimitKind::HeaderNesting => LimitKind::WireNesting,
+                litchi_iwa_core::LimitKind::ArchiveBytes
+                | litchi_iwa_core::LimitKind::ObjectBytes
+                | litchi_iwa_core::LimitKind::HeaderBytes
+                | litchi_iwa_core::LimitKind::HeaderMemoryBytes
+                | litchi_iwa_core::LimitKind::SnappyChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedChunkBytes
+                | litchi_iwa_core::LimitKind::SnappyCompressedStreamBytes
+                | litchi_iwa_core::LimitKind::SnappyFrames => LimitKind::EntryBytes,
+            },
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(maximum),
+        },
+        litchi_iwa_core::Error::Allocation { requested, .. } => {
+            Error::Allocation { amount: requested }
+        },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn map_wire_error(wire_error: litchi_iwa_common::Error) -> Error {
+    match wire_error {
+        litchi_iwa_common::Error::LimitExceeded {
+            kind,
+            observed,
+            limit,
+        } => Error::Limit {
+            kind: match kind {
+                litchi_iwa_common::LimitKind::InputBytes
+                | litchi_iwa_common::LimitKind::OutputBytes => LimitKind::WireBytes,
+                litchi_iwa_common::LimitKind::Fields
+                | litchi_iwa_common::LimitKind::TableRows
+                | litchi_iwa_common::LimitKind::TableColumns
+                | litchi_iwa_common::LimitKind::TableCells
+                | litchi_iwa_common::LimitKind::MaterializedCells => LimitKind::WireFields,
+                litchi_iwa_common::LimitKind::Nesting => LimitKind::WireNesting,
+                litchi_iwa_common::LimitKind::RewriteWork => LimitKind::WireWork,
+            },
+            observed: usize_to_u64(observed),
+            maximum: usize_to_u64(limit),
+        },
+        litchi_iwa_common::Error::Allocation { amount, .. } => Error::Allocation { amount },
+        _ => Error::InvalidSource,
+    }
+}
+
+fn name_limit_error(observed: usize, limit: usize) -> Error {
+    Error::Limit {
+        kind: LimitKind::NameBytes,
+        observed: usize_to_u64(observed),
+        maximum: usize_to_u64(limit),
+    }
+}
+
+fn output_limit_error(observed: usize, limits: WireLimits) -> Error {
+    Error::Limit {
+        kind: LimitKind::WireBytes,
+        observed: usize_to_u64(observed),
+        maximum: usize_to_u64(limits.max_output_bytes()),
+    }
+}
+
+fn work_limit_error(observed: usize, limits: WireLimits) -> Error {
+    Error::Limit {
+        kind: LimitKind::WireWork,
+        observed: usize_to_u64(observed),
+        maximum: usize_to_u64(limits.max_rewrite_work()),
+    }
+}
+
+fn usize_to_u64(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
+fn fingerprint(bytes: &[u8]) -> u64 {
+    let mut value = 0xcbf2_9ce4_8422_2325_u64;
+    for byte in bytes {
+        value ^= u64::from(*byte);
+        value = value.wrapping_mul(0x0000_0100_0000_01b3);
+    }
+    value
+}

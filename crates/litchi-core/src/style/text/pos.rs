@@ -21,18 +21,21 @@ pub enum VerticalPosition {
 impl VerticalPosition {
     /// Check if this is a normal (non-superscript, non-subscript) position.
     #[inline]
+    #[must_use]
     pub fn is_normal(&self) -> bool {
         matches!(self, VerticalPosition::Normal)
     }
 
     /// Check if this is superscript.
     #[inline]
+    #[must_use]
     pub fn is_superscript(&self) -> bool {
         matches!(self, VerticalPosition::Superscript)
     }
 
     /// Check if this is subscript.
     #[inline]
+    #[must_use]
     pub fn is_subscript(&self) -> bool {
         matches!(self, VerticalPosition::Subscript)
     }

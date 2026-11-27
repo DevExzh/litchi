@@ -1,0 +1,1161 @@
+//! Source-bound external main-document hyperlink-wrapper detachment.
+//!
+//! This module owns only detachment of `w:hyperlink` wrappers whose `r:id`
+//! resolves to an external hyperlink relationship owned by the main document.
+//! Visible child markup is retained. The relationship records are not removed
+//! because the current source-backed OPC publisher owns same-topology payload
+//! overlays, not relationship-part or member deletion. The effect report makes
+//! that retained relationship state explicit.
+
+use crate::error::{Error, Result};
+use crate::namespace::is_wordprocessing_namespace;
+use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use quick_xml::XmlVersion;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, NamespaceResolver, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::ops::Range;
+use std::sync::Arc;
+
+const RELATIONSHIPS_NAMESPACE: &[u8] =
+    b"http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_RELATIONSHIPS_NAMESPACE: &[u8] =
+    b"http://purl.oclc.org/ooxml/officeDocument/relationships";
+const XML_NAMESPACE: &[u8] = b"http://www.w3.org/XML/1998/namespace";
+const DEFAULT_MAX_DOCUMENT_BYTES: usize = 32 * 1024 * 1024;
+const DEFAULT_MAX_DEPTH: usize = 128;
+const DEFAULT_MAX_ELEMENTS: usize = 1_000_000;
+const DEFAULT_MAX_EXTERNAL_HYPERLINKS: usize = 4_096;
+
+/// Resource limits for external relationship-backed hyperlink-wrapper
+/// detachment in the main document.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_document_bytes: usize,
+    max_depth: usize,
+    max_elements: usize,
+    max_external_hyperlinks: usize,
+}
+
+impl Limits {
+    /// Return the maximum accepted main-document XML size.
+    #[must_use]
+    pub const fn max_document_bytes(self) -> usize {
+        self.max_document_bytes
+    }
+
+    /// Return the maximum accepted XML nesting depth.
+    #[must_use]
+    pub const fn max_depth(self) -> usize {
+        self.max_depth
+    }
+
+    /// Return the maximum number of XML elements scanned.
+    #[must_use]
+    pub const fn max_elements(self) -> usize {
+        self.max_elements
+    }
+
+    /// Return the maximum number of external hyperlinks detached.
+    #[must_use]
+    pub const fn max_external_hyperlinks(self) -> usize {
+        self.max_external_hyperlinks
+    }
+
+    /// Set the maximum accepted main-document XML size.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero.
+    pub fn with_max_document_bytes(mut self, value: usize) -> Result<Self> {
+        require_nonzero("main-document byte", value)?;
+        self.max_document_bytes = value;
+        Ok(self)
+    }
+
+    /// Set the maximum accepted XML nesting depth.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero.
+    pub fn with_max_depth(mut self, value: usize) -> Result<Self> {
+        require_nonzero("XML depth", value)?;
+        self.max_depth = value;
+        Ok(self)
+    }
+
+    /// Set the maximum number of XML elements scanned.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero.
+    pub fn with_max_elements(mut self, value: usize) -> Result<Self> {
+        require_nonzero("XML element", value)?;
+        self.max_elements = value;
+        Ok(self)
+    }
+
+    /// Set the maximum number of external hyperlinks detached.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when `value` is zero.
+    pub fn with_max_external_hyperlinks(mut self, value: usize) -> Result<Self> {
+        require_nonzero("external-hyperlink", value)?;
+        self.max_external_hyperlinks = value;
+        Ok(self)
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_document_bytes: DEFAULT_MAX_DOCUMENT_BYTES,
+            max_depth: DEFAULT_MAX_DEPTH,
+            max_elements: DEFAULT_MAX_ELEMENTS,
+            max_external_hyperlinks: DEFAULT_MAX_EXTERNAL_HYPERLINKS,
+        }
+    }
+}
+
+/// Deterministic effects of external relationship-backed hyperlink-wrapper
+/// detachment in the main document.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EffectReport {
+    detached_hyperlinks: usize,
+    restored_hyperlinks: usize,
+    referenced_external_relationships: usize,
+    retained_relationships: usize,
+}
+
+impl EffectReport {
+    /// Number of external `w:hyperlink` wrappers removed.
+    #[must_use]
+    pub const fn detached_hyperlinks(self) -> usize {
+        self.detached_hyperlinks
+    }
+
+    /// Number of external relationship-backed wrappers restored by an inverse
+    /// patch. A forward detachment report returns zero.
+    #[must_use]
+    pub const fn restored_hyperlinks(self) -> usize {
+        self.restored_hyperlinks
+    }
+
+    /// Number of distinct external hyperlink relationship IDs referenced by
+    /// the wrappers affected in either direction.
+    #[must_use]
+    pub const fn referenced_external_relationships(self) -> usize {
+        self.referenced_external_relationships
+    }
+
+    /// Number of those relationship records retained by the same-topology
+    /// source-backed publisher. A forward detachment leaves no selected
+    /// wrapper for them; an inverse restores wrappers without changing the
+    /// relationship records. This API makes no claim about unknown markup that
+    /// may also carry the ID. Litchi never fetches or executes the targets.
+    #[must_use]
+    pub const fn retained_relationships(self) -> usize {
+        self.retained_relationships
+    }
+
+    /// Return whether applying the plan changes no main-document bytes.
+    #[must_use]
+    pub const fn is_noop(self) -> bool {
+        self.detached_hyperlinks == 0 && self.restored_hyperlinks == 0
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RelationshipState {
+    id: String,
+    relationship_type: String,
+    target: String,
+    external: bool,
+}
+
+impl RelationshipState {
+    pub(crate) fn new(
+        id: String,
+        relationship_type: String,
+        target: String,
+        external: bool,
+    ) -> Self {
+        Self {
+            id,
+            relationship_type,
+            target,
+            external,
+        }
+    }
+
+    pub(crate) fn id(&self) -> &str {
+        &self.id
+    }
+
+    pub(crate) fn relationship_type(&self) -> &str {
+        &self.relationship_type
+    }
+
+    pub(crate) fn target(&self) -> &str {
+        &self.target
+    }
+
+    pub(crate) const fn is_external(&self) -> bool {
+        self.external
+    }
+
+    fn from_raw(value: raw::Relationship) -> Self {
+        Self::new(
+            value.id,
+            value.relationship_type,
+            value.target,
+            value.external,
+        )
+    }
+
+    fn raw(&self) -> raw::Relationship {
+        raw::Relationship::new(
+            self.id.clone(),
+            self.relationship_type.clone(),
+            self.target.clone(),
+            self.external,
+        )
+    }
+}
+
+/// Standalone bounded XML codec types.
+pub mod raw {
+    use super::{Limits, Patch, Result, Snapshot};
+
+    /// One relationship record in a standalone raw XML closure.
+    #[derive(Clone, PartialEq, Eq)]
+    pub struct Relationship {
+        pub(super) id: String,
+        pub(super) relationship_type: String,
+        pub(super) target: String,
+        pub(super) external: bool,
+    }
+
+    impl Relationship {
+        /// Construct a relationship record for a raw XML closure.
+        #[must_use]
+        pub fn new(
+            id: impl Into<String>,
+            relationship_type: impl Into<String>,
+            target: impl Into<String>,
+            external: bool,
+        ) -> Self {
+            Self {
+                id: id.into(),
+                relationship_type: relationship_type.into(),
+                target: target.into(),
+                external,
+            }
+        }
+
+        /// Relationship identifier.
+        #[must_use]
+        pub fn id(&self) -> &str {
+            &self.id
+        }
+
+        /// Relationship type URI.
+        #[must_use]
+        pub fn relationship_type(&self) -> &str {
+            &self.relationship_type
+        }
+
+        /// Relationship target.
+        #[must_use]
+        pub fn target(&self) -> &str {
+            &self.target
+        }
+
+        /// Whether the relationship target is external.
+        #[must_use]
+        pub const fn is_external(&self) -> bool {
+            self.external
+        }
+    }
+
+    impl std::fmt::Debug for Relationship {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Relationship")
+                .field("id_bytes", &self.id.len())
+                .field("relationship_type_bytes", &self.relationship_type.len())
+                .field("target_bytes", &self.target.len())
+                .field("external", &self.external)
+                .finish_non_exhaustive()
+        }
+    }
+
+    /// Mutable bounded codec for standalone main-document wrapper detachment.
+    ///
+    /// The codec owns the current XML closure and relationship records. It is
+    /// intentionally separate from the source-backed package owner: callers
+    /// that have a package should use `source_backed::Package::edit_external_
+    /// hyperlink_detachment` so the package topology and source identity are
+    /// retained by the canonical family.
+    #[derive(Clone)]
+    pub struct Codec {
+        snapshot: Snapshot,
+    }
+
+    impl std::fmt::Debug for Codec {
+        fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            formatter
+                .debug_struct("Codec")
+                .field("xml_bytes", &self.snapshot.xml.len())
+                .field(
+                    "external_hyperlinks",
+                    &self.snapshot.external_hyperlink_count(),
+                )
+                .finish_non_exhaustive()
+        }
+    }
+
+    impl Codec {
+        /// Parse an owned XML closure under the required finite policy.
+        pub fn from_xml(
+            xml: Vec<u8>,
+            relationships: Vec<Relationship>,
+            limits: Limits,
+        ) -> Result<Self> {
+            Ok(Self {
+                snapshot: Snapshot::from_xml(xml, relationships, limits)?,
+            })
+        }
+
+        /// Adopt a parsed snapshot under an explicitly repeated policy.
+        pub fn from_snapshot(snapshot: Snapshot, limits: Limits) -> Result<Self> {
+            if snapshot.limits != limits {
+                return Err(super::invalid(
+                    "raw sanitizer limits do not match the snapshot",
+                ));
+            }
+            Ok(Self { snapshot })
+        }
+
+        /// Borrow the current read-only XML projection.
+        #[must_use]
+        pub const fn snapshot(&self) -> &Snapshot {
+            &self.snapshot
+        }
+
+        /// Borrow the current XML bytes.
+        #[must_use]
+        pub fn xml_bytes(&self) -> &[u8] {
+            self.snapshot.xml_bytes()
+        }
+
+        /// Return the current relationship records.
+        #[must_use]
+        pub fn relationships(&self) -> Vec<Relationship> {
+            self.snapshot
+                .relationships
+                .iter()
+                .map(super::RelationshipState::raw)
+                .collect()
+        }
+
+        /// Apply the detach-all operation to the owned raw state.
+        pub fn detach(&mut self) -> Result<Patch> {
+            let patch = self.snapshot.plan().apply()?;
+            self.snapshot = patch.apply(&self.snapshot)?;
+            Ok(patch)
+        }
+
+        /// Apply a reversible raw patch to the current owned state.
+        pub fn apply(&mut self, patch: &Patch) -> Result<()> {
+            self.snapshot = patch.apply(&self.snapshot)?;
+            Ok(())
+        }
+    }
+}
+
+impl std::fmt::Debug for Snapshot {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Snapshot")
+            .field("xml_bytes", &self.xml.len())
+            .field("external_hyperlinks", &self.external_hyperlink_count())
+            .field("relationships", &self.relationships.len())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Immutable exact-source snapshot for external relationship-backed wrapper
+/// detachment in the main document.
+#[derive(Clone)]
+pub struct Snapshot {
+    xml: Arc<Vec<u8>>,
+    relationships: Arc<Vec<RelationshipState>>,
+    limits: Limits,
+    wrappers: Arc<Vec<Wrapper>>,
+    report: EffectReport,
+}
+
+impl Snapshot {
+    pub(crate) fn from_source(
+        xml: Arc<Vec<u8>>,
+        mut relationships: Vec<RelationshipState>,
+        limits: Limits,
+    ) -> Result<Self> {
+        relationships.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+        Self::parse(xml, Arc::new(relationships), limits)
+    }
+
+    /// Parse a standalone main-document XML closure with its relationship
+    /// records under an explicit bounded policy.
+    ///
+    /// This is the raw codec ingress. Source-backed callers should use the
+    /// package snapshot methods so source identity and package topology remain
+    /// attached to the operation.
+    pub fn from_xml(
+        xml: Vec<u8>,
+        relationships: Vec<raw::Relationship>,
+        limits: Limits,
+    ) -> Result<Self> {
+        let relationships = relationships
+            .into_iter()
+            .map(RelationshipState::from_raw)
+            .collect();
+        Self::from_source(Arc::new(xml), relationships, limits)
+    }
+
+    fn parse(
+        xml: Arc<Vec<u8>>,
+        relationships: Arc<Vec<RelationshipState>>,
+        limits: Limits,
+    ) -> Result<Self> {
+        let (wrappers, report) = scan(&xml, &relationships, limits)?;
+        Ok(Self {
+            xml,
+            relationships,
+            limits,
+            wrappers: Arc::new(wrappers),
+            report,
+        })
+    }
+
+    /// Borrow the exact main-document XML bytes.
+    #[must_use]
+    pub fn xml_bytes(&self) -> &[u8] {
+        &self.xml
+    }
+
+    /// Return the number of external hyperlink wrappers currently selected by
+    /// this exact detachment operation.
+    #[must_use]
+    pub const fn external_hyperlink_count(&self) -> usize {
+        self.report.detached_hyperlinks
+    }
+
+    /// Return whether two snapshots share the same retained XML allocation.
+    #[must_use]
+    pub fn shares_xml_allocation_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.xml, &other.xml)
+    }
+
+    pub(crate) fn relationships(&self) -> &[RelationshipState] {
+        &self.relationships
+    }
+
+    pub(crate) fn wrappers(&self) -> &[Wrapper] {
+        &self.wrappers
+    }
+
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    pub(crate) fn shared_xml(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.xml)
+    }
+
+    /// Build a non-mutating plan for detaching every selected external
+    /// hyperlink wrapper.
+    #[must_use]
+    pub fn plan(&self) -> SanitizePlan {
+        SanitizePlan {
+            source: self.clone(),
+        }
+    }
+}
+
+/// A non-mutating plan for explicitly detaching external relationship-backed
+/// hyperlink wrappers from the main document.
+#[derive(Clone)]
+pub struct SanitizePlan {
+    source: Snapshot,
+}
+
+impl SanitizePlan {
+    /// Borrow deterministic predicted effects without changing the snapshot.
+    #[must_use]
+    pub const fn effect_report(&self) -> EffectReport {
+        self.source.report
+    }
+
+    /// Apply the explicit wrapper-detachment plan and produce a source-checked
+    /// commit. The source snapshot is never mutated.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the surgical result does not parse, retain visible
+    /// text, or remove exactly the selected wrappers.
+    pub fn apply(self) -> Result<Patch> {
+        if self.source.wrappers.is_empty() {
+            return Ok(Patch {
+                before_xml: Arc::clone(&self.source.xml),
+                after_xml: Arc::clone(&self.source.xml),
+                relationships: Arc::clone(&self.source.relationships),
+                limits: self.source.limits,
+                report: self.source.report,
+            });
+        }
+
+        let rewritten = rewrite(&self.source.xml, &self.source.wrappers)?;
+        let before_text = crate::paragraph::extract_word_text(&self.source.xml)?;
+        let after_text = crate::paragraph::extract_word_text(&rewritten)?;
+        if before_text != after_text {
+            return Err(invalid(
+                "external-hyperlink detachment changed visible document text",
+            ));
+        }
+        let snapshot = Snapshot::parse(
+            Arc::new(rewritten),
+            Arc::clone(&self.source.relationships),
+            self.source.limits,
+        )?;
+        if snapshot.report.detached_hyperlinks != 0 {
+            return Err(invalid(
+                "external-hyperlink detachment left a selected hyperlink wrapper",
+            ));
+        }
+        let report = self.source.report;
+        Ok(Patch {
+            before_xml: Arc::clone(&self.source.xml),
+            after_xml: Arc::clone(&snapshot.xml),
+            relationships: Arc::clone(&self.source.relationships),
+            limits: self.source.limits,
+            report,
+        })
+    }
+}
+
+impl std::fmt::Debug for SanitizePlan {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("SanitizePlan")
+            .field("effect_report", &self.effect_report())
+            .finish_non_exhaustive()
+    }
+}
+
+/// An exact-source-checked reversible patch for external main-document
+/// hyperlink-wrapper detachment.
+#[derive(Clone)]
+pub struct Patch {
+    before_xml: Arc<Vec<u8>>,
+    after_xml: Arc<Vec<u8>>,
+    relationships: Arc<Vec<RelationshipState>>,
+    limits: Limits,
+    report: EffectReport,
+}
+
+impl Patch {
+    /// Return whether this patch changes no bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        Arc::ptr_eq(&self.before_xml, &self.after_xml)
+            || self.before_xml.as_ref() == self.after_xml.as_ref()
+    }
+
+    /// Return deterministic effects captured by the forward detachment.
+    #[must_use]
+    pub const fn effect_report(&self) -> EffectReport {
+        self.report
+    }
+
+    /// Return the exact inverse patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before_xml: Arc::clone(&self.after_xml),
+            after_xml: Arc::clone(&self.before_xml),
+            relationships: Arc::clone(&self.relationships),
+            limits: self.limits,
+            report: EffectReport {
+                detached_hyperlinks: self.report.restored_hyperlinks,
+                restored_hyperlinks: self.report.detached_hyperlinks,
+                referenced_external_relationships: self.report.referenced_external_relationships,
+                retained_relationships: self.report.retained_relationships,
+            },
+        }
+    }
+
+    /// Apply this patch only to its exact main-document and relationship
+    /// closure.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the supplied snapshot is foreign or stale.
+    pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        if source.xml.as_ref() != self.before_xml.as_ref()
+            || source.relationships.as_ref() != self.relationships.as_ref()
+        {
+            return Err(Error::conflict(
+                "external_hyperlink_detachment",
+                "the patch base does not match the supplied source",
+            ));
+        }
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        Snapshot::parse(
+            Arc::clone(&self.after_xml),
+            Arc::clone(&self.relationships),
+            self.limits,
+        )
+    }
+}
+
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("noop", &self.is_noop())
+            .field("effect_report", &self.effect_report())
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct Wrapper {
+    pub(crate) open: Range<usize>,
+    pub(crate) close: Option<Range<usize>>,
+    pub(crate) relationship_id: String,
+}
+
+#[derive(Debug)]
+struct ActiveHyperlink {
+    depth: usize,
+    open: Range<usize>,
+    relationship_id: Option<String>,
+}
+
+fn scan(
+    xml: &[u8],
+    relationships: &[RelationshipState],
+    limits: Limits,
+) -> Result<(Vec<Wrapper>, EffectReport)> {
+    scan_with_root(xml, relationships, limits, b"document")
+}
+
+/// Scan one relationship-owned WordprocessingML story for removable external
+/// hyperlink wrappers.  The source-backed package sanitizer uses the same
+/// byte-range scanner as the main-document detachment API, but supplies the
+/// story root (`hdr`, `ftr`, `footnotes`, `endnotes`, `comments`, or
+/// `glossaryDocument`).
+pub(crate) fn scan_story_wrappers(
+    xml: &[u8],
+    relationships: &[RelationshipState],
+    limits: Limits,
+    expected_root: &[u8],
+) -> Result<(Vec<Wrapper>, EffectReport)> {
+    scan_with_root(xml, relationships, limits, expected_root)
+}
+
+fn scan_with_root(
+    xml: &[u8],
+    relationships: &[RelationshipState],
+    limits: Limits,
+    expected_root: &[u8],
+) -> Result<(Vec<Wrapper>, EffectReport)> {
+    if xml.len() > limits.max_document_bytes {
+        return Err(limit(
+            LimitKind::MainDocumentXmlBytes,
+            limits.max_document_bytes,
+            xml.len(),
+        ));
+    }
+
+    let mut reader = NsReader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    reader.config_mut().check_end_names = true;
+    reader.config_mut().check_comments = true;
+    let mut depth = 0usize;
+    let mut elements = 0usize;
+    let mut roots = 0usize;
+    let mut active: Option<ActiveHyperlink> = None;
+    let mut wrappers = Vec::new();
+    let mut distinct_relationships = Vec::new();
+
+    loop {
+        let start = position(&reader, origin)?;
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?
+            .into_owned();
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+        let end = position(&reader, origin)?;
+
+        match event {
+            Event::Start(element) => {
+                elements = add_element(elements, limits)?;
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("main-document XML depth overflows usize"))?;
+                if depth > limits.max_depth {
+                    return Err(limit(
+                        LimitKind::MainDocumentXmlDepth,
+                        limits.max_depth,
+                        depth,
+                    ));
+                }
+                validate_root(&namespace, &element, depth, &mut roots, expected_root)?;
+                if is_hyperlink(&namespace, element.local_name().as_ref()) {
+                    if active.is_some() {
+                        return Err(invalid("nested WordprocessingML hyperlinks are ambiguous"));
+                    }
+                    active = Some(ActiveHyperlink {
+                        depth,
+                        open: start..end,
+                        relationship_id: external_relationship_id(
+                            &element,
+                            decoder,
+                            &resolver,
+                            relationships,
+                        )?,
+                    });
+                }
+            },
+            Event::Empty(element) => {
+                elements = add_element(elements, limits)?;
+                let child_depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("main-document XML depth overflows usize"))?;
+                if child_depth > limits.max_depth {
+                    return Err(limit(
+                        LimitKind::MainDocumentXmlDepth,
+                        limits.max_depth,
+                        child_depth,
+                    ));
+                }
+                validate_root(&namespace, &element, child_depth, &mut roots, expected_root)?;
+                if is_hyperlink(&namespace, element.local_name().as_ref()) {
+                    if active.is_some() {
+                        return Err(invalid("nested WordprocessingML hyperlinks are ambiguous"));
+                    }
+                    if let Some(relationship_id) =
+                        external_relationship_id(&element, decoder, &resolver, relationships)?
+                    {
+                        record_relationship(&mut distinct_relationships, &relationship_id)?;
+                        push_wrapper(
+                            &mut wrappers,
+                            Wrapper {
+                                open: start..end,
+                                close: None,
+                                relationship_id,
+                            },
+                            limits,
+                        )?;
+                    }
+                }
+            },
+            Event::End(element) => {
+                if is_hyperlink(&namespace, element.local_name().as_ref()) {
+                    let Some(open) = active.take() else {
+                        return Err(invalid(
+                            "WordprocessingML hyperlink end tag has no matching start tag",
+                        ));
+                    };
+                    if open.depth != depth {
+                        return Err(invalid(
+                            "WordprocessingML hyperlink nesting changed before its end tag",
+                        ));
+                    }
+                    if let Some(relationship_id) = open.relationship_id {
+                        record_relationship(&mut distinct_relationships, &relationship_id)?;
+                        push_wrapper(
+                            &mut wrappers,
+                            Wrapper {
+                                open: open.open,
+                                close: Some(start..end),
+                                relationship_id,
+                            },
+                            limits,
+                        )?;
+                    }
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("main-document XML has an unexpected end tag"))?;
+            },
+            Event::DocType(_) => {
+                return Err(invalid(
+                    "external hyperlink-wrapper detachment refuses document type declarations",
+                ));
+            },
+            Event::PI(_) => {
+                return Err(invalid(
+                    "external hyperlink-wrapper detachment refuses processing instructions",
+                ));
+            },
+            Event::Eof => break,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+
+    if depth != 0 || active.is_some() {
+        return Err(invalid("main-document XML has an unterminated element"));
+    }
+    if roots != 1 {
+        return Err(invalid(if expected_root == b"document" {
+            "main-document XML must contain exactly one w:document root"
+        } else {
+            "WordprocessingML story XML must contain exactly one root"
+        }));
+    }
+    wrappers.sort_unstable_by_key(|wrapper| wrapper.open.start);
+    for pair in wrappers.windows(2) {
+        let left_end = pair[0]
+            .close
+            .as_ref()
+            .map_or(pair[0].open.end, |range| range.end);
+        if left_end > pair[1].open.start {
+            return Err(invalid(
+                "external-hyperlink wrapper ranges overlap unexpectedly",
+            ));
+        }
+    }
+    distinct_relationships.sort_unstable();
+    distinct_relationships.dedup();
+    let report = EffectReport {
+        detached_hyperlinks: wrappers.len(),
+        restored_hyperlinks: 0,
+        referenced_external_relationships: distinct_relationships.len(),
+        retained_relationships: distinct_relationships.len(),
+    };
+    Ok((wrappers, report))
+}
+
+fn record_relationship(relationships: &mut Vec<String>, relationship_id: &str) -> Result<()> {
+    relationships
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "external-hyperlink relationship effects",
+            source,
+        })?;
+    relationships.push(relationship_id.to_owned());
+    Ok(())
+}
+
+fn validate_root(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    depth: usize,
+    roots: &mut usize,
+    expected_root: &[u8],
+) -> Result<()> {
+    if depth != 1 {
+        return Ok(());
+    }
+    *roots = roots
+        .checked_add(1)
+        .ok_or_else(|| invalid("main-document root counter overflows usize"))?;
+    if !is_wordprocessing_namespace(namespace) || element.local_name().as_ref() != expected_root {
+        return Err(invalid(if expected_root == b"document" {
+            "external hyperlink-wrapper detachment source root is not w:document"
+        } else {
+            "external hyperlink-wrapper detachment source root is not a supported WordprocessingML story"
+        }));
+    }
+    Ok(())
+}
+
+fn is_hyperlink(namespace: &ResolveResult<'_>, local_name: &[u8]) -> bool {
+    is_wordprocessing_namespace(namespace) && local_name == b"hyperlink"
+}
+
+fn external_relationship_id(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    resolver: &NamespaceResolver,
+    relationships: &[RelationshipState],
+) -> Result<Option<String>> {
+    let mut id = None;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        if attribute.key.local_name().as_ref() != b"id" {
+            continue;
+        }
+        let (namespace, _) = resolver.resolve_attribute(attribute.key);
+        if !is_relationships_namespace(&namespace) {
+            continue;
+        }
+        if id.is_some() {
+            return Err(invalid(
+                "WordprocessingML hyperlink has duplicate relationship IDs",
+            ));
+        }
+        id = Some(
+            attribute
+                .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?
+                .into_owned(),
+        );
+    }
+
+    let Some(id) = id else {
+        return Ok(None);
+    };
+    let relationship = relationships
+        .binary_search_by(|candidate| candidate.id.as_str().cmp(&id))
+        .ok()
+        .map(|index| &relationships[index])
+        .ok_or_else(|| invalid("WordprocessingML hyperlink references a missing relationship"))?;
+    if !matches!(
+        relationship.relationship_type.as_str(),
+        litchi_opc::constants::relationship_type::HYPERLINK
+            | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
+    ) {
+        return Err(invalid(
+            "WordprocessingML hyperlink relationship has an unsupported type",
+        ));
+    }
+    if !relationship.external {
+        return Ok(None);
+    }
+    validate_removable_wrapper_attributes(element, resolver)?;
+    Ok(Some(id))
+}
+
+fn validate_removable_wrapper_attributes(
+    element: &BytesStart<'_>,
+    resolver: &NamespaceResolver,
+) -> Result<()> {
+    let mut seen = 0u8;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let raw_name = attribute.key.as_ref();
+        if raw_name == b"xmlns" || raw_name.starts_with(b"xmlns:") {
+            return Err(unsafe_wrapper_attribute(
+                "namespace declarations may scope retained descendants",
+            ));
+        }
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
+        if matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == XML_NAMESPACE)
+            || raw_name.starts_with(b"xml:")
+        {
+            return Err(unsafe_wrapper_attribute(
+                "inheritable xml:* attributes may change retained descendants",
+            ));
+        }
+
+        let bit = if is_relationships_namespace(&namespace) && local_name.as_ref() == b"id" {
+            1
+        } else if is_wordprocessing_namespace(&namespace) {
+            match local_name.as_ref() {
+                b"anchor" => 1 << 1,
+                b"docLocation" => 1 << 2,
+                b"history" => 1 << 3,
+                b"tgtFrame" => 1 << 4,
+                b"tooltip" => 1 << 5,
+                _ => {
+                    return Err(unsafe_wrapper_attribute(
+                        "unknown Word hyperlink wrapper attribute",
+                    ));
+                },
+            }
+        } else {
+            return Err(unsafe_wrapper_attribute(
+                "unknown hyperlink wrapper attribute",
+            ));
+        };
+        if seen & bit != 0 {
+            return Err(invalid(
+                "external WordprocessingML hyperlink has a duplicate wrapper attribute",
+            ));
+        }
+        seen |= bit;
+    }
+    Ok(())
+}
+
+fn unsafe_wrapper_attribute(reason: &'static str) -> Error {
+    Error::refused(
+        litchi_core::edit::RefusalKind::UnsupportedContent,
+        "external_hyperlink_wrapper_detachment",
+        reason,
+    )
+}
+
+fn is_relationships_namespace(namespace: &ResolveResult<'_>) -> bool {
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == RELATIONSHIPS_NAMESPACE || *value == STRICT_RELATIONSHIPS_NAMESPACE
+    )
+}
+
+fn add_element(current: usize, limits: Limits) -> Result<usize> {
+    let next = current
+        .checked_add(1)
+        .ok_or_else(|| invalid("main-document element counter overflows usize"))?;
+    if next > limits.max_elements {
+        return Err(limit(
+            LimitKind::MainDocumentXmlElements,
+            limits.max_elements,
+            next,
+        ));
+    }
+    Ok(next)
+}
+
+fn push_wrapper(wrappers: &mut Vec<Wrapper>, wrapper: Wrapper, limits: Limits) -> Result<()> {
+    if wrappers.len() >= limits.max_external_hyperlinks {
+        return Err(limit(
+            LimitKind::ExternalHyperlinks,
+            limits.max_external_hyperlinks,
+            wrappers.len().saturating_add(1),
+        ));
+    }
+    wrappers
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "external hyperlink-wrapper detachment plan",
+            source,
+        })?;
+    wrappers.push(wrapper);
+    Ok(())
+}
+
+pub(crate) fn rewrite(xml: &[u8], wrappers: &[Wrapper]) -> Result<Vec<u8>> {
+    let removed = wrappers.iter().try_fold(0usize, |total, wrapper| {
+        let total = total
+            .checked_add(wrapper.open.len())
+            .ok_or_else(|| invalid("external-hyperlink removed-byte total overflows usize"))?;
+        total
+            .checked_add(wrapper.close.as_ref().map_or(0, Range::len))
+            .ok_or_else(|| invalid("external-hyperlink removed-byte total overflows usize"))
+    })?;
+    let capacity = xml
+        .len()
+        .checked_sub(removed)
+        .ok_or_else(|| invalid("external-hyperlink removal ranges exceed the source"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "detached-hyperlink main-document XML",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for wrapper in wrappers {
+        append_before_and_skip(&mut output, xml, &mut cursor, &wrapper.open)?;
+        if let Some(close) = &wrapper.close {
+            output.extend_from_slice(
+                xml.get(cursor..close.start).ok_or_else(|| {
+                    invalid("external-hyperlink close range is outside the source")
+                })?,
+            );
+            cursor = close.end;
+        }
+    }
+    output.extend_from_slice(
+        xml.get(cursor..)
+            .ok_or_else(|| invalid("external-hyperlink rewrite cursor exceeds the source"))?,
+    );
+    Ok(output)
+}
+
+fn append_before_and_skip(
+    output: &mut Vec<u8>,
+    xml: &[u8],
+    cursor: &mut usize,
+    range: &Range<usize>,
+) -> Result<()> {
+    if range.start < *cursor || range.end < range.start || range.end > xml.len() {
+        return Err(invalid(
+            "external-hyperlink removal range is invalid or overlaps",
+        ));
+    }
+    output.extend_from_slice(&xml[*cursor..range.start]);
+    *cursor = range.end;
+    Ok(())
+}
+
+fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+    origin
+        .offset(reader.buffer_position())
+        .ok_or_else(|| invalid("main-document XML offset does not fit usize"))
+}
+
+fn require_nonzero(resource: &str, value: usize) -> Result<()> {
+    if value == 0 {
+        return Err(invalid(format!(
+            "{resource} external hyperlink-detachment limit must be nonzero"
+        )));
+    }
+    Ok(())
+}
+
+fn invalid(message: impl Into<String>) -> Error {
+    Error::InvalidFormat(message.into())
+}
+
+fn limit(resource: LimitKind, maximum: usize, actual: usize) -> Error {
+    Error::ExternalHyperlinkDetachmentLimit {
+        kind: resource,
+        maximum,
+        actual,
+    }
+}
+
+/// The bounded resources of external-hyperlink detachment, carried by
+/// [`crate::Error::ExternalHyperlinkDetachmentLimit`].
+///
+/// Each variant names one bounded resource; [`std::fmt::Display`] gives its
+/// human-readable name, the one the error messages print.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// External hyperlinks.
+    ExternalHyperlinks,
+    /// Main-document XML bytes.
+    MainDocumentXmlBytes,
+    /// Main-document XML depth.
+    MainDocumentXmlDepth,
+    /// Main-document XML elements.
+    MainDocumentXmlElements,
+}
+
+impl LimitKind {
+    /// The resource's human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::ExternalHyperlinks => "external hyperlinks",
+            Self::MainDocumentXmlBytes => "main-document XML bytes",
+            Self::MainDocumentXmlDepth => "main-document XML depth",
+            Self::MainDocumentXmlElements => "main-document XML elements",
+        }
+    }
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(self.as_str())
+    }
+}

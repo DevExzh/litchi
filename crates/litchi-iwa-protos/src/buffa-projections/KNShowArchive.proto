@@ -1,0 +1,42 @@
+// Wire-only Buffa projection derived from these canonical IWA declarations:
+//
+// - `TSPMessages.proto`: `TSP.Reference` and `TSP.Size`;
+// - `KNArchives.proto`: the non-tree fields of `KN.ShowArchive`.
+//
+// `KN.ShowArchive.slideTree`, field 3, is intentionally absent. A bounded
+// handwritten router streams `KN.SlideTreeArchive.rootSlideNode` (field 1) and
+// `slides` (field 2) directly from caller-owned bytes. This avoids generating
+// or allocating an input-width slide-reference vector. Unknown fields are ignored
+// by the read-only projection and remain authoritative in the source payload.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message Reference {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}
+
+message Size {
+  required float width = 1;
+  required float height = 2;
+}
+
+message KeynoteShowArchive {
+  optional .LitchiIwaProjection.Reference ui_state = 1;
+  required .LitchiIwaProjection.Reference theme = 2;
+  required .LitchiIwaProjection.Size size = 4;
+  required .LitchiIwaProjection.Reference stylesheet = 5;
+  optional bool slide_numbers_visible = 6;
+  optional .LitchiIwaProjection.Reference recording = 7;
+  optional bool loop_presentation = 8;
+  optional int32 mode = 9 [default = 0];
+  optional double autoplay_transition_delay = 10 [default = 5];
+  optional double autoplay_build_delay = 11 [default = 2];
+  optional bool idle_timer_active = 15;
+  optional double idle_timer_delay = 16 [default = 900];
+  optional .LitchiIwaProjection.Reference soundtrack = 17;
+  optional bool automatically_plays_upon_open = 18;
+  optional .LitchiIwaProjection.Reference slide_list = 19;
+}

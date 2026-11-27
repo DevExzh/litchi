@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">
+  <p:embeddedFontLst>
+    <p:embeddedFont>
+      <p:font typeface="Example Sans"/>
+      <p:regular r:id="rIdFontRegular"/>
+    </p:embeddedFont>
+  </p:embeddedFontLst>
+</p:presentation>

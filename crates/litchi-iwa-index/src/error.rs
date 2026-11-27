@@ -1,0 +1,176 @@
+use std::fmt;
+
+use crate::{FragmentId, ObjectId, Reference};
+
+/// Failure while traversing the neutral records belonging to one fragment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FragmentTraversalError {
+    /// The query would visit more records than its explicit limit permits.
+    LimitExceeded {
+        /// The adapter-local fragment whose records were queried.
+        fragment: FragmentId,
+        /// The number of records registered in the fragment.
+        observed: usize,
+        /// The caller-supplied maximum number of records to visit.
+        maximum: usize,
+    },
+    /// A fragment catalog entry refers to an object that is absent from the
+    /// immutable object-record catalog.
+    ///
+    /// This indicates an internal index invariant violation. The fragment
+    /// query fails before yielding any records rather than silently returning
+    /// a partial view.
+    MissingObject {
+        /// The adapter-local fragment whose catalog is inconsistent.
+        fragment: FragmentId,
+    },
+    /// A fragment catalog entry contains a range outside the immutable
+    /// fragment/object identity storage or has reversed endpoints.
+    InvalidRange {
+        /// The adapter-local fragment whose catalog is inconsistent.
+        fragment: FragmentId,
+        /// The first catalog position addressed by the invalid range.
+        start: usize,
+        /// The exclusive catalog position addressed by the invalid range.
+        end: usize,
+        /// The number of entries available in the immutable catalog.
+        available: usize,
+    },
+}
+
+impl fmt::Display for FragmentTraversalError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::LimitExceeded {
+                fragment,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "fragment {fragment:?} contains {observed} records, exceeding traversal limit {maximum}"
+            ),
+            Self::MissingObject { fragment } => write!(
+                formatter,
+                "fragment {fragment:?} refers to an object missing from the index"
+            ),
+            Self::InvalidRange {
+                fragment,
+                start,
+                end,
+                available,
+            } => write!(
+                formatter,
+                "fragment {fragment:?} has invalid object range {start}..{end} for {available} catalog entries"
+            ),
+        }
+    }
+}
+
+impl std::error::Error for FragmentTraversalError {}
+
+/// The builder storage that could not reserve its next item.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum AllocationKind {
+    /// The distinct fragment catalog.
+    Fragments,
+    /// The object-record collection.
+    Objects,
+    /// The reference collection.
+    References,
+    /// The temporary fragment duplicate catalog.
+    FragmentCatalog,
+    /// The temporary object duplicate catalog.
+    ObjectCatalog,
+    /// The temporary reference duplicate catalog.
+    ReferenceCatalog,
+    /// The temporary catalog of sources whose outgoing references retain
+    /// insertion order.
+    ReferenceOrderCatalog,
+    /// The immutable object-record storage assembled at build time.
+    SnapshotObjects,
+    /// The temporary `(fragment, object)` ordering pairs assembled at build time.
+    FragmentObjectPairs,
+    /// The immutable object-identity storage grouped by fragment.
+    FragmentObjectIds,
+    /// The immutable fragment lookup entries assembled at build time.
+    FragmentEntries,
+    /// The immutable incoming/outgoing reference graph assembled at build time.
+    ReferenceGraph,
+}
+
+impl fmt::Display for AllocationKind {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let name = match self {
+            Self::Fragments => "fragment storage",
+            Self::Objects => "object storage",
+            Self::References => "reference storage",
+            Self::FragmentCatalog => "fragment duplicate catalog",
+            Self::ObjectCatalog => "object duplicate catalog",
+            Self::ReferenceCatalog => "reference duplicate catalog",
+            Self::ReferenceOrderCatalog => "reference-order source catalog",
+            Self::SnapshotObjects => "immutable object record storage",
+            Self::FragmentObjectPairs => "fragment/object ordering pairs",
+            Self::FragmentObjectIds => "fragment object identity storage",
+            Self::FragmentEntries => "fragment lookup entries",
+            Self::ReferenceGraph => "reference graph storage",
+        };
+        formatter.write_str(name)
+    }
+}
+
+/// Errors raised while assembling an immutable object index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub enum IndexError {
+    /// The builder could not reserve one of its record catalogs or derived
+    /// snapshot tables.
+    Allocation {
+        /// The storage that failed to reserve.
+        kind: AllocationKind,
+        /// The item count the storage was required to accommodate.
+        requested: usize,
+    },
+    /// A fragment identity was registered more than once.
+    DuplicateFragment(FragmentId),
+    /// An object identity was registered more than once.
+    DuplicateObject(ObjectId),
+    /// An object refers to a fragment that was not registered.
+    UnknownFragment(FragmentId),
+    /// A reference originates from an object that was not registered.
+    UnknownSource(ObjectId),
+    /// A reference targets an object that was not registered.
+    UnknownTarget(ObjectId),
+    /// A reference was registered more than once.
+    DuplicateReference(Reference),
+}
+
+impl fmt::Display for IndexError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Allocation { kind, requested } => {
+                write!(formatter, "could not reserve {kind} for {requested} items")
+            },
+            Self::DuplicateFragment(fragment) => {
+                write!(formatter, "fragment {fragment:?} is already registered")
+            },
+            Self::DuplicateObject(object) => {
+                write!(formatter, "object {object:?} is already registered")
+            },
+            Self::UnknownFragment(fragment) => {
+                write!(formatter, "object refers to unknown fragment {fragment:?}")
+            },
+            Self::UnknownSource(object) => {
+                write!(formatter, "reference source {object:?} is not registered")
+            },
+            Self::UnknownTarget(object) => {
+                write!(formatter, "reference target {object:?} is not registered")
+            },
+            Self::DuplicateReference(reference) => {
+                write!(formatter, "reference {reference:?} is already registered")
+            },
+        }
+    }
+}
+
+impl std::error::Error for IndexError {}

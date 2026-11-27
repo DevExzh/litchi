@@ -1,0 +1,183 @@
+#![expect(
+    clippy::let_underscore_must_use,
+    reason = "the builder return is intentionally ignored after mutation"
+)]
+#![expect(
+    clippy::shadow_reuse,
+    reason = "parser bindings are intentionally refined after validation"
+)]
+//! Paragraph and document facade integration for `w12:collapsed`.
+
+use crate::builder::{Document as DraftDocument, Paragraph as DraftParagraph};
+use crate::error::{Error, Result};
+use crate::paragraph::Paragraph;
+
+use super::codec;
+use super::model::Collapsed;
+
+impl Paragraph {
+    /// Return the direct Word 2012 collapse state, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn collapsed(&self) -> Result<Option<Collapsed>> {
+        let source = self.xml_data.xml_ref()?;
+        let _parser_admission = source.parser_admission()?;
+        let resolver = source.namespace_resolver()?;
+        let result = codec::read_with_resolver(source.bytes(), &resolver);
+        resolver.check()?;
+        result
+    }
+
+    /// Replace or remove the direct Word 2012 collapse state.
+    ///
+    /// The paragraph is changed only after the candidate XML has been parsed
+    /// and validated. Unknown paragraph and `pPr` content remains untouched.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_collapsed(&mut self, value: Option<Collapsed>) -> Result<&mut Self> {
+        if self.xml_data.is_managed() {
+            return Err(Error::refused(
+                litchi_core::edit::RefusalKind::UnsupportedOperation,
+                "paragraph.set_collapsed",
+                "managed paragraph views cannot detach source-owned XML",
+            ));
+        }
+        let _parser_admission = self.parser_admission()?;
+        if self.collapsed()? == value {
+            return Ok(self);
+        }
+        // A paragraph sliced from a main document inherits namespace bindings.
+        // Keep them when the changed view detaches from its source allocation.
+        let original = self.self_contained_xml()?;
+        let rewritten = codec::rewrite(&original, value)?;
+        if rewritten != original {
+            self.xml_data = super::super::model::XmlData::Owned(rewritten.into_boxed_slice());
+        }
+        Ok(self)
+    }
+}
+
+impl DraftParagraph {
+    /// Return the authored collapse state for this paragraph.
+    #[must_use]
+    pub fn collapsed(&self) -> Option<Collapsed> {
+        self.collapsed
+    }
+
+    /// Set or remove the collapse marker on a newly authored paragraph.
+    #[must_use]
+    pub fn set_collapsed(&mut self, value: Option<Collapsed>) -> &mut Self {
+        self.collapsed = value;
+        self
+    }
+
+    /// Mark this paragraph as collapsing subsequent deeper headings.
+    #[must_use]
+    pub fn collapse(&mut self) -> &mut Self {
+        self.set_collapsed(Some(Collapsed::Enabled))
+    }
+
+    /// Explicitly disable collapse behavior for subsequent deeper headings.
+    #[must_use]
+    pub fn expand(&mut self) -> &mut Self {
+        self.set_collapsed(Some(Collapsed::Disabled))
+    }
+
+    /// Remove the direct collapse marker.
+    #[must_use]
+    pub fn clear_collapsed(&mut self) -> &mut Self {
+        self.set_collapsed(None)
+    }
+}
+
+impl DraftDocument {
+    /// Read the collapse state of any body paragraph, including preserved
+    /// paragraphs from an opened document.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn paragraph_collapsed(&self, index: usize) -> Result<Option<Collapsed>> {
+        self.body.paragraph_collapsed(index)
+    }
+
+    /// Atomically set or remove the collapse marker on any body paragraph.
+    ///
+    /// Existing paragraphs are edited through the bounded snapshot codec, so
+    /// opaque runs, relationships, and foreign `pPr` children remain intact.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation cannot be completed.
+    pub fn set_paragraph_collapsed(
+        &mut self,
+        index: usize,
+        value: Option<Collapsed>,
+    ) -> Result<&mut Self> {
+        self.body.set_paragraph_collapsed(index, value)?;
+        self.modified = true;
+        Ok(self)
+    }
+}
+
+impl crate::writer::doc::DocumentBody {
+    pub(super) fn paragraph_collapsed(&self, index: usize) -> Result<Option<Collapsed>> {
+        let position = self
+            .paragraph_positions()
+            .get(index)
+            .copied()
+            .ok_or_else(|| Error::OutOfBounds {
+                object: "paragraph",
+                index,
+                len: self.paragraph_count(),
+            })?;
+        match self.elements.get(position) {
+            Some(crate::writer::doc::BodyElement::Paragraph(paragraph)) => {
+                Ok(paragraph.collapsed())
+            },
+            Some(crate::writer::doc::BodyElement::PreservedParagraph(xml)) => {
+                codec::read(xml.as_bytes())
+            },
+            _ => Err(Error::InvalidFormat(
+                "paragraph position does not contain a paragraph".to_owned(),
+            )),
+        }
+    }
+
+    pub(super) fn set_paragraph_collapsed(
+        &mut self,
+        index: usize,
+        value: Option<Collapsed>,
+    ) -> Result<()> {
+        let position = self
+            .paragraph_positions()
+            .get(index)
+            .copied()
+            .ok_or_else(|| Error::OutOfBounds {
+                object: "paragraph",
+                index,
+                len: self.paragraph_count(),
+            })?;
+        match self.elements.get_mut(position) {
+            Some(crate::writer::doc::BodyElement::Paragraph(paragraph)) => {
+                let _ = paragraph.set_collapsed(value);
+                Ok(())
+            },
+            Some(crate::writer::doc::BodyElement::PreservedParagraph(xml)) => {
+                let replacement = codec::rewrite(xml.as_bytes(), value)?;
+                let replacement = String::from_utf8(replacement).map_err(|error| {
+                    Error::InvalidFormat(format!("collapsed paragraph XML is not UTF-8: {error}"))
+                })?;
+                *xml = replacement;
+                Ok(())
+            },
+            _ => Err(Error::InvalidFormat(
+                "paragraph position does not contain a paragraph".to_owned(),
+            )),
+        }
+    }
+}

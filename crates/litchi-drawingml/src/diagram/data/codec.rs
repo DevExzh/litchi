@@ -1,0 +1,1078 @@
+//! `DrawingML` diagram data-model XML parsing and canonical writing.
+
+use crate::{Error, LimitKind, Result};
+use litchi_ooxml_common::mce::process_str;
+use quick_xml::events::{BytesStart, Event};
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
+use std::fmt;
+
+use super::validation::{invalid, limit, xml_error};
+use super::{
+    Conformance, Connection, ConnectionType, DGM_NAMESPACE, DGM_NAMESPACE_STRICT, DML_NAMESPACE,
+    DML_NAMESPACE_STRICT, DiagramDataModel, Id, Limits, MAX_CONNECTIONS, MAX_DATA_MODEL_XML,
+    MAX_DEPTH, MAX_NODES, MAX_POINTS, MAX_TEXT_BYTES, Point, PointType,
+};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
+/// Where the data-model reader is relative to `dgm:dataModel`. Nesting
+/// inside the root is not part of it: the depth counter holds that.
+///
+/// ```text
+/// Prolog --root start tag---------------------> Open
+/// Open   --nested content---------------------> Open
+/// Open   --root end tag-----------------------> Closed
+/// Any    --declaration, comment or PI---------> unchanged
+/// ```
+///
+/// An XML declaration is accepted anywhere, inside the root included.
+/// Whitespace outside the root is ignored. Refused: a DOCTYPE or CDATA
+/// anywhere; an empty-element root; a second top-level element; text other
+/// than whitespace and entity references outside the root; and the end of
+/// input before `Closed`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RootPhase {
+    /// No element has been read.
+    Prolog,
+    /// The root start tag was read and its end tag was not.
+    Open,
+    /// The root element is complete.
+    Closed,
+}
+
+impl DiagramDataModel {
+    /// Parse a `dgm:dataModel` document (transitional or Strict namespace).
+    ///
+    /// The input is first rewritten by markup-compatibility processing so
+    /// `mc:AlternateContent` wrappers resolve to their fallback content.
+    /// Unmodeled formatting and extension content is validated as XML structure
+    /// but is not retained; see the publication warning on [`Self::to_xml`].
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
+    pub fn parse(xml: &str, limits: &Limits) -> Result<Self> {
+        limits.validate()?;
+        let input_bytes = limits.input_bytes_value().min(MAX_DATA_MODEL_XML);
+        if xml.len() > input_bytes {
+            return Err(limit(
+                LimitKind::DiagramDataModelBytes,
+                xml.len(),
+                input_bytes,
+            ));
+        }
+        let processed = process_str(xml)?;
+        if processed.len() > input_bytes {
+            return Err(limit(
+                LimitKind::DiagramDataModelBytes,
+                processed.len(),
+                input_bytes,
+            ));
+        }
+        let mut reader = NsReader::from_reader(processed.as_bytes());
+        // Text inside `a:t` is significant: preserve whitespace verbatim and
+        // resolve entity references explicitly (`Event::GeneralRef`).
+        reader.config_mut().trim_text(false);
+
+        let mut model = DiagramDataModel::default();
+        let mut buffer = Vec::new();
+        let mut depth = 0usize;
+        let mut nodes = 0usize;
+        let mut phase = RootPhase::Prolog;
+        let mut point_list_seen = false;
+        let mut point_list_depth: Option<usize> = None;
+        let mut connection_list_seen = false;
+        let mut connection_list_depth: Option<usize> = None;
+        // Currently open point: depth at which it started plus its builder.
+        let mut open_point: Option<(usize, PointBuilder)> = None;
+        // Depths of the open `dgm:t` text body and `a:t` text leaf, if any.
+        let mut text_body_depth: Option<usize> = None;
+        let mut run_text_depth: Option<usize> = None;
+
+        loop {
+            match reader.read_event_into(&mut buffer).map_err(xml_error)? {
+                Event::Start(element) => {
+                    depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("data-model XML depth overflows"))?;
+                    nodes = nodes
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("data-model XML node count overflows"))?;
+                    let max_depth = limits.xml_depth_value().min(MAX_DEPTH);
+                    if depth > max_depth {
+                        return Err(limit(LimitKind::XmlDepth, depth, max_depth));
+                    }
+                    let max_nodes = limits.xml_nodes_value().min(MAX_NODES);
+                    if nodes > max_nodes {
+                        return Err(limit(LimitKind::XmlNodes, nodes, max_nodes));
+                    }
+                    let namespace = element_namespace(&reader, &element)?;
+                    let local = local_name(&element)?;
+                    if depth == 1 {
+                        if phase != RootPhase::Prolog {
+                            return Err(invalid("multiple data-model roots"));
+                        }
+                        if !is_dgm(&namespace) || local != "dataModel" {
+                            return Err(invalid("invalid data-model root or namespace"));
+                        }
+                        phase = RootPhase::Open;
+                    } else if is_dgm(&namespace) {
+                        match local.as_str() {
+                            "dataModel" => {
+                                return Err(invalid("nested data-model root"));
+                            },
+                            "ptLst" => {
+                                if depth != 2 || point_list_seen {
+                                    return Err(invalid("invalid or duplicate diagram point list"));
+                                }
+                                point_list_seen = true;
+                                point_list_depth = Some(depth);
+                            },
+                            "cxnLst" => {
+                                if depth != 2
+                                    || connection_list_seen
+                                    || !point_list_seen
+                                    || point_list_depth.is_some()
+                                {
+                                    return Err(invalid(
+                                        "invalid, duplicate, or out-of-order diagram connection list",
+                                    ));
+                                }
+                                connection_list_seen = true;
+                                connection_list_depth = Some(depth);
+                            },
+                            "pt" => {
+                                if point_list_depth.is_none_or(|list| depth != list + 1) {
+                                    return Err(invalid("diagram point is outside its point list"));
+                                }
+                                if open_point.is_some() {
+                                    return Err(invalid("nested diagram point"));
+                                }
+                                let max_points = limits.points_value().min(MAX_POINTS);
+                                if model.points.len() >= max_points {
+                                    return Err(limit(
+                                        LimitKind::DiagramPoints,
+                                        model.points.len() + 1,
+                                        max_points,
+                                    ));
+                                }
+                                open_point = Some((depth, PointBuilder::from_element(&element)?));
+                            },
+                            "cxn" => {
+                                if connection_list_depth.is_none_or(|list| depth != list + 1) {
+                                    return Err(invalid(
+                                        "diagram connection is outside its connection list",
+                                    ));
+                                }
+                                push_connection(&mut model, &element, limits)?;
+                            },
+                            "prSet" => {
+                                let Some((point_depth, builder)) = &mut open_point else {
+                                    return Err(invalid("diagram property set is outside a point"));
+                                };
+                                if depth != *point_depth + 1 {
+                                    return Err(invalid(
+                                        "diagram property set is not a direct point child",
+                                    ));
+                                }
+                                builder.read_pr_set(&element)?;
+                            },
+                            "t" => {
+                                let Some((point_depth, builder)) = &mut open_point else {
+                                    return Err(invalid("diagram text body is outside a point"));
+                                };
+                                if depth != *point_depth + 1
+                                    || text_body_depth.is_some()
+                                    || builder.text_body_seen
+                                {
+                                    return Err(invalid(
+                                        "invalid or duplicate diagram point text body",
+                                    ));
+                                }
+                                builder.text_body_seen = true;
+                                text_body_depth = Some(depth);
+                            },
+                            _ => {},
+                        }
+                    }
+                    if is_dml(&namespace)
+                        && local == "t"
+                        && text_body_depth.is_some_and(|body| depth > body)
+                    {
+                        if run_text_depth.is_some() {
+                            return Err(invalid("nested DrawingML text leaf"));
+                        }
+                        run_text_depth = Some(depth);
+                    }
+                },
+                Event::Empty(element) => {
+                    nodes = nodes
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("data-model XML node count overflows"))?;
+                    let child_depth = depth
+                        .checked_add(1)
+                        .ok_or_else(|| invalid("data-model XML depth overflows"))?;
+                    let max_depth = limits.xml_depth_value().min(MAX_DEPTH);
+                    if child_depth > max_depth {
+                        return Err(limit(LimitKind::XmlDepth, child_depth, max_depth));
+                    }
+                    let max_nodes = limits.xml_nodes_value().min(MAX_NODES);
+                    if nodes > max_nodes {
+                        return Err(limit(LimitKind::XmlNodes, nodes, max_nodes));
+                    }
+                    let namespace = element_namespace(&reader, &element)?;
+                    let local = local_name(&element)?;
+                    if child_depth == 1 {
+                        if phase != RootPhase::Prolog {
+                            return Err(invalid("multiple data-model roots"));
+                        }
+                        if !is_dgm(&namespace) || local != "dataModel" {
+                            return Err(invalid("invalid data-model root or namespace"));
+                        }
+                        return Err(invalid("diagram data model lacks its required point list"));
+                    } else if is_dgm(&namespace) {
+                        match local.as_str() {
+                            "dataModel" => {
+                                return Err(invalid("nested data-model root"));
+                            },
+                            "ptLst" => {
+                                if child_depth != 2 || point_list_seen {
+                                    return Err(invalid("invalid or duplicate diagram point list"));
+                                }
+                                point_list_seen = true;
+                            },
+                            "cxnLst" => {
+                                if child_depth != 2
+                                    || connection_list_seen
+                                    || !point_list_seen
+                                    || point_list_depth.is_some()
+                                {
+                                    return Err(invalid(
+                                        "invalid, duplicate, or out-of-order diagram connection list",
+                                    ));
+                                }
+                                connection_list_seen = true;
+                            },
+                            "pt" => {
+                                if point_list_depth.is_none_or(|list| child_depth != list + 1) {
+                                    return Err(invalid("diagram point is outside its point list"));
+                                }
+                                if open_point.is_some() {
+                                    return Err(invalid("nested diagram point"));
+                                }
+                                let max_points = limits.points_value().min(MAX_POINTS);
+                                if model.points.len() >= max_points {
+                                    return Err(limit(
+                                        LimitKind::DiagramPoints,
+                                        model.points.len() + 1,
+                                        max_points,
+                                    ));
+                                }
+                                let builder = PointBuilder::from_element(&element)?;
+                                model.points.push(builder.finish()?);
+                            },
+                            "cxn" => {
+                                if connection_list_depth.is_none_or(|list| child_depth != list + 1)
+                                {
+                                    return Err(invalid(
+                                        "diagram connection is outside its connection list",
+                                    ));
+                                }
+                                push_connection(&mut model, &element, limits)?;
+                            },
+                            "prSet" => {
+                                let Some((point_depth, builder)) = &mut open_point else {
+                                    return Err(invalid("diagram property set is outside a point"));
+                                };
+                                if child_depth != *point_depth + 1 {
+                                    return Err(invalid(
+                                        "diagram property set is not a direct point child",
+                                    ));
+                                }
+                                builder.read_pr_set(&element)?;
+                            },
+                            "t" => {
+                                let Some((point_depth, builder)) = &mut open_point else {
+                                    return Err(invalid("diagram text body is outside a point"));
+                                };
+                                if child_depth != *point_depth + 1 || builder.text_body_seen {
+                                    return Err(invalid(
+                                        "invalid or duplicate diagram point text body",
+                                    ));
+                                }
+                                builder.text_body_seen = true;
+                            },
+                            _ => {},
+                        }
+                    }
+                },
+                Event::Text(event) => {
+                    if run_text_depth.is_some()
+                        && let Some((_, builder)) = &mut open_point
+                    {
+                        let text = std::str::from_utf8(event.as_ref()).map_err(xml_error)?;
+                        let text = quick_xml::escape::unescape(text).map_err(xml_error)?;
+                        if builder
+                            .text
+                            .len()
+                            .checked_add(text.len())
+                            .is_none_or(|length| {
+                                length > limits.data_text_bytes_value().min(MAX_TEXT_BYTES)
+                            })
+                        {
+                            return Err(limit(
+                                LimitKind::DiagramDataModelTextBytes,
+                                builder.text.len().saturating_add(text.len()),
+                                limits.data_text_bytes_value().min(MAX_TEXT_BYTES),
+                            ));
+                        }
+                        builder.text.push_str(&text);
+                    } else if depth == 0
+                        && event
+                            .as_ref()
+                            .iter()
+                            .any(|byte| !matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+                    {
+                        return Err(invalid("text is outside the data-model root"));
+                    }
+                },
+                Event::GeneralRef(reference) => {
+                    if run_text_depth.is_some()
+                        && let Some((_, builder)) = &mut open_point
+                    {
+                        let text = litchi_ooxml_common::xml::decode_xml_reference(&reference)?;
+                        if builder
+                            .text
+                            .len()
+                            .checked_add(text.len())
+                            .is_none_or(|length| {
+                                length > limits.data_text_bytes_value().min(MAX_TEXT_BYTES)
+                            })
+                        {
+                            return Err(limit(
+                                LimitKind::DiagramDataModelTextBytes,
+                                builder.text.len().saturating_add(text.len()),
+                                limits.data_text_bytes_value().min(MAX_TEXT_BYTES),
+                            ));
+                        }
+                        builder.text.push_str(&text);
+                    } else if depth == 0 {
+                        return Err(invalid("entity reference is outside the data-model root"));
+                    }
+                },
+                Event::End(element) => {
+                    let local = local_name_end(&element)?;
+                    if run_text_depth == Some(depth) {
+                        if local != "t" {
+                            return Err(invalid("unbalanced DrawingML text leaf"));
+                        }
+                        run_text_depth = None;
+                    }
+                    if text_body_depth == Some(depth) {
+                        if local != "t" {
+                            return Err(invalid("unbalanced diagram text body"));
+                        }
+                        if run_text_depth.is_some() {
+                            return Err(invalid("unterminated DrawingML text leaf"));
+                        }
+                        text_body_depth = None;
+                    }
+                    if open_point
+                        .as_ref()
+                        .is_some_and(|(start, _)| *start == depth)
+                    {
+                        if local != "pt" {
+                            return Err(invalid("unbalanced diagram point"));
+                        }
+                        let Some((_, builder)) = open_point.take() else {
+                            return Err(invalid("diagram point state is inconsistent"));
+                        };
+                        model.points.push(builder.finish()?);
+                    }
+                    if point_list_depth == Some(depth) {
+                        if local != "ptLst" {
+                            return Err(invalid("unbalanced diagram point list"));
+                        }
+                        point_list_depth = None;
+                    }
+                    if connection_list_depth == Some(depth) {
+                        if local != "cxnLst" {
+                            return Err(invalid("unbalanced diagram connection list"));
+                        }
+                        connection_list_depth = None;
+                    }
+                    if depth == 0 {
+                        return Err(invalid("unexpected data-model closing element"));
+                    }
+                    if depth == 1 {
+                        if local != "dataModel" || phase == RootPhase::Prolog {
+                            return Err(invalid("unbalanced data-model root"));
+                        }
+                        if !point_list_seen {
+                            return Err(invalid(
+                                "diagram data model lacks its required point list",
+                            ));
+                        }
+                        phase = RootPhase::Closed;
+                    }
+                    depth -= 1;
+                },
+                Event::DocType(_) => return Err(invalid("DTDs are rejected")),
+                Event::CData(_) => return Err(invalid("CDATA is rejected")),
+                Event::Eof => break,
+                Event::Comment(_) | Event::Decl(_) | Event::PI(_) => {},
+            }
+            buffer.clear();
+        }
+        match phase {
+            RootPhase::Closed
+                if point_list_seen
+                    && depth == 0
+                    && point_list_depth.is_none()
+                    && connection_list_depth.is_none()
+                    && open_point.is_none()
+                    && text_body_depth.is_none()
+                    && run_text_depth.is_none() => {},
+            RootPhase::Prolog | RootPhase::Open | RootPhase::Closed => {
+                return Err(invalid("missing or unterminated data-model root"));
+            },
+        }
+        Ok(model)
+    }
+    /// Serializes a canonical, validated document from the modeled semantics.
+    ///
+    /// # Publication safety
+    ///
+    /// This is not a lossless rewrite API for arbitrary XML passed to
+    /// [`Self::parse`]. Rich-text formatting, shape properties, backgrounds,
+    /// whole-diagram formatting, and extension lists are outside this model and
+    /// will not be emitted. Use this method for fresh authoring or only after
+    /// deliberately accepting that canonicalization.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
+    pub fn to_xml(&self, conformance: Conformance, limits: &Limits) -> Result<String> {
+        limits.validate()?;
+        let capacity = self.serialized_xml_len(conformance, limits)?;
+        let max_output = limits.output_bytes_value().min(MAX_DATA_MODEL_XML);
+        if capacity > max_output {
+            return Err(limit(
+                LimitKind::DiagramDataModelBytes,
+                capacity,
+                max_output,
+            ));
+        }
+        let mut xml = String::new();
+        xml.try_reserve_exact(capacity)
+            .map_err(|error| reserve_error(&error))?;
+        self.write_validated_xml(&mut xml, conformance)?;
+        Ok(xml)
+    }
+
+    /// Serializes modeled semantics into a caller-owned sink for allocation
+    /// reuse.
+    ///
+    /// This has the same non-lossless publication contract as [`Self::to_xml`].
+    /// Validation and allocation complete before the destination is changed, so
+    /// an error leaves its previous contents intact.
+    /// # Errors
+    ///
+    /// Returns an error when input violates DrawingML constraints, exceeds a configured
+    /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
+    pub fn write_xml(
+        &self,
+        xml: &mut String,
+        conformance: Conformance,
+        limits: &Limits,
+    ) -> Result<()> {
+        limits.validate()?;
+        let additional = self.serialized_xml_len(conformance, limits)?;
+        let max_output = limits.output_bytes_value().min(MAX_DATA_MODEL_XML);
+        let total = xml
+            .len()
+            .checked_add(additional)
+            .ok_or_else(|| invalid("serialized data-model length overflows"))?;
+        if total > max_output {
+            return Err(limit(LimitKind::DiagramDataModelBytes, total, max_output));
+        }
+        xml.try_reserve_exact(additional)
+            .map_err(|error| reserve_error(&error))?;
+        let initial_len = xml.len();
+        if let Err(error) = self.write_validated_xml(xml, conformance) {
+            xml.truncate(initial_len);
+            return Err(error);
+        }
+        Ok(())
+    }
+    pub(super) fn write_validated_xml(
+        &self,
+        xml: &mut impl fmt::Write,
+        conformance: Conformance,
+    ) -> Result<()> {
+        let (diagram_namespace, main_namespace) = match conformance {
+            Conformance::Transitional => (DGM_NAMESPACE, DML_NAMESPACE),
+            Conformance::Strict => (DGM_NAMESPACE_STRICT, DML_NAMESPACE_STRICT),
+        };
+        write!(
+            xml,
+            "<dgm:dataModel xmlns:dgm=\"{diagram_namespace}\" xmlns:a=\"{main_namespace}\"><dgm:ptLst>"
+        )
+        .map_err(write_error)?;
+        for point in &self.points {
+            write_point(xml, point)?;
+        }
+        xml.write_str("</dgm:ptLst><dgm:cxnLst>")
+            .map_err(write_error)?;
+        for connection in &self.connections {
+            write_connection(xml, connection)?;
+        }
+        xml.write_str("</dgm:cxnLst></dgm:dataModel>")
+            .map_err(write_error)
+    }
+}
+fn write_point(xml: &mut impl fmt::Write, point: &Point) -> Result<()> {
+    write!(xml, "<dgm:pt modelId=\"{}\"", point.id).map_err(write_error)?;
+    match point.kind {
+        PointType::Node => {},
+        PointType::Document => xml.write_str(" type=\"doc\"").map_err(write_error)?,
+        PointType::Assistant => xml.write_str(" type=\"asst\"").map_err(write_error)?,
+        PointType::ParentTransition(connection) => {
+            write!(xml, " type=\"parTrans\" cxnId=\"{connection}\"").map_err(write_error)?;
+        },
+        PointType::SiblingTransition(connection) => {
+            write!(xml, " type=\"sibTrans\" cxnId=\"{connection}\"").map_err(write_error)?;
+        },
+        PointType::Presentation => xml.write_str(" type=\"pres\"").map_err(write_error)?,
+    }
+
+    let has_property_set = point.layout_type_id.is_some()
+        || point.quick_style_type_id.is_some()
+        || point.color_style_type_id.is_some();
+    if !has_property_set && point.text.is_empty() {
+        return xml.write_str("/>").map_err(write_error);
+    }
+    xml.write_char('>').map_err(write_error)?;
+    if has_property_set {
+        xml.write_str("<dgm:prSet").map_err(write_error)?;
+        write_optional_attribute(xml, "loTypeId", point.layout_type_id.as_deref())?;
+        write_optional_attribute(xml, "qsTypeId", point.quick_style_type_id.as_deref())?;
+        write_optional_attribute(xml, "csTypeId", point.color_style_type_id.as_deref())?;
+        xml.write_str("/>").map_err(write_error)?;
+    }
+    if !point.text.is_empty() {
+        xml.write_str("<dgm:t><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t xml:space=\"preserve\">")
+            .map_err(write_error)?;
+        write_xml_escaped(xml, &point.text)?;
+        xml.write_str("</a:t></a:r></a:p></dgm:t>")
+            .map_err(write_error)?;
+    }
+    xml.write_str("</dgm:pt>").map_err(write_error)
+}
+
+fn write_connection(xml: &mut impl fmt::Write, connection: &Connection) -> Result<()> {
+    write!(
+        xml,
+        "<dgm:cxn modelId=\"{}\" srcId=\"{}\" destId=\"{}\" srcOrd=\"{}\" destOrd=\"{}\"",
+        connection.id,
+        connection.source,
+        connection.destination,
+        connection.src_ord,
+        connection.dest_ord,
+    )
+    .map_err(write_error)?;
+    match &connection.kind {
+        ConnectionType::Parent {
+            parent_transition,
+            sibling_transition,
+        } => write!(
+            xml,
+            " parTransId=\"{parent_transition}\" sibTransId=\"{sibling_transition}\""
+        )
+        .map_err(write_error)?,
+        ConnectionType::Presentation(presentation) => {
+            xml.write_str(" type=\"presOf\"").map_err(write_error)?;
+            write_optional_attribute(xml, "presId", Some(presentation))?;
+        },
+        ConnectionType::PresentationParent => {
+            xml.write_str(" type=\"presParOf\"").map_err(write_error)?;
+        },
+        ConnectionType::Unknown => xml
+            .write_str(" type=\"unknownRelationship\"")
+            .map_err(write_error)?,
+    }
+    xml.write_str("/>").map_err(write_error)
+}
+
+fn write_optional_attribute(
+    xml: &mut impl fmt::Write,
+    name: &str,
+    value: Option<&str>,
+) -> Result<()> {
+    if let Some(value) = value {
+        write!(xml, " {name}=\"").map_err(write_error)?;
+        write_xml_escaped(xml, value)?;
+        xml.write_char('"').map_err(write_error)?;
+    }
+    Ok(())
+}
+
+fn write_error(error: fmt::Error) -> Error {
+    Error::Xml(format!("failed to write diagram XML: {error}"))
+}
+
+fn reserve_error(error: &std::collections::TryReserveError) -> Error {
+    invalid(format!("cannot reserve diagram XML output: {error}"))
+}
+
+fn write_xml_escaped(xml: &mut impl fmt::Write, value: &str) -> Result<()> {
+    let mut start = 0usize;
+    for (offset, character) in value.char_indices() {
+        let replacement = match character {
+            '&' => Some("&amp;"),
+            '<' => Some("&lt;"),
+            '>' => Some("&gt;"),
+            '\'' => Some("&apos;"),
+            '"' => Some("&quot;"),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            xml.write_str(&value[start..offset]).map_err(write_error)?;
+            xml.write_str(replacement).map_err(write_error)?;
+            start = offset + character.len_utf8();
+        }
+    }
+    xml.write_str(&value[start..]).map_err(write_error)
+}
+#[derive(Debug, Clone, Copy, Default)]
+enum PointTag {
+    #[default]
+    Node,
+    Document,
+    Assistant,
+    ParentTransition,
+    SiblingTransition,
+    Presentation,
+}
+
+fn parse_point_tag(value: &str) -> Result<PointTag> {
+    match xml_token(value) {
+        "node" => Ok(PointTag::Node),
+        "doc" => Ok(PointTag::Document),
+        "asst" => Ok(PointTag::Assistant),
+        "parTrans" => Ok(PointTag::ParentTransition),
+        "sibTrans" => Ok(PointTag::SiblingTransition),
+        "pres" => Ok(PointTag::Presentation),
+        value => Err(invalid(format!("invalid diagram point type `{value}`"))),
+    }
+}
+
+#[derive(Default)]
+struct PointBuilder {
+    id: Option<Id>,
+    tag: PointTag,
+    connection: Option<Id>,
+    text: String,
+    layout_type_id: Option<String>,
+    quick_style_type_id: Option<String>,
+    color_style_type_id: Option<String>,
+    property_set_seen: bool,
+    text_body_seen: bool,
+}
+
+impl PointBuilder {
+    fn from_element(element: &BytesStart<'_>) -> Result<Self> {
+        let mut builder = PointBuilder::default();
+        for (name, value) in attributes(element)? {
+            match name.as_str() {
+                "modelId" => builder.id = Some(parse_id(&value, "diagram point modelId")?),
+                "type" => builder.tag = parse_point_tag(&value)?,
+                "cxnId" => builder.connection = Some(parse_id(&value, "diagram point cxnId")?),
+                _ => {},
+            }
+        }
+        if builder.id.is_none() {
+            return Err(invalid("diagram point lacks modelId"));
+        }
+        Ok(builder)
+    }
+
+    fn read_pr_set(&mut self, element: &BytesStart<'_>) -> Result<()> {
+        if self.property_set_seen {
+            return Err(invalid("duplicate diagram point property set"));
+        }
+        self.property_set_seen = true;
+        for (name, value) in attributes(element)? {
+            match name.as_str() {
+                "loTypeId" => self.layout_type_id = Some(value),
+                "qsTypeId" => self.quick_style_type_id = Some(value),
+                "csTypeId" => self.color_style_type_id = Some(value),
+                _ => {},
+            }
+        }
+        Ok(())
+    }
+
+    fn finish(self) -> Result<Point> {
+        let id = self
+            .id
+            .ok_or_else(|| invalid("diagram point lacks modelId"))?;
+        let kind = match self.tag {
+            PointTag::Node => PointType::Node,
+            PointTag::Document => PointType::Document,
+            PointTag::Assistant => PointType::Assistant,
+            PointTag::ParentTransition => {
+                PointType::ParentTransition(self.connection.unwrap_or_else(|| Id::number(0)))
+            },
+            PointTag::SiblingTransition => {
+                PointType::SiblingTransition(self.connection.unwrap_or_else(|| Id::number(0)))
+            },
+            PointTag::Presentation => PointType::Presentation,
+        };
+        Ok(Point {
+            id,
+            kind,
+            text: self.text,
+            layout_type_id: self.layout_type_id,
+            quick_style_type_id: self.quick_style_type_id,
+            color_style_type_id: self.color_style_type_id,
+        })
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+enum ConnectionTag {
+    #[default]
+    Parent,
+    Presentation,
+    PresentationParent,
+    Unknown,
+}
+
+fn parse_connection_tag(value: &str) -> Result<ConnectionTag> {
+    match xml_token(value) {
+        "parOf" => Ok(ConnectionTag::Parent),
+        "presOf" => Ok(ConnectionTag::Presentation),
+        "presParOf" => Ok(ConnectionTag::PresentationParent),
+        "unknownRelationship" => Ok(ConnectionTag::Unknown),
+        value => Err(invalid(format!(
+            "invalid diagram connection type `{value}`"
+        ))),
+    }
+}
+
+fn push_connection(
+    model: &mut DiagramDataModel,
+    element: &BytesStart<'_>,
+    limits: &Limits,
+) -> Result<()> {
+    let max_connections = limits.connections_value().min(MAX_CONNECTIONS);
+    if model.connections.len() >= max_connections {
+        return Err(limit(
+            LimitKind::DiagramConnections,
+            model.connections.len() + 1,
+            max_connections,
+        ));
+    }
+    let mut id = None;
+    let mut tag = ConnectionTag::default();
+    let mut source = None;
+    let mut destination = None;
+    let mut source_order = None;
+    let mut destination_order = None;
+    let mut parent_transition = None;
+    let mut sibling_transition = None;
+    let mut presentation = None;
+    for (name, value) in attributes(element)? {
+        match name.as_str() {
+            "modelId" => id = Some(parse_id(&value, "diagram connection modelId")?),
+            "type" => tag = parse_connection_tag(&value)?,
+            "srcId" => source = Some(parse_id(&value, "diagram connection srcId")?),
+            "destId" => destination = Some(parse_id(&value, "diagram connection destId")?),
+            "srcOrd" => source_order = Some(parse_order(&value)?),
+            "destOrd" => destination_order = Some(parse_order(&value)?),
+            "parTransId" => {
+                parent_transition = Some(parse_id(&value, "diagram connection parTransId")?);
+            },
+            "sibTransId" => {
+                sibling_transition = Some(parse_id(&value, "diagram connection sibTransId")?);
+            },
+            "presId" => presentation = Some(value),
+            _ => {},
+        }
+    }
+    let id = id.ok_or_else(|| invalid("diagram connection lacks modelId"))?;
+    let source = source.ok_or_else(|| invalid("diagram connection lacks srcId"))?;
+    let destination = destination.ok_or_else(|| invalid("diagram connection lacks destId"))?;
+    let source_order = source_order.ok_or_else(|| invalid("diagram connection lacks srcOrd"))?;
+    let destination_order =
+        destination_order.ok_or_else(|| invalid("diagram connection lacks destOrd"))?;
+    let kind = match tag {
+        ConnectionTag::Parent => ConnectionType::Parent {
+            parent_transition: parent_transition.unwrap_or_else(|| Id::number(0)),
+            sibling_transition: sibling_transition.unwrap_or_else(|| Id::number(0)),
+        },
+        ConnectionTag::Presentation => {
+            ConnectionType::Presentation(presentation.unwrap_or_default())
+        },
+        ConnectionTag::PresentationParent => ConnectionType::PresentationParent,
+        ConnectionTag::Unknown => ConnectionType::Unknown,
+    };
+    model.connections.push(Connection::new(
+        id,
+        kind,
+        source,
+        destination,
+        source_order,
+        destination_order,
+    ));
+    Ok(())
+}
+
+fn parse_order(value: &str) -> Result<u32> {
+    xml_token(value)
+        .parse()
+        .map_err(|_error| invalid("invalid diagram connection order"))
+}
+
+fn parse_id(value: &str, description: &str) -> Result<Id> {
+    value
+        .parse()
+        .map_err(|_error| invalid(format!("invalid {description} `{value}`")))
+}
+
+fn xml_token(value: &str) -> &str {
+    value.trim_matches([' ', '\t', '\r', '\n'])
+}
+
+/// Unnamespaced, unescaped `(local name, value)` attribute pairs.
+fn attributes(element: &BytesStart<'_>) -> Result<Vec<(String, String)>> {
+    let mut values = Vec::new();
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(xml_error)?;
+        let raw = attribute.key.as_ref();
+        if raw == b"xmlns" || raw.starts_with(b"xmlns:") {
+            continue;
+        }
+        // Schema attributes on these elements are unqualified. An extension
+        // attribute with the same local name must not impersonate one merely
+        // because namespace prefixes are otherwise discarded below.
+        if raw.contains(&b':') {
+            continue;
+        }
+        let name = std::str::from_utf8(attribute.key.local_name().as_ref())
+            .map_err(xml_error)?
+            .to_owned();
+        let value = std::str::from_utf8(attribute.value.as_ref()).map_err(xml_error)?;
+        let value = quick_xml::escape::unescape(value)
+            .map_err(xml_error)?
+            .into_owned();
+        values.push((name, value));
+    }
+    Ok(values)
+}
+
+fn element_namespace(reader: &NsReader<&[u8]>, element: &BytesStart<'_>) -> Result<String> {
+    match reader.resolver().resolve_element(element.name()).0 {
+        ResolveResult::Bound(Namespace(namespace)) => Ok(std::str::from_utf8(namespace)
+            .map_err(xml_error)?
+            .to_owned()),
+        ResolveResult::Unbound => Ok(String::new()),
+        ResolveResult::Unknown(prefix) => Err(invalid(format!(
+            "unbound XML prefix '{}'",
+            String::from_utf8_lossy(prefix.as_ref())
+        ))),
+    }
+}
+
+fn local_name(element: &BytesStart<'_>) -> Result<String> {
+    Ok(std::str::from_utf8(element.local_name().as_ref())
+        .map_err(xml_error)?
+        .to_owned())
+}
+
+fn local_name_end(element: &quick_xml::events::BytesEnd<'_>) -> Result<String> {
+    Ok(std::str::from_utf8(element.local_name().as_ref())
+        .map_err(xml_error)?
+        .to_owned())
+}
+
+fn is_dgm(namespace: &str) -> bool {
+    matches!(namespace, DGM_NAMESPACE | DGM_NAMESPACE_STRICT)
+}
+
+fn is_dml(namespace: &str) -> bool {
+    matches!(namespace, DML_NAMESPACE | DML_NAMESPACE_STRICT)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_optional_attribute;
+
+    #[test]
+    fn optional_attribute_keeps_minimal_schema_lexical_form() -> crate::Result<()> {
+        let mut xml = String::new();
+        write_optional_attribute(&mut xml, "presId", None)?;
+        assert!(xml.is_empty());
+
+        write_optional_attribute(&mut xml, "presId", Some("a&\"b"))?;
+        assert_eq!(xml, " presId=\"a&amp;&quot;b\"");
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What the data-model reader accepts before, around and after `dgm:dataModel`, and the exact error reported otherwise. Each
+    //! expected line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+            ("reference before root", format!("&amp;{d}")),
+            ("reference after root", format!("{d}&amp;")),
+            ("CDATA after root", format!("{d}<![CDATA[x]]>")),
+            ("end tag before root", format!("</foreign>{d}")),
+            (
+                "declaration inside root",
+                format!("{open}{DECLARATION}{body}{close}"),
+            ),
+            (
+                "text, CDATA and reference inside root",
+                format!("{open}{body}text<![CDATA[x]]>&amp;{close}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&str) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(&xml)))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The data-model reader.
+    #[test]
+    fn data_model_envelope() {
+        let root = Root {
+            open: r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram">"#,
+            body: r#"<dgm:ptLst><dgm:pt modelId="1" type="doc"/></dgm:ptLst>"#,
+            close: r"</dgm:dataModel>",
+            empty: r#"<dgm:dataModel xmlns:dgm="http://schemas.openxmlformats.org/drawingml/2006/diagram"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"missing or unterminated data-model root\")",
+                "whitespace only: Invalid(\"missing or unterminated data-model root\")",
+                "declaration only: Invalid(\"missing or unterminated data-model root\")",
+                "empty-element root: Invalid(\"diagram data model lacks its required point list\")",
+                "start and end root: Invalid(\"diagram data model lacks its required point list\")",
+                "root then whitespace: Ok(1)",
+                "root then comment: Ok(1)",
+                "root then PI: Ok(1)",
+                "root then text: Invalid(\"text is outside the data-model root\")",
+                "root then second root: Invalid(\"multiple data-model roots\")",
+                "root then foreign start: Invalid(\"multiple data-model roots\")",
+                "root then foreign empty: Invalid(\"multiple data-model roots\")",
+                "declaration after root: Ok(1)",
+                "two declarations: Ok(1)",
+                "comment before declaration: Ok(1)",
+                "text before root: Invalid(\"text is outside the data-model root\")",
+                "unterminated root: Invalid(\"missing or unterminated data-model root\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTDs are rejected\")",
+                "top-level CDATA: Invalid(\"CDATA is rejected\")",
+                "declaration then root: Ok(1)",
+                "whitespace before declaration: Ok(1)",
+                "PI before declaration: Ok(1)",
+                "comment then root: Ok(1)",
+                "PI then root: Ok(1)",
+                "root then text then second root: Invalid(\"text is outside the data-model root\")",
+                "empty-element root then root: Invalid(\"diagram data model lacks its required point list\")",
+                "declaration after empty-element root: Invalid(\"diagram data model lacks its required point list\")",
+                "reference before root: Invalid(\"entity reference is outside the data-model root\")",
+                "reference after root: Invalid(\"entity reference is outside the data-model root\")",
+                "CDATA after root: Invalid(\"CDATA is rejected\")",
+                "end tag before root: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "declaration inside root: Ok(1)",
+                "text, CDATA and reference inside root: Invalid(\"CDATA is rejected\")",
+            ],
+            |xml| {
+                outcome(
+                    super::DiagramDataModel::parse(xml, &super::Limits::default()),
+                    |model| model.points.len().to_string(),
+                )
+            },
+        );
+    }
+}

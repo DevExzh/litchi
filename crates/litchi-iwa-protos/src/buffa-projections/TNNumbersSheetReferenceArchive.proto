@@ -1,0 +1,8 @@
+// Scalar reference envelope shared by strict Numbers sheet-order routers.
+syntax = "proto2";
+package LitchiIwaProjection;
+message NumbersSheetReferenceArchive {
+  required uint64 identifier = 1;
+  optional int32 deprecated_type = 2;
+  optional bool deprecated_is_external = 3;
+}

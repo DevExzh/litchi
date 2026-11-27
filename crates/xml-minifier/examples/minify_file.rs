@@ -14,5 +14,5 @@ const MINIFIED: &str = minified_xml!("sample.xml");
 
 fn main() {
     println!("Minified XML ({} bytes):", MINIFIED.len());
-    println!("{}", MINIFIED);
+    println!("{MINIFIED}");
 }

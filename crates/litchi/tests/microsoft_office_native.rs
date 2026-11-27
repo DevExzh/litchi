@@ -1,0 +1,813 @@
+//! Public entry-point regressions using unmodified native Microsoft Office files.
+//! The facade-format-tests gate explicitly enables every feature below.
+#![cfg(all(
+    feature = "doc",
+    feature = "docx",
+    feature = "rtf",
+    feature = "xls",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "ppt",
+    feature = "pptx"
+))]
+
+use litchi::{File, FileFormat};
+
+fn native(path: &str, expected: FileFormat) -> File {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office")
+        .join(path);
+    let file = litchi::open(&path).unwrap_or_else(|error| panic!("{}: {error}", path.display()));
+    assert_eq!(file.format(), Some(expected));
+    file
+}
+
+fn word(file: &File) {
+    let text = file.text().unwrap();
+    for marker in [
+        "Native Word text and structure",
+        "WORD_NATIVE_END",
+        "Unicode: café naïve résumé — Ελληνικά — 中文 — 日本語 — العربية — 😀",
+    ] {
+        assert!(text.contains(marker), "missing {marker}");
+    }
+    let paragraphs = file
+        .query("p")
+        .unwrap()
+        .collect::<litchi::Result<Vec<_>>>()
+        .unwrap();
+    assert!(!paragraphs.is_empty());
+    for paragraph in paragraphs {
+        assert_eq!(
+            file.get(paragraph.path().to_path()).unwrap().kind(),
+            paragraph.kind()
+        );
+    }
+    assert!(file.document().unwrap().paragraphs().unwrap().len() >= 12);
+}
+
+#[test]
+fn native_doc_reads_unicode_paragraphs_through_public_views() {
+    word(&native("word/word-text-structure.doc", FileFormat::Doc));
+}
+
+#[test]
+fn native_docx_reads_unicode_paragraphs_through_public_views() {
+    word(&native("word/word-text-structure.docx", FileFormat::Docx));
+}
+
+fn workbook(file: &File) {
+    assert_eq!(
+        file.workbook().unwrap().worksheet_names().unwrap(),
+        [
+            "Sheet1",
+            "Source_A_015",
+            "Source_B_015",
+            "Consolidated_015",
+            "Print_015"
+        ]
+    );
+    let text = file.text().unwrap();
+    for marker in [
+        "EXCEL_METADATA_015",
+        "RICH_TEXT_015 bold italic",
+        "日本語_015 東京",
+        "CONSOLIDATION_015",
+        "END_PRINT_015",
+    ] {
+        assert!(text.contains(marker), "missing {marker}");
+    }
+    let cells = file
+        .query("cell")
+        .unwrap()
+        .collect::<litchi::Result<Vec<_>>>()
+        .unwrap_or_else(|error| panic!("{error}: {:?}", std::error::Error::source(&error)));
+    assert!(!cells.is_empty());
+    for cell in cells {
+        assert_eq!(file.get(cell.path().to_path()).unwrap().path(), cell.path());
+    }
+}
+
+#[test]
+fn native_xls_keeps_all_five_metadata_worksheets() {
+    workbook(&native("excel/excel-metadata.xls", FileFormat::Xls));
+}
+
+#[test]
+fn native_xlsx_keeps_all_five_metadata_worksheets() {
+    workbook(&native("excel/excel-metadata.xlsx", FileFormat::Xlsx));
+}
+
+#[test]
+fn native_xlsb_keeps_all_five_metadata_worksheets() {
+    workbook(&native("excel/excel-metadata.xlsb", FileFormat::Xlsb));
+}
+
+fn presentation(file: &File) {
+    let view = file.presentation().unwrap();
+    assert_eq!(view.slide_count().unwrap(), 3);
+    let slides = view.slides().unwrap();
+    assert_eq!(slides.len(), 3);
+    assert!(
+        slides[0]
+            .text()
+            .unwrap()
+            .contains("powerpoint-text-table-001")
+    );
+    assert!(slides[1].text().unwrap().contains("Third bullet: tea"));
+    let table = slides[2].text().unwrap();
+    for marker in ["Apples", "3.75", "Pears", "12.50", "Tea", "9.50"] {
+        assert!(table.contains(marker), "missing {marker}");
+    }
+}
+
+#[test]
+fn native_ppt_reads_three_slides_and_table_text() {
+    presentation(&native(
+        "powerpoint/powerpoint-text-table.ppt",
+        FileFormat::Ppt,
+    ));
+}
+
+#[test]
+fn native_pptx_reads_three_slides_and_table_text() {
+    presentation(&native(
+        "powerpoint/powerpoint-text-table.pptx",
+        FileFormat::Pptx,
+    ));
+}
+
+#[test]
+fn native_rtf_edit_reopen_and_inverse_keep_the_original_word_source() {
+    let source = native("word/word-rtf-minimal.rtf", FileFormat::Rtf);
+    assert_eq!(
+        source.text().unwrap().trim(),
+        "RTF_MINIMAL_006: plain native Microsoft Word paragraph."
+    );
+    let before = source.to_bytes().unwrap();
+    let refusal = source
+        .set(
+            "/body/p[1]",
+            litchi::props! {"text" => "replace mixed formatting"},
+        )
+        .unwrap_err();
+    assert_eq!(refusal.code(), litchi::Code::UnsupportedCapability);
+    assert!(
+        std::error::Error::source(&refusal)
+            .unwrap()
+            .to_string()
+            .contains("mixed run or paragraph formatting")
+    );
+    assert_eq!(source.to_bytes().unwrap(), before);
+    let commit = source
+        .edit(|edit| {
+            edit.set(
+                "/body/p[1]/r[1]",
+                litchi::props! {"text" => "Native Word edited through File"},
+            )
+        })
+        .unwrap_or_else(|error| panic!("{error:?}: {:?}", std::error::Error::source(&error)));
+    let reopened = litchi::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened.text().unwrap().trim(),
+        "Native Word edited through File"
+    );
+    assert_eq!(source.to_bytes().unwrap(), before);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+    let File::Rtf(rtf) = reopened else {
+        panic!("expected RTF");
+    };
+    assert_eq!(
+        rtf.text().unwrap().trim(),
+        "Native Word edited through File"
+    );
+}
+
+#[test]
+fn native_rtf_math_opens_through_the_facade_and_unmodeled_grouping_is_typed() {
+    let file = native("word/word-math-navigation.rtf", FileFormat::Rtf);
+    assert!(file.text().unwrap().contains("MATH_NAVIGATION_END_005"));
+    assert_eq!(
+        file.to_bytes().unwrap().as_slice(),
+        include_bytes!("../../../test-data/microsoft-office/word/word-math-navigation.rtf")
+    );
+    let error = litchi::open_bytes(
+        br"{\rtf1{\mmath{\*\moMathPara{\*\moMath{\mr x}}{\*\moMath{\mr y}}}}}".to_vec(),
+    )
+    .unwrap_err();
+    assert_eq!(error.code(), litchi::Code::UnsupportedCapability);
+    assert_eq!(error.format(), Some(FileFormat::Rtf));
+    assert!(
+        std::error::Error::source(&error)
+            .unwrap()
+            .to_string()
+            .contains("multiple equations in one math paragraph")
+    );
+}
+
+#[test]
+fn native_ppt_table_query_edit_reopen_and_inverse_preserve_neighbor_cells() {
+    let file = native("powerpoint/powerpoint-text-table.ppt", FileFormat::Ppt);
+    let original = file.to_bytes().unwrap();
+    let cells = file
+        .query("/slide[3]/table[1] tc")
+        .unwrap()
+        .collect::<litchi::Result<Vec<_>>>()
+        .unwrap();
+    assert_eq!(cells.len(), 12);
+    for cell in cells {
+        assert_eq!(file.get(cell.path().to_path()).unwrap().kind(), cell.kind());
+    }
+    let text = |file: &File, path: &str| {
+        file.get(path)
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .unwrap()
+            .into_owned()
+    };
+    assert_eq!(text(&file, "/slide[3]/table[1]/tr[2]/tc[1]"), "Apples");
+    let commit = file
+        .edit(|edit| {
+            edit.set(
+                "/slide[3]/table[1]/tr[2]/tc[1]",
+                litchi::props! {"text"=>"Oranges"},
+            )
+        })
+        .unwrap();
+    let reopened = litchi::open_bytes(commit.file().to_bytes().unwrap()).unwrap();
+    assert_eq!(text(&reopened, "/slide[3]/table[1]/tr[2]/tc[1]"), "Oranges");
+    assert_eq!(text(&reopened, "/slide[3]/table[1]/tr[2]/tc[2]"), "3");
+    assert_eq!(text(&reopened, "/slide[3]/table[1]/tr[2]/tc[3]"), "3.75");
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        original
+    );
+}
+
+fn members(bytes: &[u8]) -> std::collections::BTreeMap<String, Vec<u8>> {
+    let reader = litchi_opc::phys_pkg::OwnedPhysPkgReader::from_bytes(
+        bytes.to_vec(),
+        litchi_opc::SourceLimits::default(),
+    )
+    .unwrap();
+    reader
+        .member_names()
+        .unwrap()
+        .into_iter()
+        .map(|name| {
+            let bytes = reader.read_member(&name).unwrap();
+            (name, bytes)
+        })
+        .collect()
+}
+
+#[test]
+fn native_pptx_template_show_and_macro_variants_preserve_inert_members_on_public_edits() {
+    for name in [
+        "powerpoint-visual-objects.potx",
+        "powerpoint-visual-objects.ppsx",
+        "powerpoint-passive-macro.pptm",
+        "powerpoint-passive-macro.potm",
+        "powerpoint-passive-macro.ppsm",
+    ] {
+        let file = native(&format!("powerpoint/{name}"), FileFormat::Pptx);
+        let before = file.to_bytes().unwrap();
+        let title = file
+            .get("/slide[1]/shape[1]")
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .unwrap()
+            .into_owned();
+        assert_eq!(
+            title,
+            if name.starts_with("powerpoint-visual") {
+                "Native PowerPoint visual objects"
+            } else {
+                "PPT_MACRO_005"
+            }
+        );
+        let commit = file
+            .edit(|edit| {
+                edit.set(
+                    "/slide[1]/shape[1]",
+                    litchi::props! {"text"=>"Native variant edited title"},
+                )
+            })
+            .unwrap();
+        let after = commit.file().to_bytes().unwrap();
+        let reopened = litchi::open_bytes(after.clone()).unwrap();
+        assert_eq!(reopened.format(), Some(FileFormat::Pptx));
+        assert_eq!(
+            reopened
+                .get("/slide[1]/shape[1]")
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some("Native variant edited title")
+        );
+        let a = members(&before);
+        let b = members(&after);
+        assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
+        for (part, bytes) in a {
+            if part != "ppt/slides/slide1.xml" {
+                assert!(b[&part] == bytes, "{name}: changed {part}");
+            }
+        }
+        assert!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.file())
+                .unwrap()
+                .to_bytes()
+                .unwrap()
+                == before
+        );
+    }
+}
+
+#[test]
+fn native_powerpoint_embedded_chart_workbook_exposes_exact_cells_through_facade() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/powerpoint");
+    let parent = litchi::pptx::Package::open(root.join("powerpoint-visual-objects.pptx")).unwrap();
+    let part = parent
+        .opc()
+        .unwrap()
+        .get_part(
+            &litchi::opc::PackURI::new("/ppt/embeddings/Microsoft_Excel_Worksheet.xlsx").unwrap(),
+        )
+        .unwrap();
+    let child = litchi::open_bytes(part.blob().to_vec()).unwrap();
+    assert_eq!(child.format(), Some(FileFormat::Xlsx));
+    assert_eq!(
+        child.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sheet1"]
+    );
+    let expected = [
+        ["Quarter", "North", "South", "West"],
+        ["Q1", "10", "15", "8"],
+        ["Q2", "20", "18", "12"],
+        ["Q3", "30", "21", "16"],
+        ["Q4", "40", "24", "20"],
+    ];
+    for (row, values) in expected.into_iter().enumerate() {
+        for (column, value) in ["A", "B", "C", "D"].into_iter().zip(values) {
+            let path = format!("Sheet1!{column}{}", row + 1);
+            assert_eq!(
+                child
+                    .get(path.as_str())
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some(value),
+                "{path}"
+            );
+        }
+    }
+    assert_eq!(child.to_bytes().unwrap(), part.blob());
+}
+
+#[test]
+fn native_word_ole_and_chart_children_expose_distinct_workbook_values() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word/word-visual-objects.docx");
+    let parent = litchi::docx::Package::open(&path).unwrap();
+    let before = parent.to_bytes().unwrap();
+    let document = parent.document().unwrap();
+    let mut objects = Vec::new();
+    for paragraph in document.paragraphs().unwrap() {
+        for run in paragraph.runs().unwrap() {
+            for content in run.contents().unwrap() {
+                if let litchi::docx::paragraph::RunContent::EmbeddedObject(object) = content {
+                    objects.push(object);
+                }
+            }
+        }
+    }
+    assert_eq!(objects.len(), 1);
+    let main = parent.opc_package().main_document_part().unwrap();
+    let ole = objects[0]
+        .ole_data(parent.opc_package(), main.rels())
+        .unwrap()
+        .unwrap();
+    let child = litchi::open_bytes(ole.to_vec()).unwrap();
+    assert_eq!(child.format(), Some(FileFormat::Xlsx));
+    assert_eq!(
+        child.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sales chart", "Sheet1", "Sheet2"]
+    );
+    let check = |bytes: &[u8]| {
+        let workbook = litchi::xlsx::Package::from_bytes(bytes).unwrap();
+        for (sheet, address, formula, cache) in [
+            ("Sheet1", "B6", "SUM(B2:B5)", "14"),
+            ("Sheet2", "B3", "Sheet1!D6", "49.75"),
+        ] {
+            let sheet = workbook.workbook().sheet(sheet).unwrap().unwrap();
+            let cell = sheet.cell(address).unwrap();
+            let Some(litchi::xlsx::Cell::Formula(value)) = cell.stored() else {
+                panic!("native formula")
+            };
+            assert_eq!(value.text(), formula);
+            let cached = value.cached().unwrap();
+            let litchi::xlsx::Value::Number(number) = cached.value() else {
+                panic!("numeric cache")
+            };
+            assert_eq!(number.as_str(), cache);
+            assert_eq!(cached.origin(), litchi::xlsx::formula::Origin::Stored);
+        }
+    };
+    check(&ole);
+    let edited = child
+        .set(
+            "Sheet2!Z100",
+            litchi::props! {"value"=>"Word child reviewed"},
+        )
+        .unwrap();
+    check(&edited.to_bytes().unwrap());
+    let graph = parent.chart_graph().unwrap();
+    let payload = &graph.charts[0].workbook.as_ref().unwrap().data;
+    let chart = litchi::open_bytes(payload.clone()).unwrap();
+    assert_eq!(
+        chart.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sheet1"]
+    );
+    for (address, text) in [
+        ("B1", "Sales"),
+        ("A2", "1st Qtr"),
+        ("A3", "2nd Qtr"),
+        ("A4", "3rd Qtr"),
+        ("A5", "4th Qtr"),
+    ] {
+        assert_eq!(
+            chart
+                .get(format!("Sheet1!{address}").as_str())
+                .unwrap()
+                .view()
+                .text()
+                .unwrap()
+                .as_deref(),
+            Some(text)
+        );
+    }
+    let workbook = litchi::xlsx::Package::from_bytes(payload).unwrap();
+    let sheet = workbook.workbook().sheet("Sheet1").unwrap().unwrap();
+    for (address, expected) in [
+        ("B2", "8.1999999999999993"),
+        ("B3", "3.2"),
+        ("B4", "1.4"),
+        ("B5", "1.2"),
+    ] {
+        let cell = sheet.cell(address).unwrap();
+        let Some(litchi::xlsx::Cell::Value(litchi::xlsx::Value::Number(number))) = cell.stored()
+        else {
+            panic!("numeric chart value")
+        };
+        assert_eq!(number.as_str(), expected);
+    }
+    assert!(chart.to_bytes().unwrap() == *payload);
+    assert!(child.to_bytes().unwrap() == ole.as_ref());
+    assert!(parent.to_bytes().unwrap() == before);
+}
+
+#[test]
+fn native_legacy_word_embedded_worksheets_open_as_inert_xlsx_children() {
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/word");
+    let doc = litchi::doc::Package::open(root.join("word-visual-objects.doc")).unwrap();
+    let doc_bytes = doc.to_bytes().unwrap();
+    let snapshot = doc.embedded_objects().unwrap();
+    let doc_payload = snapshot
+        .storages()
+        .get("_1853584064")
+        .unwrap()
+        .stream(&["Package"])
+        .unwrap();
+    let rtf = litchi::rtf::Package::open(root.join("word-visual-objects.rtf")).unwrap();
+    let rtf_bytes = rtf.to_bytes().unwrap();
+    let header = rtf.raw().objects()[0].ole_header().unwrap();
+    let mut ole = litchi::cfb::OleFile::open(
+        std::io::Cursor::new(header.native_data),
+        litchi::cfb::OleFileLimits::default(),
+    )
+    .unwrap();
+    let rtf_payload = ole.open_stream(&["Package"]).unwrap();
+    for payload in [doc_payload, rtf_payload.as_slice()] {
+        let child = litchi::open_bytes(payload.to_vec()).unwrap();
+        assert_eq!(child.format(), Some(FileFormat::Xlsx));
+        assert_eq!(
+            child.workbook().unwrap().worksheet_names().unwrap(),
+            ["Sales chart", "Sheet1", "Sheet2"]
+        );
+        let check = |bytes: &[u8]| {
+            let package = litchi::xlsx::Package::from_bytes(bytes).unwrap();
+            let book = package.workbook();
+            for (sheet, address, formula, cache) in [
+                ("Sheet1", "B6", "SUM(B2:B5)", "14"),
+                ("Sheet2", "B3", "Sheet1!D6", "49.75"),
+            ] {
+                let sheet = book.sheet(sheet).unwrap().unwrap();
+                let cell = sheet.cell(address).unwrap();
+                let Some(litchi::xlsx::Cell::Formula(value)) = cell.stored() else {
+                    panic!("stored formula")
+                };
+                assert_eq!(value.text(), formula);
+                let cached = value.cached().unwrap();
+                let litchi::xlsx::Value::Number(number) = cached.value() else {
+                    panic!("numeric cache")
+                };
+                assert_eq!(number.as_str(), cache);
+                assert_eq!(cached.origin(), litchi::xlsx::formula::Origin::Stored);
+            }
+        };
+        check(payload);
+        let changed = child
+            .set(
+                "Sheet2!Z100",
+                litchi::props! {"value"=>"Legacy Word child reviewed"},
+            )
+            .unwrap();
+        check(&changed.to_bytes().unwrap());
+        assert!(child.to_bytes().unwrap() == payload);
+    }
+    assert!(doc.to_bytes().unwrap() == doc_bytes);
+    assert!(rtf.to_bytes().unwrap() == rtf_bytes);
+}
+
+#[test]
+fn native_excel_form_link_cells_keep_cached_values_across_all_three_formats() {
+    use litchi::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
+    for (name, format) in [
+        ("excel/excel-form-controls.xls", FileFormat::Xls),
+        ("excel/excel-form-controls.xlsx", FileFormat::Xlsx),
+        ("excel/excel-form-controls.xlsb", FileFormat::Xlsb),
+    ] {
+        for mode in [litchi::SourceMode::Auto, litchi::SourceMode::Eager] {
+            let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("../../test-data/microsoft-office")
+                .join(name);
+            let file =
+                litchi::open_with(path, &litchi::OpenOptions::new().source_mode(mode)).unwrap();
+            assert_eq!(file.format(), Some(format));
+            let before = file.to_bytes().unwrap();
+            let book = file.workbook().unwrap();
+            assert_eq!(book.worksheet_names().unwrap(), ["Sheet1"]);
+            let sheet = WorkbookTrait::worksheet_by_index(&book, 0).unwrap();
+            assert_eq!(sheet.dimensions(), Some((1, 1, 12, 4)));
+            assert_eq!(
+                sheet.cell_value(2, 2).unwrap().as_ref(),
+                &CellValue::Bool(true),
+                "{name} {mode:?}"
+            );
+            for (row, value) in [(3, 2), (4, 3), (5, 5), (6, 10), (7, 2)] {
+                match sheet.cell_value(row, 2).unwrap().as_ref() {
+                    CellValue::Float(number) => assert_eq!(*number, f64::from(value)),
+                    CellValue::Int(number) => assert_eq!(*number, i64::from(value)),
+                    other => panic!("unexpected linked value in {name}: {other:?}"),
+                }
+            }
+            assert_eq!(
+                sheet.cell_value(12, 2).unwrap().as_ref(),
+                &CellValue::Error("#N/A".into())
+            );
+            for cell in [
+                sheet.cell(2, 2).unwrap(),
+                sheet.cell_by_coordinate("B2").unwrap(),
+            ] {
+                assert_eq!(
+                    (cell.row(), cell.column(), cell.coordinate()),
+                    (2, 2, "B2".into())
+                );
+                assert_eq!(cell.value(), &CellValue::Bool(true));
+            }
+            let empty = sheet.cell(8, 3).unwrap();
+            assert_eq!(
+                (empty.row(), empty.column(), empty.coordinate()),
+                (8, 3, "C8".into())
+            );
+            assert!(empty.is_empty());
+            for cell in sheet.cells() {
+                let cell = cell.unwrap();
+                assert_eq!(
+                    sheet
+                        .cell_value(cell.row(), cell.column())
+                        .unwrap()
+                        .as_ref(),
+                    cell.value()
+                );
+                assert_eq!(
+                    sheet
+                        .cell_by_coordinate(&cell.coordinate())
+                        .unwrap()
+                        .value(),
+                    cell.value()
+                );
+            }
+            let (rows, columns) = if format == FileFormat::Xls {
+                (65_536, 256)
+            } else {
+                (1_048_576, 16_384)
+            };
+            for (row, col) in [(0, 1), (1, 0), (rows + 1, 1), (1, columns + 1)] {
+                assert_eq!(
+                    sheet.cell(row, col).unwrap_err().code(),
+                    litchi::Code::OutOfRange
+                );
+                assert_eq!(
+                    sheet.cell_value(row, col).unwrap_err().code(),
+                    litchi::Code::OutOfRange
+                );
+            }
+            assert_eq!(
+                file.get("Sheet1!D10")
+                    .unwrap()
+                    .view()
+                    .text()
+                    .unwrap()
+                    .as_deref(),
+                Some("OPTION_B_008")
+            );
+            assert!(file.to_bytes().unwrap() == before);
+        }
+    }
+}
+
+#[test]
+fn native_powerpoint_ole_workbook_reads_formula_caches_and_accepts_inert_child_edit() {
+    use litchi::pptx::presentation::embedded::ole::slide;
+    let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/microsoft-office/powerpoint");
+    let parent = litchi::pptx::Package::open(root.join("powerpoint-media-objects.pptx")).unwrap();
+    let before = parent.to_bytes().unwrap();
+    let uri = litchi::opc::PackURI::new("/ppt/slides/slide4.xml").unwrap();
+    let owner = slide::load(parent.opc().unwrap(), 3, &uri).unwrap();
+    let payload = owner.payload(0).unwrap().unwrap();
+    let child = litchi::open_bytes(payload.to_vec()).unwrap();
+    assert_eq!(child.format(), Some(FileFormat::Xlsx));
+    assert_eq!(
+        child.workbook().unwrap().worksheet_names().unwrap(),
+        ["Sales chart", "Sheet1", "Sheet2"]
+    );
+    let check_formulas = |bytes: &[u8]| {
+        let workbook = litchi::xlsx::Package::from_bytes(bytes).unwrap();
+        let book = workbook.workbook();
+        assert_eq!(
+            book.sheets()
+                .map(|sheet| (sheet.name().to_owned(), sheet.kind()))
+                .collect::<Vec<_>>(),
+            [
+                ("Sales chart".into(), litchi::xlsx::WorksheetKind::Chart),
+                ("Sheet1".into(), litchi::xlsx::WorksheetKind::Worksheet),
+                ("Sheet2".into(), litchi::xlsx::WorksheetKind::Worksheet)
+            ]
+        );
+        for (name, address, formula, cache) in [
+            ("Sheet1", "B6", "SUM(B2:B5)", "14"),
+            ("Sheet1", "D6", "SUM(D2:D5)", "49.75"),
+            ("Sheet2", "B3", "Sheet1!D6", "49.75"),
+            ("Sheet2", "B4", "SUM(Table1[Quantity])", "14"),
+        ] {
+            let sheet = book.sheet(name).unwrap().unwrap();
+            let cell = sheet.cell(address).unwrap();
+            let Some(litchi::xlsx::Cell::Formula(value)) = cell.stored() else {
+                panic!("native formula {name}!{address}")
+            };
+            assert_eq!(value.text(), formula);
+            let cached = value.cached().unwrap();
+            let litchi::xlsx::Value::Number(number) = cached.value() else {
+                panic!("stored numeric cache")
+            };
+            assert_eq!(number.as_str(), cache);
+            assert_eq!(cached.origin(), litchi::xlsx::formula::Origin::Stored);
+        }
+    };
+    check_formulas(payload);
+    let edited = child
+        .set(
+            "Sheet2!Z100",
+            litchi::props! {"value"=>"Embedded child reviewed"},
+        )
+        .unwrap();
+    let edited_bytes = edited.to_bytes().unwrap();
+    check_formulas(&edited_bytes);
+    let mut edit = parent.edit_slide_ole_objects().unwrap();
+    edit.update(3_usize, |draft| {
+        draft.replace_payload(0, edited_bytes.clone())
+    })
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let after = commit.package().to_bytes().unwrap();
+    let reopened = litchi::pptx::Package::from_bytes(&after).unwrap();
+    let owner = slide::load(reopened.opc().unwrap(), 3, &uri).unwrap();
+    assert!(owner.payload(0).unwrap().unwrap() == edited_bytes);
+    assert_eq!(
+        owner.objects()[0].target().unwrap().content_type(),
+        Some(litchi::opc::constants::content_type::SML_SHEET)
+    );
+    let reread = litchi::open_bytes(owner.payload(0).unwrap().unwrap().to_vec()).unwrap();
+    assert_eq!(
+        reread
+            .get("Sheet2!Z100")
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .as_deref(),
+        Some("Embedded child reviewed")
+    );
+    check_formulas(owner.payload(0).unwrap().unwrap());
+    let a = members(&before);
+    let b = members(&after);
+    assert_eq!(a.keys().collect::<Vec<_>>(), b.keys().collect::<Vec<_>>());
+    for (name, data) in &a {
+        if name != "ppt/embeddings/Microsoft_Excel_Worksheet.xlsx" {
+            assert!(data == &b[name], "changed {name}");
+        }
+    }
+    assert!(
+        commit
+            .package()
+            .apply_slide_ole_objects(&commit.patch().inverse())
+            .unwrap()
+            .package()
+            .to_bytes()
+            .unwrap()
+            == before
+    );
+    assert!(child.to_bytes().unwrap() == payload);
+    assert!(parent.to_bytes().unwrap() == before);
+}
+
+#[test]
+fn native_rtf_font_run_edit_preserves_charset_text_and_font_declarations() {
+    let source = native("word/word-embedded-fonts.rtf", FileFormat::Rtf);
+    let before = source.to_bytes().unwrap();
+    let original = litchi::rtf::Package::from_bytes(&before).unwrap();
+    assert_eq!(
+        source
+            .get("/body/p[1]/r[1]")
+            .unwrap()
+            .view()
+            .format()
+            .unwrap()
+            .find(|p| p.key() == "font")
+            .unwrap()
+            .value()
+            .to_string(),
+        "Aptos"
+    );
+    let commit = source
+        .edit(|edit| {
+            edit.set(
+                "/body/p[1]/r[1]",
+                litchi::props! {"text"=>"FONT_RUN_REVIEWED"},
+            )
+        })
+        .unwrap();
+    let after = commit.file().to_bytes().unwrap();
+    let reopened = litchi::open_bytes(after.clone()).unwrap();
+    assert_eq!(
+        reopened.text().unwrap(),
+        source
+            .text()
+            .unwrap()
+            .replacen("WORD_EMBEDDED_FONTS_011", "FONT_RUN_REVIEWED", 1)
+    );
+    let owner = litchi::rtf::Package::from_bytes(&after).unwrap();
+    assert_eq!(owner.raw().font_table(), original.raw().font_table());
+    assert_eq!(owner.raw().data_store(), original.raw().data_store());
+    assert!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.file())
+            .unwrap()
+            .to_bytes()
+            .unwrap()
+            == before
+    );
+    assert!(source.to_bytes().unwrap() == before);
+}

@@ -1,0 +1,45 @@
+//! Shared OLE Property Set metadata grammar and transactional CFB editing.
+//!
+//! The semantic model follows [MS-OLEPS] and the shared property-set rules in
+//! [MS-OSHARED]. Parsing and serialization are lossless within the supported
+//! typed grammar, while [`Edit`] stages complete CFB rewrites and publishes
+//! them only after every requested mutation has validated successfully.
+//!
+//! [`PropertySetReader`] is an extension trait because the CFB container owns
+//! [`litchi_cfb::OleFile`]. [`SharedPropertySetReader`] is its immutable
+//! positional counterpart for [`litchi_cfb::SharedOleFile`]. Import the
+//! applicable trait to add property-set readers to an opened compound file.
+
+mod alternate_stream;
+mod binding;
+mod codec;
+pub mod document_summary;
+mod model;
+pub mod non_simple;
+pub mod summary_information;
+pub mod summary_properties;
+pub mod user_defined;
+
+#[cfg(test)]
+mod tests;
+#[cfg(test)]
+mod tolerance_tests;
+
+pub use alternate_stream::{
+    ALTERNATE_STREAM_CONTROL_NAME, AlternateStreamControl, NonSimpleAlternateStreamName,
+};
+pub use binding::Binding as Standard;
+pub use binding::{
+    Binding, BindingName, GLOBAL_INFO_FMTID, IMAGE_CONTENTS_FMTID, IMAGE_INFO_FMTID,
+    PROPERTY_BAG_FMTID,
+};
+pub use codec::{Edit, PropertySetReader, SharedPropertySetReader};
+pub use model::{
+    Array, CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Dimension, DocParts, Guid, HeadingPair,
+    HeadingPairs, IndirectPropertyName, Metadata, PID_DOC_PARTS, PID_HEADING_PAIRS,
+    SUMMARY_INFORMATION_FMTID, Scalar, Section, Stream, TextEncoding,
+    USER_DEFINED_PROPERTIES_FMTID, Value, Vector, VersionedStream,
+};
+#[cfg(test)]
+pub(crate) use model::{DEFAULT_CODEPAGE, PID_BEHAVIOR, PID_CODEPAGE};
+pub use summary_properties::SummaryProperties;

@@ -12,9 +12,12 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
-use litchi::ooxml::docx::{
-    ListType, MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation,
-    ParagraphAlignment, TableOfContents, UnderlineStyle, Watermark,
+use litchi::docx::builder::{Document as DraftDocument, Theme};
+use litchi::docx::metadata::Metadata;
+use litchi::docx::{
+    Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
+    PageNumberFormat, PageOrientation, ParagraphAlignment, Style, TableOfContents, UnderlineStyle,
+    Watermark,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("║     COMPREHENSIVE DOCX FEATURE TEST & VERIFICATION        ║");
     println!("╚════════════════════════════════════════════════════════════╝\n");
 
-    let mut doc = MutableDocument::new();
+    let mut doc = DraftDocument::new();
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PART 1: NEW ADVANCED FEATURES (Themes, Watermarks, TOC)
@@ -36,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // 1.1 Theme Configuration
     // ───────────────────────────────────────────────────────────────────────────
     println!("   [1/3] Configuring custom theme...");
-    let mut theme = MutableTheme::new("Comprehensive Test Theme");
+    let mut theme = Theme::new("Comprehensive Test Theme");
     theme.set_major_font("Georgia");
     theme.set_minor_font("Calibri");
 
@@ -500,6 +503,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         "Margins: 1 inch (1440 TWIPs) on all sides",
         "Page width: 12240 TWIPs",
         "Page height: 15840 TWIPs",
+        "Footnotes: page bottom; endnotes: document end",
+        "Page border: typed blue double line",
     ];
 
     for setting in &settings {
@@ -509,6 +514,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     // Configure section
+    let page_border = Border {
+        style: Style::Double,
+        size: Some(8),
+        space: Some(24),
+        color: Some(Color::rgb(31, 78, 120)),
+        shadow: false,
+        frame: false,
+    };
     let section = doc.section_mut();
     section.page_width = 12240;
     section.page_height = 15840;
@@ -517,6 +530,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     section.margin_left = 1440;
     section.margin_right = 1440;
     section.orientation = PageOrientation::Portrait;
+    section.footnotes = Some(Footnotes {
+        position: Some(FootnotePos::PageBottom),
+        ..Footnotes::default()
+    });
+    section.endnotes = Some(Endnotes {
+        position: Some(EndnotePos::DocumentEnd),
+        ..Endnotes::default()
+    });
+    section.page_borders = Some(Borders {
+        top: Some(page_border),
+        left: Some(page_border),
+        bottom: Some(page_border),
+        right: Some(page_border),
+        ..Borders::default()
+    });
 
     // ═══════════════════════════════════════════════════════════════════════════
     // PART 10: VERIFICATION SUMMARY
@@ -618,17 +646,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ═══════════════════════════════════════════════════════════════════════════
     println!("\n💾 Saving document...");
 
-    let mut package = Package::new()?;
-    *package.document_mut()? = doc;
+    let mut builder = litchi::docx::Builder::new()?;
+    *builder.document()? = doc;
 
     // Set document properties
-    let props = package.properties_mut();
-    props.title = Some("Comprehensive DOCX Feature Test".to_string());
-    props.subject = Some("Feature Verification and Regression Testing".to_string());
-    props.creator = Some("Litchi OOXML Library".to_string());
-    props.keywords =
-        Some("docx, test, verification, regression, features, themes, watermarks, toc".to_string());
-    props.description = Some("Complete test document for all DOCX writer features including new theme, watermark, and TOC support".to_string());
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(Metadata {
+        title: Some("Comprehensive DOCX Feature Test".to_owned()),
+        subject: Some("Feature Verification and Regression Testing".to_owned()),
+        author: Some("Litchi OOXML Library".to_owned()),
+        keywords: litchi::common::metadata::keywords::split(
+            "docx, test, verification, regression, features, themes, watermarks, toc",
+        ),
+        description: Some(
+            "Complete test document for all DOCX writer features including new theme, watermark, and TOC support"
+                .to_owned(),
+        ),
+        ..Metadata::default()
+    });
+    let package = metadata.commit()?.into_package();
 
     let filename = "comprehensive_test.docx";
     package.save(filename)?;

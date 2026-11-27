@@ -1,10 +1,16 @@
-/// Provides the PackURI value type and utilities for working with package URIs.
+/// The package pseudo-partname, representing the package itself
+pub const PACKAGE_URI: &str = "/";
+
+/// The URI for the `[Content_Types].xml` part.
+pub const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
+
+/// Provides the `PackURI` value type and utilities for working with package URIs.
 ///
-/// A PackURI represents a part name within an OPC package, following the URI format
+/// A `PackURI` represents a part name within an OPC package, following the URI format
 /// defined by the Open Packaging Conventions specification.
 /// Represents a package URI, which is a partname within an OPC package.
 ///
-/// PackURIs always begin with a forward slash and use forward slashes as path separators,
+/// `PackURIs` always begin with a forward slash and use forward slashes as path separators,
 /// following the OPC specification. They provide access to various components like
 /// the base URI (directory), filename, extension, and index.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -13,42 +19,142 @@ pub struct PackURI {
     uri: String,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PartNameConflict {
+    Duplicate,
+    Equivalent,
+    Derived,
+}
+
 impl PackURI {
-    /// Create a new PackURI from a string.
+    /// Create a new `PackURI` from a string.
     ///
     /// # Arguments
     /// * `uri` - The URI string, which must begin with a forward slash
     ///
     /// # Returns
     /// * `Ok(PackURI)` if the URI is valid
-    /// * `Err` if the URI doesn't start with a forward slash
+    /// * `Err` if the URI is not a canonical, fragment-free package path
+    ///
+    /// # Errors
+    /// Returns an error message if `uri` is not a canonical, fragment-free
+    /// package path (for example a missing leading slash, dot segments,
+    /// unencoded spaces, or invalid percent-encoding).
     pub fn new<S: Into<String>>(uri: S) -> Result<Self, String> {
-        let uri = uri.into();
-        if !uri.starts_with('/') {
-            return Err(format!("PackURI must begin with slash, got '{}'", uri));
+        let candidate = uri.into();
+        if !candidate.starts_with('/') {
+            return Err(format!("PackURI must begin with slash, got '{candidate}'"));
         }
-        Ok(PackURI { uri })
+        if candidate == "/" {
+            return Ok(PackURI { uri: candidate });
+        }
+        if candidate == CONTENT_TYPES_URI {
+            return Ok(PackURI { uri: candidate });
+        }
+        if candidate.ends_with('/') {
+            return Err(format!(
+                "PackURI must not end with slash, got '{candidate}'"
+            ));
+        }
+        if candidate.contains("//") {
+            return Err(format!(
+                "PackURI must not contain empty segments, got '{candidate}'"
+            ));
+        }
+        if candidate.contains('\\') {
+            return Err(format!(
+                "PackURI must use forward slashes, got '{candidate}'"
+            ));
+        }
+        if candidate.contains(['?', '#']) {
+            return Err(format!(
+                "PackURI must not contain a query or fragment, got '{candidate}'"
+            ));
+        }
+        if candidate
+            .chars()
+            .any(|character| character.is_control() || character == ' ')
+        {
+            return Err(format!(
+                "PackURI spaces and control characters must be percent-encoded, got '{candidate}'"
+            ));
+        }
+        if candidate
+            .split('/')
+            .skip(1)
+            .any(|part| matches!(part, "." | ".."))
+        {
+            return Err(format!(
+                "PackURI must not contain dot segments, got '{candidate}'"
+            ));
+        }
+        Self::validate_percent_encoding(&candidate)?;
+        for segment in candidate.split('/').skip(1) {
+            if segment.ends_with('.') {
+                return Err(format!(
+                    "PackURI segments must not end with a dot, got '{candidate}'"
+                ));
+            }
+            if !segment.as_bytes().iter().any(|byte| *byte != b'.') {
+                return Err(format!(
+                    "PackURI segments must contain a non-dot character, got '{candidate}'"
+                ));
+            }
+        }
+        Ok(PackURI { uri: candidate })
     }
 
-    /// Create a PackURI from a relative reference and a base URI.
+    /// Create a `PackURI` from a relative reference and a base URI.
     ///
     /// This translates a relative reference (like "../styles.xml") onto a base URI
-    /// (like "/word") to produce an absolute PackURI (like "/styles.xml").
+    /// (like "/word") to produce an absolute `PackURI` (like "/styles.xml").
     ///
     /// # Arguments
     /// * `base_uri` - The base URI to resolve from
     /// * `relative_ref` - The relative reference to resolve
+    ///
+    /// # Errors
+    /// Returns an error message if `relative_ref` is empty, absolute, uses
+    /// backslashes, contains a query or fragment, escapes the package root,
+    /// or does not otherwise resolve to a canonical package path.
     pub fn from_rel_ref(base_uri: &str, relative_ref: &str) -> Result<Self, String> {
+        if relative_ref.is_empty() {
+            return Err("Relationship target must not be empty".to_string());
+        }
+        if relative_ref.contains('\\') {
+            return Err(format!(
+                "Relationship target must use forward slashes, got '{relative_ref}'"
+            ));
+        }
+        if relative_ref.contains(['?', '#']) {
+            return Err(format!(
+                "Internal relationship target must not contain a query or fragment, got '{relative_ref}'"
+            ));
+        }
+        if relative_ref
+            .split('/')
+            .next()
+            .is_some_and(|first| first.contains(':'))
+        {
+            return Err(format!(
+                "Internal relationship target must not be an absolute URI, got '{relative_ref}'"
+            ));
+        }
         // Join the paths using POSIX-style path manipulation
-        let joined = Self::join_paths(base_uri, relative_ref);
-        let normalized = Self::normalize_path(&joined);
+        let joined = if relative_ref.starts_with('/') {
+            relative_ref.to_string()
+        } else {
+            Self::join_paths(base_uri, relative_ref)
+        };
+        let normalized = Self::normalize_path(&joined)?;
         Self::new(normalized)
     }
 
-    /// Get the base URI (directory portion) of this PackURI.
+    /// Get the base URI (directory portion) of this `PackURI`.
     ///
     /// For example, "/ppt/slides" for "/ppt/slides/slide1.xml".
     /// For the package pseudo-partname "/", returns "/".
+    #[must_use]
     pub fn base_uri(&self) -> &str {
         if self.uri == "/" {
             return "/";
@@ -61,10 +167,11 @@ impl PackURI {
         }
     }
 
-    /// Get the filename portion of this PackURI.
+    /// Get the filename portion of this `PackURI`.
     ///
     /// For example, "slide1.xml" for "/ppt/slides/slide1.xml".
     /// For the package pseudo-partname "/", returns an empty string.
+    #[must_use]
     pub fn filename(&self) -> &str {
         if let Some(pos) = self.uri.rfind('/') {
             &self.uri[pos + 1..]
@@ -73,9 +180,10 @@ impl PackURI {
         }
     }
 
-    /// Get the extension portion of this PackURI.
+    /// Get the extension portion of this `PackURI`.
     ///
     /// For example, "xml" for "/word/document.xml" (note: no leading period).
+    #[must_use]
     pub fn ext(&self) -> &str {
         let filename = self.filename();
         if let Some(pos) = filename.rfind('.') {
@@ -88,6 +196,7 @@ impl PackURI {
     /// Get the partname index for tuple partnames, or None for singleton partnames.
     ///
     /// For example, returns 21 for "/ppt/slides/slide21.xml" and None for "/ppt/presentation.xml".
+    #[must_use]
     pub fn idx(&self) -> Option<u32> {
         let filename = self.filename();
         if filename.is_empty() {
@@ -129,14 +238,16 @@ impl PackURI {
     ///
     /// This is the form used as the Zip file membername for the package item.
     /// Returns an empty string for the package pseudo-partname "/".
+    #[must_use]
     pub fn membername(&self) -> &str {
         if self.uri == "/" { "" } else { &self.uri[1..] }
     }
 
-    /// Get the relative reference from a base URI to this PackURI.
+    /// Get the relative reference from a base URI to this `PackURI`.
     ///
     /// For example, PackURI("/ppt/slideLayouts/slideLayout1.xml") would return
-    /// "../slideLayouts/slideLayout1.xml" for base_uri "/ppt/slides".
+    /// "../slideLayouts/slideLayout1.xml" for `base_uri` "/ppt/slides".
+    #[must_use]
     pub fn relative_ref(&self, base_uri: &str) -> String {
         // Special case for root base URI
         if base_uri == "/" {
@@ -173,39 +284,89 @@ impl PackURI {
         result
     }
 
-    /// Get the PackURI of the .rels part corresponding to this PackURI.
+    /// Return the byte length of [`Self::relative_ref`] without allocating it.
+    ///
+    /// Callers that admit a relationship target under a byte budget can use
+    /// this before constructing the target string. The calculation follows
+    /// [`Self::relative_ref`] exactly and only borrows the URI segments.
+    #[must_use]
+    pub fn relative_ref_len(&self, base_uri: &str) -> usize {
+        if base_uri == "/" {
+            return self.membername().len();
+        }
+
+        let from_parts = base_uri.split('/').filter(|part| !part.is_empty());
+        let to_parts = self.uri.split('/').filter(|part| !part.is_empty());
+        let common = from_parts
+            .clone()
+            .zip(to_parts.clone())
+            .take_while(|(from, to)| from == to)
+            .count();
+        let parent_segments = from_parts.count().saturating_sub(common);
+        let target_length = to_parts.clone().skip(common).map(str::len).sum::<usize>();
+        parent_segments
+            .saturating_mul(3)
+            .saturating_add(target_length)
+            .saturating_add(to_parts.skip(common).count().saturating_sub(1))
+    }
+
+    /// Get the `PackURI` of the .rels part corresponding to this `PackURI`.
     ///
     /// For example, "/word/_rels/document.xml.rels" for "/word/document.xml".
+    ///
+    /// # Errors
+    /// Returns an error message if the constructed `.rels` URI is not a valid
+    /// `PackURI`.
     pub fn rels_uri(&self) -> Result<PackURI, String> {
         let filename = self.filename();
         let base_uri = self.base_uri();
 
-        let rels_filename = format!("{}.rels", filename);
+        let rels_filename = format!("{filename}.rels");
         let rels_uri_str = if base_uri == "/" {
-            format!("/_rels/{}", rels_filename)
+            format!("/_rels/{rels_filename}")
         } else {
-            format!("{}/_rels/{}", base_uri, rels_filename)
+            format!("{base_uri}/_rels/{rels_filename}")
         };
 
         Self::new(rels_uri_str)
     }
 
     /// Get the full URI string.
+    #[must_use]
     pub fn as_str(&self) -> &str {
         &self.uri
+    }
+
+    /// Whether two part names are equivalent under OPC's ASCII case-insensitive rule.
+    #[must_use]
+    pub fn is_equivalent_to(&self, other: &Self) -> bool {
+        self.uri.eq_ignore_ascii_case(&other.uri)
+    }
+
+    pub(crate) fn conflict_with(&self, other: &Self) -> Option<PartNameConflict> {
+        if self.uri == other.uri {
+            return Some(PartNameConflict::Duplicate);
+        }
+        if self.is_equivalent_to(other) {
+            return Some(PartNameConflict::Equivalent);
+        }
+        if is_derived_name(&self.uri, &other.uri) || is_derived_name(&other.uri, &self.uri) {
+            return Some(PartNameConflict::Derived);
+        }
+        None
     }
 
     /// Helper function to join two paths using forward slashes
     fn join_paths(base: &str, rel: &str) -> String {
         if base.ends_with('/') {
-            format!("{}{}", base, rel)
+            format!("{base}{rel}")
         } else {
-            format!("{}/{}", base, rel)
+            format!("{base}/{rel}")
         }
     }
 
     /// Helper function to normalize a path (resolve ".." and ".")
-    fn normalize_path(path: &str) -> String {
+    fn normalize_path(path: &str) -> Result<String, String> {
         let mut parts = Vec::new();
 
         for part in path.split('/') {
@@ -221,6 +382,10 @@ impl PackURI {
                     // Go up one directory
                     if parts.len() > 1 {
                         parts.pop();
+                    } else {
+                        return Err(format!(
+                            "Relationship target escapes the package root: '{path}'"
+                        ));
                     }
                 },
                 _ => {
@@ -231,10 +396,51 @@ impl PackURI {
 
         // Handle root case
         if parts.is_empty() || (parts.len() == 1 && parts[0].is_empty()) {
-            return "/".to_string();
+            return Ok("/".to_string());
         }
 
-        parts.join("/")
+        Ok(parts.join("/"))
+    }
+
+    fn validate_percent_encoding(uri: &str) -> Result<(), String> {
+        let bytes = uri.as_bytes();
+        let mut index = 0usize;
+        while index < bytes.len() {
+            if bytes[index] == b'/' {
+                index += 1;
+                continue;
+            }
+            if bytes[index] != b'%' {
+                if !is_pchar(bytes[index]) {
+                    return Err(format!(
+                        "PackURI contains a character outside RFC 3986 pchar, got '{uri}'"
+                    ));
+                }
+                index += 1;
+                continue;
+            }
+            let encoded = bytes.get(index + 1..index + 3).ok_or_else(|| {
+                format!("PackURI contains incomplete percent encoding, got '{uri}'")
+            })?;
+            if !encoded.iter().all(u8::is_ascii_hexdigit) {
+                return Err(format!(
+                    "PackURI contains invalid percent encoding, got '{uri}'"
+                ));
+            }
+            let decoded = (hex_value(encoded[0]) << 4) | hex_value(encoded[1]);
+            if matches!(decoded, b'/' | b'\\') {
+                return Err(format!(
+                    "PackURI must not percent-encode path separators, got '{uri}'"
+                ));
+            }
+            if is_unreserved(decoded) {
+                return Err(format!(
+                    "PackURI must not percent-encode unreserved characters, got '{uri}'"
+                ));
+            }
+            index += 3;
+        }
+        Ok(())
     }
 }
 
@@ -250,20 +456,122 @@ impl AsRef<str> for PackURI {
     }
 }
 
-/// The package pseudo-partname, representing the package itself
-pub const PACKAGE_URI: &str = "/";
+fn is_unreserved(byte: u8) -> bool {
+    byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~')
+}
 
-/// The URI for the [Content_Types].xml part
-pub const CONTENT_TYPES_URI: &str = "/[Content_Types].xml";
+fn is_pchar(byte: u8) -> bool {
+    is_unreserved(byte)
+        || matches!(
+            byte,
+            b'!' | b'$'
+                | b'&'
+                | b'\''
+                | b'('
+                | b')'
+                | b'*'
+                | b'+'
+                | b','
+                | b';'
+                | b'='
+                | b':'
+                | b'@'
+        )
+}
+
+fn is_derived_name(candidate: &str, base: &str) -> bool {
+    candidate.len() > base.len()
+        && candidate
+            .get(..base.len())
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(base))
+        && candidate.as_bytes().get(base.len()) == Some(&b'/')
+}
+
+fn hex_value(byte: u8) -> u8 {
+    match byte {
+        b'0'..=b'9' => byte - b'0',
+        b'a'..=b'f' => byte - b'a' + 10,
+        b'A'..=b'F' => byte - b'A' + 10,
+        _ => 0,
+    }
+}
 
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]
     fn test_packuri_new() {
         assert!(PackURI::new("/word/document.xml").is_ok());
         assert!(PackURI::new("word/document.xml").is_err());
+    }
+
+    #[test]
+    fn rejects_ambiguous_or_noncanonical_part_names() {
+        for invalid in [
+            "/word/",
+            "/word//document.xml",
+            "/word/./document.xml",
+            "/word/../document.xml",
+            "/word\\document.xml",
+            "/word/document.xml?query",
+            "/word/document.xml#fragment",
+            "/word/my document.xml",
+            "/word/%document.xml",
+            "/word/%2Fdocument.xml",
+            "/word/%5cdocument.xml",
+            "/word/%64ocument.xml",
+            "/word/document.",
+            "/word/.../document.xml",
+            "/word/doc[1].xml",
+            "/word/doc^1.xml",
+            "/word/café.xml",
+        ] {
+            assert!(PackURI::new(invalid).is_err(), "accepted {invalid}");
+        }
+        assert!(PackURI::new("/word/my%20document.xml").is_ok());
+        assert!(PackURI::new("/word/a!$&'()*+,;=:@.xml").is_ok());
+        assert!(PackURI::new("/").is_ok());
+    }
+
+    #[test]
+    fn detects_equivalent_and_derived_part_names() {
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let equivalent = PackURI::new("/WORD/DOCUMENT.XML").unwrap();
+        let derived = PackURI::new("/word/document.xml/image.gif").unwrap();
+        assert!(document.is_equivalent_to(&equivalent));
+        assert_eq!(
+            document.conflict_with(&equivalent),
+            Some(PartNameConflict::Equivalent)
+        );
+        assert_eq!(
+            document.conflict_with(&derived),
+            Some(PartNameConflict::Derived)
+        );
+    }
+
+    #[test]
+    fn resolves_internal_targets_without_allowing_root_escape() {
+        assert_eq!(
+            PackURI::from_rel_ref("/word", "styles/styles.xml")
+                .unwrap()
+                .as_str(),
+            "/word/styles/styles.xml"
+        );
+        assert_eq!(
+            PackURI::from_rel_ref("/word/charts", "../embeddings/data.bin")
+                .unwrap()
+                .as_str(),
+            "/word/embeddings/data.bin"
+        );
+        assert!(PackURI::from_rel_ref("/", "../escape.xml").is_err());
+        assert!(PackURI::from_rel_ref("/word", "https://example.com/a.xml").is_err());
+        assert!(PackURI::from_rel_ref("/word", "document.xml#bookmark").is_err());
     }
 
     #[test]
@@ -295,8 +603,8 @@ mod tests {
         let uri = PackURI::new("/ppt/slides/slide21.xml").unwrap();
         assert_eq!(uri.idx(), Some(21));
 
-        let uri = PackURI::new("/ppt/presentation.xml").unwrap();
-        assert_eq!(uri.idx(), None);
+        let presentation = PackURI::new("/ppt/presentation.xml").unwrap();
+        assert_eq!(presentation.idx(), None);
     }
 
     #[test]
@@ -306,5 +614,18 @@ mod tests {
 
         let root = PackURI::new("/").unwrap();
         assert_eq!(root.membername(), "");
+    }
+
+    #[test]
+    fn relative_ref_len_matches_the_allocating_writer() {
+        for (uri, base) in [
+            ("/word/document.xml", "/word"),
+            ("/word/styles/styles.xml", "/word"),
+            ("/word/embeddings/data.bin", "/word/charts"),
+            ("/xl/workbook.xml", "/"),
+        ] {
+            let uri = PackURI::new(uri).unwrap();
+            assert_eq!(uri.relative_ref_len(base), uri.relative_ref(base).len());
+        }
     }
 }

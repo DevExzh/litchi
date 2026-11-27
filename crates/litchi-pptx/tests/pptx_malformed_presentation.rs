@@ -1,0 +1,279 @@
+mod in_place;
+use in_place::InPlace as _;
+
+use litchi_opc::PackURI;
+use litchi_pptx::parts::SlideReference;
+use litchi_pptx::{Error, Package, Result};
+use tempfile::NamedTempFile;
+
+const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+const STRICT_PML: &str = "http://purl.oclc.org/ooxml/presentationml/main";
+const RML: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+
+type SlideReferences = Result<Vec<SlideReference>>;
+type SlideSize = Result<(i64, i64)>;
+
+/// Replace one canonical part in a valid package without asking the typed
+/// presentation reader to accept the replacement during the edit itself.
+fn with_presentation_blob(blob: &[u8]) -> Package {
+    let output = NamedTempFile::with_suffix(".pptx")
+        .unwrap()
+        .into_temp_path();
+    let package = Package::new().unwrap();
+    package.save(&output).unwrap();
+
+    let mut package = Package::open(&output).unwrap();
+    let part_name = PackURI::new("/ppt/presentation.xml").unwrap();
+    package
+        .edit_opc_in_place(|opc| {
+            opc.get_part_mut(&part_name)?.set_blob(blob.to_vec());
+            Ok(())
+        })
+        .unwrap();
+    package
+}
+
+fn presentation_accessors(blob: &[u8]) -> (SlideReferences, SlideSize) {
+    let package = with_presentation_blob(blob);
+    let presentation = match package.presentation() {
+        Ok(presentation) => presentation,
+        Err(error) => {
+            return (
+                Err(error),
+                Err(Error::Invalid("presentation root was rejected".into())),
+            );
+        },
+    };
+    (presentation.slide_references(), presentation.slide_size())
+}
+
+#[test]
+fn malformed_presentation_roots_return_typed_errors() {
+    let cases = [
+        Vec::new(),
+        b"<p:presentation".to_vec(),
+        format!(r#"<p:deck xmlns:p="{PML}"/>"#).into_bytes(),
+        format!(r#"<x/><p:presentation xmlns:p="{PML}"/>"#).into_bytes(),
+        format!(r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst><p:sldId id="256"/>"#).into_bytes(),
+        b"\xff\xfe\x00not xml\x00".to_vec(),
+    ];
+
+    for blob in cases {
+        let (references, size) = presentation_accessors(&blob);
+        assert!(references.is_err(), "accepted malformed blob: {blob:?}");
+        assert!(size.is_err(), "accepted malformed blob: {blob:?}");
+    }
+}
+
+#[test]
+fn malformed_presentation_children_are_reported_by_their_owner() {
+    let missing_size = format!(r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst/></p:presentation>"#);
+    let (references, size) = presentation_accessors(missing_size.as_bytes());
+    assert!(references.is_ok());
+    assert!(size.is_err());
+
+    let malformed_reference = format!(
+        r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="not-a-number" r:id="rId1"/></p:sldIdLst><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
+    );
+    let (references, size) = presentation_accessors(malformed_reference.as_bytes());
+    assert!(references.is_err());
+    assert!(size.is_ok());
+}
+
+#[test]
+fn optional_slide_id_list_accepts_missing_and_empty_lists_in_both_namespaces() {
+    let cases = [
+        (
+            "transitional missing",
+            format!(
+                r#"<p:presentation xmlns:p="{PML}"><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
+            ),
+        ),
+        (
+            "transitional empty",
+            format!(
+                r#"<p:presentation xmlns:p="{PML}"><p:sldIdLst/><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
+            ),
+        ),
+        (
+            "strict missing",
+            format!(
+                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
+            ),
+        ),
+        (
+            "strict empty",
+            format!(
+                r#"<p:presentation xmlns:p="{STRICT_PML}"><p:sldIdLst/><p:sldSz cx="914400" cy="914400"/></p:presentation>"#
+            ),
+        ),
+    ];
+
+    for (label, blob) in cases {
+        let package = with_presentation_blob(blob.as_bytes());
+        let presentation = package
+            .presentation()
+            .expect("presentation root should remain valid");
+        assert!(
+            !presentation.part().slide_master_relationships().is_empty(),
+            "fixture should retain package relationships: {label}"
+        );
+        assert!(
+            presentation
+                .slide_references()
+                .expect("optional slide-ID list should be readable")
+                .is_empty(),
+            "optional slide-ID list should produce no references: {label}"
+        );
+        assert_eq!(
+            presentation
+                .slide_size()
+                .expect("slide size should remain readable"),
+            (914_400, 914_400),
+            "slide size should be independent of slide-ID list presence: {label}"
+        );
+    }
+}
+
+#[test]
+fn slide_reference_owner_rejects_duplicate_ids_and_out_of_range_ids() {
+    let cases = [
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="256" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="256" r:id="rId1"/><p:sldId id="257" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="255" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+        format!(
+            r#"<p:presentation xmlns:p="{PML}" xmlns:r="{RML}"><p:sldIdLst><p:sldId id="2147483648" r:id="rId1"/></p:sldIdLst></p:presentation>"#
+        )
+        .into_bytes(),
+    ];
+
+    for blob in cases {
+        let package = with_presentation_blob(&blob);
+        let presentation = package
+            .presentation()
+            .expect("presentation root should remain valid");
+        assert!(
+            presentation.slide_references().is_err(),
+            "accepted invalid slide reference XML: {blob:?}"
+        );
+    }
+}
+
+#[test]
+fn slide_reference_owner_skips_case_equivalent_target_parts_first_wins() {
+    let output = NamedTempFile::with_suffix(".pptx")
+        .unwrap()
+        .into_temp_path();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    let presentation = builder.presentation().unwrap();
+    presentation.add_slide().unwrap();
+    presentation.add_slide().unwrap();
+    let package = builder.build().unwrap();
+    package.save(&output).unwrap();
+
+    let mut package = Package::open(&output).unwrap();
+    let second = package
+        .presentation()
+        .unwrap()
+        .slide_references()
+        .unwrap()
+        .get(1)
+        .unwrap()
+        .clone();
+    let second_relationship_id = second.relationship_id().to_owned();
+    package
+        .edit_opc_in_place(|opc| {
+            let presentation = opc.get_part_mut(&PackURI::new("/ppt/presentation.xml").unwrap())?;
+            presentation
+                .rels_mut()
+                .retarget(&second_relationship_id, "slides/SLIDE1.XML".to_owned())?;
+            Ok(())
+        })
+        .unwrap();
+
+    let edited = NamedTempFile::with_suffix(".pptx")
+        .unwrap()
+        .into_temp_path();
+    package.save(&edited).unwrap();
+    let package = Package::open(&edited).unwrap();
+    let presentation = package
+        .presentation()
+        .expect("presentation root should remain valid");
+    // The second entry resolves to the first slide's part: it is skipped
+    // and the repair is recorded at open.
+    let references = presentation.slide_references().unwrap();
+    assert_eq!(references.len(), 1);
+    assert_ne!(references[0].id(), second.id());
+    let repairs: Vec<_> = package
+        .tolerance_report()
+        .defects()
+        .iter()
+        .map(|tolerated| (tolerated.defect, tolerated.context, tolerated.part()))
+        .collect();
+    assert_eq!(
+        repairs,
+        [(
+            litchi_pptx::Defect::Presentation(
+                litchi_pptx::PresentationDefect::DuplicateSlideTarget
+            ),
+            second.id(),
+            Some("/ppt/presentation.xml")
+        )]
+    );
+}
+
+#[test]
+fn malformed_slide_accessors_do_not_panic() {
+    let cases = [
+        Vec::new(),
+        b"<p:sld".to_vec(),
+        b"\x00\x01\x02".to_vec(),
+        format!(r#"<p:sld xmlns:p="{PML}"><p:cSld><p:spTree><p:sp"#).into_bytes(),
+        format!(r#"<p:sld xmlns:p="{PML}"><p:bg><p:bgPr"#).into_bytes(),
+    ];
+
+    for blob in cases {
+        let output = NamedTempFile::with_suffix(".pptx")
+            .unwrap()
+            .into_temp_path();
+        let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+        builder
+            .presentation()
+            .unwrap()
+            .add_slide()
+            .unwrap()
+            .set_title("seed");
+        let package = builder.build().unwrap();
+        package.save(&output).unwrap();
+
+        let mut package = Package::open(&output).unwrap();
+        let slide_uri = PackURI::new("/ppt/slides/slide1.xml").unwrap();
+        package
+            .edit_opc_in_place(|opc| {
+                opc.get_part_mut(&slide_uri)?.set_blob(blob.clone());
+                Ok(())
+            })
+            .unwrap();
+
+        match package.presentation() {
+            Err(_) => {},
+            Ok(presentation) => match presentation.slides() {
+                Err(_) => {},
+                Ok(slides) => {
+                    let slide = &slides[0];
+                    let _ = slide.text();
+                    let _ = slide.shapes();
+                },
+            },
+        }
+    }
+}

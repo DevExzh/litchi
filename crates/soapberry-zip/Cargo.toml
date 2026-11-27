@@ -3,24 +3,25 @@ name = "soapberry-zip"
 version = "0.0.1"
 authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
 edition = "2021"
-description = "High-performance ZIP reader for Office document formats (OOXML, ODF, iWork)"
+description = "High-performance ZIP reader and writer for Office document formats (OOXML, ODF, iWork)"
 license = "MIT"
 keywords = ["zip", "archive", "office"]
 categories = ["filesystem", "compression", "parser-implementations"]
-rust-version = "1.70"
+rust-version.workspace = true
 
 [dependencies]
 # Hardware-accelerated CRC32 (uses SIMD/PCLMULQDQ when available)
-crc32fast = "1"
-# Deflate compression - used by all Office formats
-flate2 = { version = "1", features = ["zlib-rs"], default-features = false }
+crc32fast = "1.5.6"
+# Keep runtime CPU dispatch enabled with the Rust-only Deflate backend.
+flate2 = { workspace = true }
 # Parallel processing for multi-threaded decompression
-rayon = "1"
+rayon = "1.12.0"
+# SHA-256 replay fingerprints.
+sha2 = { workspace = true }
 
 [dev-dependencies]
-jiff = "0.2"
-paste = "1.0"
-quickcheck = "1.0.3"
-quickcheck_macros = "1.1.0"
-rstest = "0.26"
-tempfile = "3"
+jiff = "1.0.3"
+quickcheck = "1.1.0"
+quickcheck_macros = "1.2.0"
+rstest = "0.29.0"
+tempfile = "3.27.0"

@@ -1,43 +1,54 @@
 # litchi-imgconv
 
-Pure decoders and converters for the image formats embedded inside Microsoft Office documents.
+Bounded vector-first conversion for image formats embedded in Microsoft Office documents.
 
-## Overview
+OfficeArt BLIP and BStore grammar lives in `litchi-odraw`. This crate consumes
+its borrowed `image::Blip` views and performs RFC1950 decompression, DIB/WMF
+adaptation, EMF/WMF/PICT conversion, resizing, and raster encoding under explicit
+resource ceilings. EMF, WMF and PICT raster output is produced by first generating
+SVG and rasterizing that SVG; the crate never substitutes a placeholder image.
+Macintosh PICT pictures (version 1, version 2 and extended version 2) are played
+back like QuickDraw draws them; a picture that cannot be drawn exactly is rejected
+by the strict helpers instead of being replaced by a placeholder image, and
+`convert_metafile` returns its approximation together with diagnostics.
 
-`litchi-imgconv` parses BLIP (Binary Large Image or Picture) records and
-the metafile formats they wrap — Enhanced Metafile (EMF), Windows Metafile
-(WMF), and Macintosh PICT — and converts them to modern raster formats
-(PNG, JPEG, WebP) or SVG. It is a leaf crate in the
-[Litchi](https://github.com/DevExzh/litchi) workspace, depending only on
-`litchi-core` plus the `image`, `flate2`, `bytes`, `xml-minifier`, and
-`zerocopy` crates. The OLE/Escher integration glue lives in the umbrella
-`litchi` crate.
-
-## Usage
-
-```toml
-[dependencies]
-litchi-imgconv = "0.0.1"
-```
+Host crates can expose borrowed or move-owned `litchi_odraw::image::File`
+values. Import `litchi_imgconv::Convert` to add the short `decode`, `png`,
+`jpeg`, `webp`, `svg`, and `extract` codec operations without introducing a dependency
+from the format-neutral OfficeArt crate back to this codec crate.
 
 ```rust
-use litchi_imgconv::{Blip, convert_blip_to_png};
+use litchi_imgconv::{Options, to_png};
+use litchi_odraw::image::{Blip, Limits};
 
 fn render(blip_bytes: &[u8]) -> litchi_core::error::Result<Vec<u8>> {
-    let blip = Blip::parse(blip_bytes)?;
-    convert_blip_to_png(&blip, Some(800), None)
+    let blip = Blip::parse(blip_bytes, Limits::default())
+        .map_err(|error| litchi_core::error::Error::ParseError(error.to_string()))?;
+    to_png(&blip, Options::default().width(800))
 }
 ```
 
-## Features
+For raw metafiles (EMF, WMF or PICT), use `convert_metafile` for a typed result
+that carries its actual format, MIME type, extension, and selection report. `OutputFormat::Auto`
+is vector-first: it selects SVG unless the parsed metafile is exclusively bitmap
+painting, in which case it selects PNG.
 
-- BLIP record parsing (`Blip`, `BitmapBlip`, `MetafileBlip`, `BlipType`)
-- BLIP store table parsing (`BlipStore`, `BlipStoreEntry`)
-- EMF, WMF, and PICT metafile decoding to PNG/JPEG/WebP
-- Optional SVG output for vector metafiles
-- Optional resizing with high-quality Lanczos3 filtering
+```rust
+use litchi_imgconv::{InputFormat, Options, OutputFormat, convert_metafile};
 
-## License
+let emf = std::fs::read("diagram.emf")?;
+let output = convert_metafile(&emf, InputFormat::Emf, OutputFormat::Auto, Options::default())?;
+assert_eq!(output.mime_type, "image/svg+xml");
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
-Licensed under the Apache License, Version 2.0. Part of the
-[Litchi](https://github.com/DevExzh/litchi) workspace.
+The default limits are safe for ordinary Office documents and can be replaced
+through `Options::limits` when a trusted workload needs larger images. The
+format-specific legacy helpers remain available and now use the same bounded
+SVG-backed raster path.
+
+See [FORMAT_COVERAGE.md](FORMAT_COVERAGE.md) for the specification inventory,
+bitmap matrix, strict-fidelity policy, and the operations that intentionally
+return `Unsupported` instead of producing misleading SVG.
+
+Licensed under the Apache License, Version 2.0.

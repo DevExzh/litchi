@@ -1,24 +1,31 @@
-//! Format-agnostic Markdown emission helpers for the Litchi office-formats library.
+//! Bounded Markdown reading, editing, and format-agnostic emission helpers.
 //!
 //! This crate provides the building blocks used by Litchi's higher-level format
 //! crates (and the `litchi` umbrella crate) to render Office documents and
 //! presentations as Markdown:
 //!
+//! - [`reader`] for immutable CommonMark/GFM snapshots and exact-source edits.
 //! - The [`ToMarkdown`] trait for converting types to Markdown.
 //! - [`MarkdownOptions`] and related enums for configuring the output.
+//! - [`escape`] helpers for embedding literal text safely.
 //! - Unicode helpers for rendering super- and subscript characters.
 //!
-//! The crate intentionally has no knowledge of any concrete document format;
-//! per-format `impl ToMarkdown for ...` blocks live alongside their respective
-//! format crates.
+//! The crate intentionally has no knowledge of any concrete document format.
+//! The concrete format adapters implement [`ToMarkdown`] next to the types
+//! they convert: the unified `File` of `litchi-ops`, which the `litchi`
+//! umbrella crate re-exports, and the umbrella crate's older format-family
+//! types.
 //!
 //! # Re-exports
 //!
 //! The most commonly used items are re-exported at the crate root for
 //! convenience.
 pub mod config;
+pub mod escape;
+pub mod reader;
 pub mod traits;
 pub mod unicode;
 
-pub use config::{FormulaStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
+pub use config::{EquationStyle, MarkdownOptions, ScriptStyle, StrikethroughStyle, TableStyle};
+pub use reader::OpenOptions;
 pub use traits::ToMarkdown;

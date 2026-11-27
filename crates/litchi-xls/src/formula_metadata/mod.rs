@@ -1,0 +1,25 @@
+//! Typed metadata carried by a BIFF8 `Formula` record.
+//!
+//! The formula expression remains an opaque token stream owned by the cell
+//! record. This owner types the surrounding calculation flags and application
+//! cache without pretending to evaluate formulas or rebuild Excel's dependency
+//! graph.
+
+pub mod array;
+mod codec;
+mod extra;
+mod model;
+pub mod shared;
+mod validation;
+
+#[cfg(test)]
+mod tests;
+
+pub use model::{Defect, Metadata};
+pub use shared::{Cell, Owner, Range};
+
+pub(crate) use codec::{measure_record, parse_record, parse_record_reporting};
+pub(crate) use extra::{
+    FormulaExtraKind, formula_payload_parts, scan_list_extra_kinds, validate_formula_extra,
+};
+pub(crate) use validation::{FlagDefect, encode_flags, validate_for_write};

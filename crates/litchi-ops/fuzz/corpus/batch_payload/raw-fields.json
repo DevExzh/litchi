@@ -1,0 +1,1 @@
+[{"command":"raw-set","part":"/word/document.xml","xpath":"//w:body/w:p[1]","action":"append","xml":"<w:r><w:t>x</w:t></w:r>"}]

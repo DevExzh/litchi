@@ -7,14 +7,14 @@
 //!
 //! Run with: cargo run --example doc_writer_headers_footers
 
-use litchi::ole::doc::writer::DocWriter;
+use litchi_doc::builder::Builder;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with headers and footers...");
 
     // Create a new DOC writer
-    let mut writer = DocWriter::new();
+    let mut writer = Builder::new();
 
     // Add some content to the document (need enough for multiple pages)
     writer.add_paragraph("Title Page")?;
@@ -47,7 +47,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         writer.add_paragraph("More content on the fourth page...")?;
     }
 
-    // Set headers and footers using DocWriter API
+    // Set headers and footers using Writer API
     writer.set_first_header("=== FIRST PAGE HEADER ===");
     writer.set_odd_header("Document Title - Odd Pages");
     writer.set_even_header("Document Title - Even Pages");
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the document
     let output_path = "output/doc_headers_footers.doc";
-    writer.save(output_path)?;
+    writer.build()?.save(output_path)?;
 
     println!("\n✅ Document saved to: {}", output_path);
     println!("\n📝 Open this file in Microsoft Word to verify:");

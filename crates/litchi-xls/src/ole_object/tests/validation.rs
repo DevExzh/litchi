@@ -1,0 +1,365 @@
+//! Focused semantic validation coverage.
+
+use super::super::*;
+
+fn embedded_formula() -> Vec<u8> {
+    vec![
+        0x05, 0x00, 0x00, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x03, 0x00, 0x00,
+    ]
+}
+
+fn embedded_object(formula: Vec<u8>, storage: Option<u32>, buffer: Option<u32>) -> OleObjectRecord {
+    OleObjectRecord {
+        subrecords: vec![
+            ObjSubrecord::Common(FtCmo {
+                object_type: 8,
+                object_id: 1,
+                flags: 0,
+                reserved: [0; 12],
+            }),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::UNSPECIFIED,
+            }),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
+            ObjSubrecord::PictureFormula(FtPictFmla {
+                formula,
+                storage_position: storage,
+                control_buffer_size: buffer,
+            }),
+            ObjSubrecord::End,
+        ],
+        text_object: None,
+    }
+}
+
+#[test]
+fn ole_obj_rejects_conflicting_link_and_control_flags() {
+    let value = OleObjectRecord {
+        subrecords: vec![
+            ObjSubrecord::Common(FtCmo {
+                object_type: 8,
+                object_id: 1,
+                flags: 0,
+                reserved: [0; 12],
+            }),
+            ObjSubrecord::PictureFormat(FtCf {
+                format: FtCf::UNSPECIFIED,
+            }),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0x0012 }),
+            ObjSubrecord::PictureFormula(FtPictFmla {
+                formula: vec![0],
+                storage_position: Some(1),
+                control_buffer_size: Some(0),
+            }),
+            ObjSubrecord::End,
+        ],
+        text_object: None,
+    };
+    assert!(value.validate().is_err());
+}
+
+#[test]
+fn ole_obj_requires_a_valid_picture_format() {
+    let value = OleObjectRecord {
+        subrecords: vec![
+            ObjSubrecord::Common(FtCmo {
+                object_type: 8,
+                object_id: 1,
+                flags: 0,
+                reserved: [0; 12],
+            }),
+            ObjSubrecord::PictureFlags(FtPioGrbit { raw: 0 }),
+            ObjSubrecord::PictureFormula(FtPictFmla {
+                formula: vec![0x05, 0, 0, 0, 0],
+                storage_position: Some(1),
+                control_buffer_size: None,
+            }),
+            ObjSubrecord::End,
+        ],
+        text_object: None,
+    };
+    assert!(value.validate().is_err());
+}
+
+#[test]
+fn ole_obj_rejects_a_second_malformed_ftcf() {
+    let mut value = embedded_object(embedded_formula(), Some(1), None);
+    value
+        .subrecords
+        .insert(2, ObjSubrecord::ClipboardFormat(vec![0x02]));
+    assert!(value.validate().is_err());
+}
+
+#[test]
+fn ole_obj_rejects_all_control_specific_subrecords() {
+    let control_subrecords = [
+        ObjSubrecord::CheckBoxData(FtCblsData {
+            state: CheckState::Unchecked,
+            accelerator: 0,
+            reserved: 0,
+            flags: 0,
+        }),
+        ObjSubrecord::RadioButtonData(FtRboData {
+            next_radio_button_id: 0,
+            first_in_group: false,
+        }),
+        ObjSubrecord::EditBoxData(FtEdoData {
+            validation: EditBoxValidation::AnyString,
+            multi_line: false,
+            vertical_scroll_bar: false,
+            list_control_id: 0,
+        }),
+        ObjSubrecord::GroupBoxData(FtGboData {
+            accelerator: 0,
+            reserved: 0,
+            flags: 0,
+        }),
+        ObjSubrecord::ScrollBarData(valid_sbs()),
+        ObjSubrecord::ListBoxData(FtLbsData::default()),
+        ObjSubrecord::RawListBoxData {
+            cb_f_continued: 0x1fde,
+            data: vec![0xff],
+        },
+    ];
+    for control_subrecord in control_subrecords {
+        let mut value = embedded_object(embedded_formula(), Some(1), None);
+        value.subrecords.insert(3, control_subrecord);
+        assert!(value.validate().is_err());
+    }
+}
+
+#[test]
+fn list_authoring_uses_its_terminal_data_and_button_metadata_is_admitted() {
+    let list = FormControl::new(
+        ObjectType::List,
+        42,
+        [
+            ObjSubrecord::ScrollBarData(valid_sbs()),
+            ObjSubrecord::ListBoxData(FtLbsData::from_texts(["one"]).unwrap()),
+        ],
+    );
+    list.validate().unwrap();
+    assert!(matches!(
+        list.subrecords.last(),
+        Some(ObjSubrecord::ListBoxData(_))
+    ));
+    let button = FormControl::new(ObjectType::Button, 43, []);
+    button.validate().unwrap();
+    assert_eq!(
+        FormControl::parse(&button.to_record_bytes().unwrap()[4..], None).unwrap(),
+        button
+    );
+}
+
+#[test]
+fn ole_obj_rejects_malformed_known_control_record_kinds() {
+    for kind in [
+        FT_CBLS_DATA,
+        FT_RBO_DATA,
+        FT_EDO_DATA,
+        FT_GBO_DATA,
+        FT_SBS,
+        FT_LBS_DATA,
+    ] {
+        let mut value = embedded_object(embedded_formula(), Some(1), None);
+        value.subrecords.insert(
+            3,
+            ObjSubrecord::Unknown {
+                kind,
+                data: vec![0xA5],
+            },
+        );
+        assert!(
+            value.validate().is_err(),
+            "kind {kind:#06X} should be rejected"
+        );
+    }
+}
+
+#[test]
+fn ole_obj_requires_ms_xls_picture_field_order() {
+    let valid = embedded_object(embedded_formula(), Some(1), None);
+    let common = valid.subrecords[0].clone();
+    let format = valid.subrecords[1].clone();
+    let flags = valid.subrecords[2].clone();
+    let formula = valid.subrecords[3].clone();
+    let end = valid.subrecords[4].clone();
+    let reordered = OleObjectRecord {
+        subrecords: vec![common, formula, format, flags, end],
+        text_object: None,
+    };
+    assert!(reordered.validate().is_err());
+}
+
+#[test]
+fn ole_obj_requires_even_cce_ptgtbl_and_conditional_storage_tail() {
+    let mut odd = embedded_formula();
+    odd.pop();
+    assert!(embedded_object(odd, Some(1), None).validate().is_err());
+
+    let mut wrong_cce = embedded_formula();
+    wrong_cce[0] = 4;
+    assert!(
+        embedded_object(wrong_cce, Some(1), None)
+            .validate()
+            .is_err()
+    );
+
+    let mut wrong_token = embedded_formula();
+    wrong_token[6] = 1;
+    assert!(
+        embedded_object(wrong_token, Some(1), None)
+            .validate()
+            .is_err()
+    );
+
+    assert!(
+        embedded_object(embedded_formula(), None, None)
+            .validate()
+            .is_err()
+    );
+    assert!(
+        embedded_object(embedded_formula(), Some(1), Some(0))
+            .validate()
+            .is_err()
+    );
+    embedded_object(embedded_formula(), Some(1), None)
+        .validate()
+        .expect("embedding formula tail should match fPrstm=0");
+}
+
+#[test]
+fn ole_obj_rejects_truncated_high_byte_class_string() {
+    let mut formula = embedded_formula();
+    formula[12] = 2; // cbClass: fHighByte plus one byte of rgb.
+    formula.extend_from_slice(&[1, 0x41]);
+    assert!(embedded_object(formula, Some(1), None).validate().is_err());
+}
+
+#[test]
+fn scrollbar_validation_rejects_out_of_range_values() {
+    let value = FtSbs {
+        reserved: [0; 4],
+        value: 11,
+        minimum: 0,
+        maximum: 10,
+        increment: 1,
+        page_increment: 1,
+        horizontal: false,
+        scroll_width: 1,
+        flags: 0,
+    };
+    assert!(value.validate().is_err());
+}
+
+fn valid_sbs() -> FtSbs {
+    FtSbs {
+        reserved: [0; 4],
+        value: 0,
+        minimum: 0,
+        maximum: 10,
+        increment: 1,
+        page_increment: 2,
+        horizontal: false,
+        scroll_width: 1,
+        flags: 0,
+    }
+}
+
+#[test]
+fn form_control_constructor_authors_typed_checkbox() {
+    let control = FormControl::new(
+        ObjectType::CheckBox,
+        41,
+        [ObjSubrecord::CheckBoxData(FtCblsData {
+            state: CheckState::Checked,
+            accelerator: 0,
+            reserved: 0,
+            flags: 0,
+        })],
+    );
+    control
+        .validate()
+        .expect("constructed checkbox should validate");
+    let bytes = control
+        .to_record_bytes()
+        .expect("constructed checkbox should encode");
+    assert_eq!(
+        FormControl::parse(&bytes[4..], None)
+            .expect("encoded checkbox should parse")
+            .object_id(),
+        41
+    );
+}
+
+#[test]
+fn list_authoring_synchronizes_items_and_requires_sbs() {
+    let mut list = FtLbsData::from_texts(["one", "二"]).expect("list strings should encode");
+    assert_eq!(list.entry_count, 2);
+    assert!(list.has_item_strings());
+    list.set_items_checked(vec![LbsItem::new("only").expect("short item")])
+        .expect("item replacement should be checked");
+    assert_eq!(list.entry_count, 1);
+    assert_eq!(list.items()[0].text(), "only");
+    list.validate().expect("synchronized list should validate");
+
+    let missing_sbs = FormControl::new(
+        ObjectType::List,
+        42,
+        [ObjSubrecord::ListBoxData(list.clone())],
+    );
+    assert!(missing_sbs.validate().is_err());
+
+    let valid = FormControl::new(
+        ObjectType::List,
+        42,
+        [
+            ObjSubrecord::ScrollBarData(valid_sbs()),
+            ObjSubrecord::ListBoxData(list),
+        ],
+    );
+    valid.validate().expect("complete list should validate");
+}
+
+#[test]
+fn dropdown_authoring_requires_matching_drop_data() {
+    let drop_down = LbsDropData::try_new(DropDownStyle::ComboEdit, 8, 100, "choose")
+        .expect("dropdown metadata should encode");
+    assert!(LbsDropData::new(DropDownStyle::Reserved, 8, 100, "choose").is_none());
+    let mut data = FtLbsData::from_texts(["one", "two"]).expect("dropdown items should encode");
+    data.drop_down = Some(drop_down);
+
+    let dropdown = FormControl::new(
+        ObjectType::DropDown,
+        43,
+        [
+            ObjSubrecord::ScrollBarData(valid_sbs()),
+            ObjSubrecord::ListBoxData(data.clone()),
+        ],
+    );
+    dropdown
+        .validate()
+        .expect("matching dropdown metadata should validate");
+
+    data.drop_down = None;
+    let missing_drop_data = FormControl::new(
+        ObjectType::DropDown,
+        43,
+        [
+            ObjSubrecord::ScrollBarData(valid_sbs()),
+            ObjSubrecord::ListBoxData(data),
+        ],
+    );
+    assert!(missing_drop_data.validate().is_err());
+}
+
+#[test]
+fn list_validation_rejects_incomplete_typed_arrays() {
+    let mut list = FtLbsData::from_texts(["one"]).expect("list should encode");
+    list.entry_count = 2;
+    assert!(list.validate().is_err());
+
+    list.entry_count = 1;
+    list.flags |= 1 << LBS_SELECTION_TYPE_SHIFT;
+    assert!(list.validate().is_err());
+}

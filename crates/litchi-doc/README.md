@@ -1,0 +1,95 @@
+# litchi-doc
+
+Strictly typed support for the legacy Microsoft Word (`.doc`) binary format.
+
+## Overview
+
+This crate owns legacy Word parsing and writing. It builds on `litchi-cfb` for
+the CFB storage substrate, `litchi-ole-common` for shared OLE object metadata,
+and `litchi-odraw` for OfficeArt. Its canonical API lives at the crate root;
+there is no migration-host or format-dispatch layer.
+
+## Usage
+
+```toml
+[dependencies]
+litchi-doc = "0.0.1"
+```
+
+```rust
+use litchi_doc::{OpenOptions, Package, SourceLimits};
+
+let limits = SourceLimits::builder()
+    .max_input_bytes(32 * 1024 * 1024)?
+    .max_entry_bytes(32 * 1024 * 1024)?
+    .max_aggregate_bytes(32 * 1024 * 1024)?
+    .build()?;
+let package = Package::open_with_options(
+    "example.doc",
+    OpenOptions::default().source_limits(limits),
+)?;
+let document = package.document();
+println!("paragraphs: {}", document.paragraph_count()?);
+# Ok::<(), litchi_doc::Error>(())
+```
+
+## Features
+
+- `.doc` (Word 97-2003) reader and writer with full PLCF/SPRM handling
+- Optional `equation` feature for MathType and Equation Editor (MTEF) equations as LaTeX
+
+`Package::open` uses finite defaults (128 MiB package, 64 MiB stream, and
+96 MiB aggregate DOC streams). Use `Package::open_with_options` and
+`OpenOptions` to select stricter or
+workload-specific limits. Passwords
+are supplied to encrypted documents through `OpenOptions::with_password` and
+the non-cloneable, zeroizing `Password` type. `Document::text` exposes stored
+source text. `body_text::Snapshot` additionally exposes stored, accepted, and
+rejected body projections plus paragraph selectors for every DOC story, simple
+table cells, simple cached field results, and revision marks. Its bounded
+immutable transaction can resize modeled main-story text, overwrite
+equal-length Unicode text in auxiliary stories, apply direct
+bold/italic/underline, dispose of non-destructive revision marks, and change
+passive embedded-object display metadata. Managed embedded objects can also be
+added, removed, or transferred with their field PLCF, CHPX picture reference,
+exact `PICFAndOfficeArtData` preview, Data-stream offset, and bounded inert
+`ObjectPool` CFB regenerated as one dependency closure. It rebuilds CLX and
+CHPX FKPs, shifts the modeled CP/PLCF closure, updates FIB story counts, and
+fully reopens the CFB and DOC before publication. Source-checked in-memory and
+blob-backed durable semantic patches, disjoint composition, three-way planning,
+text and embedded-resource transfer, and bounded undo/redo history use the same
+operation model. A second bounded transfer slice accepts canonical native
+inline or floating pictures plus a floating picture inside a closed
+single-child nested group chain: it proves the selected PICF/Data block and,
+for a floating picture, its exact SPA-to-shape/group-to-`pib`-to-BStore binary
+identity, then re-homes that closed slice with collision-free shape IDs.
+Unrelated bounded main/header-story shapes, groups, textboxes, and shared
+BStore slots may coexist in the donor without being copied or regenerated. Marker CHPX,
+PICF/Data, and floating `PlcfSpaMom`/`DggInfo` are regenerated together. The
+slice participates in exact in-memory inverse/history, three-way planning, and
+blob-backed durable replay/inversion.
+Structural table edits, field delimiters or nesting, destructive revision
+dispositions, auxiliary-story length changes, mixed formatting, and unmodeled
+CP dependencies are typed refusals. A selected multi-child or multi-image
+group, textbox, primitive, ambiguous shape/SPA owner, noncanonical picture frame,
+scaling/cropping, producer extension, delay-loaded BLIP, selection outside the
+main story, receiver shape-ID collision,
+producer-defined object characters, and other active controls have specific
+dependency refusals. Selection uses the
+format-neutral, zero-based
+`litchi_core::Position`; resolving it against a source collection reports a
+typed not-found refusal.
+
+The closure tests include a checked-in genuine DOC receiver and a genuine Word
+97 floating-picture donor corpus. The supported writer graph is fully reopened
+after ordinary and durable replay; the genuine producer graph remains a typed
+refusal where its selected records are outside the proven canonical slice. No
+native Word or LibreOffice changed-save result is claimed by this test suite.
+
+Format-neutral OfficeArt image discovery lives in `litchi-odraw`; optional
+codec operations are provided by the separate `litchi-imgconv::Convert`
+extension trait.
+
+## License
+
+Licensed under the Apache License, Version 2.0. Part of the [Litchi](https://github.com/DevExzh/litchi) workspace.

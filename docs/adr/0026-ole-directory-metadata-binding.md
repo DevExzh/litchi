@@ -1,0 +1,62 @@
+# ADR 0026: Shared OLE directory metadata binding
+
+- Status: Accepted
+- Date: 2026-08-06
+- Scope: `litchi-ole-common::object`
+
+## Decision
+
+The common OLE object owner projects the validated CFB directory fields needed
+by DOC, PPT, and XLS into `object::directory::{Metadata, EntryKind, Links,
+Sid}`. `Storage::directory()` always exposes typed storage metadata and
+`Stream::directory()` exposes the captured stream metadata without copying its
+payload. CLSIDs reuse the common Property Set `Guid` value, while `NOSTREAM`
+links become `Option<Sid>`.
+
+The projection covers directory identity, object kind, class identifier,
+red-black-tree sibling/child links, starting sector, parsed stream size, and
+MiniFAT placement, state bits, and creation/modification timestamps. It does not
+activate an OLE class, interpret an object
+payload, or duplicate CFB sector/tree validation already owned by
+`litchi-cfb`.
+
+## Validation and publication
+
+The directory codec rejects unknown object kinds, invalid regular SIDs,
+self-referential links, stream child/CLSID fields, storage stream-only fields,
+and invalid root links. Existing `Limits` remain the operation ceilings for
+directory traversal, stream count, nesting, and retained bytes; the metadata
+itself is a small `Copy` value and adds no payload allocation.
+
+Every staged object edit renders and reopens the candidate CFB before
+publishing it. The editor now assigns that freshly captured package to its
+internal state before rebuilding the public object catalog, so sector, size,
+and MiniFAT metadata cannot remain stale across a subsequent snapshot edit.
+Failed edits still operate on a cloned candidate and leave the source
+snapshot, bytes, and metadata unchanged.
+
+## Authority and non-goals
+
+The field mapping follows MS-CFB §2.6 directory entries,
+including the `NOSTREAM` terminator, object kinds, CLSID rules, stream size,
+and MiniFAT distinction. The inert object boundary remains compatible with
+MS-OLEDS §2.3 OLE2.0 structures,
+while property-set names and values remain owned by the existing
+MS-OLEPS binding
+and semantic codec. Shared toolbar and envelope vocabulary remains under
+MS-OSHARED.
+
+Captured source metadata may retain nonconforming timestamps and stale storage
+starting-sector fields for source-preserving replay. Typed metadata edits require
+zero root creation time, zero stream timestamps, and zero storage starting
+sector. The full directory catalog must begin with SID-zero `Root Entry`, whose
+name cannot be changed.
+
+Extracting a nested storage creates a fresh standalone root: the selected
+storage retains its captured metadata on `Object::storage()`, while only its
+CLSID transfers to the new root. Replacing an object preserves the existing
+target storage state and timestamps; adding an object uses fresh zero defaults.
+Only a captured compound-file root can replay source root metadata.
+
+Activation, host classification, and format-specific `CompObj`/`ObjInfo`
+semantics belong to their respective owner layers.

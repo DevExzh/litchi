@@ -41,6 +41,13 @@ pub mod content_type {
     pub const OFC_THEME: &str = "application/vnd.openxmlformats-officedocument.theme+xml";
     pub const OFC_THEME_OVERRIDE: &str =
         "application/vnd.openxmlformats-officedocument.themeOverride+xml";
+    /// MS-OFFMACRO2 VBA Project binary-part content type.
+    pub const OFC_VBA_PROJECT: &str = "application/vnd.ms-office.vbaProject";
+    /// MS-XLSB legacy VBA Project Signature part content type.
+    pub const OFC_VBA_PROJECT_SIGNATURE: &str = "application/vnd.ms-office.vbaProjectSignature";
+    /// MS-XLSB Agile VBA Project Signature part content type.
+    pub const OFC_VBA_PROJECT_SIGNATURE_AGILE: &str =
+        "application/vnd.ms-office.vbaProjectSignatureAgile";
     pub const OFC_VML_DRAWING: &str = "application/vnd.openxmlformats-officedocument.vmlDrawing";
 
     // OPC core content types
@@ -63,6 +70,14 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.glossary+xml";
     pub const WML_DOCUMENT_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml";
+    pub const WML_TEMPLATE_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.template.main+xml";
+    /// MS-OFFMACRO2 macro-enabled Word document main-part content type.
+    pub const WML_DOCUMENT_MACRO_MAIN: &str =
+        "application/vnd.ms-word.document.macroEnabled.main+xml";
+    /// MS-OFFMACRO2 macro-enabled Word template main-part content type.
+    pub const WML_TEMPLATE_MACRO_MAIN: &str =
+        "application/vnd.ms-word.template.macroEnabledTemplate.main+xml";
     pub const WML_ENDNOTES: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.endnotes+xml";
     pub const WML_FONT_TABLE: &str =
@@ -81,23 +96,34 @@ pub mod content_type {
         "application/vnd.openxmlformats-officedocument.wordprocessingml.styles+xml";
     pub const WML_WEB_SETTINGS: &str =
         "application/vnd.openxmlformats-officedocument.wordprocessingml.webSettings+xml";
+    /// MS-OFFMACRO2 Word VBA Supplemental Data part content type.
+    pub const WML_VBA_DATA: &str = "application/vnd.ms-word.vbaData+xml";
 
     // SpreadsheetML content types
     pub const SML_SHEET: &str = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet";
     pub const SML_SHEET_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml";
+    pub const SML_TEMPLATE_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.template.main+xml";
+    pub const SML_SHEET_MACRO_MAIN: &str = "application/vnd.ms-excel.sheet.macroEnabled.main+xml";
+    pub const SML_TEMPLATE_MACRO_MAIN: &str =
+        "application/vnd.ms-excel.template.macroEnabled.main+xml";
     pub const SML_WORKSHEET: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml";
     pub const SML_STYLES: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml";
     pub const SML_SHARED_STRINGS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml";
+    pub const SML_EXTERNAL_LINK: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.externalLink+xml";
     pub const SML_PIVOT_CACHE_DEFINITION: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheDefinition+xml";
     pub const SML_PIVOT_CACHE_RECORDS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotCacheRecords+xml";
     pub const SML_PIVOT_TABLE: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.pivotTable+xml";
+    pub const SML_TABLE: &str =
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.table+xml";
     pub const SML_COMMENTS: &str =
         "application/vnd.openxmlformats-officedocument.spreadsheetml.comments+xml";
     pub const SML_THREADED_COMMENTS: &str = "application/vnd.ms-excel.threadedcomments+xml";
@@ -111,8 +137,18 @@ pub mod content_type {
     // PresentationML content types
     pub const PML_PRESENTATION_MAIN: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.presentation.main+xml";
+    pub const PML_SLIDESHOW_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.slideshow.main+xml";
+    pub const PML_TEMPLATE_MAIN: &str =
+        "application/vnd.openxmlformats-officedocument.presentationml.template.main+xml";
     pub const PML_PRES_MACRO_MAIN: &str =
         "application/vnd.ms-powerpoint.presentation.macroEnabled.main+xml";
+    /// MS-OFFMACRO2 macro-enabled `PowerPoint` slideshow main-part content type.
+    pub const PML_SLIDESHOW_MACRO_MAIN: &str =
+        "application/vnd.ms-powerpoint.slideshow.macroEnabled.main+xml";
+    /// MS-OFFMACRO2 macro-enabled `PowerPoint` template main-part content type.
+    pub const PML_TEMPLATE_MACRO_MAIN: &str =
+        "application/vnd.ms-powerpoint.template.macroEnabled.main+xml";
     pub const PML_SLIDE: &str =
         "application/vnd.openxmlformats-officedocument.presentationml.slide+xml";
     pub const PML_SLIDE_LAYOUT: &str =
@@ -152,7 +188,7 @@ pub mod content_type {
 
 /// XML namespace URIs used in OPC packages
 pub mod namespace {
-    /// DrawingML wordprocessing drawing namespace
+    /// `DrawingML` wordprocessing drawing namespace
     pub const DML_WORDPROCESSING_DRAWING: &str =
         "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing";
 
@@ -168,7 +204,7 @@ pub mod namespace {
     pub const OPC_CONTENT_TYPES: &str =
         "http://schemas.openxmlformats.org/package/2006/content-types";
 
-    /// WordprocessingML main namespace
+    /// `WordprocessingML` main namespace
     pub const WML_MAIN: &str = "http://schemas.openxmlformats.org/wordprocessingml/2006/main";
 }
 
@@ -196,10 +232,19 @@ pub mod relationship_type {
     // Office document
     pub const OFFICE_DOCUMENT: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument";
+    /// ISO/IEC 29500 Strict main-document relationship type.
+    pub const STRICT_OFFICE_DOCUMENT: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/officeDocument";
+    /// OPC package digital-signature origin relationship.
+    pub const DIGITAL_SIGNATURE_ORIGIN: &str =
+        "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/origin";
 
     // Document parts
     pub const COMMENTS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/comments";
+    /// ISO/IEC 29500 Strict comments relationship type.
+    pub const STRICT_COMMENTS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/comments";
     pub const ENDNOTES: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/endnotes";
     pub const FONT: &str =
@@ -218,23 +263,69 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/settings";
     pub const STYLES: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles";
+    /// ISO/IEC 29500 Strict styles relationship type.
+    pub const STRICT_STYLES: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/styles";
+    pub const SHARED_STRINGS: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings";
+    /// ISO/IEC 29500 Strict shared-strings relationship type.
+    pub const STRICT_SHARED_STRINGS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/sharedStrings";
+    pub const CALC_CHAIN: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/calcChain";
+    pub const STRICT_CALC_CHAIN: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/calcChain";
+    pub const EXTERNAL_LINK: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLink";
+    pub const STRICT_EXTERNAL_LINK: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/externalLink";
+    pub const EXTERNAL_LINK_PATH: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/externalLinkPath";
+    pub const STRICT_EXTERNAL_LINK_PATH: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/externalLinkPath";
     pub const WEB_SETTINGS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/webSettings";
+    /// ISO/IEC 29500 alternative-format import relationship type.
+    pub const ALTERNATIVE_FORMAT_IMPORT: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/afChunk";
+    /// Case-sensitive relationship type emitted by Microsoft Word.
+    pub const MS_ALTERNATIVE_FORMAT_IMPORT: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/aFChunk";
     pub const PIVOT_CACHE_DEFINITION: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheDefinition";
+    /// ISO/IEC 29500 Strict pivot-cache-definition relationship type.
+    pub const STRICT_PIVOT_CACHE_DEFINITION: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotCacheDefinition";
     pub const PIVOT_CACHE_RECORDS: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotCacheRecords";
+    /// ISO/IEC 29500 Strict pivot-cache-records relationship type.
+    pub const STRICT_PIVOT_CACHE_RECORDS: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotCacheRecords";
     pub const PIVOT_TABLE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/pivotTable";
+    /// ISO/IEC 29500 Strict pivot-table relationship type.
+    pub const STRICT_PIVOT_TABLE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/pivotTable";
+    pub const TABLE: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/table";
+    /// ISO/IEC 29500 Strict table relationship type.
+    pub const STRICT_TABLE: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/table";
     pub const THREADED_COMMENTS: &str =
         "http://schemas.microsoft.com/office/2017/10/relationships/threadedComment";
     pub const PERSONS: &str = "http://schemas.microsoft.com/office/2017/10/relationships/person";
     pub const SHEET_METADATA: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata";
+    pub const WORKSHEET: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet";
+    /// ISO/IEC 29500 Strict worksheet relationship type.
+    pub const STRICT_WORKSHEET: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet";
 
     // Images and media
     pub const IMAGE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/image";
+    /// ISO/IEC 29500 Strict image relationship type.
+    pub const STRICT_IMAGE: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/image";
     pub const AUDIO: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/audio";
     pub const VIDEO: &str =
@@ -245,8 +336,15 @@ pub mod relationship_type {
     // Chart and drawing
     pub const CHART: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chart";
+    pub const CHART_USER_SHAPES: &str =
+        "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes";
+    /// ISO/IEC 29500 Strict chart relationship type.
+    pub const STRICT_CHART: &str = "http://purl.oclc.org/ooxml/officeDocument/relationships/chart";
     pub const DRAWING: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/drawing";
+    /// ISO/IEC 29500 Strict drawing relationship type.
+    pub const STRICT_DRAWING: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/drawing";
     pub const VML_DRAWING: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/vmlDrawing";
 
@@ -260,13 +358,32 @@ pub mod relationship_type {
     pub const CUSTOM_XML: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/customXml";
 
+    // Office macro-enabled package relationships (MS-OFFMACRO2)
+    pub const VBA_PROJECT: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/vbaProject";
+    pub const VBA_PROJECT_SIGNATURE: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/vbaProjectSignature";
+    pub const VBA_PROJECT_SIGNATURE_AGILE: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/vbaProjectSignatureAgile";
+    pub const WORD_VBA_DATA: &str =
+        "http://schemas.microsoft.com/office/2006/relationships/wordVbaData";
+
     // External links
     pub const HYPERLINK: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink";
+    /// ISO/IEC 29500 Strict hyperlink relationship type.
+    pub const STRICT_HYPERLINK: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/hyperlink";
     pub const OLE_OBJECT: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/oleObject";
+    /// ISO/IEC 29500 Strict embedded-object relationship type.
+    pub const STRICT_OLE_OBJECT: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/oleObject";
     pub const PACKAGE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/package";
+    /// ISO/IEC 29500 Strict embedded-package relationship type.
+    pub const STRICT_PACKAGE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/package";
 
     // PresentationML relationships
     pub const SLIDE: &str =
@@ -279,6 +396,10 @@ pub mod relationship_type {
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesSlide";
     pub const NOTES_MASTER: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/notesMaster";
+    pub const STRICT_NOTES_SLIDE: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/notesSlide";
+    pub const STRICT_NOTES_MASTER: &str =
+        "http://purl.oclc.org/ooxml/officeDocument/relationships/notesMaster";
     pub const HANDOUT_MASTER: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/handoutMaster";
     pub const COMMENT_AUTHORS: &str =

@@ -1,0 +1,51 @@
+// Bounded lazy views for the physical table-sort storage seam.
+//
+// Collection row/header/UID fields intentionally stay out of the generated
+// projection.  The source-preserving handwritten codec streams those fields
+// and retains their exact wire records; Buffa is only a borrowed parity
+// oracle for singular scalar envelopes.
+syntax = "proto2";
+package LitchiIwaTablePhysicalSortProjection;
+
+message TileArchive {
+  required uint32 max_column = 1;
+  required uint32 max_row = 2;
+  required uint32 num_cells = 3;
+  required uint32 num_rows = 4;
+  optional uint32 storage_version = 6;
+  optional bool last_saved_in_bnc = 7;
+  optional bool should_use_wide_rows = 8;
+}
+
+message TileRowInfoArchive {
+  required uint32 tile_row_index = 1;
+  required uint32 cell_count = 2;
+  required bytes cell_storage_buffer_pre_bnc = 3;
+  required bytes cell_offsets_pre_bnc = 4;
+  optional uint32 storage_version = 5;
+  optional bytes cell_storage_buffer = 6;
+  optional bytes cell_offsets = 7;
+  optional bool has_wide_offsets = 8;
+}
+
+message HeaderStorageBucketArchive {
+  required uint32 bucket_hash_function = 1;
+}
+
+message HeaderArchive {
+  required uint32 index = 1;
+  required fixed32 size_bits = 2;
+  required uint32 hiding_state = 3;
+  required uint32 number_of_cells = 4;
+  optional bytes cell_style = 5;
+  optional bytes text_style = 6;
+}
+
+// All native fields are collections and remain on the handwritten strict path.
+message ColumnRowUidMapArchive {
+}
+
+message Uuid {
+  required uint64 lower = 1;
+  required uint64 upper = 2;
+}

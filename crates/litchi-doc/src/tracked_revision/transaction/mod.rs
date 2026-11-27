@@ -1,0 +1,51 @@
+//! Source-checked snapshot transactions for typed DOC tracked revisions.
+//!
+//! The transaction layer owns the complete DOC source artifact while the
+//! package layer continues to own the Word FIB, piece, FKP, PLC, and SPRM
+//! rewrites. Keeping these layers separate makes the public facade semantic:
+//! callers edit revision metadata and ranges, not CFB streams or FKP pages.
+
+#![allow(
+    dead_code,
+    reason = "the record-level revision API is driven by the package family and unit tests; each uses a subset"
+)]
+
+mod commit;
+mod edit;
+mod patch;
+mod snapshot;
+
+pub(crate) use commit::Commit;
+pub(crate) use edit::Transaction;
+pub(crate) use patch::Patch;
+pub(crate) use snapshot::Snapshot;
+
+use crate::package::Error as PackageError;
+
+/// Errors produced by a staged tracked-revision edit or source-checked patch.
+#[derive(Debug)]
+pub enum Error {
+    /// The candidate violates a DOC, CFB, resource, or SPRM invariant.
+    Invalid(PackageError),
+    /// A patch was applied to a snapshot other than its exact source.
+    Conflict,
+}
+
+impl std::fmt::Display for Error {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Invalid(error) => error.fmt(formatter),
+            Self::Conflict => formatter.write_str("tracked-revision transaction source conflict"),
+        }
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<PackageError> for Error {
+    fn from(error: PackageError) -> Self {
+        Self::Invalid(error)
+    }
+}
+
+type Result<T> = std::result::Result<T, Error>;

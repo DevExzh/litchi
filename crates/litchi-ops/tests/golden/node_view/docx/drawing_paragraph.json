@@ -1,0 +1,174 @@
+{
+  "path": "/body/p[10]",
+  "type": "paragraph",
+  "text": "\nСостоится пресс-конференция президента компании \"Евразийское водное партнерство\" (ЕВП) С.Яшечкина и члена правления ЕВП, президента Национального центра по развитию частно-государственных партнерств А.Баженова. Тема пресс-конференции: \"Евразийское водное партнерство: от декларации стратегии к реализации проектного принципа привлечения инвестиций в коммунальную инфраструктуру. Проблемы и перспективы инициатив частного бизнеса в ЖКХ\". (14:30)\n\n",
+  "preview": "\nСостоится пресс-конференция президента компании \"...",
+  "style": "a3",
+  "childCount": 16,
+  "format": {
+    "style": "a3",
+    "styleId": "a3",
+    "styleName": "Normal (Web)",
+    "align": "justify",
+    "spaceAfter": "12pt",
+    "spaceAfterAuto": false
+  },
+  "children": [
+    {
+      "path": "/body/p[10]/r[1]",
+      "type": "run",
+      "text": "\n",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[2]",
+      "type": "run",
+      "text": "Состоится пресс-конференция президента компании \"",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[3]",
+      "type": "run",
+      "text": "Евразийское водное партнерство",
+      "childCount": 0,
+      "format": {
+        "bold": true,
+        "bold.cs": true,
+        "color": "#FF0000"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[4]",
+      "type": "run",
+      "text": "\" (ЕВП) ",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[5]",
+      "type": "run",
+      "text": "С.Яшечкина",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[6]",
+      "type": "run",
+      "text": " и члена правления ЕВП, президента Национального центра по развитию ",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[7]",
+      "type": "run",
+      "text": "частно-государственных",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[8]",
+      "type": "run",
+      "text": " ",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[9]",
+      "type": "run",
+      "text": "партнерств",
+      "childCount": 0,
+      "format": {
+        "bold": true,
+        "bold.cs": true,
+        "color": "#FF0000"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[10]",
+      "type": "run",
+      "text": " А.Баженова. Тема пресс-конференции: \"",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[11]",
+      "type": "run",
+      "text": "Евразийское водное партнерство",
+      "childCount": 0,
+      "format": {
+        "bold": true,
+        "bold.cs": true,
+        "color": "#FF0000"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[12]",
+      "type": "run",
+      "text": ": от декларации стратегии к реализации проектного принципа привлечения инвестиций в коммунальную инфраструктуру.",
+      "childCount": 0,
+      "format": {
+        "color": "#0000FF"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[13]",
+      "type": "run",
+      "text": " Проблемы и перспективы инициатив частного бизнеса в ЖКХ\". (14:30)",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[14]",
+      "type": "run",
+      "text": "\n",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[15]",
+      "type": "run",
+      "text": "\n",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/p[10]/r[16]",
+      "type": "run",
+      "text": "",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    }
+  ]
+}

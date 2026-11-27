@@ -1,0 +1,465 @@
+//! Source-preserving semantic edits for one `OfficeArtClientData` record.
+
+use std::sync::Arc;
+
+use crate::package::{Error, Result};
+
+use super::model::{ClientData, ClientDataChild, ClientDataLimits};
+
+/// Deterministic identity of one exact serialized client-data record.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Revision(u64);
+
+impl Revision {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut value = 0xcbf2_9ce4_8422_2325u64;
+        for byte in bytes {
+            value ^= u64::from(*byte);
+            value = value.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Self(value)
+    }
+
+    /// Compact revision value useful for parent-owner conflict checks.
+    #[must_use]
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
+/// One ordered child edit made by a transaction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Change {
+    /// Insert an ordered child before the child currently at `index`.
+    Insert {
+        index: usize,
+        child: ClientDataChild,
+    },
+    /// Remove the child currently at `index`.
+    Remove {
+        index: usize,
+        child: ClientDataChild,
+    },
+    /// Replace one child in place.
+    Replace {
+        index: usize,
+        before: ClientDataChild,
+        after: ClientDataChild,
+    },
+}
+
+impl Change {
+    /// Child-list index affected by this edit.
+    #[must_use]
+    pub const fn index(&self) -> usize {
+        match self {
+            Self::Insert { index, .. }
+            | Self::Remove { index, .. }
+            | Self::Replace { index, .. } => *index,
+        }
+    }
+
+    /// The child present before this edit, when there was one.
+    #[must_use]
+    pub fn before(&self) -> Option<&ClientDataChild> {
+        match self {
+            Self::Insert { .. } => None,
+            Self::Remove { child, .. } => Some(child),
+            Self::Replace { before, .. } => Some(before),
+        }
+    }
+
+    /// The child present after this edit, when there is one.
+    #[must_use]
+    pub fn after(&self) -> Option<&ClientDataChild> {
+        match self {
+            Self::Insert { child, .. } => Some(child),
+            Self::Remove { .. } => None,
+            Self::Replace { after, .. } => Some(after),
+        }
+    }
+}
+
+/// Immutable, cheap-to-clone source or committed client-data state.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Snapshot {
+    bytes: Arc<[u8]>,
+    value: ClientData,
+    revision: Revision,
+    limits: ClientDataLimits,
+}
+
+impl Snapshot {
+    /// Parse one complete record and retain its exact source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &ClientDataLimits) -> Result<Self> {
+        Self::parse_with_limits(bytes, *limits)
+    }
+
+    /// Parse one complete record under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub(crate) fn parse_with_limits(
+        bytes: impl AsRef<[u8]>,
+        limits: ClientDataLimits,
+    ) -> Result<Self> {
+        let input = bytes.as_ref();
+        let value = ClientData::parse_with_limits(input, limits)?;
+        let encoded = value.to_bytes_with_limits(limits)?;
+        if encoded != input {
+            return Err(Error::Corrupted(
+                "OfficeArtClientData is not losslessly representable".into(),
+            ));
+        }
+        Ok(Self::from_parts(
+            Arc::from(input.to_vec().into_boxed_slice()),
+            value,
+            limits,
+        ))
+    }
+
+    /// Capture a validated semantic value using the default resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn from_client_data(value: ClientData) -> Result<Self> {
+        Self::from_client_data_with_limits(value, ClientDataLimits::default())
+    }
+
+    /// Capture a validated semantic value under explicit resource bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn from_client_data_with_limits(
+        value: ClientData,
+        limits: ClientDataLimits,
+    ) -> Result<Self> {
+        let bytes = value.to_bytes_with_limits(limits)?;
+        Self::parse_with_limits(bytes, limits)
+    }
+
+    fn from_parts(bytes: Arc<[u8]>, value: ClientData, limits: ClientDataLimits) -> Self {
+        let revision = Revision::from_bytes(&bytes);
+        Self {
+            bytes,
+            value,
+            revision,
+            limits,
+        }
+    }
+
+    /// Borrow the validated semantic client-data value.
+    #[must_use]
+    pub const fn client_data(&self) -> &ClientData {
+        &self.value
+    }
+
+    /// Borrow ordered typed and opaque children.
+    #[must_use]
+    pub fn children(&self) -> &[ClientDataChild] {
+        self.value.children()
+    }
+
+    /// Exact source or committed record bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Revision of the exact serialized source.
+    #[must_use]
+    pub const fn revision(&self) -> Revision {
+        self.revision
+    }
+
+    /// Resource bounds retained for subsequent edits and patch application.
+    #[must_use]
+    pub const fn limits(&self) -> ClientDataLimits {
+        self.limits
+    }
+
+    /// Start an isolated semantic edit over this snapshot.
+    #[must_use]
+    pub(crate) fn edit(&self) -> RecordEdit {
+        RecordEdit {
+            source: self.clone(),
+            candidate: self.value.clone(),
+            changes: Vec::new(),
+        }
+    }
+}
+
+/// Reversible, source-checked result of one successful transaction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecordPatch {
+    base: Revision,
+    target: Revision,
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+    changes: Vec<Change>,
+    limits: ClientDataLimits,
+}
+
+impl RecordPatch {
+    /// Ordered semantic edits represented by this patch.
+    #[must_use]
+    pub(crate) fn changes(&self) -> &[Change] {
+        &self.changes
+    }
+
+    /// Whether the transaction changed no child bytes.
+    #[must_use]
+    pub(crate) const fn is_empty(&self) -> bool {
+        self.changes.is_empty()
+    }
+
+    /// Apply only to the exact source snapshot from which this patch came.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+        if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
+            return Err(Error::InvalidFormat(
+                "client-data patch source does not match its base snapshot".into(),
+            ));
+        }
+        Snapshot::parse_with_limits(self.after.as_ref(), self.limits)
+    }
+
+    /// Apply the inverse to the exact committed target snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+        self.inverse().apply(current)
+    }
+
+    /// Reapply this patch to its exact source snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn redo(&self, current: &Snapshot) -> Result<Snapshot> {
+        self.apply(current)
+    }
+
+    /// Build a source-checked inverse patch.
+    #[must_use]
+    pub(crate) fn inverse(&self) -> Self {
+        Self {
+            base: self.target,
+            target: self.base,
+            before: self.after.clone(),
+            after: self.before.clone(),
+            changes: self.changes.iter().rev().map(Change::inverse).collect(),
+            limits: self.limits,
+        }
+    }
+}
+
+impl Change {
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Insert { index, child } => Self::Remove {
+                index: *index,
+                child: child.clone(),
+            },
+            Self::Remove { index, child } => Self::Insert {
+                index: *index,
+                child: child.clone(),
+            },
+            Self::Replace {
+                index,
+                before,
+                after,
+            } => Self::Replace {
+                index: *index,
+                before: after.clone(),
+                after: before.clone(),
+            },
+        }
+    }
+}
+
+/// Isolated, failure-atomic semantic editor over one source snapshot.
+#[derive(Debug, Clone)]
+pub(crate) struct RecordEdit {
+    source: Snapshot,
+    candidate: ClientData,
+    changes: Vec<Change>,
+}
+
+impl RecordEdit {
+    /// Borrow the current transaction candidate.
+    #[must_use]
+    pub(crate) const fn client_data(&self) -> &ClientData {
+        &self.candidate
+    }
+
+    /// Borrow the candidate's ordered child list.
+    #[must_use]
+    pub(crate) fn children(&self) -> &[ClientDataChild] {
+        self.candidate.children()
+    }
+
+    /// Borrow the staged semantic operations.
+    #[must_use]
+    pub(crate) fn changes(&self) -> &[Change] {
+        &self.changes
+    }
+
+    /// Insert one validated child at an exact ordered position.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn insert(&mut self, index: usize, child: ClientDataChild) -> Result<()> {
+        if index > self.candidate.children.len() {
+            return invalid("client-data insertion index is out of range");
+        }
+        let mut candidate = self.candidate.clone();
+        candidate.children.insert(index, child.clone());
+        validate_candidate(&candidate, self.source.limits)?;
+        self.candidate = candidate;
+        self.changes.push(Change::Insert { index, child });
+        Ok(())
+    }
+
+    /// Append one validated child after the current ordered sequence.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn append(&mut self, child: ClientDataChild) -> Result<()> {
+        self.insert(self.candidate.children.len(), child)
+    }
+
+    /// Replace one child in place, preserving all other child order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn replace(
+        &mut self,
+        index: usize,
+        replacement: ClientDataChild,
+    ) -> Result<ClientDataChild> {
+        let before = self.candidate.children.get(index).cloned().ok_or_else(|| {
+            Error::InvalidFormat("client-data replacement index is out of range".into())
+        })?;
+        if before == replacement {
+            return Ok(before);
+        }
+        let mut candidate = self.candidate.clone();
+        candidate.children[index] = replacement.clone();
+        validate_candidate(&candidate, self.source.limits)?;
+        self.candidate = candidate;
+        self.changes.push(Change::Replace {
+            index,
+            before: before.clone(),
+            after: replacement,
+        });
+        Ok(before)
+    }
+
+    /// Remove one child and return the removed value.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn remove(&mut self, index: usize) -> Result<ClientDataChild> {
+        if index >= self.candidate.children.len() {
+            return Err(Error::InvalidFormat(
+                "client-data removal index is out of range".into(),
+            ));
+        }
+        let mut candidate = self.candidate.clone();
+        let child = candidate.children.remove(index);
+        validate_candidate(&candidate, self.source.limits)?;
+        self.candidate = candidate;
+        self.changes.push(Change::Remove {
+            index,
+            child: child.clone(),
+        });
+        Ok(child)
+    }
+
+    /// Validate and publish the candidate atomically with its reversible patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn commit(self) -> Result<RecordCommit> {
+        let bytes = self.candidate.to_bytes_with_limits(self.source.limits)?;
+        let snapshot = if bytes.as_slice() == self.source.bytes.as_ref() {
+            self.source.clone()
+        } else {
+            Snapshot::parse_with_limits(bytes, self.source.limits)?
+        };
+        let changes = if snapshot.revision == self.source.revision {
+            Vec::new()
+        } else {
+            self.changes
+        };
+        let patch = RecordPatch {
+            base: self.source.revision,
+            target: snapshot.revision,
+            before: self.source.bytes.clone(),
+            after: snapshot.bytes.clone(),
+            changes,
+            limits: self.source.limits,
+        };
+        Ok(RecordCommit { snapshot, patch })
+    }
+}
+
+/// A successful immutable target and its source-checked patch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct RecordCommit {
+    snapshot: Snapshot,
+    patch: RecordPatch,
+}
+
+impl RecordCommit {
+    /// Published target snapshot.
+    #[must_use]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Reversible patch from the source to this target.
+    #[must_use]
+    pub(crate) const fn patch(&self) -> &RecordPatch {
+        &self.patch
+    }
+
+    /// Split the published target and patch.
+    #[must_use]
+    pub(crate) fn into_parts(self) -> (Snapshot, RecordPatch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+fn validate_candidate(candidate: &ClientData, limits: ClientDataLimits) -> Result<()> {
+    // The source snapshot has already passed wire validation. A candidate
+    // grammar failure describes the requested edit, not corrupt input bytes.
+    candidate
+        .validate_with_limits(limits)
+        .map_err(|error| match error {
+            Error::Corrupted(message) => Error::InvalidFormat(message),
+            error => error,
+        })
+}
+
+fn invalid<T>(message: impl Into<String>) -> Result<T> {
+    Err(Error::InvalidFormat(message.into()))
+}

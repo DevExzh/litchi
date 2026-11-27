@@ -1,0 +1,95 @@
+# Architecture Decision Records
+
+These records define the breaking Office API architecture begun on 2026-07-31
+and refined by focused decisions. They are normative for the refactor: code and
+examples that disagree with an accepted record must be changed or the record
+must be superseded explicitly.
+
+The records intentionally capture durable contracts rather than every design
+branch discussed during the architecture interview. Detailed choices follow the
+same priorities and are tested through executable examples, compile-fail cases,
+the [CRUD scenario checklist](../CRUD_Scenario_Checklist.md), and real Microsoft
+Office round trips.
+
+| ADR | Decision |
+|---|---|
+| [0001](0001-priorities-and-api-layers.md) | Product priorities and strict public layers |
+| [0002](0002-crate-topology.md) | Dependency direction and target crate split |
+| [0003](0003-snapshots-edits-and-patches.md) | Immutable snapshots, tracked edits, patches, and concurrency |
+| [0004](0004-semantic-api-design.md) | Ergonomic, typed semantic API conventions |
+| [0005](0005-io-memory-and-performance.md) | Positional I/O, budgets, streaming, and measured performance |
+| [0006](0006-validation-security-and-compatibility.md) | Preservation, validation, security, and compatibility |
+| [0007](0007-office-object-models.md) | Word, spreadsheet, presentation, and drawing models |
+| [0008](0008-migration-and-verification.md) | Buildable migration phases and evidence gates |
+| [0009](0009-odf-detection-ownership.md) | ODF detection ownership and fuzz boundary |
+| [0010](0010-facade-archive-ownership.md) | Archive ownership below the facade |
+| [0011](0011-ooxml-physical-package-ownership.md) | Physical OPC package ownership below the OOXML migration host |
+| [0012](0012-biff8-formula-reference-types.md) | Checked BIFF8 formula references and panic-free encoding |
+| [0013](0013-pptx-notes-deletion.md) | PowerPoint notes ownership and atomic deletion |
+| [0014](0014-core-properties-reader-ownership.md) | Core-properties reader ownership in the OOXML common crate (amended by 0015) |
+| [0015](0015-lossless-core-properties-crud.md) | Lossless, schema-typed OOXML core-properties CRUD |
+| [0016](0016-biff8-writer-location-types.md) | Checked BIFF8 writer locations beyond ordinary cells |
+| [0017](0017-ooxml-producer-template-ownership.md) | Format-owned deterministic OOXML producer templates |
+| [0018](0018-xlsx-calculation-chain-ownership.md) | Typed XLSX calculation-chain ownership |
+| [0019](0019-docx-web-settings-ownership.md) | Typed DOCX web-settings ownership |
+| [0020](0020-pptx-table-style-ownership.md) | Typed PPTX table-style ownership |
+| [0021](0021-docx-glossary-ownership.md) | Typed DOCX glossary and building-block ownership |
+| [0022](0022-pptx-embedded-font-ownership.md) | Typed PPTX embedded-font ownership |
+| [0023](0023-odf-family-crate-split.md) | Dedicated ODF family crates and umbrella facade |
+| [0024](0024-current-topology.md) | Current post-migration workspace topology |
+| [0025](0025-ograph-chart-area-transactions.md) | Typed OGraph chart-area snapshot transactions |
+| [0026](0026-ole-directory-metadata-binding.md) | Typed shared OLE CFB directory metadata |
+| [0027](0027-xls-sheet-anchor-ownership.md) | Typed XLS sheet-anchor ownership |
+| [0028](0028-iwa-monolith-exit.md) | Ordered exit of the legacy IWA migration host (host since deleted) |
+| [0029](0029-iwa-index-foundation.md) | Archive-free IWA object-index foundation |
+| [0030](0030-lazy-opc-part-decode.md) | Lazy OPC part decode behind the fallible package accessors |
+| [0031](0031-execution-context-budgets.md) | I/O concurrency, CPU task and executor budgets in the execution context |
+| [0032](0032-snapshot-derived-value-memos.md) | Snapshot memos of small derived values of payload bytes (widens ADR 0005's retained digest memos) |
+| [0033](0033-unified-operations-api.md) | Unified operations API over the per-format owners (`litchi-ops`), with read and write for every claimed format |
+| [0034](0034-unified-api-glossary-and-default-policies.md) | Canonical API vocabulary and strict default policies |
+
+The OGraph record retains its original 0025 identity. The later XLS record,
+which duplicated that number, is indexed as 0027; its decision text remains
+unchanged apart from the corrected identifier.
+
+The ODF family record retains its original 0023 identity. The later IWA index
+record, which duplicated that number, is indexed as 0029; its decision text
+remains unchanged apart from the corrected identifier.
+
+## Proposed records (not accepted, not normative)
+
+These drafts exist for human review and are deliberately **not** listed in the
+table above. Nothing in the workspace may cite them as authority, and no code
+change is permitted on their basis, until a human accepts one and moves it into
+the table.
+
+| ADR | Proposed | Decision |
+|---|---|---|
+| _none_ | | |
+
+ADR 0033, proposed on 2026-10-04, was
+accepted the same day by the owner's decision.
+
+Earlier proposals have all been accepted. ADR 0030 and ADR 0031, proposed on
+2026-09-15, were accepted on 2026-09-16 by the owner's decision. ADR
+0032, proposed on 2026-09-23, was
+accepted on 2026-09-24 by the owner's decision. All three now
+appear in the table above.
+
+## Decision hierarchy
+
+When two records appear to conflict, apply this order:
+
+1. Correctness, lossless preservation, and safety are non-negotiable.
+2. The ordinary facade remains concise, intuitive, and panic-free.
+3. Performance decisions require representative measurements.
+4. Internal modularity serves the first three goals and never leaks type noise.
+5. Production readiness gates any support claim.
+
+## Current-state terminology
+
+[ADR 0024](0024-current-topology.md) is the authoritative inventory of the
+current workspace package topology. Older records may retain `litchi-ooxml` as
+historical migration-host terminology, and older records name `litchi-iwa`, the
+iWork migration host since deleted; those references are
+preserved as implementation evidence and do not denote a current workspace package.

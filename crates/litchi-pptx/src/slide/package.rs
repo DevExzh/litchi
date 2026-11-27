@@ -1,0 +1,232 @@
+//! `PresentationML` package-graph adapters for slides, layouts, and masters.
+//!
+//! Relationship cardinality, internal-target checks, content-type checks,
+//! strict/transitional relationship families, and XML-owned layout ordering
+//! remain enforced by the validated [`crate::parts::SlidePart`] family and
+//! shared part helpers. These adapters add only contextual companion-part
+//! resolution; they never materialize or reinterpret unknown `DrawingML`.
+
+use litchi_opc::OpcPackage;
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+
+use crate::parts::{
+    PresentationPart, SlideLayoutPart, SlideMasterPart, SlidePart, related_part_by_type,
+};
+use crate::{Error, Result};
+
+pub(crate) fn slide_tags<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::tag::Limits,
+) -> Result<Option<crate::tag::List>> {
+    Ok(
+        crate::tag::load_with_limits(package, part.part().partname(), limits)?
+            .map(crate::tag::Source::into_list),
+    )
+}
+
+pub(crate) fn slide_shape_tags<'a, 'k>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape: impl Into<crate::shape::Key<'k>>,
+    limits: crate::tag::Limits,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<crate::tag::List>> {
+    Ok(
+        crate::tag::shape::load(package, part.part().partname(), shape, limits, shape_limits)?
+            .map(crate::tag::Source::into_list),
+    )
+}
+
+pub(crate) fn slide_shape_classification<'a, 'k>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<crate::shape::classification::Snapshot>> {
+    crate::shape::classification::load_with_limits(
+        package,
+        part.part().partname(),
+        shape,
+        shape_limits,
+    )
+}
+
+pub(crate) fn slide_shape_design_element<'a, 'k>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape: impl Into<crate::shape::Key<'k>>,
+    shape_limits: crate::shape::Limits,
+) -> Result<Option<crate::shape::designer::Snapshot>> {
+    crate::shape::designer::load_with_limits(package, part.part().partname(), shape, shape_limits)
+}
+
+pub(crate) fn slide_shape_designer_properties<'a, 'k>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape: impl Into<crate::shape::Key<'k>>,
+    limits: crate::shape::designer::Limits,
+    shape_limits: crate::shape::Limits,
+) -> Result<crate::shape::designer::properties::Snapshot> {
+    crate::shape::designer::load_properties_with_limits_and_shape_limits(
+        package,
+        part.part().partname(),
+        shape,
+        limits,
+        shape_limits,
+    )
+}
+
+pub(crate) fn slide_designer_tags<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::shape::designer::Limits,
+) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
+    let presentation = PresentationPart::from_package(package)?;
+    let mut selected = None;
+    for reference in presentation.slide_references()? {
+        let relationship = presentation
+            .part()
+            .rels()
+            .get(reference.relationship_id())
+            .ok_or_else(|| {
+                Error::Relationship(format!(
+                    "slide ID {} references missing relationship '{}'",
+                    reference.id(),
+                    reference.relationship_id()
+                ))
+            })?;
+        if relationship.is_external()
+            || !crate::parts::is_relationship_type(relationship.reltype(), rt::SLIDE, "slide")
+        {
+            return Err(Error::Relationship(format!(
+                "slide ID {} does not reference an internal slide",
+                reference.id()
+            )));
+        }
+        let target = relationship.target_partname()?;
+        let target_part = package.get_part(&target)?;
+        crate::parts::validate_content_type(target_part, ct::PML_SLIDE)?;
+        if target == *part.part().partname() && selected.replace(reference.id()).is_some() {
+            return Err(Error::Invalid(
+                "slide part is bound to multiple stable slide IDs".into(),
+            ));
+        }
+    }
+    let slide_id = selected
+        .ok_or_else(|| Error::Invalid("slide part has no exact stable slide-ID binding".into()))?;
+    crate::presentation_properties::metadata::designer_tags::load_snapshot_with_limits(
+        package, slide_id, limits,
+    )
+}
+
+pub(crate) fn slide_tag_inventory<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::tag::Limits,
+) -> Result<Vec<crate::tag::Source>> {
+    crate::tag::discover_with_limits(part.part(), package, limits)
+}
+
+pub(crate) fn slide_charts<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<Vec<crate::chart::Part<'a>>> {
+    part.charts(package)
+}
+
+pub(crate) fn slide_chart_extensions<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<Vec<crate::chart::extension::Part<'a>>> {
+    part.chart_extensions(package)
+}
+
+pub(crate) fn slide_comments<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<Option<crate::comments::ListPart<'a>>> {
+    part.comments(package)
+}
+
+pub(crate) fn slide_comment_snapshot<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::comments::Limits,
+) -> Result<Option<crate::presentation::related::Comments>> {
+    crate::presentation::related::load_eager_comments(package, part, limits)
+}
+
+pub(crate) fn slide_notes<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    shape_limits: crate::shape::Limits,
+    notes_limits: crate::notes::Limits,
+) -> Result<Option<crate::presentation::related::Notes>> {
+    crate::presentation::related::load_eager_notes(package, part, shape_limits, notes_limits)
+}
+
+pub(crate) fn slide_zooms<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<crate::shape::zoom::Owner> {
+    crate::shape::zoom::package::load_part(package, part)
+}
+
+pub(crate) fn slide_sync<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+    limits: crate::presentation_properties::metadata::slide_sync::Limits,
+) -> Result<Option<crate::presentation_properties::metadata::slide_sync::Properties>> {
+    let part_name = part.part().partname();
+    let mut matches = crate::presentation_properties::metadata::slide_sync::load(
+        package,
+        limits.constrained_by_source(package.read_limits()),
+    )?
+    .into_iter()
+    .filter(|entry| entry.slide_part_name == *part_name);
+    Ok(matches.next().map(|entry| entry.properties))
+}
+
+pub(crate) fn slide_layout<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<Option<SlideLayoutPart<'a>>> {
+    related_part_by_type(
+        package,
+        part.part(),
+        rt::SLIDE_LAYOUT,
+        "slideLayout",
+        ct::PML_SLIDE_LAYOUT,
+    )?
+    .map(SlideLayoutPart::from_part)
+    .transpose()
+}
+
+pub(crate) fn layout_theme_override<'a>(
+    package: &'a OpcPackage,
+    part: &SlideLayoutPart<'a>,
+) -> Result<Option<crate::shape::theme::Override>> {
+    crate::shape::theme::package::load_override(package, part.part().partname().as_str())
+}
+
+pub(crate) fn layout_master<'a>(
+    package: &'a OpcPackage,
+    part: &SlideLayoutPart<'a>,
+) -> Result<SlideMasterPart<'a>> {
+    part.master(package)
+}
+
+pub(crate) fn master_theme<'a>(
+    package: &'a OpcPackage,
+    part: &SlideMasterPart<'a>,
+) -> Result<Option<crate::shape::theme::ThemeSummary>> {
+    part.theme(package)
+}
+
+pub(crate) fn master_layouts<'a>(
+    package: &'a OpcPackage,
+    part: &SlideMasterPart<'a>,
+) -> Result<Vec<SlideLayoutPart<'a>>> {
+    part.layouts(package)
+}

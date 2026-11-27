@@ -1,0 +1,335 @@
+use super::chp::CharacterProperties;
+use super::fkp::ChpxFkp;
+use super::piece_table::PieceTable;
+/// `CHPBinTable` (Character Property Bin Table) parser.
+///
+/// Based on Apache POI's `CHPBinTable` class.
+/// This handles the two-level structure of character properties in DOC files:
+/// 1. `PlcfBteChpx`: Contains BTE entries with page numbers
+/// 2. CHPXFKP pages: 512-byte pages containing actual character runs
+///
+/// References:
+/// - org.apache.poi.hwpf.model.CHPBinTable
+/// - org.apache.poi.hwpf.model.CHPFormattedDiskPage
+/// - [MS-DOC] 2.8.5 `PlcfBteChpx`
+use crate::leniency::{ChpDefect, ToleranceReport};
+use litchi_core::binary::read_u32_le;
+
+/// A character run with properties.
+///
+/// Represents a contiguous range of text with the same formatting.
+#[derive(Debug, Clone)]
+pub struct CharacterRun {
+    /// Start character position
+    pub start_cp: u32,
+    /// End character position
+    pub end_cp: u32,
+    /// Character properties
+    pub properties: CharacterProperties,
+    /// Direct CHPX followed by piece modifiers, retained for style cascading.
+    pub(crate) direct_grpprl: Vec<u8>,
+}
+
+/// `CHPBinTable` - manages character property bin table.
+///
+/// Based on Apache POI's `CHPBinTable`.
+#[derive(Debug)]
+pub struct ChpBinTable {
+    /// All character runs extracted from FKP pages
+    runs: Vec<CharacterRun>,
+    /// Word-compatible repairs applied while the runs were parsed.
+    tolerance: ToleranceReport,
+}
+
+impl ChpBinTable {
+    /// Parse `CHPBinTable` from `PlcfBteChpx` data.
+    ///
+    /// # Arguments
+    ///
+    /// * `plcf_bte_chpx_data` - The `PlcfBteChpx` data from table stream
+    /// * `word_document` - The `WordDocument` stream (FKP pages are stored here!)
+    /// * `piece_table` - The piece table for FC-to-CP conversion
+    ///
+    /// # Returns
+    ///
+    /// Parsed `CHPBinTable` or None if invalid
+    #[must_use]
+    pub fn parse(
+        plcf_bte_chpx_data: &[u8],
+        word_document: &[u8],
+        piece_table: &PieceTable,
+    ) -> Option<Self> {
+        // PlcfBteChpx structure:
+        // - Array of FC positions (4 bytes each, n+1 entries)
+        // - Array of PnBteChpx structures (4 bytes each, n entries)
+        //
+        // Each PnBteChpx contains:
+        // - pn (PN): Page number (offset / 512) of CHPXFKP page
+
+        if plcf_bte_chpx_data.len() < 12 || !(plcf_bte_chpx_data.len() - 4).is_multiple_of(8) {
+            return None;
+        }
+
+        // Calculate number of BTE entries
+        // PlcfBteChpx structure: array of (n+1) FCs followed by n PnFkpChpx structures
+        // Each FC is 4 bytes, each PnFkpChpx is 4 bytes
+        // Size = (n+1)*4 + n*4 = 8n + 4
+        // So n = (size - 4) / 8
+        let n = (plcf_bte_chpx_data.len() - 4) / 8;
+
+        // Parsing PlcfBteChpx with n BTE entries
+        // Pre-allocate: estimate ~10 runs per FKP page (conservative estimate)
+        let estimated_runs = n.saturating_mul(10);
+        let mut all_runs = Vec::with_capacity(estimated_runs);
+        let mut tolerance = ToleranceReport::default();
+
+        // Parse each BTE entry
+        for i in 0..n {
+            // Read PN from PnFkpChpx array (starts after FC array)
+            let pn_offset = (n + 1) * 4 + i * 4;
+            if pn_offset + 4 > plcf_bte_chpx_data.len() {
+                continue;
+            }
+
+            let pn_raw = read_u32_le(plcf_bte_chpx_data, pn_offset).unwrap_or(0);
+
+            // PnFkpChpx structure (from [MS-DOC]):
+            // - Bits 0-21 (22 bits): pn (Page Number)
+            // - Bits 22-31 (10 bits): unused (MUST be ignored)
+            // The ChpxFkp structure begins at offset pn * 512 in WordDocument stream
+            let pn = pn_raw & 0x3FFFFF; // Mask to get 22-bit page number
+
+            // PN (Page Number) format:
+            // pageOffset = 512 * pn
+            // FKP pages are stored in the WordDocument stream, not table stream!
+            if pn == 0 {
+                // Invalid PN - skip this entry
+                continue;
+            }
+
+            let page_offset = (pn as usize) * 512;
+
+            if page_offset + 512 > word_document.len() {
+                // Page offset exceeds document size - skip
+                continue;
+            }
+
+            // Extract the 512-byte FKP page from WordDocument stream
+            let fkp_page = &word_document[page_offset..page_offset + 512];
+
+            // Parse CHPX FKP
+            if let Some(fkp) = ChpxFkp::parse(fkp_page, word_document) {
+                for entry in fkp.entries() {
+                    for (start_cp, end_cp) in
+                        piece_table.fc_range_to_cp_ranges(entry.fc, entry.end_fc)
+                    {
+                        let piece_modifier = piece_table
+                            .piece_for_cp(start_cp)
+                            .map(super::piece_table::TextPiece::property_modifier)
+                            .unwrap_or_default();
+                        let (properties, direct_grpprl) =
+                            Self::parse_chpx(&entry.grpprl, piece_modifier, i, &mut tolerance);
+                        all_runs.push(CharacterRun {
+                            start_cp,
+                            end_cp,
+                            properties,
+                            direct_grpprl,
+                        });
+                    }
+                }
+            }
+        }
+
+        // Sort runs by start CP, then by end CP
+        // This is essential for proper merging and overlap detection
+        all_runs.sort_unstable_by_key(|r| (r.start_cp, r.end_cp));
+
+        // Remove overlapping/duplicate runs and fix boundaries
+        // Following Apache POI's approach: consecutive CHPXs should not overlap
+        // Use retain_mut for in-place filtering (Rust 1.61+)
+        let mut last_end_cp = 0u32;
+
+        all_runs.retain_mut(|run| {
+            // Clamp run boundaries to avoid overlaps
+            if run.start_cp < last_end_cp {
+                // This run overlaps with the previous one - skip or adjust
+                if run.end_cp <= last_end_cp {
+                    // Completely contained in previous run - skip
+                    return false;
+                }
+                // Partially overlaps - adjust start to avoid overlap
+                run.start_cp = last_end_cp;
+            }
+
+            // Skip invalid runs
+            if run.start_cp >= run.end_cp {
+                return false;
+            }
+
+            last_end_cp = run.end_cp;
+            true
+        });
+
+        Some(Self {
+            runs: all_runs,
+            tolerance,
+        })
+    }
+
+    /// Parse CHPX data (grpprl) into `CharacterProperties`.
+    ///
+    /// Delegates to `CharacterProperties::from_sprm` for consistent behavior
+    /// with the full SPRM parser (handles `is_spec`, `is_obj`, `is_data` flags correctly).
+    #[inline]
+    ///
+    /// A run whose grpprl cannot be decoded reads with default character
+    /// properties and records [`ChpDefect::Run`] against its bin-table page;
+    /// operand repairs inside a run are recorded only when the run is kept.
+    fn parse_chpx(
+        grpprl: &[u8],
+        piece_modifier: &[u8],
+        page_index: usize,
+        tolerance: &mut ToleranceReport,
+    ) -> (CharacterProperties, Vec<u8>) {
+        if grpprl.is_empty() && piece_modifier.is_empty() {
+            return (CharacterProperties::default(), Vec::new());
+        }
+
+        let direct = [grpprl, piece_modifier].concat();
+
+        // Use the complete SPRM parser from CharacterProperties
+        // This ensures all flags (is_spec, is_obj, is_data, etc.) are set correctly
+        let mut run_repairs = ToleranceReport::default();
+        let properties = match CharacterProperties::from_sprm_recording(&direct, &mut run_repairs) {
+            Ok(properties) => {
+                tolerance.append(&run_repairs);
+                properties
+            },
+            Err(_) => {
+                tolerance.record(
+                    ChpDefect::Run,
+                    u16::try_from(page_index).unwrap_or(u16::MAX),
+                );
+                CharacterProperties::default()
+            },
+        };
+        (properties, direct)
+    }
+
+    /// Word-compatible repairs applied while the CHPX runs were parsed.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &ToleranceReport {
+        &self.tolerance
+    }
+
+    /// Get all character runs.
+    #[inline]
+    #[must_use]
+    pub fn runs(&self) -> &[CharacterRun] {
+        &self.runs
+    }
+
+    /// Find runs that overlap with a character position range.
+    ///
+    /// Returns an iterator to avoid unnecessary allocations.
+    /// Use `.collect()` only if you need a Vec.
+    pub fn runs_in_range(&self, start_cp: u32, end_cp: u32) -> impl Iterator<Item = &CharacterRun> {
+        // Parsing sorts starts and normalizes overlaps, so retained end positions are
+        // strictly increasing too. Skip every run ending before the query in O(log n),
+        // then stop as soon as starts can no longer overlap [start_cp, end_cp).
+        let first = self.runs.partition_point(|run| run.end_cp <= start_cp);
+        self.runs[first..]
+            .iter()
+            .take_while(move |run| run.start_cp < end_cp)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{CharacterRun, ChpBinTable};
+    use crate::parts::chp::CharacterProperties;
+
+    fn table(ranges: &[(u32, u32)]) -> ChpBinTable {
+        ChpBinTable {
+            runs: ranges
+                .iter()
+                .map(|&(start_cp, end_cp)| CharacterRun {
+                    start_cp,
+                    end_cp,
+                    properties: CharacterProperties::default(),
+                    direct_grpprl: Vec::new(),
+                })
+                .collect(),
+            tolerance: crate::leniency::ToleranceReport::default(),
+        }
+    }
+
+    fn indexed_ranges(table: &ChpBinTable, start_cp: u32, end_cp: u32) -> Vec<(u32, u32)> {
+        table
+            .runs_in_range(start_cp, end_cp)
+            .map(|run| (run.start_cp, run.end_cp))
+            .collect()
+    }
+
+    fn scalar_ranges(table: &ChpBinTable, start_cp: u32, end_cp: u32) -> Vec<(u32, u32)> {
+        table
+            .runs()
+            .iter()
+            .filter(|run| run.end_cp > start_cp && run.start_cp < end_cp)
+            .map(|run| (run.start_cp, run.end_cp))
+            .collect()
+    }
+
+    #[test]
+    fn indexed_range_query_matches_scalar_overlap_boundaries() {
+        let cases = [
+            table(&[]),
+            table(&[(0, 1)]),
+            table(&[(0, 5), (5, 10), (20, 30), (31, u32::MAX)]),
+            table(&[(0, 1), (2, 3), (4, 5), (6, 7), (8, 9)]),
+        ];
+        let queries = [
+            (0, 0),
+            (0, 1),
+            (1, 1),
+            (1, 5),
+            (5, 10),
+            (10, 5),
+            (10, 20),
+            (20, 21),
+            (30, 31),
+            (31, u32::MAX),
+            (u32::MAX, u32::MAX),
+            (0, u32::MAX),
+        ];
+
+        for table in &cases {
+            for &(start_cp, end_cp) in &queries {
+                assert_eq!(
+                    indexed_ranges(table, start_cp, end_cp),
+                    scalar_ranges(table, start_cp, end_cp),
+                    "query [{start_cp}, {end_cp})"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn indexed_range_query_preserves_run_identity_and_order() {
+        let table = table(&[(0, 3), (3, 8), (12, 18), (18, 21)]);
+        let indexed: Vec<_> = table.runs_in_range(2, 19).collect();
+        let scalar: Vec<_> = table
+            .runs()
+            .iter()
+            .filter(|run| run.end_cp > 2 && run.start_cp < 19)
+            .collect();
+
+        assert_eq!(indexed.len(), scalar.len());
+        assert!(
+            indexed
+                .iter()
+                .zip(scalar)
+                .all(|(indexed, scalar)| std::ptr::eq(*indexed, scalar))
+        );
+    }
+}

@@ -1,0 +1,281 @@
+//! Worksheet and shared-string BIFF12 stream materialization.
+
+use super::super::model::Workbook;
+use crate::package::error::Result;
+use crate::package::formula::Context;
+use crate::package::shared_strings::SharedString;
+use crate::raw::{Records, kind};
+use crate::sheet::Worksheet;
+use litchi_core::binary;
+use litchi_opc::constants::relationship_type;
+use std::io::Cursor;
+
+impl Workbook {
+    pub fn worksheet(&self, index: usize) -> Result<Worksheet> {
+        let worksheet = self.cached_worksheet(index)?;
+        Ok((*worksheet).clone())
+    }
+
+    pub(crate) fn parse_worksheet(
+        &self,
+        index: usize,
+        catalog_position: usize,
+    ) -> Result<Worksheet> {
+        let name = self
+            .formula_context
+            .worksheet_names
+            .get(catalog_position)
+            .ok_or({
+                crate::package::error::Error::InvalidFormat(
+                    "Worksheet catalog position out of bounds",
+                )
+            })?;
+        let rel_id = self
+            .worksheet_rel_ids
+            .get(catalog_position)
+            .and_then(Option::as_deref)
+            .ok_or({
+                crate::package::error::Error::UnsupportedFeature(
+                    "sheet has no worksheet relationship",
+                )
+            })?;
+        let workbook_part = self.package.main_document_part()?;
+        let relationship =
+            workbook_part
+                .rels()
+                .get(rel_id)
+                .ok_or(crate::package::error::Error::FileNotFound(
+                    "relationship for sheet",
+                ))?;
+        if relationship.is_external() {
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "sheet has an external worksheet relationship",
+            ));
+        }
+        let sheet_uri = relationship.target_partname()?;
+
+        let sheet_part = self.package.get_part(&sheet_uri)?;
+        let comments_uri = {
+            let mut relationships = sheet_part
+                .rels()
+                .iter()
+                .filter(|rel| rel.reltype() == relationship_type::COMMENTS);
+            let first = relationships.next();
+            if relationships.next().is_some() {
+                return Err(crate::package::error::Error::Unrecognized {
+                    typ: "worksheet comments relationship",
+                    val: "multiple relationships",
+                });
+            }
+            match first {
+                Some(rel) if rel.is_external() => {
+                    return Err(crate::package::error::Error::UnsupportedFeature(
+                        "external XLSB comments part",
+                    ));
+                },
+                Some(rel) => Some(rel.target_partname()?),
+                None => None,
+            }
+        };
+        let blob = sheet_part.blob();
+        let cursor = Cursor::new(blob);
+        let mut worksheet = Self::read_worksheet(
+            cursor,
+            name.clone(),
+            &self.shared_strings,
+            &self.formula_context,
+            catalog_position,
+            self.styles.cell_xfs.len(),
+            self.raw_limits,
+            self.leniency,
+        )?;
+        worksheet.set_scenarios(crate::package::scenarios::parse_worksheet(
+            blob,
+            self.raw_limits,
+        )?);
+        worksheet.set_slicers(
+            crate::slicer::package::load_views(&self.package, &sheet_uri, self.raw_limits)?
+                .map(|part| part.views),
+        );
+        worksheet.set_timelines(
+            crate::timeline::package::load_views(
+                &self.package,
+                &sheet_uri,
+                self.semantic_limits.xml_parts_value(),
+            )?
+            .map(|part| part.views),
+        );
+        worksheet.set_sparkline_groups(self.sparklines(index)?.groups().cloned());
+        if let Some(uri) = comments_uri {
+            let part = self.package.get_part(&uri)?;
+            if !part.rels().is_empty() {
+                return Err(crate::package::error::Error::Unrecognized {
+                    typ: "Comments part",
+                    val: "relationships are not permitted",
+                });
+            }
+            for comment in crate::comments::read_recording(
+                part.blob(),
+                self.raw_limits,
+                worksheet.tolerance_report_mut(),
+            )? {
+                worksheet.add_comment(comment);
+            }
+        }
+        Ok(worksheet)
+    }
+
+    /// Read shared strings from SST
+    pub(in crate::workbook) fn read_shared_strings(
+        iter: &mut Records<'_>,
+        strings: &mut Vec<SharedString>,
+        report: &mut crate::leniency::ToleranceReport,
+        raw_limits: crate::raw::Limits,
+    ) -> Result<()> {
+        let initial_count = strings.len();
+        let mut expected_unique = None;
+        let mut ended = false;
+        for record in iter.by_ref() {
+            let record = record?;
+            match record.kind() {
+                kind::BEGIN_SST => {
+                    if expected_unique.is_some() {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtBeginSst",
+                            val: "duplicate record",
+                        });
+                    }
+                    if record.payload().len() != 8 {
+                        return Err(crate::package::error::Error::InvalidLength {
+                            expected: 8,
+                            found: record.payload().len(),
+                        });
+                    }
+                    let total = binary::read_u32_le_at(record.payload(), 0)?;
+                    let unique = binary::read_u32_le_at(record.payload(), 4)?;
+                    if total > 0x7FFF_FFFF || unique > total {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtBeginSst counts",
+                            val: "total=, unique=",
+                        });
+                    }
+                    expected_unique = Some(unique as usize);
+                },
+                kind::SST_ITEM => {
+                    let expected = expected_unique.ok_or({
+                        crate::package::error::Error::Unrecognized {
+                            typ: "BrtSSTItem",
+                            val: "record before BrtBeginSst",
+                        }
+                    })?;
+                    let found = strings.len() - initial_count;
+                    if found >= expected {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtSSTItem count",
+                            val: "more than declared",
+                        });
+                    }
+                    let location = u32::try_from(found).unwrap_or(u32::MAX);
+                    strings.push(SharedString::parse_with(
+                        record.payload(),
+                        &mut crate::leniency::Tolerance::recording(report),
+                        kind::SST_ITEM,
+                        location,
+                        raw_limits,
+                    )?);
+                },
+                kind::END_SST => {
+                    if !record.payload().is_empty() {
+                        return Err(crate::package::error::Error::InvalidLength {
+                            expected: 0,
+                            found: record.payload().len(),
+                        });
+                    }
+                    let expected = expected_unique.ok_or({
+                        crate::package::error::Error::Unrecognized {
+                            typ: "BrtEndSst",
+                            val: "record before BrtBeginSst",
+                        }
+                    })?;
+                    let found = strings.len() - initial_count;
+                    if found != expected {
+                        return Err(crate::package::error::Error::Unrecognized {
+                            typ: "BrtSSTItem count",
+                            val: "declared",
+                        });
+                    }
+                    ended = true;
+                    break;
+                },
+                _ => {
+                    // Skip other records
+                },
+            }
+        }
+        if expected_unique.is_none() {
+            return Err(crate::package::error::Error::Unrecognized {
+                typ: "SST stream",
+                val: "missing BrtBeginSst",
+            });
+        }
+        if !ended {
+            return Err(crate::package::error::Error::Unrecognized {
+                typ: "SST stream",
+                val: "missing BrtEndSst",
+            });
+        }
+        Ok(())
+    }
+
+    pub(in crate::workbook) fn read_worksheet(
+        cursor: Cursor<&[u8]>,
+        name: String,
+        shared_strings: &[SharedString],
+        formula_context: &Context,
+        sheet_index: usize,
+        cell_xf_count: usize,
+        raw_limits: crate::raw::Limits,
+        leniency: crate::leniency::Leniency,
+    ) -> Result<Worksheet> {
+        let mut worksheet = Worksheet::new(name);
+        let iter = crate::package::records::Stream::new(cursor, raw_limits);
+        let formula_context = formula_context.for_sheet(sheet_index);
+        let mut cells_reader = crate::package::cells_reader::CellsReader::new(
+            iter,
+            shared_strings,
+            &formula_context,
+            cell_xf_count,
+            raw_limits,
+            leniency,
+        )?;
+
+        // Read all cells
+        while let Some(cell) = cells_reader.next_cell()? {
+            worksheet.add_cell(cell);
+        }
+
+        // Transfer advanced features from reader to worksheet
+        for merged in cells_reader.merged_cells {
+            worksheet.add_merged_cell(merged);
+        }
+        for hyperlink in cells_reader.hyperlinks {
+            worksheet.add_hyperlink(hyperlink);
+        }
+        worksheet.set_column_infos(cells_reader.column_infos);
+        worksheet.set_row_infos(cells_reader.row_infos);
+        worksheet.set_auto_filter(cells_reader.auto_filter);
+        worksheet.set_sheet_protection(cells_reader.sheet_protection);
+        worksheet.set_strong_sheet_protection(cells_reader.strong_sheet_protection);
+        worksheet.set_data_validations(
+            cells_reader.data_validation_settings,
+            cells_reader.data_validation14_settings,
+            cells_reader.data_validations,
+        );
+        worksheet.set_conditional_formattings(cells_reader.conditional_formattings);
+        worksheet.set_web_extension_bindings(cells_reader.web_extension_bindings);
+        worksheet.set_views(cells_reader.views);
+        worksheet.set_tolerance_report(cells_reader.tolerance);
+
+        Ok(worksheet)
+    }
+}

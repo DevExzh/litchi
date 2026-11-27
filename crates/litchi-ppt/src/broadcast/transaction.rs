@@ -1,0 +1,566 @@
+//! Source-checked semantic edits for one broadcast metadata container.
+
+use std::sync::Arc;
+
+use crate::package::{Error, Result, SourceLimits};
+use crate::records::Record;
+
+use super::codec;
+use super::model::{Broadcast, BroadcastProperties, UnknownRecord};
+
+/// Deterministic identity of one exact serialized broadcast container.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct Revision(u64);
+
+impl Revision {
+    fn from_bytes(bytes: &[u8]) -> Self {
+        let mut value = 0xcbf2_9ce4_8422_2325u64 ^ bytes.len() as u64;
+        for byte in bytes {
+            value ^= u64::from(*byte);
+            value = value.wrapping_mul(0x0000_0100_0000_01b3);
+        }
+        Self(value)
+    }
+
+    /// Compact source fingerprint suitable for optimistic owner checks.
+    #[must_use]
+    pub const fn value(self) -> u64 {
+        self.0
+    }
+}
+
+/// One typed replacement staged by a broadcast transaction.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) enum Change {
+    /// Replace the complete typed broadcast projection while retaining opaque
+    /// source children owned by the snapshot.
+    Replace { before: Broadcast, after: Broadcast },
+}
+
+impl Change {
+    fn inverse(&self) -> Self {
+        match self {
+            Self::Replace { before, after } => Self::Replace {
+                before: after.clone(),
+                after: before.clone(),
+            },
+        }
+    }
+}
+
+/// Immutable, lossless snapshot of one complete
+/// `BroadcastDocInfo9Container` record.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Snapshot {
+    bytes: Arc<[u8]>,
+    broadcast: Broadcast,
+    unknown_records: Vec<UnknownRecord>,
+    revision: Revision,
+    limits: SourceLimits,
+}
+
+impl Snapshot {
+    /// Parse exactly one complete broadcast container and retain its source.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn parse(bytes: impl AsRef<[u8]>, limits: &SourceLimits) -> Result<Self> {
+        let source = bytes.as_ref();
+        let (record, consumed) = Record::parse_strict_with_limits(source, 0, *limits)?;
+        if consumed != source.len() {
+            return Err(Error::Corrupted(
+                "broadcast snapshot contains trailing bytes".into(),
+            ));
+        }
+        Self::from_record_and_bytes(&record, source.to_vec(), *limits)
+    }
+
+    /// Capture owned source bytes without a caller-side borrow.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_bytes(bytes: Vec<u8>, limits: &SourceLimits) -> Result<Self> {
+        Self::parse(bytes, limits)
+    }
+
+    /// Capture a validated typed broadcast using canonical source bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn from_broadcast(broadcast: &Broadcast, limits: &SourceLimits) -> Result<Self> {
+        let record = broadcast.to_record()?;
+        let bytes = codec::record_bytes(
+            record.version,
+            record.instance,
+            record.record_type_raw,
+            &record.data,
+        )?;
+        Self::parse(bytes, limits)
+    }
+
+    fn from_record_and_bytes(
+        record: &Record,
+        bytes: Vec<u8>,
+        limits: SourceLimits,
+    ) -> Result<Self> {
+        let parsed = codec::parse_lossless(record)?;
+        let shared: Arc<[u8]> = Arc::from(bytes.into_boxed_slice());
+        Ok(Self {
+            revision: Revision::from_bytes(&shared),
+            bytes: shared,
+            broadcast: parsed.value,
+            unknown_records: parsed.unknown_records,
+            limits,
+        })
+    }
+
+    /// Borrow the typed broadcast projection.
+    #[must_use]
+    pub const fn broadcast(&self) -> &Broadcast {
+        &self.broadcast
+    }
+
+    /// Borrow source-order opaque child records.
+    #[must_use]
+    pub fn unknown_records(&self) -> &[UnknownRecord] {
+        &self.unknown_records
+    }
+
+    /// Exact source or committed record bytes.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Compact identity of the exact serialized source.
+    #[must_use]
+    pub const fn revision(&self) -> Revision {
+        self.revision
+    }
+
+    /// Start an isolated semantic edit.
+    #[must_use]
+    pub(crate) fn edit(&self) -> Transaction {
+        Transaction {
+            source: self.clone(),
+            candidate: self.broadcast.clone(),
+            changes: Vec::new(),
+        }
+    }
+}
+
+/// Isolated, failure-atomic editor over one source snapshot.
+#[derive(Debug, Clone)]
+pub(crate) struct Transaction {
+    source: Snapshot,
+    candidate: Broadcast,
+    changes: Vec<Change>,
+}
+
+impl Transaction {
+    /// Current typed broadcast projection.
+    #[must_use]
+    pub(crate) const fn broadcast(&self) -> &Broadcast {
+        &self.candidate
+    }
+
+    /// Opaque source records retained by every candidate publication.
+    #[must_use]
+    pub(crate) fn unknown_records(&self) -> &[UnknownRecord] {
+        self.source.unknown_records()
+    }
+
+    /// Whether staged semantics differ from the source projection.
+    #[must_use]
+    fn has_net_change(&self) -> bool {
+        self.candidate != self.source.broadcast
+    }
+
+    /// Typed operations staged in transaction order.
+    #[must_use]
+    pub(crate) fn changes(&self) -> &[Change] {
+        &self.changes
+    }
+
+    /// Replace all typed broadcast fields atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn replace(&mut self, replacement: Broadcast) -> Result<()> {
+        replacement.validate()?;
+        self.replace_candidate(replacement)
+    }
+
+    /// Set one optional inert title.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_title(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.title, value)
+    }
+
+    /// Set one optional inert description.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_description(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.description, value)
+    }
+
+    /// Set one optional inert speaker name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_speaker(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.speaker, value)
+    }
+
+    /// Set one optional inert contact name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_contact(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.contact, value)
+    }
+
+    /// Set one optional inert remote server name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_remote_server_name(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.remote_server_name, value)
+    }
+
+    /// Set one optional inert email address.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_email_address(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.email_address, value)
+    }
+
+    /// Set one optional inert email display name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_email_name(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.email_name, value)
+    }
+
+    /// Set one optional inert HTTP chat URL.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_chat_url(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.chat_url, value)
+    }
+
+    /// Set one optional inert archive directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_archive_directory(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.archive_directory, value)
+    }
+
+    /// Set one optional inert `NetShow` base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_netshow_files_base_directory(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(
+            |broadcast| &mut broadcast.netshow_files_base_directory,
+            value,
+        )
+    }
+
+    /// Set one optional inert `NetShow` directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_netshow_files_directory(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.netshow_files_directory, value)
+    }
+
+    /// Set one optional inert `NetShow` server name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_netshow_server_name(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.netshow_server_name, value)
+    }
+
+    /// Set one optional inert calendar entry identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_entry_id(&mut self, value: Option<String>) -> Result<()> {
+        self.set_optional_string(|broadcast| &mut broadcast.entry_id, value)
+    }
+
+    /// Set the inert `PowerPoint` files base directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_ppt_files_base_directory(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(
+            |broadcast| &mut broadcast.ppt_files_base_directory,
+            value.into(),
+        )
+    }
+
+    /// Set the inert `PowerPoint` files directory.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_ppt_files_directory(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(|broadcast| &mut broadcast.ppt_files_directory, value.into())
+    }
+
+    /// Set the inert `PowerPoint` files base URL or UNC path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_ppt_files_base_url(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(|broadcast| &mut broadcast.ppt_files_base_url, value.into())
+    }
+
+    /// Set the inert user-name file fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_user_name(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(|broadcast| &mut broadcast.user_name, value.into())
+    }
+
+    /// Set the inert broadcast date/time file fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_broadcast_date_time(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(|broadcast| &mut broadcast.broadcast_date_time, value.into())
+    }
+
+    /// Set the inert presentation-name file fragment.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_presentation_name(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(|broadcast| &mut broadcast.presentation_name, value.into())
+    }
+
+    /// Set the inert ASD file UNC path.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_asd_file_name(&mut self, value: impl Into<String>) -> Result<()> {
+        self.set_required_string(|broadcast| &mut broadcast.asd_file_name, value.into())
+    }
+
+    /// Replace the typed broadcast flags and inert timestamps atomically.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn set_properties(&mut self, value: BroadcastProperties) -> Result<()> {
+        let mut candidate = self.candidate.clone();
+        candidate.properties = value;
+        self.replace_candidate(candidate)
+    }
+
+    /// Publish the candidate atomically with a reversible source-checked patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn commit(self) -> Result<Commit> {
+        let snapshot = self.build_snapshot()?;
+        let changes = if snapshot.bytes == self.source.bytes {
+            Vec::new()
+        } else {
+            self.changes
+        };
+        let patch = Patch {
+            base: self.source.revision,
+            target: snapshot.revision,
+            before: self.source.bytes.clone(),
+            after: snapshot.bytes.clone(),
+            changes,
+        };
+        Ok(Commit { snapshot, patch })
+    }
+
+    fn set_optional_string(
+        &mut self,
+        set: impl FnOnce(&mut Broadcast) -> &mut Option<String>,
+        value: Option<String>,
+    ) -> Result<()> {
+        let mut candidate = self.candidate.clone();
+        *set(&mut candidate) = value;
+        self.replace_candidate(candidate)
+    }
+
+    fn set_required_string(
+        &mut self,
+        set: impl FnOnce(&mut Broadcast) -> &mut String,
+        value: String,
+    ) -> Result<()> {
+        let mut candidate = self.candidate.clone();
+        *set(&mut candidate) = value;
+        self.replace_candidate(candidate)
+    }
+
+    fn replace_candidate(&mut self, candidate: Broadcast) -> Result<()> {
+        candidate.validate()?;
+        if candidate == self.candidate {
+            return Ok(());
+        }
+        let before = std::mem::replace(&mut self.candidate, candidate.clone());
+        self.changes.push(Change::Replace {
+            before,
+            after: candidate,
+        });
+        Ok(())
+    }
+
+    fn build_snapshot(&self) -> Result<Snapshot> {
+        if !self.has_net_change() {
+            return Ok(self.source.clone());
+        }
+        let record = self
+            .candidate
+            .to_record_lossless(&self.source.unknown_records)?;
+        let bytes = codec::record_bytes(
+            record.version,
+            record.instance,
+            record.record_type_raw,
+            &record.data,
+        )?;
+        Snapshot::parse(bytes, &self.source.limits)
+    }
+}
+
+/// A successful immutable target and its source-checked patch.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Commit {
+    snapshot: Snapshot,
+    patch: Patch,
+}
+
+impl Commit {
+    /// Published target snapshot.
+    #[must_use]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
+        &self.snapshot
+    }
+
+    /// Reversible patch from source to target.
+    #[must_use]
+    pub(crate) const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Split the commit into its target and patch.
+    #[must_use]
+    pub(crate) fn into_parts(self) -> (Snapshot, Patch) {
+        (self.snapshot, self.patch)
+    }
+}
+
+/// A source-checked reversible patch for one complete broadcast container.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct Patch {
+    base: Revision,
+    target: Revision,
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+    changes: Vec<Change>,
+}
+
+impl Patch {
+    /// Typed operations represented by this patch.
+    #[must_use]
+    pub(crate) fn changes(&self) -> &[Change] {
+        &self.changes
+    }
+
+    /// Exact source bytes bound to this patch.
+    #[must_use]
+    pub(crate) fn before(&self) -> &[u8] {
+        &self.before
+    }
+
+    /// Exact target bytes produced by this patch.
+    #[must_use]
+    pub(crate) fn after(&self) -> &[u8] {
+        &self.after
+    }
+
+    /// Whether this patch is an exact byte-for-byte no-op.
+    #[must_use]
+    pub(crate) fn is_empty(&self) -> bool {
+        self.before.as_ref() == self.after.as_ref()
+    }
+
+    /// Apply only to the exact source snapshot used to create this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn apply(&self, current: &Snapshot) -> Result<Snapshot> {
+        if current.revision != self.base || current.bytes.as_ref() != self.before.as_ref() {
+            return Err(Error::InvalidFormat(
+                "broadcast patch source does not match its base snapshot".into(),
+            ));
+        }
+        if self.is_empty() {
+            return Ok(current.clone());
+        }
+        Snapshot::parse(self.after.as_ref(), &current.limits)
+    }
+
+    /// Apply the inverse to the exact committed target.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub(crate) fn undo(&self, current: &Snapshot) -> Result<Snapshot> {
+        self.inverse().apply(current)
+    }
+
+    /// Build a source-checked inverse patch.
+    #[must_use]
+    pub(crate) fn inverse(&self) -> Self {
+        Self {
+            base: self.target,
+            target: self.base,
+            before: self.after.clone(),
+            after: self.before.clone(),
+            changes: self.changes.iter().rev().map(Change::inverse).collect(),
+        }
+    }
+}

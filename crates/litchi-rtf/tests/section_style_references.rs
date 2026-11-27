@@ -1,0 +1,131 @@
+mod repair_support;
+
+use litchi_rtf::raw::Tree;
+use litchi_rtf::{SectionProperties, StyleType, write::Writer};
+
+#[test]
+fn retains_grouped_references_inherits_sections_and_sectd_resets() {
+    let inherited = Tree::parse(
+        concat!(
+            r#"{\rtf1{\stylesheet{\*\ds5 Declared Section;}}"#,
+            r#"\sectd\ds5{\ds6}First\sect\lndscpsxn Second}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+
+    assert!(
+        inherited
+            .stylesheet()
+            .get_typed(StyleType::Section, 5)
+            .is_some()
+    );
+    assert_eq!(inherited.sections().len(), 2);
+    assert_eq!(inherited.sections()[0].properties.section_style, Some(6));
+    assert_eq!(inherited.sections()[1].properties.section_style, Some(6));
+
+    let reset = Tree::parse(
+        r"{\rtf1\sectd\ds6 First\sect\sectd Second}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(reset.sections().len(), 2);
+    assert_eq!(reset.sections()[0].properties.section_style, Some(6));
+    assert_eq!(reset.sections()[1].properties.section_style, None);
+}
+
+#[test]
+fn preserves_zero_maximum_omission_and_public_mutation() {
+    let document = Tree::parse(
+        r"{\rtf1\sectd\ds0 First\sect\sectd\ds65535 Second\sect\sectd Third}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert_eq!(document.sections()[0].properties.section_style, Some(0));
+    assert_eq!(
+        document.sections()[1].properties.section_style,
+        Some(65_535)
+    );
+    assert_eq!(document.sections()[2].properties.section_style, None);
+
+    let mut properties = SectionProperties::default();
+    properties.set_section_style(Some(0));
+    assert_eq!(properties.section_style, Some(0));
+    properties.set_section_style(None);
+    assert_eq!(properties, SectionProperties::default());
+}
+
+#[test]
+fn rejects_malformed_body_and_stylesheet_handles_and_duplicate_selectors() {
+    for source in [
+        r"{\rtf1\sectd\ds Body}",
+        r"{\rtf1\sectd\ds-1 Body}",
+        r"{\rtf1\sectd\ds65536 Body}",
+        r"{\rtf1{\stylesheet{\*\ds Missing;}}}",
+        r"{\rtf1{\stylesheet{\*\ds-1 Negative;}}}",
+        r"{\rtf1{\stylesheet{\*\ds65536 Overflow;}}}",
+        r"{\rtf1{\stylesheet{\ds1 Unstarred;}}}",
+        r"{\rtf1{\stylesheet{\*\b\ds1 Late;}}}",
+        r"{\rtf1{\stylesheet{\*\ds1\ds2 Duplicate;}}}",
+    ] {
+        assert!(
+            repair_support::rejected_or_parameter_repaired(&Tree::parse(
+                source,
+                litchi_rtf::read::OpenOptions::default()
+            )),
+            "accepted {source}"
+        );
+    }
+
+    let inert = Tree::parse(
+        r"{\rtf1{\field{\*\fldinst TEST \ds65536}{\fldrslt Result}}Body}",
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    assert!(
+        inert
+            .sections()
+            .iter()
+            .all(|section| section.properties.section_style.is_none())
+    );
+}
+
+#[test]
+fn writer_is_canonical_and_round_trip_is_stable_without_resolving_styles() {
+    let document = Tree::parse(
+        concat!(
+            r#"{\rtf1{\stylesheet{\*\ds3 Declared Section;}}"#,
+            r#"\sectd\ds3\lndscpsxn Body}"#,
+        ),
+        litchi_rtf::read::OpenOptions::default(),
+    )
+    .unwrap();
+    let original = document.sections()[0].properties.clone();
+
+    let mut first = Vec::new();
+    Writer::new(&mut first).write_document(&document).unwrap();
+    let serialized = String::from_utf8(first.clone()).unwrap();
+    assert!(serialized.contains(r"\sectd\ds3"));
+
+    let reparsed = Tree::parse_bytes(&first, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert_eq!(reparsed.stylesheet(), document.stylesheet());
+    assert_eq!(reparsed.sections()[0].properties, original);
+    let mut second = Vec::new();
+    Writer::new(&mut second).write_document(&reparsed).unwrap();
+    assert_eq!(first, second);
+}
+
+#[test]
+fn parses_libreoffice_section_fixture_without_materializing_a_reference() {
+    let source = include_bytes!(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/tdf100507.rtf"
+    ));
+    let document = Tree::parse_bytes(source, litchi_rtf::read::OpenOptions::default()).unwrap();
+    assert!(
+        document
+            .sections()
+            .iter()
+            .all(|section| section.properties.section_style.is_none())
+    );
+}

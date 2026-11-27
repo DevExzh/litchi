@@ -1,0 +1,188 @@
+use litchi_odc::{
+    AxisSpec, AxisUpdate, Builder, ChartClass, Definition, Package, chart::Dimension,
+};
+use litchi_odf_common::core::PackageWriter;
+use soapberry_zip::office::StreamingArchiveWriter;
+
+fn source_definition() -> Definition {
+    let mut definition = Definition::new(ChartClass::bar());
+    let mut horizontal = AxisSpec::new(Dimension::X);
+    horizontal.name = Some("primary-x".to_string());
+    definition.plot_area.axes.push(horizontal);
+    let mut vertical = AxisSpec::new(Dimension::Y);
+    vertical.name = Some("primary-y".to_string());
+    definition.plot_area.axes.push(vertical);
+    definition
+}
+
+fn package(content: &str, auxiliary: Option<(&str, &[u8])>) -> Vec<u8> {
+    let mut writer = PackageWriter::new(litchi_odf_common::core::StreamingArchiveLimits::default());
+    writer
+        .set_mimetype("application/vnd.oasis.opendocument.chart")
+        .unwrap();
+    writer.add_file("content.xml", content.as_bytes()).unwrap();
+    if let Some((path, bytes)) = auxiliary {
+        writer.add_file(path, bytes).unwrap();
+    }
+    writer.finish_to_bytes().unwrap()
+}
+
+fn raw_negative_fixture_package(content: &str) -> Vec<u8> {
+    const MIMETYPE: &[u8] = b"application/vnd.oasis.opendocument.chart";
+    const MANIFEST: &[u8] = br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.chart"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#;
+    let mut archive =
+        StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+    archive.write_stored("mimetype", MIMETYPE).unwrap();
+    archive
+        .write_deflated("content.xml", content.as_bytes())
+        .unwrap();
+    archive
+        .write_deflated("META-INF/manifest.xml", MANIFEST)
+        .unwrap();
+    archive.finish_to_bytes().unwrap()
+}
+
+#[test]
+fn package_axis_transaction_is_atomic_exact_source_checked_and_reversible() {
+    let source = Builder::new()
+        .with_definition(source_definition())
+        .build()
+        .unwrap();
+    let no_op = source.edit().commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+
+    let mut edit = source.edit();
+    edit.update_axis(0, AxisUpdate::named("revenue&amp<2026>"))
+        .unwrap();
+    edit.update_axis(1, AxisUpdate::unnamed()).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert_eq!(commit.patch().changes().len(), 2);
+    assert!(commit.patch().is_applicable_to(&source));
+    assert!(
+        commit
+            .package()
+            .chart()
+            .content_xml()
+            .contains("chart:name=\"revenue&amp;amp&lt;2026&gt;\"")
+    );
+    assert!(!commit.package().chart().content_xml().contains("primary-y"));
+    assert!(!commit.package().chart().content_xml().contains("><\n<"));
+    assert!(!commit.package().chart().content_xml().contains("><\r\n<"));
+
+    let stale = Builder::new()
+        .with_definition(Definition::new(ChartClass::line()))
+        .build()
+        .unwrap();
+    assert!(!commit.patch().is_applicable_to(&stale));
+    assert!(stale.apply(commit.patch()).is_err());
+
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
+}
+
+#[test]
+fn package_edit_preserves_auxiliary_payloads_refuses_signatures_and_splices_pretty_xml() {
+    let content = litchi_odc::serialize_content(&source_definition()).unwrap();
+    let bytes = package(&content, Some(("Pictures/keep.bin", b"keep-exact")));
+    let source = Package::from_bytes(&bytes).unwrap();
+    let mut edit = source.edit();
+    edit.update_axis(0, AxisUpdate::named("changed")).unwrap();
+    let committed = edit.commit().unwrap().into_package();
+    let archive =
+        litchi_odf_common::core::OwnedPackage::from_bytes(committed.to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        archive.get_file("Pictures/keep.bin").unwrap(),
+        b"keep-exact"
+    );
+
+    let signed = Package::from_bytes(&package(
+        &content,
+        Some(("META-INF/documentsignatures.xml", b"<signatures/>")),
+    ))
+    .unwrap();
+    let mut signed_edit = signed.edit();
+    signed_edit
+        .update_axis(0, AxisUpdate::named("blocked"))
+        .unwrap();
+    assert!(signed_edit.commit().is_err());
+
+    let pretty = content.replacen("><", ">\n<", 1);
+    let pretty_chart = Package::from_bytes(&raw_negative_fixture_package(&pretty)).unwrap();
+    let mut pretty_edit = pretty_chart.edit();
+    pretty_edit
+        .update_axis(0, AxisUpdate::styled("producer-style"))
+        .unwrap();
+    let pretty_commit = pretty_edit.commit().unwrap();
+    assert!(
+        pretty_commit
+            .package()
+            .chart()
+            .content_xml()
+            .contains(">\n<")
+    );
+    assert_eq!(
+        pretty_commit
+            .package()
+            .chart()
+            .plot_area()
+            .unwrap()
+            .axes()
+            .next()
+            .unwrap()
+            .style_name(),
+        Some("producer-style")
+    );
+    assert_eq!(
+        pretty_commit
+            .package()
+            .apply(&pretty_commit.patch().inverse())
+            .unwrap()
+            .into_package()
+            .as_bytes(),
+        pretty_chart.as_bytes()
+    );
+}
+
+#[test]
+fn explicit_chart_replacement_publishes_full_typed_definition_and_is_reversible() {
+    let original = source_definition();
+    let source = Builder::new()
+        .with_definition(original.clone())
+        .build()
+        .unwrap();
+    let mut no_op_edit = source.edit();
+    no_op_edit.replace_chart(&original).unwrap();
+    let no_op = no_op_edit.commit().unwrap();
+    assert!(!no_op.diagnostics().changed());
+    assert_eq!(no_op.package().as_bytes(), source.as_bytes());
+
+    let mut replacement = Definition::new(ChartClass::ring());
+    replacement.title = Some(litchi_odc::Text::new("Quarterly totals"));
+    let mut category_axis = AxisSpec::new(Dimension::X);
+    category_axis.name = Some("categories".to_string());
+    replacement.plot_area.axes.push(category_axis);
+
+    let mut edit = source.edit();
+    edit.replace_chart(&replacement).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert!(commit.patch().replaces_chart());
+    assert!(commit.patch().changes().is_empty());
+    assert_eq!(
+        commit.package().chart().class().unwrap().kind(),
+        replacement.class.kind()
+    );
+    assert!(
+        commit
+            .package()
+            .chart()
+            .content_xml()
+            .contains("<text:p>Quarterly totals</text:p>")
+    );
+    assert!(!commit.package().chart().content_xml().contains('\n'));
+
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.into_package().as_bytes(), source.as_bytes());
+}

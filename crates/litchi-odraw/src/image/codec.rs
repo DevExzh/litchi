@@ -1,0 +1,693 @@
+//! `OfficeArt` image wire decoding and lazy record traversal.
+
+use super::LimitKind;
+use super::model::{
+    Bitmap, Blip, Block, Compression, Context, Delay, DelayBlocks, Embedded, Entry, Kind, Limits,
+    Meta, MetaHeader, Offset, Point, Rect, Store, Uid, Uids,
+};
+use crate::{Error, Record, RecordKind, Result};
+
+#[derive(Debug, Clone, Copy)]
+enum Family {
+    Meta,
+    Bitmap,
+}
+
+fn admit_record_header(data: &[u8], limits: Limits, check_blip: bool) -> Result<()> {
+    let Some(header) = data.get(4..8) else {
+        return Ok(());
+    };
+    let body_len = u32::from_le_bytes([header[0], header[1], header[2], header[3]]);
+    if body_len > limits.records.max_record_bytes {
+        return Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed: u64::from(body_len),
+            maximum: u64::from(limits.records.max_record_bytes),
+        });
+    }
+    if check_blip && body_len > limits.max_blip_bytes {
+        return Err(Error::ImageLimitExceeded {
+            limit: LimitKind::BlipBytes,
+            observed: u64::from(body_len),
+            maximum: u64::from(limits.max_blip_bytes),
+        });
+    }
+    Ok(())
+}
+
+/// Parses exactly one BLIP record.
+impl<'data> Blip<'data> {
+    /// Parses exactly one complete BLIP record under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` cannot be decoded as exactly one BLIP record,
+    /// or if the record exceeds `limits` or fails BLIP validation.
+    pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
+        admit_record_header(data, limits, true)?;
+        let (record, consumed) = Record::parse(data, 0, limits.record_limits())?;
+        if consumed != data.len() {
+            return Err(Error::TrailingData { offset: consumed });
+        }
+        Self::from_record(record, limits)
+    }
+
+    /// Parses a previously checked `OfficeArt` record under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `record` exceeds `limits`, is not a BLIP record, or
+    /// fails BLIP validation.
+    pub fn from_record(record: Record<'data>, limits: Limits) -> Result<Self> {
+        let effective_records = record.limits().constrained_by(limits.records);
+        check_record_bytes(&record, effective_records)?;
+        if record.len() > limits.max_blip_bytes {
+            return Err(Error::ImageLimitExceeded {
+                limit: LimitKind::BlipBytes,
+                observed: u64::from(record.len()),
+                maximum: u64::from(limits.max_blip_bytes),
+            });
+        }
+        let record = record.with_limits(effective_records);
+        if !record.kind().is_blip() {
+            return Err(Error::NotImageRecord {
+                raw_kind: record.raw_kind(),
+            });
+        }
+
+        let layout = layout(record.raw_kind(), record.instance());
+        let Some((kind, family, two_uids)) = layout else {
+            if matches!(record.kind(), RecordKind::Unknown(_)) {
+                return Ok(Self::Opaque(super::model::Opaque { record }));
+            }
+            return Err(Error::MalformedImage {
+                reason: "BLIP record has an invalid instance",
+            });
+        };
+        if record.version() != 0 {
+            return Err(Error::MalformedImage {
+                reason: "BLIP record version is not zero",
+            });
+        }
+
+        let body = record.data();
+        let (uids, mut offset) = parse_uids(body, two_uids)?;
+        match family {
+            Family::Meta => {
+                let end = offset.checked_add(34).ok_or(Error::ArithmeticOverflow {
+                    context: "metafile header extent",
+                })?;
+                let header_bytes = body.get(offset..end).ok_or(Error::MalformedImage {
+                    reason: "metafile BLIP header is truncated",
+                })?;
+                let size = le_u32(header_bytes, 0)?;
+                let bounds = Rect {
+                    left: le_i32(header_bytes, 4)?,
+                    top: le_i32(header_bytes, 8)?,
+                    right: le_i32(header_bytes, 12)?,
+                    bottom: le_i32(header_bytes, 16)?,
+                };
+                let extent = Point {
+                    x: le_i32(header_bytes, 20)?,
+                    y: le_i32(header_bytes, 24)?,
+                };
+                let saved = le_u32(header_bytes, 28)?;
+                let compression = match header_bytes[32] {
+                    0x00 => Compression::Deflate,
+                    0xFE => Compression::None,
+                    _ => {
+                        return Err(Error::MalformedImage {
+                            reason: "metafile BLIP compression is not 0x00 or 0xFE",
+                        });
+                    },
+                };
+                if header_bytes[33] != 0xFE {
+                    return Err(Error::MalformedImage {
+                        reason: "metafile BLIP filter is not 0xFE",
+                    });
+                }
+                offset = end;
+                let stored = usize::try_from(saved).map_err(|_err| Error::ArithmeticOverflow {
+                    context: "metafile BLIP data length",
+                })?;
+                // Some producers append bytes after the stored payload. Office
+                // and LibreOffice read exactly `cbSave` bytes and ignore the
+                // rest, so the image is the declared payload; the record keeps
+                // the remaining bytes available through `Meta::trailing_len`.
+                let data = body
+                    .get(offset..)
+                    .and_then(|rest| rest.get(..stored))
+                    .ok_or(Error::ImageSizeMismatch {
+                        field: "cbSave",
+                        declared: u64::from(saved),
+                        actual: body.len().saturating_sub(offset),
+                    })?;
+                let trailing = body.len() - offset - stored;
+                if compression == Compression::None && size != saved {
+                    return Err(Error::ImageSizeMismatch {
+                        field: "cbSize",
+                        declared: u64::from(size),
+                        actual: data.len(),
+                    });
+                }
+                let meta = Meta {
+                    record,
+                    kind,
+                    uids,
+                    header: MetaHeader {
+                        size,
+                        bounds,
+                        extent,
+                        saved,
+                        compression,
+                    },
+                    data,
+                    trailing,
+                };
+                match kind {
+                    Kind::Emf => Ok(Self::Emf(meta)),
+                    Kind::Wmf => Ok(Self::Wmf(meta)),
+                    Kind::Pict => Ok(Self::Pict(meta)),
+                    Kind::Error
+                    | Kind::Unknown
+                    | Kind::Jpeg
+                    | Kind::Png
+                    | Kind::Dib
+                    | Kind::Tiff
+                    | Kind::CmykJpeg
+                    | Kind::Other(_) => Err(Error::MalformedImage {
+                        reason: "metafile layout resolved to a non-metafile kind",
+                    }),
+                }
+            },
+            Family::Bitmap => {
+                let tag = *body.get(offset).ok_or(Error::MalformedImage {
+                    reason: "bitmap BLIP tag is missing",
+                })?;
+                offset += 1;
+                let bitmap = Bitmap {
+                    record,
+                    kind,
+                    uids,
+                    tag,
+                    data: &body[offset..],
+                };
+                match kind {
+                    Kind::Jpeg | Kind::CmykJpeg => Ok(Self::Jpeg(bitmap)),
+                    Kind::Png => Ok(Self::Png(bitmap)),
+                    Kind::Dib => Ok(Self::Dib(bitmap)),
+                    Kind::Tiff => Ok(Self::Tiff(bitmap)),
+                    Kind::Error
+                    | Kind::Unknown
+                    | Kind::Emf
+                    | Kind::Wmf
+                    | Kind::Pict
+                    | Kind::Other(_) => Err(Error::MalformedImage {
+                        reason: "bitmap layout resolved to a non-bitmap kind",
+                    }),
+                }
+            },
+        }
+    }
+}
+
+impl<'data> Entry<'data> {
+    /// Parses an FBSE record under explicit image limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `record` is not an FBSE record, exceeds `limits`, or
+    /// fails FBSE validation.
+    pub fn parse(record: Record<'data>, limits: Limits) -> Result<Self> {
+        let effective_records = record.limits().constrained_by(limits.records);
+        check_record_bytes(&record, effective_records)?;
+        let limits = Limits {
+            records: effective_records,
+            ..limits
+        };
+        if record.kind() != RecordKind::Bse {
+            return Err(Error::NotImageRecord {
+                raw_kind: record.raw_kind(),
+            });
+        }
+        if record.version() != 2 {
+            return Err(Error::MalformedImage {
+                reason: "FBSE record version is not two",
+            });
+        }
+        let instance = u8::try_from(record.instance()).map_err(|_err| Error::MalformedImage {
+            reason: "FBSE instance is not an MSOBLIPTYPE value",
+        })?;
+        let body = record.data();
+        if body.len() < super::model::FBSE_FIXED_LEN {
+            return Err(Error::MalformedImage {
+                reason: "FBSE fixed fields are truncated",
+            });
+        }
+        let win = Kind::from_raw(body[0]);
+        let mac = Kind::from_raw(body[1]);
+        if instance != win.raw() && instance != mac.raw() {
+            return Err(Error::MalformedImage {
+                reason: "FBSE instance matches neither platform kind",
+            });
+        }
+        let uid = uid_at(body, 2)?;
+        let tag = le_u16(body, 18)?;
+        let size = le_u32(body, 20)?;
+        let refs = le_u32(body, 24)?;
+        let delay = le_u32(body, 28)?;
+        let unused1 = body[32];
+        let name_len = usize::from(body[33]);
+        let unused2 = body[34];
+        let unused3 = body[35];
+        if name_len % 2 != 0 {
+            return Err(Error::MalformedImage {
+                reason: "FBSE name length is odd",
+            });
+        }
+        let name_end = super::model::FBSE_FIXED_LEN.checked_add(name_len).ok_or(
+            Error::ArithmeticOverflow {
+                context: "FBSE name extent",
+            },
+        )?;
+        let name_bytes =
+            body.get(super::model::FBSE_FIXED_LEN..name_end)
+                .ok_or(Error::MalformedImage {
+                    reason: "FBSE name extends past the record",
+                })?;
+        let name = if name_bytes.is_empty() {
+            None
+        } else {
+            if name_bytes[name_bytes.len() - 2..] != [0, 0] {
+                return Err(Error::MalformedImage {
+                    reason: "FBSE name is not NUL terminated",
+                });
+            }
+            let decoded = name_bytes[..name_bytes.len() - 2]
+                .as_chunks::<2>()
+                .0
+                .iter()
+                .map(|bytes| u16::from_le_bytes([bytes[0], bytes[1]]));
+            if char::decode_utf16(decoded).any(|value| value.is_err()) {
+                return Err(Error::MalformedImage {
+                    reason: "FBSE name is not valid UTF-16",
+                });
+            }
+            Some(super::model::Name { bytes: name_bytes })
+        };
+        let embedded = &body[name_end..];
+        let embedded_len =
+            u64::try_from(embedded.len()).map_err(|_err| Error::ArithmeticOverflow {
+                context: "embedded BLIP byte length",
+            })?;
+        if !embedded.is_empty() && u64::from(size) != embedded_len {
+            return Err(Error::ImageSizeMismatch {
+                field: "FBSE size",
+                declared: u64::from(size),
+                actual: embedded.len(),
+            });
+        }
+        if !embedded.is_empty() && refs == 0 {
+            return Err(Error::MalformedImage {
+                reason: "FBSE with an embedded BLIP has an empty-slot cRef",
+            });
+        }
+        if embedded.is_empty() && delay == u32::MAX && refs != 0 {
+            return Err(Error::MalformedImage {
+                reason: "FBSE without delay data uses the sentinel with nonzero cRef",
+            });
+        }
+
+        let entry = Self {
+            record: record.with_limits(effective_records),
+            win,
+            mac,
+            uid,
+            tag,
+            size,
+            refs,
+            delay,
+            unused1,
+            name,
+            unused2,
+            unused3,
+            embedded,
+            limits,
+        };
+        super::validation::validate_embedded(&entry, instance)?;
+        Ok(entry)
+    }
+}
+
+impl<'data> Entry<'data> {
+    /// Iterates all embedded BLIPs without allocating.
+    #[must_use]
+    pub fn embedded(&self) -> Embedded<'data> {
+        Embedded {
+            records: crate::Children::new(self.embedded, self.limits.record_limits()),
+            limits: self.limits,
+        }
+    }
+}
+
+impl<'data> Store<'data> {
+    /// Parses exactly one `BStore` container under explicit limits.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `data` cannot be decoded as exactly one `BStore`
+    /// container under `limits`.
+    pub fn parse(data: &'data [u8], limits: Limits) -> Result<Self> {
+        admit_record_header(data, limits, false)?;
+        let (record, consumed) = Record::parse(data, 0, limits.record_limits())?;
+        if consumed != data.len() {
+            return Err(Error::TrailingData { offset: consumed });
+        }
+        Self::from_record(record, limits)
+    }
+
+    /// Returns the number of file blocks the container holds.
+    ///
+    /// This counts the children, not the container header's `recInstance`,
+    /// which some producers write incorrectly.
+    #[must_use]
+    pub const fn len(&self) -> u16 {
+        self.count
+    }
+
+    /// Returns whether the store is empty.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.count == 0
+    }
+
+    /// Iterates file blocks lazily and validates the admitted block count.
+    #[must_use]
+    pub fn iter(&self) -> super::model::Blocks<'data> {
+        let limits = self.limits();
+        super::model::Blocks {
+            records: crate::Children::new(self.record.data(), limits.record_limits()),
+            expected: self.count,
+            seen: 0,
+            done: false,
+            limits,
+        }
+    }
+
+    /// Looks up a checked one-based identifier.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a file block at or before `id` fails to decode.
+    pub fn get(&self, id: super::model::Id) -> Result<Option<Block<'data>>> {
+        if id.get() > self.count {
+            return Ok(None);
+        }
+        let wanted = id.get() - 1;
+        for (index, item) in self.iter().enumerate() {
+            let parsed = item?;
+            if index == usize::from(wanted) {
+                return Ok(Some(parsed));
+            }
+        }
+        Ok(None)
+    }
+
+    /// Resolves an image identifier with optional delay-store context.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the addressed file block fails to decode or its BLIP
+    /// reference cannot be resolved.
+    pub fn resolve(
+        &self,
+        id: super::model::Id,
+        context: Context<'data>,
+    ) -> Result<Option<Blip<'data>>> {
+        match self.get(id)? {
+            None => Ok(None),
+            Some(Block::Blip(blip)) => Ok(Some(blip)),
+            Some(Block::Entry(entry)) => entry.resolve(context),
+        }
+    }
+
+    /// Returns the underlying `BStore` record.
+    #[must_use]
+    pub const fn record(&self) -> &Record<'data> {
+        &self.record
+    }
+
+    /// Returns the image and traversal policy retained by this store.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        Limits {
+            records: self.record.limits(),
+            max_blip_bytes: self.max_blip_bytes,
+            max_store_entries: self.max_store_entries,
+            max_files: self.max_files,
+        }
+    }
+}
+
+fn check_record_bytes(record: &Record<'_>, limits: crate::Limits) -> Result<()> {
+    if record.len() > limits.max_record_bytes {
+        return Err(Error::ImageLimitExceeded {
+            limit: LimitKind::RecordBytes,
+            observed: u64::from(record.len()),
+            maximum: u64::from(limits.max_record_bytes),
+        });
+    }
+    Ok(())
+}
+
+impl<'data> Delay<'data> {
+    /// Borrows a delay store under explicit image limits.
+    #[must_use]
+    pub const fn new(data: &'data [u8], limits: Limits) -> Self {
+        Self { data, limits }
+    }
+
+    /// Iterates every file block in order.
+    #[must_use]
+    pub fn iter(self) -> DelayBlocks<'data> {
+        DelayBlocks {
+            records: crate::Children::new(self.data, self.limits.record_limits()),
+            limits: self.limits,
+            seen: 0,
+            done: false,
+        }
+    }
+
+    /// Parses the file block beginning at an exact delay offset.
+    ///
+    /// This direct lookup applies the BLIP byte ceiling. It does not traverse
+    /// the delay sequence, so the iteration count ceiling does not apply.
+    ///
+    /// # Errors
+    ///
+    /// Returns `Error::DelayOffsetOutOfBounds` if `offset` lies outside the
+    /// delay store, or an error if the record at `offset` fails to decode.
+    pub fn at(self, offset: Offset) -> Result<Block<'data>> {
+        let start =
+            usize::try_from(offset.get()).map_err(|_err| Error::DelayOffsetOutOfBounds {
+                offset: offset.get(),
+                available: self.data.len(),
+            })?;
+        if start >= self.data.len() {
+            return Err(Error::DelayOffsetOutOfBounds {
+                offset: offset.get(),
+                available: self.data.len(),
+            });
+        }
+        admit_record_header(&self.data[start..], self.limits, false)?;
+        let (record, _) = Record::parse(self.data, start, self.limits.record_limits())?;
+        block(record, self.limits)
+    }
+
+    /// Returns the borrowed delay-store bytes.
+    #[must_use]
+    pub const fn as_bytes(self) -> &'data [u8] {
+        self.data
+    }
+}
+
+impl<'data> IntoIterator for &Store<'data> {
+    type Item = Result<Block<'data>>;
+    type IntoIter = super::model::Blocks<'data>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'data> Iterator for Embedded<'data> {
+    type Item = Result<Blip<'data>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.records.next().map(|record| {
+            record
+                .map_err(super::map_traversal_limit)
+                .and_then(|blip_record| Blip::from_record(blip_record, self.limits))
+        })
+    }
+}
+
+impl std::iter::FusedIterator for Embedded<'_> {}
+
+impl<'data> Iterator for super::model::Blocks<'data> {
+    type Item = Result<Block<'data>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        match self.records.next() {
+            Some(Ok(_)) if self.seen >= self.expected => {
+                self.done = true;
+                Some(Err(Error::MalformedImage {
+                    reason: "BStore contains more file blocks than were counted at admission",
+                }))
+            },
+            Some(Ok(record)) => {
+                self.seen += 1;
+                Some(block(record, self.limits))
+            },
+            Some(Err(error)) => {
+                self.done = true;
+                Some(Err(super::map_traversal_limit(error)))
+            },
+            None if self.seen != self.expected => {
+                self.done = true;
+                Some(Err(Error::MalformedImage {
+                    reason: "BStore contains fewer file blocks than were counted at admission",
+                }))
+            },
+            None => {
+                self.done = true;
+                None
+            },
+        }
+    }
+}
+
+impl std::iter::FusedIterator for super::model::Blocks<'_> {}
+
+impl<'data> Iterator for DelayBlocks<'data> {
+    type Item = Result<Block<'data>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.done {
+            return None;
+        }
+        match self.records.next() {
+            Some(Ok(_)) if self.seen >= u32::from(self.limits.max_store_entries) => {
+                self.done = true;
+                Some(Err(Error::ImageLimitExceeded {
+                    limit: LimitKind::StoreEntries,
+                    observed: u64::from(self.seen) + 1,
+                    maximum: u64::from(self.limits.max_store_entries),
+                }))
+            },
+            Some(Ok(record)) => {
+                self.seen += 1;
+                Some(block(record, self.limits))
+            },
+            Some(Err(error)) => {
+                self.done = true;
+                Some(Err(super::map_traversal_limit(error)))
+            },
+            None => {
+                self.done = true;
+                None
+            },
+        }
+    }
+}
+
+impl std::iter::FusedIterator for DelayBlocks<'_> {}
+
+fn layout(raw_kind: u16, instance: u16) -> Option<(Kind, Family, bool)> {
+    let value = match (raw_kind, instance) {
+        (0xF01A, 0x3D4) => (Kind::Emf, Family::Meta, false),
+        (0xF01A, 0x3D5) => (Kind::Emf, Family::Meta, true),
+        (0xF01B, 0x216) => (Kind::Wmf, Family::Meta, false),
+        (0xF01B, 0x217) => (Kind::Wmf, Family::Meta, true),
+        (0xF01C, 0x542) => (Kind::Pict, Family::Meta, false),
+        (0xF01C, 0x543) => (Kind::Pict, Family::Meta, true),
+        (0xF01D | 0xF02A, 0x46A) => (Kind::Jpeg, Family::Bitmap, false),
+        (0xF01D | 0xF02A, 0x46B) => (Kind::Jpeg, Family::Bitmap, true),
+        (0xF01D | 0xF02A, 0x6E2) => (Kind::CmykJpeg, Family::Bitmap, false),
+        (0xF01D | 0xF02A, 0x6E3) => (Kind::CmykJpeg, Family::Bitmap, true),
+        (0xF01E, 0x6E0) => (Kind::Png, Family::Bitmap, false),
+        (0xF01E, 0x6E1) => (Kind::Png, Family::Bitmap, true),
+        (0xF01F, 0x7A8) => (Kind::Dib, Family::Bitmap, false),
+        (0xF01F, 0x7A9) => (Kind::Dib, Family::Bitmap, true),
+        (0xF029, 0x6E4) => (Kind::Tiff, Family::Bitmap, false),
+        (0xF029, 0x6E5) => (Kind::Tiff, Family::Bitmap, true),
+        _ => return None,
+    };
+    Some(value)
+}
+
+fn parse_uids(data: &[u8], second: bool) -> Result<(Uids, usize)> {
+    let first = uid_at(data, 0)?;
+    if second {
+        Ok((Uids::new(first, Some(uid_at(data, 16)?)), 32))
+    } else {
+        Ok((Uids::new(first, None), 16))
+    }
+}
+
+pub(super) fn uid_at(data: &[u8], offset: usize) -> Result<Uid> {
+    let end = offset.checked_add(16).ok_or(Error::ArithmeticOverflow {
+        context: "BLIP UID extent",
+    })?;
+    let bytes = data.get(offset..end).ok_or(Error::MalformedImage {
+        reason: "BLIP UID is truncated",
+    })?;
+    let mut uid = [0; 16];
+    uid.copy_from_slice(bytes);
+    Ok(Uid::new(uid))
+}
+
+pub(super) fn block(record: Record<'_>, limits: Limits) -> Result<Block<'_>> {
+    if record.kind() == RecordKind::Bse {
+        Entry::parse(record, limits).map(Block::Entry)
+    } else if record.kind().is_blip() {
+        Blip::from_record(record, limits).map(Block::Blip)
+    } else {
+        Err(Error::MalformedImage {
+            reason: "BLIP store contains a non-image file block",
+        })
+    }
+}
+
+fn le_u16(data: &[u8], offset: usize) -> Result<u16> {
+    let end = offset.checked_add(2).ok_or(Error::ArithmeticOverflow {
+        context: "image u16 field extent",
+    })?;
+    let bytes = data.get(offset..end).ok_or(Error::MalformedImage {
+        reason: "image integer field is truncated",
+    })?;
+    Ok(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn le_u32(data: &[u8], offset: usize) -> Result<u32> {
+    let end = offset.checked_add(4).ok_or(Error::ArithmeticOverflow {
+        context: "image u32 field extent",
+    })?;
+    let bytes = data.get(offset..end).ok_or(Error::MalformedImage {
+        reason: "image integer field is truncated",
+    })?;
+    Ok(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn le_i32(data: &[u8], offset: usize) -> Result<i32> {
+    let end = offset.checked_add(4).ok_or(Error::ArithmeticOverflow {
+        context: "image i32 field extent",
+    })?;
+    let bytes = data.get(offset..end).ok_or(Error::MalformedImage {
+        reason: "image integer field is truncated",
+    })?;
+    Ok(i32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}

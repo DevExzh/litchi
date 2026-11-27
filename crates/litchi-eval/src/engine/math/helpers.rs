@@ -52,12 +52,12 @@ pub(super) fn to_int_if_whole(value: f64) -> Option<i64> {
     Some(truncated as i64)
 }
 
-pub(super) async fn flatten_numeric_values(
+pub(super) fn flatten_numeric_values(
     ctx: EvalCtx<'_>,
     current_sheet: &str,
     expr: &Expr,
 ) -> Result<Vec<f64>> {
-    let flat = flatten_range_expr(ctx, current_sheet, expr).await?;
+    let flat = flatten_range_expr(ctx, current_sheet, expr)?;
     let values = flat
         .values
         .into_iter()

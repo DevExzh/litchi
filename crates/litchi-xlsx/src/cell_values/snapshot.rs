@@ -1,0 +1,3223 @@
+//! Immutable source closure for one value-only worksheet capability.
+
+use std::collections::HashSet;
+use std::sync::{Arc, OnceLock};
+
+use litchi_core::{ExecutionContext, ExecutionError, Selector as CoreSelector, SourceVersion};
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{
+    OpcError, OpcPackage, PackURI, Part, Relationship, Relationships, ReplacementSpan,
+    SourceBackedPackage, SourceLineage, SourceRelationshipTarget, SourceTopologyPlan, TargetMode,
+};
+use litchi_sheet::{Cell as Address, Rect};
+use smallvec::SmallVec;
+
+use crate::cell::{Cell, SharedFormulaStorage, Store, Stored, Text, Value};
+use crate::error::{EditBlock, Error, Result, allocation, invalid};
+use crate::formula::Kind;
+use crate::source_payload::SourcePayload;
+use crate::workbook::source::validate_sheet_graph;
+use crate::{Selector, WorksheetKind, raw};
+
+use super::validation;
+
+const CHARTSHEET_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
+const STRICT_CHARTSHEET_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet";
+const DIALOGSHEET_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet";
+const MACROSHEET_REL: &str = "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet";
+const QUERY_TABLE_REL: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships/queryTable";
+const STRICT_QUERY_TABLE_REL: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships/queryTable";
+const INTL_MACROSHEET_REL: &str =
+    "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
+const CHARTSHEET_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.chartsheet+xml";
+const CALCULATION_CHAIN_CONTENT_TYPE: &str =
+    "application/vnd.openxmlformats-officedocument.spreadsheetml.calcChain+xml";
+
+fn check_execution(context: Option<&ExecutionContext>) -> Result<()> {
+    let Some(context) = context else {
+        return Ok(());
+    };
+    context.check().map_err(|error| {
+        Error::Package(match error {
+            ExecutionError::Cancelled => OpcError::Cancelled,
+            error => OpcError::Execution(error),
+        })
+    })
+}
+
+/// Exact worksheet values plus the complete package owner state required to
+/// publish a one-Part overlay safely.
+#[derive(Clone, Debug)]
+pub struct Snapshot {
+    sheet_name: Box<str>,
+    sheet_position: usize,
+    cells: Arc<Store>,
+    source: SourceState,
+    /// Compact source-bound worksheet facts captured by the planning
+    /// traversal of exactly `source.worksheet.bytes`.
+    ///
+    /// Present only on the source-backed planning route and only when the
+    /// builder proved the commit's layout scan would agree with it. Every
+    /// snapshot derived from a rewrite drops them, so a derived snapshot
+    /// commits through the complete scan exactly as before.
+    facts: Option<Arc<raw::worksheet::SourceFacts>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct SharedFormulaGroup {
+    pub(crate) storage: SharedFormulaStorage,
+    pub(crate) master: litchi_sheet::Cell,
+    pub(crate) members: Box<[litchi_sheet::Cell]>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SheetGraphState {
+    name: Box<str>,
+    relationship_id: Box<str>,
+    sheet_id: u32,
+    visibility: raw::Visibility,
+    kind: WorksheetKind,
+    uri: PackURI,
+    content_type: Box<str>,
+    relationships: Box<[SourceRelationship]>,
+    relationship: SourceRelationship,
+}
+
+struct SourceCatalogCapture {
+    sheets: Vec<raw::Sheet>,
+    parts: Vec<crate::workbook::source::SheetPart>,
+    workbook_uri: PackURI,
+    workbook_content_type: Box<str>,
+    workbook_xml: SourcePayload,
+    owner_relationship: SourceRelationship,
+    package_relationships: Arc<[SourceRelationship]>,
+    workbook_relationships: Arc<[SourceRelationship]>,
+    calculation_chain: Option<CalculationChainState>,
+    shared_strings: Option<SharedStringsState>,
+    style_count: u32,
+    auxiliary: Arc<[PartState]>,
+    graph: Arc<[SheetGraphState]>,
+    source_lineage: SourceLineage,
+    source_version: SourceVersion,
+}
+
+pub(super) fn checked_multi_bytes(total: usize, next: usize, maximum: usize) -> Result<usize> {
+    let updated = total
+        .checked_add(next)
+        .ok_or_else(|| invalid("multi-sheet worksheet XML size overflows usize"))?;
+    if updated > maximum {
+        return Err(Error::limit(
+            super::LimitKind::WorksheetBytes,
+            updated,
+            maximum,
+        ));
+    }
+    Ok(updated)
+}
+
+/// Maximum worksheet owners in one source-backed scalar transaction.
+pub const MAX_SHEET_OWNERS: usize = 64;
+/// Maximum aggregate worksheet and shared-string XML retained by one
+/// multi-sheet transaction.
+pub const MAX_MULTI_WORKSHEET_BYTES: usize = 64 * 1024 * 1024;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SourceProvenance {
+    Matched,
+    Mismatched,
+    Unavailable,
+}
+
+/// Immutable source closure for a bounded set of worksheets.
+///
+/// Selected worksheet payload bytes are retained for editing and reversible
+/// publication. The complete workbook sheet graph (descriptors, relationships,
+/// targets, kinds, and content types) is retained as shared ownership
+/// metadata; unrelated worksheet payloads remain deferred so independent edits
+/// can compose without materializing or overwriting them.
+#[derive(Clone, Debug)]
+pub struct MultiSnapshot {
+    sheets: Box<[Snapshot]>,
+}
+
+impl MultiSnapshot {
+    pub(crate) fn from_sheets(mut sheets: Vec<Snapshot>) -> Result<Self> {
+        if sheets.is_empty() {
+            return Err(invalid("multi-sheet value edits require one worksheet"));
+        }
+        if sheets.len() > MAX_SHEET_OWNERS {
+            return Err(invalid(format!(
+                "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+            )));
+        }
+        let mut total_bytes = 0usize;
+        if let Some(shared_strings) = sheets
+            .first()
+            .and_then(|snapshot| snapshot.source.shared_strings.as_ref())
+        {
+            total_bytes = checked_multi_bytes(
+                total_bytes,
+                shared_strings.part.bytes.len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
+        for snapshot in &sheets {
+            total_bytes = checked_multi_bytes(
+                total_bytes,
+                snapshot.source_xml().len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
+        sheets.sort_unstable_by_key(Snapshot::sheet_position);
+        if sheets
+            .windows(2)
+            .any(|pair| pair[0].sheet_position() == pair[1].sheet_position())
+        {
+            return Err(invalid(
+                "multi-sheet value edits contain a duplicate worksheet",
+            ));
+        }
+        Ok(Self {
+            sheets: sheets.into_boxed_slice(),
+        })
+    }
+
+    pub(crate) fn load_source_backed<'a, I>(
+        package: &SourceBackedPackage,
+        selectors: I,
+    ) -> Result<Self>
+    where
+        I: IntoIterator<Item = Selector<'a>>,
+    {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
+        let mut selected = Vec::new();
+        selected
+            .try_reserve_exact(MAX_SHEET_OWNERS)
+            .map_err(|source| allocation("multi-sheet selector snapshot", source))?;
+        for selector in selectors {
+            package.check_execution()?;
+            if selected.len() >= MAX_SHEET_OWNERS {
+                return Err(invalid(format!(
+                    "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+                )));
+            }
+            selected.push(selector);
+        }
+        let selectors = selected;
+        let mut sheets = Vec::new();
+        sheets
+            .try_reserve_exact(MAX_SHEET_OWNERS)
+            .map_err(|source| allocation("multi-sheet value snapshot", source))?;
+        if selectors.len() > MAX_SHEET_OWNERS {
+            return Err(invalid(format!(
+                "multi-sheet value edits exceed {MAX_SHEET_OWNERS} worksheet owners"
+            )));
+        }
+        let capture = load_source_catalog(package)?;
+        let positions = resolve_selectors(&capture.sheets, selectors)?;
+        let mut aggregate_bytes = 0usize;
+        if let Some(shared_strings) = capture.shared_strings.as_ref() {
+            aggregate_bytes = checked_multi_bytes(
+                aggregate_bytes,
+                shared_strings.part.bytes.len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+        }
+        for position in positions {
+            let remaining = MAX_MULTI_WORKSHEET_BYTES.saturating_sub(aggregate_bytes);
+            let snapshot = Snapshot::from_source_selected(package, position, &capture, remaining)?;
+            aggregate_bytes = checked_multi_bytes(
+                aggregate_bytes,
+                snapshot.source_xml().len(),
+                MAX_MULTI_WORKSHEET_BYTES,
+            )?;
+            sheets.push(snapshot);
+        }
+        let snapshot = Self::from_sheets(sheets)?;
+        package.check_execution()?;
+        let final_version = package.source_version()?;
+        if final_version != source_version {
+            return Err(invalid(
+                "source-backed multi-sheet snapshot source version changed",
+            ));
+        }
+        Ok(snapshot)
+    }
+
+    pub(crate) fn sheets(&self) -> &[Snapshot] {
+        &self.sheets
+    }
+
+    /// Number of selected worksheet owners.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.sheets.len()
+    }
+
+    /// Whether no worksheet owners were selected.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.sheets.is_empty()
+    }
+
+    /// Name of a selected worksheet in deterministic workbook order.
+    #[must_use]
+    pub fn sheet_name(&self, index: usize) -> Option<&str> {
+        self.sheets.get(index).map(Snapshot::sheet_name)
+    }
+
+    /// Zero-based workbook position of a selected worksheet.
+    #[must_use]
+    pub fn sheet_position(&self, index: usize) -> Option<usize> {
+        self.sheets.get(index).map(Snapshot::sheet_position)
+    }
+
+    /// Exact scalar value in one selected worksheet.
+    #[must_use]
+    pub fn value(&self, index: usize, address: litchi_sheet::Cell) -> Option<&Value> {
+        self.sheets
+            .get(index)
+            .and_then(|sheet| sheet.value(address))
+    }
+
+    /// Whether an explicit cell owner exists in one selected worksheet.
+    #[must_use]
+    pub fn contains_cell(&self, index: usize, address: litchi_sheet::Cell) -> bool {
+        self.sheets
+            .get(index)
+            .is_some_and(|sheet| sheet.contains_cell(address))
+    }
+
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
+        self.sheets.len() == other.sheets.len()
+            && self
+                .sheets
+                .iter()
+                .zip(&other.sheets)
+                .all(|(left, right)| left.same_source(right))
+    }
+
+    /// The same selected worksheet closures, whatever source they were read
+    /// from (a replay compares content).
+    pub(crate) fn same_content(&self, other: &Self) -> bool {
+        self.sheets.len() == other.sheets.len()
+            && self
+                .sheets
+                .iter()
+                .zip(&other.sheets)
+                .all(|(left, right)| left.same_content(right))
+    }
+
+    /// Whether these closures were read from `package`'s source.
+    pub(crate) fn same_lineage(&self, package: &SourceBackedPackage) -> bool {
+        self.sheets
+            .iter()
+            .any(|snapshot| snapshot.same_lineage(package))
+    }
+
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        for snapshot in &self.sheets {
+            snapshot.check_execution()?;
+        }
+        Ok(())
+    }
+
+    /// Check that this source-backed closure still belongs to the exact
+    /// opened package and source revision without reloading any Part body.
+    pub(crate) fn matches_source_backed(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Result<SourceProvenance> {
+        package.check_execution()?;
+        let version = package.source_version()?;
+        package.check_execution()?;
+        let lineage = package.source_lineage();
+        let mut unavailable = false;
+        for snapshot in &self.sheets {
+            match snapshot.source_provenance(&lineage, version) {
+                SourceProvenance::Matched => {},
+                SourceProvenance::Mismatched => return Ok(SourceProvenance::Mismatched),
+                SourceProvenance::Unavailable => unavailable = true,
+            }
+        }
+        Ok(if unavailable {
+            SourceProvenance::Unavailable
+        } else {
+            SourceProvenance::Matched
+        })
+    }
+}
+
+fn stored_entry_is_supported(entry: &Stored) -> bool {
+    !entry.inline_rich && entry.cell_metadata.is_none() && entry.value_metadata.is_none()
+}
+
+impl Snapshot {
+    fn from_source_selected(
+        package: &SourceBackedPackage,
+        position: usize,
+        capture: &SourceCatalogCapture,
+        remaining_bytes: usize,
+    ) -> Result<Self> {
+        package.check_execution()?;
+        let sheet = &capture.sheets[position];
+        let sheet_part = &capture.parts[position];
+        if sheet_part.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: sheet.name.clone(),
+            });
+        }
+        let worksheet = package.part(&sheet_part.uri)?;
+        validate_worksheet_relationships(worksheet.rels())?;
+        let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
+        checked_multi_bytes(0, worksheet_xml.len(), remaining_bytes)?;
+        let shared_strings = capture.shared_strings.as_ref();
+        let (cells, facts) = if let Some(admission) =
+            raw::worksheet::source_stream_admission(worksheet_xml.as_bytes())
+        {
+            validation::worksheet_xml_and_parse_source(worksheet_xml.as_bytes(), admission, || {
+                shared_strings.map(SharedStringsState::strings).transpose()
+            })?
+        } else {
+            validation::worksheet_xml(worksheet_xml.as_bytes())?;
+            (
+                raw::worksheet::parse_refusing_repairs(worksheet_xml.as_bytes(), || {
+                    shared_strings.map(SharedStringsState::strings).transpose()
+                })?,
+                None,
+            )
+        };
+        package.check_execution()?;
+        validate_style_references(&cells, capture.style_count)?;
+        validate_scalar_cells(&cells)?;
+        let graph = &capture.graph[position];
+        Ok(Self {
+            sheet_name: copy_boxed(&sheet.name, "value-only sheet name")?,
+            sheet_position: position,
+            cells: Arc::new(cells),
+            facts: facts.map(Arc::new),
+            source: SourceState {
+                workbook: PartState::new(
+                    capture.workbook_uri.clone(),
+                    capture.workbook_content_type.as_ref(),
+                    capture.workbook_xml.clone(),
+                )?,
+                worksheet: PartState::new(
+                    worksheet.partname().clone(),
+                    worksheet.content_type(),
+                    worksheet_xml,
+                )?,
+                owner_relationship: capture.owner_relationship.clone(),
+                sheet_relationship: graph.relationship.clone(),
+                package_relationships: Arc::clone(&capture.package_relationships),
+                workbook_relationships: Arc::clone(&capture.workbook_relationships),
+                calculation_chain: capture.calculation_chain.clone(),
+                shared_strings: capture.shared_strings.clone(),
+                auxiliary: Arc::clone(&capture.auxiliary),
+                graph: Arc::clone(&capture.graph),
+                context: package.execution_context(),
+                source_lineage: Some(capture.source_lineage.clone()),
+                source_version: Some(capture.source_version),
+                worksheet_replacement_hint: None,
+            },
+        })
+    }
+
+    pub(crate) fn load_source_backed<'a>(
+        package: &SourceBackedPackage,
+        selector: impl Into<Selector<'a>>,
+    ) -> Result<Self> {
+        Self::load_source_backed_with_sheet_policy(package, selector, true)
+    }
+
+    fn load_source_backed_with_sheet_policy<'a>(
+        package: &SourceBackedPackage,
+        selector: impl Into<Selector<'a>>,
+        require_single_sheet: bool,
+    ) -> Result<Self> {
+        package.check_execution()?;
+        let source_version = package.source_version()?;
+        let workbook = package.main_document_part()?;
+        validate_package_relationships(package.rels())?;
+        if workbook.content_type() != ct::SML_SHEET_MAIN {
+            return Err(invalid(
+                "value-only edits require an ordinary XLSX workbook",
+            ));
+        }
+        let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
+        validation::workbook_xml(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
+        let sheet_parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
+        if require_single_sheet && catalog.sheets.len() != 1 {
+            return Err(invalid(
+                "value-only edits currently require exactly one worksheet",
+            ));
+        }
+        validate_workbook_relationships(workbook.rels(), require_single_sheet)?;
+        let position = resolve_selector(&catalog.sheets, selector.into())?
+            .ok_or_else(|| invalid("value-only worksheet selector did not resolve"))?;
+        let sheet = &catalog.sheets[position];
+        let sheet_part = &sheet_parts[position];
+        if sheet_part.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: sheet.name.clone(),
+            });
+        }
+        let worksheet = package.part(&sheet_part.uri)?;
+        validate_worksheet_relationships(worksheet.rels())?;
+        let sheet_relationship = workbook
+            .rels()
+            .get(&sheet.relationship_id)
+            .ok_or_else(|| invalid("selected worksheet relationship is missing"))?;
+        let worksheet_xml = SourcePayload::from_part_data(package, worksheet.data()?)?;
+        validation::worksheet_xml(worksheet_xml.as_bytes())?;
+        let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+        let shared_strings = capture_shared_strings_source(package, &workbook)?;
+        checked_multi_bytes(
+            0,
+            shared_strings
+                .as_ref()
+                .map_or(0, |state| state.part.bytes.len()),
+            MAX_MULTI_WORKSHEET_BYTES,
+        )?;
+        let calculation_chain = capture_calculation_chain_source(package, &workbook)?;
+        let owner = unique_owner(package.rels())?;
+        let snapshot = Self::from_parts(
+            &sheet.name,
+            position,
+            workbook.partname().clone(),
+            workbook.content_type(),
+            workbook_xml,
+            owner,
+            package.rels(),
+            workbook.rels(),
+            worksheet.partname().clone(),
+            worksheet.content_type(),
+            worksheet_xml,
+            sheet_relationship,
+            style_count,
+            calculation_chain,
+            shared_strings,
+            auxiliary,
+            capture_sheet_graph_source(package, &workbook, &catalog.sheets, &sheet_parts)?,
+            package.execution_context(),
+            Some(package.source_lineage()),
+            Some(source_version),
+        )?;
+        package.check_execution()?;
+        let final_version = package.source_version()?;
+        if final_version != source_version {
+            return Err(invalid(
+                "source-backed worksheet snapshot source version changed",
+            ));
+        }
+        Ok(snapshot)
+    }
+
+    /// Load and validate one value-only closure from an owning OPC package.
+    pub fn load<'a>(package: &OpcPackage, selector: impl Into<Selector<'a>>) -> Result<Self> {
+        Self::load_with_sheet_policy(package, selector, true)
+    }
+
+    /// Load one selected worksheet from a multi-worksheet value-only closure.
+    pub fn load_multi<'a>(package: &OpcPackage, selector: impl Into<Selector<'a>>) -> Result<Self> {
+        Self::load_with_sheet_policy(package, selector, false)
+    }
+
+    fn load_with_sheet_policy<'a>(
+        package: &OpcPackage,
+        selector: impl Into<Selector<'a>>,
+        require_single_sheet: bool,
+    ) -> Result<Self> {
+        let workbook = package.main_document_part()?;
+        validate_package_relationships(package.rels())?;
+        if workbook.content_type() != ct::SML_SHEET_MAIN {
+            return Err(invalid(
+                "value-only edits require an ordinary XLSX workbook",
+            ));
+        }
+        let workbook_xml = SourcePayload::Owned(workbook.blob_arc());
+        validation::workbook_xml(workbook_xml.as_bytes())?;
+        let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
+        let sheet_parts = validate_sheet_graph_owned(package, workbook, &catalog.sheets)?;
+        if require_single_sheet && catalog.sheets.len() != 1 {
+            return Err(invalid(
+                "value-only edits currently require exactly one worksheet",
+            ));
+        }
+        validate_workbook_relationships(workbook.rels(), require_single_sheet)?;
+        let position = resolve_selector(&catalog.sheets, selector.into())?
+            .ok_or_else(|| invalid("value-only worksheet selector did not resolve"))?;
+        let sheet = &catalog.sheets[position];
+        let relationship = workbook
+            .rels()
+            .get(&sheet.relationship_id)
+            .ok_or_else(|| invalid("selected worksheet relationship is missing"))?;
+        require_worksheet_relationship(relationship)?;
+        let uri = relationship.target_partname()?;
+        let worksheet = package.get_part(&uri)?;
+        if worksheet.content_type() != ct::SML_WORKSHEET {
+            return Err(invalid("selected worksheet content type is invalid"));
+        }
+        validate_worksheet_relationships(worksheet.rels())?;
+        let worksheet_xml = SourcePayload::Owned(worksheet.blob_arc());
+        validation::worksheet_xml(worksheet_xml.as_bytes())?;
+        let (style_count, auxiliary) = capture_auxiliary(package, workbook)?;
+        let shared_strings = capture_shared_strings_owned(package, workbook)?;
+        checked_multi_bytes(
+            0,
+            shared_strings
+                .as_ref()
+                .map_or(0, |state| state.part.bytes.len()),
+            MAX_MULTI_WORKSHEET_BYTES,
+        )?;
+        let calculation_chain = capture_calculation_chain_owned(package, workbook)?;
+        let owner = unique_owner(package.rels())?;
+        Self::from_parts(
+            &sheet.name,
+            position,
+            workbook.partname().clone(),
+            workbook.content_type(),
+            workbook_xml,
+            owner,
+            package.rels(),
+            workbook.rels(),
+            worksheet.partname().clone(),
+            worksheet.content_type(),
+            worksheet_xml,
+            relationship,
+            style_count,
+            calculation_chain,
+            shared_strings,
+            auxiliary,
+            capture_sheet_graph_owned(package, workbook, &catalog.sheets, &sheet_parts)?,
+            None,
+            None,
+            None,
+        )
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn from_parts(
+        sheet_name: &str,
+        sheet_position: usize,
+        workbook_uri: PackURI,
+        workbook_content_type: &str,
+        workbook_xml: SourcePayload,
+        owner_relationship: &Relationship,
+        package_relationships: &Relationships,
+        workbook_relationships: &Relationships,
+        worksheet_uri: PackURI,
+        worksheet_content_type: &str,
+        worksheet_xml: SourcePayload,
+        sheet_relationship: &Relationship,
+        style_count: u32,
+        calculation_chain: Option<CalculationChainState>,
+        shared_strings: Option<SharedStringsState>,
+        auxiliary: Box<[PartState]>,
+        graph: Box<[SheetGraphState]>,
+        context: Option<ExecutionContext>,
+        source_lineage: Option<SourceLineage>,
+        source_version: Option<SourceVersion>,
+    ) -> Result<Self> {
+        require_worksheet_relationship(sheet_relationship)?;
+        if sheet_relationship.target_partname()? != worksheet_uri {
+            return Err(invalid(
+                "selected worksheet relationship does not target its captured Part",
+            ));
+        }
+        let shared_strings_ref = shared_strings.as_ref();
+        let cells = raw::worksheet::parse_refusing_repairs(worksheet_xml.as_bytes(), || {
+            shared_strings_ref
+                .map(SharedStringsState::strings)
+                .transpose()
+        })?;
+        validate_style_references(&cells, style_count)?;
+        validate_scalar_cells(&cells)?;
+        Ok(Self {
+            sheet_name: copy_boxed(sheet_name, "value-only sheet name")?,
+            sheet_position,
+            cells: Arc::new(cells),
+            facts: None,
+            source: SourceState {
+                workbook: PartState::new(workbook_uri, workbook_content_type, workbook_xml)?,
+                worksheet: PartState::new(worksheet_uri, worksheet_content_type, worksheet_xml)?,
+                owner_relationship: SourceRelationship::capture(owner_relationship)?,
+                sheet_relationship: SourceRelationship::capture(sheet_relationship)?,
+                package_relationships: Arc::from(capture_relationships(package_relationships)?),
+                workbook_relationships: Arc::from(capture_relationships(workbook_relationships)?),
+                calculation_chain,
+                shared_strings,
+                auxiliary: Arc::from(auxiliary),
+                graph: Arc::from(graph),
+                context,
+                source_lineage,
+                source_version,
+                worksheet_replacement_hint: None,
+            },
+        })
+    }
+
+    pub(crate) fn from_rewritten_source(source: &Self, bytes: Vec<u8>) -> Result<Self> {
+        source.source.check_execution()?;
+        validation::worksheet_xml(&bytes)?;
+        let shared_strings = source.source.shared_strings.as_ref();
+        let cells = raw::worksheet::parse_refusing_repairs(&bytes, || {
+            shared_strings.map(SharedStringsState::strings).transpose()
+        })?;
+        let mut result = source.clone();
+        result.cells = Arc::new(cells);
+        result.facts = None;
+        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        result.source.worksheet_replacement_hint = None;
+        result.source.check_execution()?;
+        Ok(result)
+    }
+
+    /// Rebind a value-only rewrite after validating its complete output.
+    ///
+    /// The independent parser sees the full worksheet envelope and all
+    /// changed cell records, while provenance-selected source records fill
+    /// only the omitted cell spans. Any provenance mismatch, reduced-parser
+    /// refusal, or unexpected collision falls back to the ordinary complete
+    /// parse so the public error and preservation authority remain unchanged.
+    pub(crate) fn from_rewritten_value_source(
+        source: &Self,
+        rewrite: raw::worksheet::edit::ValueOnlyRewrite<'_>,
+    ) -> Result<Self> {
+        if !std::ptr::eq(rewrite.source, source.source_xml()) {
+            return Self::from_rewritten_source(source, rewrite.bytes);
+        }
+        source.source.check_execution()?;
+        validation::worksheet_xml(&rewrite.bytes)?;
+        // Speculative buffers are dropped before the complete parser fallback.
+        let cells = if rewrite.omitted.is_empty() {
+            let shared_strings = source.source.shared_strings.as_ref();
+            raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
+                shared_strings.map(SharedStringsState::strings).transpose()
+            })?
+        } else {
+            match Self::try_rewritten_value_cells(source, &rewrite) {
+                Some(cells) => cells,
+                None => {
+                    let shared_strings = source.source.shared_strings.as_ref();
+                    raw::worksheet::parse_refusing_repairs(&rewrite.bytes, || {
+                        shared_strings.map(SharedStringsState::strings).transpose()
+                    })?
+                },
+            }
+        };
+        let bytes = Arc::new(rewrite.bytes);
+        let replacement_hint = WorksheetReplacementHint::new(rewrite.source, &bytes, rewrite.spans);
+        let mut result = source.clone();
+        result.cells = Arc::new(cells);
+        result.facts = None;
+        result.source.worksheet.bytes = SourcePayload::Owned(bytes);
+        result.source.worksheet_replacement_hint = replacement_hint;
+        result.source.check_execution()?;
+        Ok(result)
+    }
+
+    fn try_rewritten_value_cells(
+        source: &Self,
+        rewrite: &raw::worksheet::edit::ValueOnlyRewrite<'_>,
+    ) -> Option<Store> {
+        let reduced =
+            raw::worksheet::edit::reduced_readback(&rewrite.bytes, &rewrite.omitted).ok()?;
+        let shared_strings = source.source.shared_strings.as_ref();
+        let parsed = raw::worksheet::parse_refusing_repairs(&reduced, || {
+            shared_strings.map(SharedStringsState::strings).transpose()
+        })
+        .ok()?;
+        let mut omitted = Vec::new();
+        omitted.try_reserve_exact(rewrite.omitted.len()).ok()?;
+        for span in &rewrite.omitted {
+            let end_column = span.last_column.checked_add(1)?;
+            let end_row = span.row.checked_add(1)?;
+            let start = Address::at(span.row, span.first_column).ok()?;
+            omitted.push(Rect::new(start, end_row, end_column).ok()?);
+        }
+        if !source.cells.entries().iter().all(stored_entry_is_supported)
+            || !parsed.entries().iter().all(stored_entry_is_supported)
+        {
+            return None;
+        }
+        Store::merge_omitted_cells(parsed, &source.cells, &omitted)
+            .ok()
+            .flatten()
+    }
+
+    pub(super) fn invalidated_workbook_xml(&self) -> Result<Arc<Vec<u8>>> {
+        self.source.check_execution()?;
+        let bytes = raw::recalc::invalidate(self.source.workbook.bytes.as_bytes())?;
+        validation::workbook_xml(&bytes)?;
+        self.source.check_execution()?;
+        Ok(Arc::new(bytes))
+    }
+
+    pub(super) fn with_invalidated_calculation(self) -> Result<Self> {
+        let workbook = self.invalidated_workbook_xml()?;
+        self.with_invalidated_workbook(workbook)
+    }
+
+    pub(super) fn with_invalidated_workbook(mut self, workbook: Arc<Vec<u8>>) -> Result<Self> {
+        self.source.check_execution()?;
+        validation::workbook_xml(workbook.as_slice())?;
+        self.source.workbook.bytes = SourcePayload::Owned(workbook);
+        if let Some(chain) = self.source.calculation_chain.take() {
+            let mut relationships = self.source.workbook_relationships.to_vec();
+            relationships.retain(|relationship| relationship.id != chain.relationship.id);
+            self.source.workbook_relationships = Arc::from(relationships.into_boxed_slice());
+        }
+        self.source.check_execution()?;
+        Ok(self)
+    }
+
+    /// Rebind worksheet bytes after the row-visibility owner proves that only
+    /// direct `hidden` attributes changed.
+    ///
+    /// Cell values, formulas, styles, metadata, and owners are therefore
+    /// byte-identical, so their already validated store remains authoritative.
+    /// The candidate XML grammar is still validated independently before the
+    /// source-bound snapshot is published.
+    pub(crate) fn from_visibility_rewrite<'source>(
+        source: &'source Self,
+        rewrite: crate::row_visibility::rewrite::VisibilityRewrite<'source>,
+    ) -> Result<Self> {
+        source.source.check_execution()?;
+        let bytes = rewrite.into_bytes_for(source.source_xml())?;
+        validation::worksheet_xml(&bytes)?;
+        let mut result = source.clone();
+        result.facts = None;
+        result.source.worksheet.bytes = SourcePayload::Owned(Arc::new(bytes));
+        result.source.worksheet_replacement_hint = None;
+        result.source.check_execution()?;
+        Ok(result)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn shares_cell_store_with(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.cells, &other.cells)
+    }
+
+    /// Selected worksheet name.
+    #[must_use]
+    pub fn sheet_name(&self) -> &str {
+        &self.sheet_name
+    }
+
+    /// Selected zero-based sheet position.
+    #[must_use]
+    pub const fn sheet_position(&self) -> usize {
+        self.sheet_position
+    }
+
+    /// Exact scalar value at a stored coordinate.
+    #[must_use]
+    pub fn value(&self, address: litchi_sheet::Cell) -> Option<&Value> {
+        match self.cells.entry(address).map(|entry| &entry.cell) {
+            Some(Cell::Value(value)) => Some(value),
+            _ => None,
+        }
+    }
+
+    /// Exact semantic cell stored at a coordinate.
+    #[must_use]
+    pub fn cell(&self, address: litchi_sheet::Cell) -> Option<&Cell> {
+        self.cells.entry(address).map(|entry| &entry.cell)
+    }
+
+    pub(super) fn editable_cell(&self, address: litchi_sheet::Cell) -> Option<&Cell> {
+        self.cell(address)
+    }
+
+    pub(super) fn require_insertable_absence(&self, address: Address) -> Result<()> {
+        if self
+            .cells
+            .merge_ranges()
+            .iter()
+            .any(|range| range.contains(address))
+        {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::CoveredMerge,
+            });
+        }
+        let formula_covered = self.cells.entries().iter().any(|entry| {
+            entry
+                .formula_range
+                .is_some_and(|range| range.contains(address))
+                || entry
+                    .shared_formula
+                    .as_ref()
+                    .is_some_and(|storage| storage.range.contains(address))
+        });
+        if formula_covered {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::GroupFormula,
+            });
+        }
+        if self.cells.entry(address).is_some() {
+            return Err(invalid(format!(
+                "cell selector '{address}' already has an existing cell owner"
+            )));
+        }
+        Ok(())
+    }
+
+    /// Refuse an edit at an address a merged range covers but does not
+    /// anchor.
+    ///
+    /// `<mergeCells>` is one of the admitted worksheet children: the rewrite
+    /// copies it verbatim, and a merged range addresses its cells by
+    /// coordinate, so a value change never moves it. What the range does
+    /// decide is which cell's value the merged rectangle displays — its
+    /// top-left anchor. A value written to any other covered address would be
+    /// stored and never shown, so this module refuses it, exactly as
+    /// [`Self::require_insertable_absence`] already refuses an insert there.
+    pub(super) fn require_unmerged_target(&self, address: litchi_sheet::Cell) -> Result<()> {
+        if self
+            .cells
+            .merge_ranges()
+            .iter()
+            .any(|range| range.contains(address) && range.start() != address)
+        {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::CoveredMerge,
+            });
+        }
+        Ok(())
+    }
+
+    /// Keep the shared-string table's indexes stable across a value rewrite.
+    ///
+    /// Existing shared-string cells are readable because their table is part of
+    /// the retained source closure, but this editor does not author a new
+    /// table entry or rewrite an existing index. A mutation at such a cell
+    /// would remove or replace its source reference, so it is refused before
+    /// staging can produce a partial candidate.
+    pub(super) fn require_shared_string_free_target(&self, address: Address) -> Result<()> {
+        if self
+            .cells
+            .entry(address)
+            .is_some_and(|entry| entry.shared_string.is_some())
+        {
+            return Err(invalid(
+                "value-only edits cannot add, remove, or renumber shared strings",
+            ));
+        }
+        Ok(())
+    }
+
+    pub(crate) fn shared_formula_group(
+        &self,
+        address: litchi_sheet::Cell,
+        maximum_members: usize,
+    ) -> Result<SharedFormulaGroup> {
+        let entry = self.cells.entry(address).ok_or_else(|| {
+            invalid(format!(
+                "shared formula selector '{address}' has no existing cell owner"
+            ))
+        })?;
+        let Some(storage) = entry.shared_formula.as_ref() else {
+            return Err(self.edit_blocked(address));
+        };
+        if !storage.master || storage.range.start() != address {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::GroupFormula,
+            });
+        }
+        if !matches!(&entry.cell, Cell::Formula(formula) if matches!(formula.kind(), Kind::Scalar))
+            || entry.cell_metadata.is_some()
+            || entry.value_metadata.is_some()
+        {
+            return Err(invalid(
+                "shared formula group contains a non-scalar or metadata cell",
+            ));
+        }
+
+        let rows = usize::try_from(storage.range.rows())
+            .map_err(|_| invalid("shared formula range row count overflows usize"))?;
+        let columns = usize::try_from(storage.range.columns())
+            .map_err(|_| invalid("shared formula range column count overflows usize"))?;
+        let area = rows
+            .checked_mul(columns)
+            .ok_or_else(|| invalid("shared formula range area overflows usize"))?;
+        if area > maximum_members {
+            return Err(Error::limit(
+                super::LimitKind::SharedFormulaMembers,
+                area,
+                maximum_members,
+            ));
+        }
+
+        let mut members = Vec::new();
+        members
+            .try_reserve_exact(area)
+            .map_err(|source| allocation("shared formula group members", source))?;
+        let start = storage.range.start();
+        let (end_row, end_column) = storage.range.end();
+        for row in start.row().get()..end_row {
+            for column in start.column().get()..end_column {
+                let member = litchi_sheet::Cell::at(row, column)
+                    .map_err(|_| invalid("shared formula range contains an invalid cell"))?;
+                let member_entry = self.cells.entry(member).ok_or_else(|| {
+                    invalid(format!("shared formula group is missing cell '{member}'"))
+                })?;
+                let Some(member_storage) = member_entry.shared_formula.as_ref() else {
+                    return Err(invalid(format!(
+                        "shared formula group cell '{member}' has no shared storage"
+                    )));
+                };
+                if member_storage.index != storage.index
+                    || member_storage.range != storage.range
+                    || member_storage.reference != storage.reference
+                {
+                    return Err(invalid(
+                        "shared formula group members do not share exact storage metadata",
+                    ));
+                }
+                if member_storage.master != (member == start)
+                    || !matches!(
+                        &member_entry.cell,
+                        Cell::Formula(formula) if matches!(formula.kind(), Kind::Scalar)
+                    )
+                    || member_entry.cell_metadata.is_some()
+                    || member_entry.value_metadata.is_some()
+                {
+                    return Err(invalid(
+                        "shared formula group contains a non-scalar or metadata cell",
+                    ));
+                }
+                members.push(member);
+            }
+        }
+
+        for member_entry in self.cells.entries() {
+            let Some(member_storage) = member_entry.shared_formula.as_ref() else {
+                continue;
+            };
+            if member_storage.index != storage.index {
+                continue;
+            }
+            if member_storage.range != storage.range
+                || member_storage.reference != storage.reference
+                || !storage.range.contains(member_entry.address)
+                || member_storage.master != (member_entry.address == start)
+            {
+                return Err(invalid(
+                    "shared formula group contains an outsider or mismatched storage metadata",
+                ));
+            }
+        }
+
+        Ok(SharedFormulaGroup {
+            storage: storage.clone(),
+            master: start,
+            members: members.into_boxed_slice(),
+        })
+    }
+
+    pub(super) fn edit_blocked(&self, address: litchi_sheet::Cell) -> Error {
+        let reason = self
+            .cells
+            .entry(address)
+            .and_then(|entry| entry.formula_range)
+            .map_or(EditBlock::UnknownCell, |_| EditBlock::GroupFormula);
+        Error::EditBlocked {
+            sheet: self.sheet_name().to_owned(),
+            address,
+            reason,
+        }
+    }
+
+    pub(super) fn require_formula_target(&self, address: litchi_sheet::Cell) -> Result<()> {
+        let entry = self.cells.entry(address).ok_or_else(|| {
+            invalid(format!(
+                "formula selector '{address}' has no existing cell owner"
+            ))
+        })?;
+        if entry.formula_range.is_some() {
+            return Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::GroupFormula,
+            });
+        }
+        if matches!(entry.cell, Cell::Value(_) | Cell::Formula(_)) {
+            Ok(())
+        } else {
+            Err(Error::EditBlocked {
+                sheet: self.sheet_name().to_owned(),
+                address,
+                reason: EditBlock::UnknownCell,
+            })
+        }
+    }
+
+    /// Whether an explicit `<c>` owner exists at this coordinate.
+    ///
+    /// This distinguishes a cleared cell record from a removed cell record.
+    #[must_use]
+    pub fn contains_cell(&self, address: litchi_sheet::Cell) -> bool {
+        self.cells.entry(address).is_some()
+    }
+
+    /// Compact planning facts for exactly [`Self::source_xml`], when the
+    /// planning traversal proved them.
+    pub(crate) fn source_facts(&self) -> Option<&raw::worksheet::SourceFacts> {
+        self.facts.as_deref()
+    }
+
+    /// Exact source worksheet XML.
+    #[must_use]
+    pub fn source_xml(&self) -> &[u8] {
+        self.source.worksheet.bytes.as_bytes()
+    }
+
+    /// Selected worksheet Part URI.
+    #[must_use]
+    pub const fn worksheet_part_name(&self) -> &PackURI {
+        &self.source.worksheet.uri
+    }
+
+    pub(crate) fn same_source(&self, other: &Self) -> bool {
+        self.sheet_name == other.sheet_name
+            && self.sheet_position == other.sheet_position
+            && self.source.same_owner(&other.source)
+    }
+
+    /// The same worksheet closure, whatever source it was read from.
+    pub(crate) fn same_content(&self, other: &Self) -> bool {
+        self.sheet_name == other.sheet_name
+            && self.sheet_position == other.sheet_position
+            && self.source.same_owner_content(&other.source)
+    }
+
+    /// Whether this closure was read from `package`'s source.
+    pub(crate) fn same_lineage(&self, package: &SourceBackedPackage) -> bool {
+        self.source
+            .source_lineage
+            .as_ref()
+            .is_some_and(|lineage| *lineage == package.source_lineage())
+    }
+
+    pub(crate) fn check_execution(&self) -> Result<()> {
+        self.source.check_execution()
+    }
+
+    fn source_provenance(
+        &self,
+        lineage: &SourceLineage,
+        version: SourceVersion,
+    ) -> SourceProvenance {
+        match (
+            self.source.source_lineage.as_ref(),
+            self.source.source_version,
+        ) {
+            (Some(expected_lineage), Some(expected_version)) => {
+                if expected_lineage == lineage && expected_version == version {
+                    SourceProvenance::Matched
+                } else {
+                    SourceProvenance::Mismatched
+                }
+            },
+            (None, None) => SourceProvenance::Unavailable,
+            _ => SourceProvenance::Unavailable,
+        }
+    }
+
+    /// Check that this source-backed closure still belongs to the exact
+    /// opened package and source revision without reloading any Part body.
+    pub(crate) fn matches_source_backed(
+        &self,
+        package: &SourceBackedPackage,
+    ) -> Result<SourceProvenance> {
+        package.check_execution()?;
+        let version = package.source_version()?;
+        package.check_execution()?;
+        let lineage = package.source_lineage();
+        Ok(self.source_provenance(&lineage, version))
+    }
+
+    /// This snapshot with its worksheet payload copied out of any managed
+    /// reservation, under `maximum_bytes`.
+    pub(crate) fn materialized(&self, maximum_bytes: usize) -> Result<Self> {
+        let mut snapshot = self.clone();
+        snapshot.source.worksheet.bytes = SourcePayload::Owned(
+            self.source
+                .worksheet
+                .bytes
+                .materialized_arc(maximum_bytes, "source-backed value-only worksheet")?,
+        );
+        Ok(snapshot)
+    }
+
+    pub(super) fn topology_plan_from(&self, before: &Self) -> Result<SourceTopologyPlan> {
+        let mut plan = SourceTopologyPlan::new();
+        append_owner_topology(&mut plan, &before.source, &self.source)?;
+        append_worksheet_replacement(&mut plan, &before.source, &self.source)?;
+        Ok(plan)
+    }
+}
+
+impl MultiSnapshot {
+    pub(super) fn topology_plan_from(&self, before: &Self) -> Result<SourceTopologyPlan> {
+        if self.len() != before.len() {
+            return Err(invalid(
+                "multi-sheet topology snapshots have different owners",
+            ));
+        }
+        let mut plan = SourceTopologyPlan::new();
+        let first_before = before
+            .sheets()
+            .first()
+            .ok_or_else(|| invalid("multi-sheet topology has no source owner"))?;
+        let first_after = self
+            .sheets()
+            .first()
+            .ok_or_else(|| invalid("multi-sheet topology has no target owner"))?;
+        append_owner_topology(&mut plan, &first_before.source, &first_after.source)?;
+        for (before, after) in before.sheets().iter().zip(self.sheets()) {
+            append_worksheet_replacement(&mut plan, &before.source, &after.source)?;
+        }
+        Ok(plan)
+    }
+}
+
+fn validate_sheet_graph_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    sheets: &[raw::Sheet],
+) -> Result<Vec<crate::workbook::source::SheetPart>> {
+    let mut parts = Vec::new();
+    let mut targets = HashSet::new();
+    parts
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| allocation("owned workbook sheet graph", source))?;
+    for sheet in sheets {
+        let relationship = workbook.rels().get(&sheet.relationship_id).ok_or_else(|| {
+            invalid(format!(
+                "sheet '{}' references missing relationship '{}'",
+                sheet.name, sheet.relationship_id
+            ))
+        })?;
+        if relationship.is_external() {
+            return Err(invalid("worksheet relationship cannot be external"));
+        }
+        let target = relationship.target_partname()?;
+        let part = package.get_part(&target)?;
+        let kind = match relationship.reltype() {
+            rt::WORKSHEET | rt::STRICT_WORKSHEET => {
+                if part.content_type() != ct::SML_WORKSHEET {
+                    return Err(invalid("worksheet content type is invalid"));
+                }
+                WorksheetKind::Worksheet
+            },
+            CHARTSHEET_REL | STRICT_CHARTSHEET_REL => {
+                if part.content_type() != CHARTSHEET_CONTENT_TYPE {
+                    return Err(invalid("chartsheet content type is invalid"));
+                }
+                WorksheetKind::Chart
+            },
+            DIALOGSHEET_REL => WorksheetKind::Dialog,
+            MACROSHEET_REL | INTL_MACROSHEET_REL => WorksheetKind::Macro,
+            _ => WorksheetKind::Unknown,
+        };
+        if !targets.insert(part.partname().clone()) {
+            return Err(invalid(
+                "workbook sheet graph contains a duplicate Part target",
+            ));
+        }
+        parts.push(crate::workbook::source::SheetPart {
+            kind,
+            uri: part.partname().clone(),
+        });
+    }
+    Ok(parts)
+}
+
+#[derive(Clone, Debug)]
+struct SourceState {
+    workbook: PartState,
+    worksheet: PartState,
+    owner_relationship: SourceRelationship,
+    sheet_relationship: SourceRelationship,
+    package_relationships: Arc<[SourceRelationship]>,
+    workbook_relationships: Arc<[SourceRelationship]>,
+    calculation_chain: Option<CalculationChainState>,
+    shared_strings: Option<SharedStringsState>,
+    auxiliary: Arc<[PartState]>,
+    graph: Arc<[SheetGraphState]>,
+    context: Option<ExecutionContext>,
+    source_lineage: Option<SourceLineage>,
+    source_version: Option<SourceVersion>,
+    worksheet_replacement_hint: Option<WorksheetReplacementHint>,
+}
+
+impl SourceState {
+    fn check_execution(&self) -> Result<()> {
+        check_execution(self.context.as_ref())
+    }
+
+    fn same_owner(&self, other: &Self) -> bool {
+        self.same_owner_content(other)
+            && match (&self.source_lineage, &other.source_lineage) {
+                (Some(left), Some(right)) => left == right,
+                (None, _) | (_, None) => true,
+            }
+            && match (self.source_version, other.source_version) {
+                (Some(left), Some(right)) => left == right,
+                (None, _) | (_, None) => true,
+            }
+    }
+
+    fn same_owner_content(&self, other: &Self) -> bool {
+        self.workbook == other.workbook
+            && self.worksheet == other.worksheet
+            && self.owner_relationship == other.owner_relationship
+            && self.sheet_relationship == other.sheet_relationship
+            && self.package_relationships == other.package_relationships
+            && self.workbook_relationships == other.workbook_relationships
+            && self.calculation_chain == other.calculation_chain
+            && optional_shared_strings_same(&self.shared_strings, &other.shared_strings)
+            && self.auxiliary == other.auxiliary
+            && self.graph == other.graph
+    }
+}
+
+/// Bounded, detached metadata describing the worksheet replacement produced by
+/// one value-only rewrite. The source and replacement payloads themselves are
+/// deliberately not retained: publication checks these identities against the
+/// before and after snapshots and the OPC auditor treats every span as
+/// untrusted input.
+#[derive(Clone, Debug)]
+struct WorksheetReplacementHint {
+    source_ptr: usize,
+    source_len: usize,
+    replacement_ptr: usize,
+    replacement_len: usize,
+    spans: Arc<[ReplacementSpan]>,
+}
+
+impl WorksheetReplacementHint {
+    fn new(
+        source: &[u8],
+        replacement: &Arc<Vec<u8>>,
+        spans: Box<[ReplacementSpan]>,
+    ) -> Option<Self> {
+        if spans.len() < 2 || spans.len() > raw::worksheet::edit::MAX_REPLACEMENT_SPANS {
+            return None;
+        }
+        let mut source_end = 0;
+        let mut replacement_end = 0;
+        for span in &spans {
+            if span.original.start >= span.original.end
+                || span.replacement.start >= span.replacement.end
+                || span.original.start < source_end
+                || span.replacement.start < replacement_end
+                || span.original.end > source.len()
+                || span.replacement.end > replacement.len()
+            {
+                return None;
+            }
+            source_end = span.original.end;
+            replacement_end = span.replacement.end;
+        }
+        let spans: Arc<[ReplacementSpan]> = Arc::from(spans);
+        Some(Self {
+            source_ptr: source.as_ptr() as usize,
+            source_len: source.len(),
+            replacement_ptr: replacement.as_ptr() as usize,
+            replacement_len: replacement.len(),
+            spans,
+        })
+    }
+
+    fn matches(&self, source: &[u8], replacement: &[u8]) -> bool {
+        self.source_ptr == source.as_ptr() as usize
+            && self.source_len == source.len()
+            && self.replacement_ptr == replacement.as_ptr() as usize
+            && self.replacement_len == replacement.len()
+    }
+}
+
+#[derive(Clone, Debug)]
+struct PartState {
+    uri: PackURI,
+    content_type: Box<str>,
+    bytes: SourcePayload,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct CalculationChainState {
+    part: PartState,
+    relationship: SourceRelationship,
+}
+
+/// The source-backed shared-string relationship and its retained bytes.
+///
+/// The part is captured with the rest of the source closure so publication can
+/// prove that the table was not replaced or renumbered. The parsed table is
+/// shared by snapshots and initialized only when a worksheet parser actually
+/// encounters a `t="s"` cell.
+#[derive(Clone, Debug)]
+struct SharedStringsState {
+    relationship: SourceRelationship,
+    part: PartState,
+    table: Arc<OnceLock<Box<[Text]>>>,
+}
+
+impl SharedStringsState {
+    fn new(
+        relationship: &Relationship,
+        uri: PackURI,
+        content_type: &str,
+        bytes: SourcePayload,
+    ) -> Result<Self> {
+        Ok(Self {
+            relationship: SourceRelationship::capture(relationship)?,
+            part: PartState::new(uri, content_type, bytes)?,
+            table: Arc::new(OnceLock::new()),
+        })
+    }
+
+    fn strings(&self) -> Result<&[Text]> {
+        if let Some(table) = self.table.get() {
+            return Ok(table);
+        }
+        let parsed = raw::strings::parse(self.part.bytes.as_bytes())?;
+        let _ = self.table.set(parsed);
+        self.table.get().map_or_else(
+            || {
+                Err(invalid(
+                    "shared-string table initialization did not publish a value",
+                ))
+            },
+            |table| Ok(table.as_ref()),
+        )
+    }
+
+    fn same_source(&self, other: &Self) -> bool {
+        self.relationship == other.relationship && self.part == other.part
+    }
+}
+
+impl PartState {
+    fn new(uri: PackURI, content_type: &str, bytes: SourcePayload) -> Result<Self> {
+        Ok(Self {
+            uri,
+            content_type: copy_boxed(content_type, "value-only content type")?,
+            bytes,
+        })
+    }
+}
+
+impl PartialEq for PartState {
+    fn eq(&self, other: &Self) -> bool {
+        self.uri == other.uri
+            && self.content_type == other.content_type
+            && self.bytes == other.bytes
+    }
+}
+
+impl Eq for PartState {}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct SourceRelationship {
+    id: Box<str>,
+    kind: Box<str>,
+    target: Box<str>,
+    mode: TargetMode,
+}
+
+impl SourceRelationship {
+    fn capture(value: &Relationship) -> Result<Self> {
+        Ok(Self {
+            id: copy_boxed(value.r_id(), "value-only relationship ID")?,
+            kind: copy_boxed(value.reltype(), "value-only relationship type")?,
+            target: copy_boxed(value.target_ref(), "value-only relationship target")?,
+            mode: value.target_mode(),
+        })
+    }
+}
+
+fn copy_payload(bytes: &[u8], resource: &'static str) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| allocation(resource, source))?;
+    output.extend_from_slice(bytes);
+    Ok(output)
+}
+
+fn try_replace_source_payload(
+    plan: &mut SourceTopologyPlan,
+    partname: PackURI,
+    payload: &SourcePayload,
+    resource: &'static str,
+    replacement_spans: Option<&Arc<[ReplacementSpan]>>,
+) -> Result<()> {
+    // Only already-detached bytes may cross the OPC publication boundary by
+    // Arc. Keep managed and budgeted payloads on the old fallible Vec copy so
+    // their reservation and allocation behavior stays unchanged.
+    match payload {
+        SourcePayload::Owned(bytes) => {
+            if let Some(spans) = replacement_spans {
+                plan.try_replace_part_shared_with_spans(
+                    partname,
+                    Arc::clone(bytes),
+                    Arc::clone(spans),
+                )
+                .map_err(Error::Package)?;
+            } else {
+                plan.try_replace_part_shared(partname, Arc::clone(bytes))
+                    .map_err(Error::Package)?;
+            }
+        },
+        SourcePayload::Managed(_) | SourcePayload::OwnedBudgeted { .. } => {
+            plan.try_replace_part(partname, copy_payload(payload.as_bytes(), resource)?)
+                .map_err(Error::Package)?;
+        },
+    }
+    Ok(())
+}
+
+fn append_worksheet_replacement(
+    plan: &mut SourceTopologyPlan,
+    before: &SourceState,
+    after: &SourceState,
+) -> Result<()> {
+    if before.worksheet.uri != after.worksheet.uri
+        || before.worksheet.content_type != after.worksheet.content_type
+    {
+        return Err(invalid("worksheet topology changed during a cell edit"));
+    }
+    if before.worksheet.bytes != after.worksheet.bytes {
+        // The value-only rewrite copies the head before `<sheetData>`, every
+        // unedited row and every unedited cell record, and the tail after
+        // `</sheetData>`, byte for byte from the source, and authors compact
+        // bytes only for the `<dimension>` tag and the edited `<c>` records.
+        // The replacement therefore carries the producer's own formatting,
+        // which publication audits with source rules.
+        let replacement_spans = after
+            .worksheet_replacement_hint
+            .as_ref()
+            .filter(|hint| {
+                hint.matches(
+                    before.worksheet.bytes.as_bytes(),
+                    after.worksheet.bytes.as_bytes(),
+                )
+            })
+            .map(|hint| &hint.spans);
+        try_replace_source_payload(
+            plan,
+            after.worksheet.uri.clone(),
+            &after.worksheet.bytes,
+            "source-backed worksheet topology replacement",
+            replacement_spans,
+        )?;
+    }
+    Ok(())
+}
+
+fn append_owner_topology(
+    plan: &mut SourceTopologyPlan,
+    before: &SourceState,
+    after: &SourceState,
+) -> Result<()> {
+    if before.workbook.uri != after.workbook.uri
+        || before.workbook.content_type != after.workbook.content_type
+    {
+        return Err(invalid("workbook topology changed during a cell edit"));
+    }
+    if before.workbook.bytes != after.workbook.bytes {
+        // `raw::recalc::invalidate` is a span editor: it rewrites the
+        // `<calcPr>` start tag in place, or inserts one compact `<calcPr/>`
+        // at its schema position, and copies every other byte of the workbook
+        // from the source, so the replacement carries the producer's
+        // formatting for the same reason the worksheet's does.
+        try_replace_source_payload(
+            plan,
+            after.workbook.uri.clone(),
+            &after.workbook.bytes,
+            "source-backed workbook topology replacement",
+            None,
+        )?;
+    }
+    match (&before.calculation_chain, &after.calculation_chain) {
+        (Some(before_chain), None) => {
+            plan.try_remove_relationship(
+                after.workbook.uri.clone(),
+                before_chain.relationship.id.as_ref(),
+            )?;
+            plan.try_remove_part(before_chain.part.uri.clone())?;
+        },
+        (None, Some(after_chain)) => {
+            plan.try_add_part(
+                after_chain.part.uri.clone(),
+                after_chain.part.content_type.as_ref(),
+                copy_payload(
+                    after_chain.part.bytes.as_bytes(),
+                    "source-backed calculation-chain addition",
+                )?,
+            )?;
+            plan.try_add_relationship(
+                after.workbook.uri.clone(),
+                after_chain.relationship.id.as_ref(),
+                after_chain.relationship.kind.as_ref(),
+                SourceRelationshipTarget::Internal(after_chain.part.uri.clone()),
+            )?;
+        },
+        (Some(before_chain), Some(after_chain)) if before_chain != after_chain => {
+            return Err(invalid(
+                "calculation-chain replacement is outside the cell transaction",
+            ));
+        },
+        (Some(_), Some(_)) | (None, None) => {},
+    }
+    Ok(())
+}
+
+fn calculation_chain_relationship(relationships: &Relationships) -> Result<Option<&Relationship>> {
+    let mut matching = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::CALC_CHAIN | rt::STRICT_CALC_CHAIN
+        )
+    });
+    let first = matching.next();
+    if matching.next().is_some() {
+        return Err(invalid(
+            "workbook has multiple calculation-chain relationships",
+        ));
+    }
+    Ok(first)
+}
+
+fn capture_calculation_chain_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+) -> Result<Option<CalculationChainState>> {
+    let Some(relationship) = calculation_chain_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("calculation-chain relationship cannot be external"));
+    }
+    let part = package.part(&relationship.target_partname()?)?;
+    if part.content_type() != CALCULATION_CHAIN_CONTENT_TYPE || !part.rels().is_empty() {
+        return Err(invalid("calculation-chain Part has unsupported topology"));
+    }
+    let bytes = SourcePayload::from_part_data(package, part.data()?)?;
+    Ok(Some(CalculationChainState {
+        part: PartState::new(part.partname().clone(), part.content_type(), bytes)?,
+        relationship: SourceRelationship::capture(relationship)?,
+    }))
+}
+
+fn capture_calculation_chain_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+) -> Result<Option<CalculationChainState>> {
+    let Some(relationship) = calculation_chain_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("calculation-chain relationship cannot be external"));
+    }
+    let part = package.get_part(&relationship.target_partname()?)?;
+    if part.content_type() != CALCULATION_CHAIN_CONTENT_TYPE || !part.rels().is_empty() {
+        return Err(invalid("calculation-chain Part has unsupported topology"));
+    }
+    Ok(Some(CalculationChainState {
+        part: PartState::new(
+            part.partname().clone(),
+            part.content_type(),
+            SourcePayload::Owned(part.blob_arc()),
+        )?,
+        relationship: SourceRelationship::capture(relationship)?,
+    }))
+}
+
+fn shared_strings_relationship(relationships: &Relationships) -> Result<Option<&Relationship>> {
+    let mut matching = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::SHARED_STRINGS | rt::STRICT_SHARED_STRINGS
+        )
+    });
+    let first = matching.next();
+    if matching.next().is_some() {
+        return Err(invalid("workbook has multiple shared-string relationships"));
+    }
+    Ok(first)
+}
+
+fn capture_shared_strings_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+) -> Result<Option<SharedStringsState>> {
+    let Some(relationship) = shared_strings_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("shared-string relationship cannot be external"));
+    }
+    let part = package.part(&relationship.target_partname()?)?;
+    if !part.rels().is_empty() {
+        return Err(invalid("shared-string Part has unsupported topology"));
+    }
+    if part.content_type() != ct::SML_SHARED_STRINGS {
+        return Err(invalid(format!(
+            "shared-string part has content type '{}', expected '{}'",
+            part.content_type(),
+            ct::SML_SHARED_STRINGS
+        )));
+    }
+    let bytes = SourcePayload::from_part_data(package, part.data()?)?;
+    SharedStringsState::new(
+        relationship,
+        part.partname().clone(),
+        part.content_type(),
+        bytes,
+    )
+    .map(Some)
+}
+
+fn capture_shared_strings_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+) -> Result<Option<SharedStringsState>> {
+    let Some(relationship) = shared_strings_relationship(workbook.rels())? else {
+        return Ok(None);
+    };
+    if relationship.is_external() {
+        return Err(invalid("shared-string relationship cannot be external"));
+    }
+    let part = package.get_part(&relationship.target_partname()?)?;
+    if !part.rels().is_empty() {
+        return Err(invalid("shared-string Part has unsupported topology"));
+    }
+    if part.content_type() != ct::SML_SHARED_STRINGS {
+        return Err(invalid(format!(
+            "shared-string part has content type '{}', expected '{}'",
+            part.content_type(),
+            ct::SML_SHARED_STRINGS
+        )));
+    }
+    SharedStringsState::new(
+        relationship,
+        part.partname().clone(),
+        part.content_type(),
+        SourcePayload::Owned(part.blob_arc()),
+    )
+    .map(Some)
+}
+
+/// Relationship types whose target's meaning depends on a cell's value.
+///
+/// This is the dependency rule's refusal set, and the reason each member is
+/// in it is that the target stores a copy of, or a name derived from, a value
+/// the editor may replace:
+///
+/// * `pivotCacheDefinition`, `pivotCacheRecords` — the cache holds a copy of
+///   the source cells, which an edit would silently disagree with.
+/// * `table`, `queryTable` — a table column is named after the text of its
+///   header cell, so editing that cell renames a column the part still
+///   spells the old way.
+///
+/// Everything else a package can point at is preserved verbatim by
+/// `litchi-opc` and is never named by the value-only topology plan, so it
+/// needs no permission from this module.
+fn value_dependent_relationship(reltype: &str) -> bool {
+    matches!(
+        reltype,
+        rt::PIVOT_CACHE_DEFINITION
+            | rt::STRICT_PIVOT_CACHE_DEFINITION
+            | rt::PIVOT_CACHE_RECORDS
+            | rt::STRICT_PIVOT_CACHE_RECORDS
+            | rt::TABLE
+            | rt::STRICT_TABLE
+            | QUERY_TABLE_REL
+            | STRICT_QUERY_TABLE_REL
+    )
+}
+
+/// Admit a worksheet relationship the value-only rewrite cannot disturb.
+///
+/// `rewrite_value_only_with_provenance` writes three things: the
+/// `<dimension>` `ref` attribute, the cell records inside `<sheetData>`, and
+/// a byte-verbatim copy of everything before and after that span. In
+/// `CT_Worksheet`'s fixed sequence every child that can carry an `r:id`
+/// follows `sheetData`, and neither `CT_Row` nor `CT_Cell` has an `r:id`
+/// attribute in either dialect — which the value-only validator now also
+/// enforces directly. So a printer setting, a drawing, a hyperlink set or a
+/// legacy VML part is copied with its reference intact, and the part itself
+/// is never named by the topology plan.
+///
+/// What stays refused is an external target, and a target whose meaning
+/// depends on the edited value.
+fn validate_worksheet_relationships(relationships: &Relationships) -> Result<()> {
+    for relationship in relationships.iter() {
+        if relationship.is_external() || value_dependent_relationship(relationship.reltype()) {
+            return Err(invalid(format!(
+                "value-only edits refuse worksheet relationship '{}'",
+                relationship.reltype()
+            )));
+        }
+    }
+    Ok(())
+}
+
+/// Admit a workbook relationship the value-only closure does not interpret.
+///
+/// The five types this function counts are the ones the closure models: the
+/// worksheets it edits, the styles table it validates cell style indexes
+/// against, the theme and shared-string table it retains beside it, and the
+/// calculation chain it drops atomically with its relationship. Their
+/// cardinalities are bounded to one except for worksheets.
+/// Every other type is unfamiliar and is transferred verbatim, except the
+/// value-dependent set above.
+fn validate_workbook_relationships(
+    relationships: &Relationships,
+    require_single_sheet: bool,
+) -> Result<()> {
+    let mut worksheets = 0usize;
+    let mut styles = 0usize;
+    let mut themes = 0usize;
+    let mut shared_strings = 0usize;
+    let mut calculation_chains = 0usize;
+    for relationship in relationships.iter() {
+        if relationship.is_external() {
+            return Err(invalid(
+                "value-only edits refuse external workbook relationships",
+            ));
+        }
+        if value_dependent_relationship(relationship.reltype()) {
+            return Err(invalid(format!(
+                "value-only edits refuse workbook relationship '{}'",
+                relationship.reltype()
+            )));
+        }
+        match relationship.reltype() {
+            rt::WORKSHEET | rt::STRICT_WORKSHEET => worksheets += 1,
+            rt::STYLES | rt::STRICT_STYLES => styles += 1,
+            rt::THEME => themes += 1,
+            rt::SHARED_STRINGS | rt::STRICT_SHARED_STRINGS => shared_strings += 1,
+            rt::CALC_CHAIN | rt::STRICT_CALC_CHAIN => calculation_chains += 1,
+            _ => {},
+        }
+    }
+    let worksheets_valid = if require_single_sheet {
+        worksheets == 1
+    } else {
+        worksheets > 0
+    };
+    if !worksheets_valid || styles > 1 || themes > 1 || shared_strings > 1 || calculation_chains > 1
+    {
+        return Err(invalid(
+            "cell edits require worksheet relationships and at most one styles, theme, shared-string, and calculation-chain relationship",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_scalar_cells(cells: &Store) -> Result<()> {
+    if cells.entries().iter().any(|entry| {
+        matches!(entry.cell, Cell::Unknown(_))
+            || entry.cell_metadata.is_some()
+            || entry.value_metadata.is_some()
+    }) {
+        return Err(invalid("cell edits refuse unknown cells and cell metadata"));
+    }
+    Ok(())
+}
+
+fn resolve_selectors<'a>(
+    sheets: &[raw::Sheet],
+    selectors: Vec<Selector<'a>>,
+) -> Result<Vec<usize>> {
+    let mut positions = Vec::new();
+    positions
+        .try_reserve_exact(selectors.len())
+        .map_err(|source| allocation("multi-sheet selector positions", source))?;
+    for selector in selectors {
+        let position = resolve_selector(sheets, selector)?
+            .ok_or_else(|| invalid("value-only worksheet selector did not resolve"))?;
+        if positions.contains(&position) {
+            return Err(invalid(
+                "multi-sheet value edits contain a duplicate worksheet",
+            ));
+        }
+        positions.push(position);
+    }
+    positions.sort_unstable();
+    Ok(positions)
+}
+
+fn capture_sheet_graph_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+    sheets: &[raw::Sheet],
+    parts: &[crate::workbook::source::SheetPart],
+) -> Result<Box<[SheetGraphState]>> {
+    let mut graph = Vec::new();
+    graph
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| allocation("source-backed worksheet graph", source))?;
+    for (sheet, part_info) in sheets.iter().zip(parts) {
+        let relationship = workbook
+            .rels()
+            .get(&sheet.relationship_id)
+            .ok_or_else(|| invalid("worksheet relationship is missing"))?;
+        let part = package.part(&part_info.uri)?;
+        graph.push(SheetGraphState {
+            name: copy_boxed(&sheet.name, "worksheet graph sheet name")?,
+            relationship_id: copy_boxed(&sheet.relationship_id, "worksheet graph relationship ID")?,
+            sheet_id: sheet.sheet_id,
+            visibility: sheet.visibility.clone(),
+            kind: part_info.kind,
+            uri: part.partname().clone(),
+            content_type: copy_boxed(part.content_type(), "worksheet graph content type")?,
+            relationships: capture_relationships(part.rels())?,
+            relationship: SourceRelationship::capture(relationship)?,
+        });
+    }
+    Ok(graph.into_boxed_slice())
+}
+
+fn capture_sheet_graph_owned(
+    package: &OpcPackage,
+    workbook: &dyn Part,
+    sheets: &[raw::Sheet],
+    parts: &[crate::workbook::source::SheetPart],
+) -> Result<Box<[SheetGraphState]>> {
+    let mut graph = Vec::new();
+    graph
+        .try_reserve_exact(sheets.len())
+        .map_err(|source| allocation("owned worksheet graph", source))?;
+    for (sheet, part_info) in sheets.iter().zip(parts) {
+        let relationship = workbook
+            .rels()
+            .get(&sheet.relationship_id)
+            .ok_or_else(|| invalid("worksheet relationship is missing"))?;
+        let part = package.get_part(&part_info.uri)?;
+        graph.push(SheetGraphState {
+            name: copy_boxed(&sheet.name, "worksheet graph sheet name")?,
+            relationship_id: copy_boxed(&sheet.relationship_id, "worksheet graph relationship ID")?,
+            sheet_id: sheet.sheet_id,
+            visibility: sheet.visibility.clone(),
+            kind: part_info.kind,
+            uri: part.partname().clone(),
+            content_type: copy_boxed(part.content_type(), "worksheet graph content type")?,
+            relationships: capture_relationships(part.rels())?,
+            relationship: SourceRelationship::capture(relationship)?,
+        });
+    }
+    Ok(graph.into_boxed_slice())
+}
+
+fn load_source_catalog(package: &SourceBackedPackage) -> Result<SourceCatalogCapture> {
+    package.check_execution()?;
+    let workbook = package.main_document_part()?;
+    validate_package_relationships(package.rels())?;
+    if workbook.content_type() != ct::SML_SHEET_MAIN {
+        return Err(invalid(
+            "value-only edits require an ordinary XLSX workbook",
+        ));
+    }
+    let workbook_xml = SourcePayload::from_part_data(package, workbook.data()?)?;
+    validation::workbook_xml(workbook_xml.as_bytes())?;
+    let catalog = raw::parse_catalog(workbook_xml.as_bytes(), &package.read_limits())?;
+    let parts = validate_sheet_graph(package, &workbook, &catalog.sheets)?;
+    validate_workbook_relationships(workbook.rels(), false)?;
+    let owner = unique_owner(package.rels())?;
+    let (style_count, auxiliary) = capture_auxiliary_source(package, &workbook)?;
+    let shared_strings = capture_shared_strings_source(package, &workbook)?;
+    let calculation_chain = capture_calculation_chain_source(package, &workbook)?;
+    let graph = capture_sheet_graph_source(package, &workbook, &catalog.sheets, &parts)?;
+    package.check_execution()?;
+    Ok(SourceCatalogCapture {
+        sheets: catalog.sheets.clone(),
+        parts,
+        workbook_uri: workbook.partname().clone(),
+        workbook_content_type: copy_boxed(
+            workbook.content_type(),
+            "value-only workbook content type",
+        )?,
+        workbook_xml,
+        owner_relationship: SourceRelationship::capture(owner)?,
+        package_relationships: Arc::from(capture_relationships(package.rels())?),
+        workbook_relationships: Arc::from(capture_relationships(workbook.rels())?),
+        calculation_chain,
+        shared_strings,
+        style_count,
+        auxiliary: Arc::from(auxiliary),
+        graph: Arc::from(graph),
+        source_lineage: package.source_lineage(),
+        source_version: package.source_version()?,
+    })
+}
+
+/// Admit a package-root relationship the value-only closure never names.
+///
+/// A value-only commit's [`SourceTopologyPlan`] names exactly three things:
+/// the worksheet part, the workbook part and the calculation chain. Every
+/// other member is transferred verbatim, so `docProps/app.xml`,
+/// `docProps/core.xml`, a thumbnail or a vendor metadata part is already
+/// preserved byte for byte; refusing it refuses to preserve what is
+/// preserved. Two properties are the closure, and they stay:
+///
+/// * exactly one `officeDocument` owner, so the part the edit rewrites is
+///   the one this package's catalog describes; and
+/// * no external relationship, whose target lies outside the package and
+///   over which no closure can be proved.
+///
+/// The signed-package guard is elsewhere and is unchanged: applying a patch
+/// to a signed package returns [`Error::Signed`] from `Patch::apply_inner`.
+fn validate_package_relationships(relationships: &Relationships) -> Result<()> {
+    let mut owners = 0usize;
+    for relationship in relationships.iter() {
+        if relationship.is_external() {
+            return Err(invalid(format!(
+                "value-only edits refuse package relationship '{}'",
+                relationship.reltype()
+            )));
+        }
+        if matches!(
+            relationship.reltype(),
+            rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+        ) {
+            owners += 1;
+        }
+    }
+    if owners != 1 {
+        return Err(invalid(
+            "value-only edits require exactly one package officeDocument owner",
+        ));
+    }
+    Ok(())
+}
+
+fn optional_shared_strings_same(
+    left: &Option<SharedStringsState>,
+    right: &Option<SharedStringsState>,
+) -> bool {
+    match (left, right) {
+        (Some(left), Some(right)) => left.same_source(right),
+        (None, None) => true,
+        (None, Some(_)) | (Some(_), None) => false,
+    }
+}
+
+/// The workbook's styles and theme relationships in rId byte order.
+///
+/// `Relationships::iter` walks a `HashMap`, so the visit order is seeded per
+/// collection. `capture_auxiliary` and `capture_auxiliary_source` build the
+/// captured `PartState` array from this walk, and `SourceState::same_owner`
+/// compares two such arrays with slice `==`, so on the ordinary shape — one
+/// styles relationship and one theme relationship — a patch captured against
+/// one load was refused against another load of the same bytes. Sorting by rId
+/// is the key `capture_relationships` already uses for every other captured
+/// relationship array in this file, and the key `Relationships::to_xml` emits
+/// in, so the captured array becomes a function of the workbook.
+///
+/// `validate_workbook_relationships` runs before every caller and admits at
+/// most one styles and at most one theme relationship, so the two inline slots
+/// are exact and the ordering costs no allocation.
+fn auxiliary_relationships(relationships: &Relationships) -> SmallVec<[&Relationship; 2]> {
+    let mut selected: SmallVec<[&Relationship; 2]> = relationships
+        .iter()
+        .filter(|relationship| {
+            matches!(
+                relationship.reltype(),
+                rt::STYLES | rt::STRICT_STYLES | rt::THEME
+            )
+        })
+        .collect();
+    selected.sort_unstable_by(|left, right| left.r_id().cmp(right.r_id()));
+    selected
+}
+
+fn capture_auxiliary_source(
+    package: &SourceBackedPackage,
+    workbook: &litchi_opc::PartView<'_>,
+) -> Result<(u32, Box<[PartState]>)> {
+    let mut style_count = 0;
+    let mut auxiliary = Vec::new();
+    auxiliary
+        .try_reserve_exact(2)
+        .map_err(|source| allocation("value-only auxiliary closure", source))?;
+    for relationship in auxiliary_relationships(workbook.rels()) {
+        package.check_execution()?;
+        let part = package.part(&relationship.target_partname()?)?;
+        if !part.rels().is_empty() {
+            return Err(invalid(
+                "value-only edits refuse styles and theme relationships",
+            ));
+        }
+        let data = SourcePayload::from_part_data(package, part.data()?)?;
+        match relationship.reltype() {
+            rt::STYLES | rt::STRICT_STYLES if part.content_type() == ct::SML_STYLES => {
+                style_count = raw::styles::parse(data.as_bytes())?.len();
+            },
+            rt::THEME if part.content_type() == ct::OFC_THEME => {},
+            rt::STYLES | rt::STRICT_STYLES => {
+                return Err(invalid("styles relationship has the wrong content type"));
+            },
+            rt::THEME => return Err(invalid("theme relationship has the wrong content type")),
+            _ => {},
+        }
+        auxiliary.push(PartState::new(
+            part.partname().clone(),
+            part.content_type(),
+            data,
+        )?);
+    }
+    package.check_execution()?;
+    Ok((style_count, auxiliary.into_boxed_slice()))
+}
+
+fn capture_auxiliary(package: &OpcPackage, workbook: &dyn Part) -> Result<(u32, Box<[PartState]>)> {
+    let mut style_count = 0;
+    let mut auxiliary = Vec::new();
+    auxiliary
+        .try_reserve_exact(2)
+        .map_err(|source| allocation("value-only auxiliary closure", source))?;
+    for relationship in auxiliary_relationships(workbook.rels()) {
+        let part = package.get_part(&relationship.target_partname()?)?;
+        if !part.rels().is_empty() {
+            return Err(invalid(
+                "value-only edits refuse styles and theme relationships",
+            ));
+        }
+        match relationship.reltype() {
+            rt::STYLES | rt::STRICT_STYLES if part.content_type() == ct::SML_STYLES => {
+                style_count = raw::styles::parse(part.blob())?.len();
+            },
+            rt::THEME if part.content_type() == ct::OFC_THEME => {},
+            rt::STYLES | rt::STRICT_STYLES => {
+                return Err(invalid("styles relationship has the wrong content type"));
+            },
+            rt::THEME => return Err(invalid("theme relationship has the wrong content type")),
+            _ => {},
+        }
+        auxiliary.push(PartState::new(
+            part.partname().clone(),
+            part.content_type(),
+            SourcePayload::Owned(part.blob_arc()),
+        )?);
+    }
+    Ok((style_count, auxiliary.into_boxed_slice()))
+}
+
+fn validate_style_references(cells: &Store, style_count: u32) -> Result<()> {
+    let invalid_cell = cells
+        .entries()
+        .iter()
+        .any(|entry| entry.style.is_some_and(|style| style >= style_count));
+    let invalid_row = cells.row_entries().iter().any(|entry| {
+        entry
+            .properties
+            .style
+            .is_some_and(|style| style >= style_count)
+    });
+    let invalid_column = cells.column_entries().iter().any(|entry| {
+        entry
+            .properties
+            .style
+            .is_some_and(|style| style >= style_count)
+    });
+    if invalid_cell || invalid_row || invalid_column {
+        return Err(invalid(
+            "worksheet references a shared style outside the styles table",
+        ));
+    }
+    Ok(())
+}
+
+fn require_worksheet_relationship(relationship: &Relationship) -> Result<()> {
+    if relationship.target_mode() != TargetMode::Internal
+        || !matches!(relationship.reltype(), rt::WORKSHEET | rt::STRICT_WORKSHEET)
+    {
+        return Err(invalid("selected worksheet relationship is invalid"));
+    }
+    Ok(())
+}
+
+fn unique_owner(relationships: &Relationships) -> Result<&Relationship> {
+    let mut owners = relationships.iter().filter(|relationship| {
+        matches!(
+            relationship.reltype(),
+            rt::OFFICE_DOCUMENT | rt::STRICT_OFFICE_DOCUMENT
+        )
+    });
+    let owner = owners
+        .next()
+        .ok_or_else(|| invalid("workbook has no officeDocument owner"))?;
+    if owners.next().is_some() || owner.is_external() {
+        return Err(invalid(
+            "workbook officeDocument owner is not unique and internal",
+        ));
+    }
+    Ok(owner)
+}
+
+fn resolve_selector(sheets: &[raw::Sheet], selector: Selector<'_>) -> Result<Option<usize>> {
+    match selector {
+        CoreSelector::Position(position) => {
+            Ok((position.get() < sheets.len()).then_some(position.get()))
+        },
+        CoreSelector::Name(name) => {
+            let key = crate::sheet::key(&name);
+            Ok(sheets
+                .iter()
+                .position(|sheet| crate::sheet::key(&sheet.name) == key))
+        },
+        CoreSelector::Id(never) => match never {},
+        _ => Err(Error::UnsupportedSelector),
+    }
+}
+
+fn copy_boxed(value: &str, resource: &'static str) -> Result<Box<str>> {
+    let mut output = String::new();
+    output
+        .try_reserve_exact(value.len())
+        .map_err(|source| allocation(resource, source))?;
+    output.push_str(value);
+    Ok(output.into_boxed_str())
+}
+
+fn capture_relationships(values: &Relationships) -> Result<Box<[SourceRelationship]>> {
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(values.len())
+        .map_err(|source| allocation("value-only relationship closure", source))?;
+    for value in values.iter() {
+        output.push(SourceRelationship::capture(value)?);
+    }
+    output.sort_unstable_by(|left, right| left.id.cmp(&right.id));
+    Ok(output.into_boxed_slice())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::num::{NonZeroU64, NonZeroUsize};
+    use std::path::PathBuf;
+    use std::sync::Arc;
+
+    use litchi_core::{
+        Budget, CancellationSource, ExecutionContext, ExecutionLimits, FileSource,
+        Limits as BudgetLimits, Resource,
+    };
+    use litchi_opc::{OpcError, PackURI, SourceBackedPackage, SourceLimits, SourceTopologyPlan};
+
+    use super::{checked_multi_bytes, try_replace_source_payload};
+    use crate::error::Error;
+    use crate::source_payload::{SourcePayload, retained_budget_hold};
+
+    #[test]
+    fn aggregate_cap_accepts_exact_total_and_rejects_one_over() {
+        assert_eq!(checked_multi_bytes(0, 4, 4).unwrap(), 4);
+        assert!(checked_multi_bytes(4, 1, 4).is_err());
+    }
+
+    #[test]
+    fn topology_payload_replacement_shares_owned_and_copies_budgeted_bytes() {
+        let owned_bytes = Arc::new(b"owned replacement".to_vec());
+        let owned = SourcePayload::Owned(Arc::clone(&owned_bytes));
+        assert_eq!(Arc::strong_count(&owned_bytes), 2);
+        let mut owned_plan = SourceTopologyPlan::new();
+        try_replace_source_payload(
+            &mut owned_plan,
+            PackURI::new("/xl/workbook.xml").unwrap(),
+            &owned,
+            "owned replacement test",
+            None,
+        )
+        .unwrap();
+        assert_eq!(Arc::strong_count(&owned_bytes), 3);
+        drop(owned);
+        assert_eq!(Arc::strong_count(&owned_bytes), 2);
+        drop(owned_plan);
+        assert_eq!(Arc::strong_count(&owned_bytes), 1);
+
+        let budget = Budget::root(
+            "xlsx-topology-payload-test",
+            BudgetLimits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+        );
+        let reservation = budget
+            .reserve(Resource::Memory, 17)
+            .expect("payload reservation");
+        let hold = retained_budget_hold(Some(reservation), None);
+        let budgeted_bytes = Arc::new(b"budgeted replacement".to_vec());
+        let budgeted = SourcePayload::owned_budgeted(Arc::clone(&budgeted_bytes), Some(hold));
+        let mut budgeted_plan = SourceTopologyPlan::new();
+        try_replace_source_payload(
+            &mut budgeted_plan,
+            PackURI::new("/xl/worksheets/sheet1.xml").unwrap(),
+            &budgeted,
+            "budgeted replacement test",
+            None,
+        )
+        .unwrap();
+        assert_eq!(
+            Arc::strong_count(&budgeted_bytes),
+            2,
+            "fallback copy must not retain the source Arc"
+        );
+        drop(budgeted);
+        assert_eq!(Arc::strong_count(&budgeted_bytes), 1);
+        assert_eq!(budget.used(Resource::Memory), 0);
+        drop(budgeted_plan);
+        assert_eq!(Arc::strong_count(&budgeted_bytes), 1);
+    }
+
+    fn managed_context() -> (Budget, ExecutionContext) {
+        let budget = Budget::root(
+            "xlsx-managed-topology-payload-test",
+            BudgetLimits::new(
+                64 * 1024 * 1024,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+                u64::MAX,
+            ),
+        );
+        let (_cancellation_source, cancellation) = CancellationSource::pair();
+        let limits = ExecutionLimits::new(
+            NonZeroUsize::new(1).expect("one worker"),
+            NonZeroUsize::new(1).expect("one in-flight task"),
+            NonZeroU64::new(64 * 1024 * 1024).expect("in-flight bytes"),
+            0,
+        )
+        .expect("execution limits");
+        (
+            budget.clone(),
+            ExecutionContext::new(budget, cancellation, limits),
+        )
+    }
+
+    #[test]
+    fn topology_payload_replacement_copies_managed_bytes_before_plan_ownership() {
+        let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("tests/fixtures/form_control_properties/tdf134769.xlsx");
+        let (budget, context) = managed_context();
+        let package = SourceBackedPackage::from_read_at(
+            Arc::new(FileSource::open(&fixture).expect("managed fixture source")),
+            SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            litchi_opc::SourceReadPolicy::exact(),
+            Some(context),
+        )
+        .expect("managed fixture package");
+        let part = package
+            .part(&PackURI::new("/xl/ctrlProps/ctrlProp1.xml").unwrap())
+            .unwrap();
+        let data = part.data().unwrap();
+        let payload = SourcePayload::Managed(data.clone());
+        let mut plan = SourceTopologyPlan::new();
+        try_replace_source_payload(
+            &mut plan,
+            PackURI::new("/xl/ctrlProps/ctrlProp1.xml").unwrap(),
+            &payload,
+            "managed replacement test",
+            None,
+        )
+        .unwrap();
+        assert!(matches!(
+            payload.detached_arc(),
+            Err(Error::Package(OpcError::ManagedPartDataArcEscape))
+        ));
+
+        drop(payload);
+        drop(data);
+        drop(package);
+        assert_eq!(
+            budget.used(Resource::Memory),
+            0,
+            "the copied plan payload must not retain the managed source lease"
+        );
+        drop(plan);
+    }
+}
+
+#[cfg(test)]
+mod row_reuse_tests {
+    use std::collections::BTreeMap;
+
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+    use litchi_opc::{
+        BlobPart, OpcPackage, PackURI, PackageWriter, SourceBackedPackage, TargetMode,
+    };
+    use litchi_sheet::{Cell as Address, Rect, Row};
+
+    use super::Snapshot;
+    use crate::cell::{Cell, Store, Value};
+    use crate::cell_values::Change;
+    use crate::cell_values::test_editors::RowVisibilityEditor as RowVisibilitySourceBackedEditor;
+    use crate::cell_values::test_editors::SourceBackedEditor;
+    use crate::formula::Formula;
+    use crate::raw;
+    use crate::raw::worksheet::edit::{
+        Action, ValueOnlyRewrite, rewrite, rewrite_value_only_with_provenance,
+    };
+    use crate::{ErrorValue, Number};
+
+    const SML: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const OUTER: &str = "urn:litchi:outer-scope";
+    const SHEET: &str = "/xl/worksheets/sheet1.xml";
+    const MAIN: &str = "/xl/workbook.xml";
+    const STYLES: &str = "/xl/styles.xml";
+
+    fn fixture_package(worksheet: &str) -> OpcPackage {
+        let mut package = OpcPackage::new();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new(MAIN).unwrap(),
+                ct::SML_SHEET_MAIN.to_owned(),
+                format!(
+                    r#"<workbook xmlns="{SML}" xmlns:r="{REL}"><bookViews><workbookView/></bookViews><sheets><sheet name="Sheet1" sheetId="1" r:id="rIdSheet"/></sheets></workbook>"#
+                )
+                .into_bytes(),
+            )))
+            .unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new(SHEET).unwrap(),
+                ct::SML_WORKSHEET.to_owned(),
+                worksheet.as_bytes().to_vec(),
+            )))
+            .unwrap();
+        package
+            .try_add_part(Box::new(BlobPart::new(
+                PackURI::new(STYLES).unwrap(),
+                ct::SML_STYLES.to_owned(),
+                format!(
+                    r#"<styleSheet xmlns="{SML}"><cellXfs count="2"><xf/><xf numFmtId="1"/></cellXfs></styleSheet>"#
+                )
+                .into_bytes(),
+            )))
+            .unwrap();
+        package
+            .get_part_mut(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::WORKSHEET.to_owned(),
+                "worksheets/sheet1.xml".to_owned(),
+                "rIdSheet".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        package
+            .get_part_mut(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                rt::STYLES.to_owned(),
+                "styles.xml".to_owned(),
+                "rIdStyles".to_owned(),
+                TargetMode::Internal,
+            )
+            .unwrap();
+        package.relate_to("xl/workbook.xml", rt::OFFICE_DOCUMENT);
+        package
+    }
+
+    fn source_backed_editor(worksheet: &str) -> SourceBackedEditor {
+        use soapberry_zip::office::{ArchiveReader, StreamingArchiveWriter};
+
+        // The producer requires compact XML. Install the exact input through
+        // the raw fixture writer so source parsing also covers indentation.
+        let placeholder = format!(r#"<worksheet xmlns="{SML}"><sheetData/></worksheet>"#);
+        let base = PackageWriter::to_bytes(&fixture_package(&placeholder)).unwrap();
+        let archive = ArchiveReader::new(
+            base.as_slice(),
+            soapberry_zip::office::ArchiveLimits::default(),
+        )
+        .unwrap();
+        let mut writer =
+            StreamingArchiveWriter::new(soapberry_zip::office::StreamingArchiveLimits::default());
+        for name in archive.file_names() {
+            let bytes = if name == "xl/worksheets/sheet1.xml" {
+                worksheet.as_bytes().to_vec()
+            } else {
+                archive.read(name).unwrap()
+            };
+            writer.write_deflated(name, &bytes).unwrap();
+        }
+        let bytes = writer.finish_to_bytes().unwrap();
+        SourceBackedEditor::from_source_backed_package(
+            SourceBackedPackage::from_vec(
+                bytes,
+                litchi_opc::SourceLimits::default(),
+                litchi_opc::SourceCacheLimits::default(),
+                None,
+            )
+            .unwrap(),
+        )
+        .unwrap()
+    }
+
+    fn scalar_fixture() -> String {
+        format!(
+            r#"<x:worksheet xmlns:x="{SML}" xmlns="{OUTER}">
+                <x:dimension ref="A1"/>
+                <x:sheetFormatPr baseColWidth="10" defaultColWidth="12.5" defaultRowHeight="15" customHeight="1" zeroHeight="1" thickTop="1" thickBottom="1" outlineLevelRow="2" outlineLevelCol="1"/>
+                <x:cols><x:col min="2" max="3" width="20" style="1" hidden="1" bestFit="1" customWidth="1" phonetic="1" outlineLevel="2" collapsed="1"/></x:cols>
+                <x:sheetData xmlns="{SML}">
+                    <x:row r="1" s="1" customFormat="1" ht="20" customHeight="1" hidden="1" outlineLevel="2" collapsed="1" thickTop="1" thickBot="1" ph="1">
+                        <c r="A1" s="1"><v>1</v></c>
+                        <!-- sentinel comment before the inferred owner -->
+                        <c><v>2</v></c>
+                        <!-- a second sentinel between omitted owners -->
+                        <c r="C1" t="b"><v>1</v></c>
+                        <!-- preserve escaped text while neighboring cells are omitted -->
+                        <c r="D1" t="inlineStr"><is><t xml:space="preserve">old &amp; &lt; escaped</t></is></c>
+                        <c r="E1" t="d"><v>2025-01-01</v></c>
+                        <c r="F1" t="e"><v>#N/A</v></c>
+                        <x:c xmlns:x="{SML}" r="G1"><x:f>SUM(A1:B1)</x:f><x:v>3</x:v></x:c>
+                        <c r="H1" s="1"/>
+                    </x:row>
+                    <x:row>
+                        <q:c xmlns:q="{SML}" r="A2"><q:v>4</q:v></q:c>
+                        <q:c xmlns:q="{SML}"><q:v>5</q:v></q:c>
+                    </x:row>
+                    <x:row r="3"/>
+                    <x:row r="4"><x:c r="H4"><x:v>8</x:v></x:c></x:row>
+                </x:sheetData>
+            </x:worksheet>"#
+        )
+    }
+
+    fn full_store(bytes: &[u8]) -> Store {
+        raw::worksheet::parse_refusing_repairs(bytes, || Ok(None))
+            .expect("complete candidate worksheet parse")
+    }
+
+    fn assert_store_matches(actual: &Store, expected: &Store) {
+        assert_eq!(
+            actual.entries().len(),
+            expected.entries().len(),
+            "stored cell count"
+        );
+        for (index, (actual, expected)) in
+            actual.entries().iter().zip(expected.entries()).enumerate()
+        {
+            assert_eq!(
+                actual.address, expected.address,
+                "cell address at entry {index}"
+            );
+            assert_eq!(actual.cell, expected.cell, "cell value at entry {index}");
+            assert_eq!(actual.style, expected.style, "cell style at entry {index}");
+            assert_eq!(
+                actual.shared_string, expected.shared_string,
+                "shared string at entry {index}"
+            );
+            assert_eq!(
+                actual.inline_rich, expected.inline_rich,
+                "inline provenance at entry {index}"
+            );
+            assert_eq!(
+                actual.formula_range, expected.formula_range,
+                "formula range at entry {index}"
+            );
+            assert_eq!(
+                actual.shared_formula, expected.shared_formula,
+                "shared formula at entry {index}"
+            );
+            assert_eq!(
+                actual.cell_metadata, expected.cell_metadata,
+                "cell metadata at entry {index}"
+            );
+            assert_eq!(
+                actual.value_metadata, expected.value_metadata,
+                "value metadata at entry {index}"
+            );
+        }
+        assert_eq!(actual.row_entries(), expected.row_entries(), "row records");
+        assert_eq!(
+            actual.column_entries(),
+            expected.column_entries(),
+            "column records"
+        );
+        assert_eq!(actual.defaults(), expected.defaults(), "worksheet defaults");
+        assert_eq!(
+            actual.merge_ranges(),
+            expected.merge_ranges(),
+            "merge records"
+        );
+        assert_eq!(actual.extents(), expected.extents(), "worksheet extents");
+    }
+
+    fn commit_with(
+        worksheet: &str,
+        stage: impl FnOnce(&mut crate::cell_values::sheet::Edit) -> crate::Result<()>,
+    ) -> crate::Result<Snapshot> {
+        let editor = source_backed_editor(worksheet);
+        let mut edit = editor.edit("Sheet1")?;
+        stage(&mut edit)?;
+        Ok(edit.commit()?.patch().after().clone())
+    }
+
+    fn actions_for_sets(values: &[(&str, u32)]) -> BTreeMap<Address, Action> {
+        let mut actions = BTreeMap::new();
+        for (address, value) in values {
+            actions.insert(
+                Address::from_a1(address).unwrap(),
+                Action::set((*value).into()),
+            );
+        }
+        actions
+    }
+
+    fn proof_for_sets<'source>(
+        source: &'source Snapshot,
+        values: &[(&str, u32)],
+    ) -> ValueOnlyRewrite<'source> {
+        rewrite_value_only_with_provenance(
+            source.source_xml(),
+            "Sheet1",
+            actions_for_sets(values),
+            source.source_facts(),
+        )
+        .unwrap()
+    }
+
+    fn proof_for_set<'source>(
+        source: &'source Snapshot,
+        address: &str,
+        value: u32,
+    ) -> ValueOnlyRewrite<'source> {
+        proof_for_sets(source, &[(address, value)])
+    }
+
+    fn omission_shapes(proof: &ValueOnlyRewrite<'_>) -> Vec<(u32, u32, u32)> {
+        proof
+            .omitted
+            .iter()
+            .map(|span| (span.row, span.first_column, span.last_column))
+            .collect()
+    }
+
+    #[test]
+    fn replacement_hints_refresh_and_clear_across_rebinds() {
+        let worksheet = format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:B1"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c></row></sheetData></worksheet>"#
+        );
+        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
+        let first_proof = proof_for_sets(&source, &[("A1", 11), ("B1", 12)]);
+        assert_eq!(first_proof.spans.len(), 2);
+        let first = Snapshot::from_rewritten_value_source(&source, first_proof).unwrap();
+        let first_hint = first
+            .source
+            .worksheet_replacement_hint
+            .as_ref()
+            .expect("multi-cell rewrite retains a hint");
+        assert_eq!(
+            first_hint.source_ptr,
+            source.source_xml().as_ptr() as usize,
+            "the hint is tied to the exact source allocation"
+        );
+        assert_eq!(
+            first_hint.replacement_ptr,
+            first.source_xml().as_ptr() as usize,
+            "the hint is tied to the exact detached output allocation"
+        );
+
+        let second_proof = proof_for_sets(&first, &[("A1", 21), ("B1", 22)]);
+        assert_eq!(second_proof.spans.len(), 2);
+        let second = Snapshot::from_rewritten_value_source(&first, second_proof).unwrap();
+        let second_hint = second
+            .source
+            .worksheet_replacement_hint
+            .as_ref()
+            .expect("repeated rewrite retains a refreshed hint");
+        assert_eq!(
+            second_hint.source_ptr,
+            first.source_xml().as_ptr() as usize,
+            "the second hint points at the immediately preceding payload"
+        );
+        assert_eq!(
+            second_hint.replacement_ptr,
+            second.source_xml().as_ptr() as usize,
+            "the second hint points at its own output payload"
+        );
+        assert_ne!(
+            first_hint.source_ptr, second_hint.source_ptr,
+            "repeated rewrites must not retain the original source identity"
+        );
+
+        let rebased = Snapshot::from_rewritten_source(&first, first.source_xml().to_vec())
+            .expect("ordinary worksheet rebind");
+        assert!(
+            rebased.source.worksheet_replacement_hint.is_none(),
+            "ordinary worksheet rebind clears stale span metadata"
+        );
+        let invalidated = first
+            .clone()
+            .with_invalidated_calculation()
+            .expect("workbook-only invalidation");
+        assert!(
+            invalidated.source.worksheet_replacement_hint.is_some(),
+            "workbook-only invalidation preserves the worksheet hint"
+        );
+
+        let visibility_package = SourceBackedPackage::from_vec(
+            PackageWriter::to_bytes(&fixture_package(
+                std::str::from_utf8(first.source_xml()).expect("worksheet XML is UTF-8"),
+            ))
+            .expect("visibility package archive"),
+            litchi_opc::SourceLimits::default(),
+            litchi_opc::SourceCacheLimits::default(),
+            None,
+        )
+        .expect("visibility source package");
+        let visibility_editor =
+            RowVisibilitySourceBackedEditor::from_source_backed_package(visibility_package)
+                .expect("visibility editor");
+        let mut visibility_edit = visibility_editor.edit("Sheet1").expect("visibility edit");
+        visibility_edit
+            .hide(Row::new(0).unwrap())
+            .expect("visibility stage");
+        let visibility_snapshot = visibility_edit
+            .commit()
+            .expect("visibility commit")
+            .patch()
+            .after()
+            .clone();
+        let visibility_rebound =
+            Snapshot::from_rewritten_source(&first, visibility_snapshot.source_xml().to_vec())
+                .expect("visibility rebind");
+        assert!(
+            visibility_rebound
+                .source
+                .worksheet_replacement_hint
+                .is_none(),
+            "worksheet visibility rebind clears cell span metadata"
+        );
+
+        let other = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
+        let stale_proof = proof_for_sets(&first, &[("A1", 31), ("B1", 32)]);
+        let stale = Snapshot::from_rewritten_value_source(&other, stale_proof)
+            .expect("stale proof falls back to complete parse");
+        assert!(
+            stale.source.worksheet_replacement_hint.is_none(),
+            "a proof from another allocation cannot publish span metadata"
+        );
+    }
+
+    fn bytes_between<'a>(bytes: &'a [u8], start: &[u8], end: &[u8]) -> &'a [u8] {
+        let start_at = bytes
+            .windows(start.len())
+            .position(|window| window == start)
+            .unwrap();
+        let end_at = bytes[start_at..]
+            .windows(end.len())
+            .position(|window| window == end)
+            .map(|offset| start_at + offset)
+            .unwrap();
+        &bytes[start_at..end_at]
+    }
+
+    #[test]
+    fn provenance_writer_matches_ordinary_rewrite_bytes() {
+        let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
+        let values = [("A1", 101), ("G1", 107)];
+        let provenance = rewrite_value_only_with_provenance(
+            source.source_xml(),
+            "Sheet1",
+            actions_for_sets(&values),
+            source.source_facts(),
+        )
+        .unwrap();
+        let ordinary = rewrite(source.source_xml(), "Sheet1", actions_for_sets(&values)).unwrap();
+        assert_eq!(
+            provenance.bytes, ordinary,
+            "provenance must not alter output"
+        );
+        assert!(
+            !provenance.omitted.is_empty(),
+            "the comparison must be eligible"
+        );
+    }
+
+    #[test]
+    fn valid_formula_value_provenance_forces_omission_and_matches_complete_parse() {
+        let worksheet = format!(
+            r#"<p:worksheet xmlns:p="{SML}"><p:dimension ref="A1:B2"/><p:sheetData><p:row r="1"><p:c r="A1"><p:v>1</p:v></p:c><!--keep-between-cells--><p:c r="B1"><p:f>SUM(A1)</p:f><p:v>2</p:v></p:c></p:row><p:row r="2"><c xmlns="{SML}" r="A2"><v>3</v></c></p:row></p:sheetData></p:worksheet>"#
+        );
+        let source =
+            Snapshot::load(&fixture_package(&worksheet), "Sheet1").expect("valid formula source");
+        let actions = actions_for_sets(&[("A1", 42)]);
+        let proof = rewrite_value_only_with_provenance(
+            source.source_xml(),
+            "Sheet1",
+            actions,
+            source.source_facts(),
+        )
+        .expect("source-backed provenance rewrite");
+        assert!(
+            !proof.omitted.is_empty(),
+            "the valid source-backed case must take the reuse path"
+        );
+        let b1 = proof
+            .omitted
+            .iter()
+            .find(|span| span.row == 0 && span.first_column == 1 && span.last_column == 1)
+            .expect("unchanged B1 must be omitted");
+        assert_eq!(
+            &proof.bytes[b1.start..b1.end],
+            b"<p:c r=\"B1\"><p:f>SUM(A1)</p:f><p:v>2</p:v></p:c>"
+        );
+        assert!(
+            proof
+                .bytes
+                .windows(b"r=\"A1\"".len())
+                .any(|window| window == b"r=\"A1\""),
+            "changed A1 must have an explicit address"
+        );
+
+        let ordinary = rewrite(
+            source.source_xml(),
+            "Sheet1",
+            actions_for_sets(&[("A1", 42)]),
+        )
+        .expect("ordinary rewrite");
+        assert_eq!(
+            proof.bytes, ordinary,
+            "ordinary and provenance bytes differ"
+        );
+
+        let expected = full_store(&proof.bytes);
+        let candidate =
+            Snapshot::from_rewritten_value_source(&source, proof).expect("valid proof readback");
+        assert_store_matches(&candidate.cells, &expected);
+    }
+
+    #[test]
+    fn merge_omitted_cells_handles_same_row_gaps_and_a_lower_next_row_column() {
+        let source_xml = format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="A1"><v>1</v></c><c r="B1"><v>2</v></c><c r="C1"><v>3</v></c><c r="D1"><v>4</v></c><c r="E1"><v>5</v></c></row><row r="2"><c r="A2"><v>6</v></c></row></sheetData></worksheet>"#
+        );
+        let parsed_xml = format!(
+            r#"<worksheet xmlns="{SML}"><dimension ref="A1:E2"/><sheetData><row r="1"><c r="C1"><v>30</v></c></row><row r="2"/></sheetData></worksheet>"#
+        );
+        let source = full_store(source_xml.as_bytes());
+        let parsed = full_store(parsed_xml.as_bytes());
+        let omitted = [
+            Rect::from_a1("A1:B1").unwrap(),
+            Rect::from_a1("D1:E1").unwrap(),
+            // A2 starts at a lower column than E1's exclusive end.  Row
+            // order must still make this omission valid.
+            Rect::from_a1("A2").unwrap(),
+        ];
+        let merged = Store::merge_omitted_cells(parsed, &source, &omitted)
+            .expect("omitted ranges should be structurally valid")
+            .expect("same-row gaps must take the merge path, not fallback");
+        let expected_xml =
+            source_xml.replace("<c r=\"C1\"><v>3</v></c>", "<c r=\"C1\"><v>30</v></c>");
+        assert_store_matches(&merged, &full_store(expected_xml.as_bytes()));
+        assert!(matches!(
+            merged.entry(Address::from_a1("C1").unwrap()),
+            Some(entry) if matches!(&entry.cell, Cell::Value(Value::Number(number)) if number.as_str() == "30")
+        ));
+    }
+
+    #[test]
+    fn replacement_only_readback_matches_full_parse_for_all_scalar_facets() {
+        let worksheet = scalar_fixture();
+        let candidate = commit_with(&worksheet, |edit| {
+            edit.apply_batch([
+                Change::set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap()),
+                // B1 is source-implicit.  The rewritten owner must gain an
+                // explicit address before any preceding owners are omitted.
+                Change::set(Address::from_a1("B1").unwrap(), 22u32),
+                Change::set(Address::from_a1("C1").unwrap(), false),
+                Change::set(Address::from_a1("D1").unwrap(), "new & < escaped"),
+                Change::set(
+                    Address::from_a1("E1").unwrap(),
+                    Value::date("2026-08-14").unwrap(),
+                ),
+                Change::set(
+                    Address::from_a1("F1").unwrap(),
+                    Value::Error(ErrorValue::DivZero),
+                ),
+                Change::set_formula(
+                    Address::from_a1("G1").unwrap(),
+                    Formula::new("A1+C1").unwrap(),
+                ),
+                // The source dimension is intentionally stale.  The emitted
+                // dimension must be used by the merged Store.
+                Change::set(Address::from_a1("H4").unwrap(), 9u32),
+            ])
+        })
+        .expect("replacement-only candidate");
+        let expected = full_store(candidate.source_xml());
+        assert_store_matches(&candidate.cells, &expected);
+        for address in ["A1", "B1", "C1", "D1", "E1", "F1", "G1", "H4"] {
+            let marker = format!("r=\"{address}\"");
+            assert!(
+                candidate
+                    .source_xml()
+                    .windows(marker.len())
+                    .any(|window| window == marker.as_bytes()),
+                "changed cell {address} must have an explicit address"
+            );
+        }
+        assert!(matches!(
+            candidate.cell(Address::from_a1("B1").unwrap()),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "22"
+        ));
+        assert_eq!(
+            candidate.cells.extents().declared().map(|range| range.a1()),
+            Some("A1:H4".to_owned())
+        );
+        assert!(matches!(
+            candidate.cell(Address::from_a1("A1").unwrap()),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "42"
+        ));
+        assert!(matches!(
+            candidate.cell(Address::from_a1("D1").unwrap()),
+            Some(Cell::Value(Value::Text(text))) if text.as_str() == "new & < escaped"
+        ));
+        assert!(matches!(
+            candidate.cell(Address::from_a1("G1").unwrap()),
+            Some(Cell::Formula(formula)) if formula.text() == "A1+C1" && formula.cached().is_none()
+        ));
+        // Row 2 has no r attribute.  Keeping the row shell is required for
+        // its inferred row number and is checked through the exact row slice.
+        assert_eq!(candidate.cells.row_entries(), expected.row_entries());
+    }
+
+    #[test]
+    fn replacement_after_implicit_cells_preserves_every_omitted_address() {
+        let worksheet = scalar_fixture();
+        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
+        let proof = proof_for_sets(&source, &[("A1", 101), ("G1", 107)]);
+        assert_eq!(
+            omission_shapes(&proof),
+            vec![(0, 1, 5), (0, 7, 7), (1, 0, 1), (3, 7, 7)],
+            "the long touched row and untouched rows must carry exact omitted owners"
+        );
+        assert_eq!(
+            &proof.bytes[proof.omitted[0].start..proof.omitted[0].end],
+            bytes_between(source.source_xml(), b"<c><v>2</v></c>", b"<x:c xmlns:x=")
+        );
+        assert_eq!(
+            &proof.bytes[proof.omitted[1].start..proof.omitted[1].end],
+            bytes_between(source.source_xml(), b"<c r=\"H1\" s=\"1\"/>", b"</x:row>")
+        );
+        assert_eq!(
+            &proof.bytes[proof.omitted[2].start..proof.omitted[2].end],
+            &bytes_between(source.source_xml(), b"<x:row>", b"</x:row>")[b"<x:row>".len()..]
+        );
+        assert_eq!(
+            &proof.bytes[proof.omitted[3].start..proof.omitted[3].end],
+            &bytes_between(source.source_xml(), b"<x:row r=\"4\">", b"</x:row>")
+                [b"<x:row r=\"4\">".len()..]
+        );
+        assert!(
+            source
+                .source_xml()
+                .windows(b"<x:row r=\"3\"/>".len())
+                .any(|window| { window == b"<x:row r=\"3\"/>" })
+        );
+        assert!(
+            proof
+                .bytes
+                .windows(b"<x:row r=\"3\"/>".len())
+                .any(|window| { window == b"<x:row r=\"3\"/>" }),
+            "untouched self-closing rows must remain byte-exact"
+        );
+        let candidate = Snapshot::from_rewritten_value_source(&source, proof).unwrap();
+        let expected = full_store(candidate.source_xml());
+        assert_store_matches(&candidate.cells, &expected);
+        for (address, expected_value) in [("B1", "2"), ("G1", "107"), ("H4", "8")] {
+            assert!(matches!(
+                candidate.cell(Address::from_a1(address).unwrap()),
+                Some(Cell::Value(Value::Number(number))) if number.as_str() == expected_value
+            ));
+        }
+        assert!(matches!(
+            candidate.cell(Address::from_a1("C1").unwrap()),
+            Some(Cell::Value(Value::Bool(true)))
+        ));
+        assert!(matches!(
+            candidate.cell(Address::from_a1("F1").unwrap()),
+            Some(Cell::Value(Value::Error(ErrorValue::NotAvailable)))
+        ));
+    }
+
+    #[test]
+    fn changed_output_bytes_are_observed_by_specialized_readback() {
+        let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
+        let mut proof = proof_for_set(&source, "A1", 42);
+        assert!(
+            !proof.omitted.is_empty(),
+            "this proof must take the reuse route"
+        );
+        let needle = b"<v>42</v>";
+        let position = proof
+            .bytes
+            .windows(needle.len())
+            .position(|window| window == needle)
+            .unwrap();
+        proof.bytes.splice(
+            position..position + needle.len(),
+            b"<v>84</v>".iter().copied(),
+        );
+        let candidate = Snapshot::from_rewritten_value_source(&source, proof).unwrap();
+        assert!(matches!(
+            candidate.cell(Address::from_a1("A1").unwrap()),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "84"
+        ));
+        assert_store_matches(&candidate.cells, &full_store(candidate.source_xml()));
+    }
+
+    #[test]
+    fn omission_proof_from_another_source_cannot_reuse_its_store() {
+        let source_a = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
+        let source_b_xml = scalar_fixture().replace("<c><v>2</v></c>", "<c><v>902</v></c>");
+        let source_b = Snapshot::load(&fixture_package(&source_b_xml), "Sheet1").unwrap();
+        assert!(matches!(
+            source_b.cell(Address::from_a1("B1").unwrap()),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "902"
+        ));
+        let proof = proof_for_set(&source_a, "A1", 42);
+        assert!(
+            !proof.omitted.is_empty(),
+            "the source-A proof must be eligible"
+        );
+        let candidate = Snapshot::from_rewritten_value_source(&source_b, proof).unwrap();
+        let expected = full_store(candidate.source_xml());
+        assert_store_matches(&candidate.cells, &expected);
+        assert!(matches!(
+            candidate.cell(Address::from_a1("B1").unwrap()),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "2"
+        ));
+    }
+
+    #[test]
+    fn clear_remove_and_existing_row_insert_match_the_complete_parser() {
+        let clear_remove = format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="5"><c r="A5"><v>1</v></c><c r="B5"><v>2</v></c><c><v>3</v></c><c r="E5"><v>5</v></c></row></sheetData></worksheet>"#
+        );
+        let cleared = commit_with(&clear_remove, |edit| {
+            edit.clear(Address::from_a1("B5").unwrap())
+        })
+        .expect("clear existing owner");
+        assert_store_matches(&cleared.cells, &full_store(cleared.source_xml()));
+
+        let inserted = format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="5"><c r="A5"><v>1</v></c><c r="B5"><v>2</v></c><c r="D5"><v>4</v></c><c><v>5</v></c></row></sheetData></worksheet>"#
+        );
+        let inserted = commit_with(&inserted, |edit| {
+            edit.insert(Address::from_a1("C5").unwrap(), Number::new("30").unwrap())
+        })
+        .expect("insert in existing row");
+        assert_store_matches(&inserted.cells, &full_store(inserted.source_xml()));
+        assert!(matches!(
+            inserted.cell(Address::from_a1("E5").unwrap()),
+            Some(Cell::Value(Value::Number(number))) if number.as_str() == "5"
+        ));
+
+        let shifted = commit_with(&clear_remove, |edit| {
+            edit.remove(Address::from_a1("B5").unwrap())
+        });
+        assert!(
+            shifted.is_err(),
+            "shifted implicit follower must refuse readback"
+        );
+    }
+
+    #[test]
+    fn new_row_and_shared_formula_inputs_use_complete_parse_semantics() {
+        let worksheet = format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><v>1</v></c></row><row r="3"><c r="A3"><v>3</v></c></row></sheetData></worksheet>"#
+        );
+        let source = Snapshot::load(&fixture_package(&worksheet), "Sheet1").unwrap();
+        let proof = proof_for_set(&source, "A2", 2);
+        assert!(
+            proof.omitted.is_empty(),
+            "a new row must use complete parsing"
+        );
+        let inserted = commit_with(&worksheet, |edit| {
+            edit.insert(Address::from_a1("A2").unwrap(), Number::new("2").unwrap())
+        })
+        .expect("new row insertion");
+        assert_store_matches(&inserted.cells, &full_store(inserted.source_xml()));
+
+        let shared = format!(
+            r#"<worksheet xmlns="{SML}"><sheetData><row r="1"><c r="A1"><f t="shared" ref="A1:B2" si="7">A1+1</f><v>1</v></c><c r="B1"><f t="shared" si="7"/><v>2</v></c></row><row r="2"><c r="A2"><f t="shared" si="7"/><v>3</v></c><c r="B2"><f t="shared" si="7"/><v>4</v></c><c r="C2"><v>5</v></c></row></sheetData></worksheet>"#
+        );
+        let source = Snapshot::load(&fixture_package(&shared), "Sheet1").unwrap();
+        let proof = proof_for_set(&source, "C2", 50);
+        assert!(
+            proof.omitted.is_empty(),
+            "shared-formula worksheets must fall back"
+        );
+        let candidate = commit_with(&shared, |edit| {
+            edit.set(Address::from_a1("C2").unwrap(), 50u32)
+        })
+        .expect("unrelated shared-formula edit");
+        let expected = full_store(candidate.source_xml());
+        assert_store_matches(&candidate.cells, &expected);
+        for address in ["A1", "B1", "A2", "B2"] {
+            let address = Address::from_a1(address).unwrap();
+            assert_eq!(
+                candidate.cells.entry(address).unwrap().shared_formula,
+                expected.entry(address).unwrap().shared_formula,
+                "shared formula metadata at {address}"
+            );
+        }
+    }
+
+    #[test]
+    fn malformed_or_mce_candidate_bytes_are_rejected_before_merge() {
+        let source = Snapshot::load(&fixture_package(&scalar_fixture()), "Sheet1").unwrap();
+
+        // An unfamiliar attribute on the root is copied through by the
+        // rewrite, so a candidate that carries one is admitted and still
+        // reads back to the same store.
+        let mut unfamiliar = proof_for_set(&source, "A1", 42);
+        assert!(!unfamiliar.omitted.is_empty());
+        let root_end = unfamiliar
+            .bytes
+            .iter()
+            .position(|byte| *byte == b'>')
+            .unwrap();
+        unfamiliar
+            .bytes
+            .splice(root_end..root_end, b" future=\"unknown\"".iter().copied());
+        let expected = full_store(&unfamiliar.bytes);
+        let admitted = Snapshot::from_rewritten_value_source(&source, unfamiliar)
+            .expect("an unfamiliar root attribute is preserved, not interpreted");
+        assert_store_matches(&admitted.cells, &expected);
+
+        // An unknown element inside the composed sheetData span is not.
+        let mut unknown = proof_for_set(&source, "A1", 42);
+        assert!(!unknown.omitted.is_empty());
+        let data_start = unknown
+            .bytes
+            .windows(13)
+            .position(|window| window == b"<x:sheetData ")
+            .unwrap();
+        let data_end = data_start
+            + unknown.bytes[data_start..]
+                .iter()
+                .position(|byte| *byte == b'>')
+                .unwrap()
+            + 1;
+        unknown
+            .bytes
+            .splice(data_end..data_end, b"<x:future/>".iter().copied());
+        assert!(Snapshot::from_rewritten_value_source(&source, unknown).is_err());
+
+        let mut mce = proof_for_set(&source, "A1", 42);
+        assert!(!mce.omitted.is_empty());
+        let root_end = mce.bytes.iter().position(|byte| *byte == b'>').unwrap();
+        mce.bytes.splice(
+            root_end..root_end,
+            b" xmlns:mc=\"http://schemas.openxmlformats.org/markup-compatibility/2006\""
+                .iter()
+                .copied(),
+        );
+        let close = b"</x:worksheet>";
+        let close_at = mce
+            .bytes
+            .windows(close.len())
+            .position(|window| window == close)
+            .unwrap();
+        mce.bytes.splice(
+            close_at..close_at,
+            b"<mc:AlternateContent/>".iter().copied(),
+        );
+        assert!(Snapshot::from_rewritten_value_source(&source, mce).is_err());
+    }
+
+    #[test]
+    fn no_op_source_edit_shares_the_original_semantic_store() {
+        let editor = source_backed_editor(&scalar_fixture());
+        let edit = editor.edit("Sheet1").unwrap();
+        let before = edit.before().unwrap().clone();
+        let commit = edit.commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().after().shares_cell_store_with(&before));
+        assert_eq!(commit.patch().after().source_xml(), before.source_xml());
+    }
+
+    #[test]
+    fn changed_publication_preserves_unrelated_parts_and_typed_values() {
+        let worksheet = scalar_fixture();
+        let original = fixture_package(&worksheet);
+        let original_workbook = original
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob()
+            .to_vec();
+        let original_styles = original
+            .get_part(&PackURI::new(STYLES).unwrap())
+            .unwrap()
+            .blob()
+            .to_vec();
+
+        let editor = source_backed_editor(&worksheet);
+        let mut edit = editor.edit("Sheet1").unwrap();
+        edit.set(Address::from_a1("A1").unwrap(), Number::new("42").unwrap())
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let mut published = Vec::new();
+        editor
+            .publish_commit_to_stream(&mut published, &commit)
+            .unwrap();
+
+        let package =
+            OpcPackage::from_bytes(&published, litchi_opc::SourceLimits::default()).unwrap();
+        let published_workbook = package
+            .get_part(&PackURI::new(MAIN).unwrap())
+            .unwrap()
+            .blob();
+        let published_worksheet = package
+            .get_part(&PackURI::new(SHEET).unwrap())
+            .unwrap()
+            .blob();
+        assert_ne!(published_workbook, original_workbook.as_slice());
+        assert_ne!(published_worksheet, worksheet.as_bytes());
+        assert_eq!(
+            package
+                .get_part(&PackURI::new(STYLES).unwrap())
+                .unwrap()
+                .blob(),
+            original_styles.as_slice()
+        );
+
+        let reopened = Snapshot::load(&package, "Sheet1").unwrap();
+        assert!(matches!(
+            reopened.value(Address::from_a1("A1").unwrap()),
+            Some(Value::Number(number)) if number.as_str() == "42"
+        ));
+        assert!(matches!(
+            reopened.value(Address::from_a1("C1").unwrap()),
+            Some(Value::Bool(true))
+        ));
+    }
+}

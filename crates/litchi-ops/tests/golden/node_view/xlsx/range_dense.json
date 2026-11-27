@@ -1,0 +1,80 @@
+[
+{
+  "path": "/sheet[1]/D1:E2",
+  "type": "range",
+  "preview": "D1:E2",
+  "childCount": 4,
+  "format": {
+    "merge": false
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/D1",
+      "type": "cell",
+      "text": "",
+      "preview": "D1",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "empty": true
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/E1",
+      "type": "cell",
+      "text": "Merged",
+      "preview": "E1",
+      "childCount": 0,
+      "format": {
+        "type": "SharedString",
+        "merge": "E1:F2",
+        "mergeAnchor": true
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/D2",
+      "type": "cell",
+      "text": "",
+      "preview": "D2",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "empty": true,
+        "font.italic": true,
+        "underline": "single",
+        "font.color": "#FF0000",
+        "font.size": "14pt",
+        "font.name": "Arial",
+        "fill": "#FFFF00",
+        "border.left": "thin",
+        "border.left.color": "#000000",
+        "border.right": "thin",
+        "border.right.color": "#000000",
+        "border.top": "medium",
+        "border.bottom": "double",
+        "border.diagonal": "thin",
+        "border.diagonalUp": true,
+        "alignment.wrapText": true,
+        "alignment.horizontal": "center",
+        "alignment.vertical": "top",
+        "numberformat": "0.00%"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/E2",
+      "type": "cell",
+      "text": "",
+      "preview": "E2",
+      "childCount": 0,
+      "format": {
+        "type": "Number",
+        "empty": true
+      },
+      "children": []
+    }
+  ]
+}
+]

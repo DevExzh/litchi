@@ -11,18 +11,17 @@
 //!
 //! Run with: cargo run --example doc_writer_all_features
 
-use litchi::ole::doc::writer::{
-    CharacterFormatting, DocWriter, FootnoteEntry, ListFormatOverride, ListLevel, ListStructure,
-    NumberFormat, ParagraphFormatting,
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::{
+    CharacterFormatting, FootnoteEntry, ListFormatOverride, ListLevel, ListStructure, NumberFormat,
+    ParagraphFormatting,
 };
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating comprehensive DOC file with all features...");
 
-    let mut writer = DocWriter::new();
-    writer.set_property("Title", "Comprehensive DOC Features Demonstration");
-    writer.set_property("Author", "Litchi Examples");
+    let mut writer = Builder::new();
 
     writer.set_first_header("=== Comprehensive DOC Features Demo ===");
     writer.set_odd_header("DOC Features - Odd Pages");
@@ -220,7 +219,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // ===== SAVE DOCUMENT =====
     let output_path = "output/doc_all_features.doc";
-    writer.save(output_path)?;
+    writer.build()?.save(output_path)?;
 
     println!("\n✅ Comprehensive DOC file created: {}", output_path);
     println!("\n📝 Open in Microsoft Word to verify:");

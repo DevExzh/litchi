@@ -1,0 +1,21 @@
+[
+  {"case":"ascii_findb","function":"FINDB","formula":"of:=FINDB(\"bc\";\"abcdef\")","profile":{"type":"number","value":2},"native":{"type":"number","value":2},"matches_profile":true},
+  {"case":"ascii_leftb","function":"LEFTB","formula":"of:=LEFTB(\"abcdef\";3)","profile":{"type":"text","value":"abc"},"native":{"type":"text","value":"abc"},"matches_profile":true},
+  {"case":"ascii_lenb","function":"LENB","formula":"of:=LENB(\"abcdef\")","profile":{"type":"number","value":6},"native":{"type":"number","value":6},"matches_profile":true},
+  {"case":"ascii_midb","function":"MIDB","formula":"of:=MIDB(\"abcdef\";2;3)","profile":{"type":"text","value":"bcd"},"native":{"type":"text","value":"bcd"},"matches_profile":true},
+  {"case":"ascii_replaceb","function":"REPLACEB","formula":"of:=REPLACEB(\"abcdef\";2;3;\"XYZ\")","profile":{"type":"text","value":"aXYZef"},"native":{"type":"text","value":"aXYZef"},"matches_profile":true},
+  {"case":"ascii_rightb","function":"RIGHTB","formula":"of:=RIGHTB(\"abcdef\";3)","profile":{"type":"text","value":"def"},"native":{"type":"text","value":"def"},"matches_profile":true},
+  {"case":"ascii_searchb","function":"SEARCHB","formula":"of:=SEARCHB(\"CD\";\"abcdef\")","profile":{"type":"number","value":3},"native":{"type":"number","value":3},"matches_profile":true},
+  {"case":"utf8_lenb_e_acute","function":"LENB","formula":"of:=LENB(\"é\")","profile":{"type":"number","value":2},"native":{"type":"number","value":1},"matches_profile":false},
+  {"case":"utf8_lenb_cjk","function":"LENB","formula":"of:=LENB(\"界\")","profile":{"type":"number","value":3},"native":{"type":"number","value":2},"matches_profile":false},
+  {"case":"utf8_lenb_emoji","function":"LENB","formula":"of:=LENB(\"🙂\")","profile":{"type":"number","value":4},"native":{"type":"number","value":2},"matches_profile":false},
+  {"case":"utf8_leftb_e_acute","function":"LEFTB","formula":"of:=LEFTB(\"Aé\";2)","profile":{"type":"text","value":"A"},"native":{"type":"text","value":"Aé"},"matches_profile":false},
+  {"case":"utf8_midb_e_acute","function":"MIDB","formula":"of:=MIDB(\"Aé界\";3;2)","profile":{"type":"text","value":"é"},"native":{"type":"text","value":"界"},"matches_profile":false},
+  {"case":"utf8_rightb_emoji","function":"RIGHTB","formula":"of:=RIGHTB(\"Aé界🙂\";1)","profile":{"type":"text","value":""},"native":{"type":"text","value":""},"matches_profile":true},
+  {"case":"utf8_findb_cjk","function":"FINDB","formula":"of:=FINDB(\"界\";\"Aé界🙂\")","profile":{"type":"number","value":4},"native":{"type":"number","value":3},"matches_profile":false},
+  {"case":"utf8_searchb_sharp_s","function":"SEARCHB","formula":"of:=SEARCHB(\"ss\";\"aß\")","profile":{"type":"number","value":2},"native":{"type":"number","value":2},"matches_profile":true},
+  {"case":"utf8_replaceb_e_acute","function":"REPLACEB","formula":"of:=REPLACEB(\"Aé界\";3;2;\"X\")","profile":{"type":"text","value":"AX界"},"native":{"type":"text","value":"AéX"},"matches_profile":false},
+  {"case":"utf8_rightb_cjk","function":"RIGHTB","formula":"of:=RIGHTB(\"Aé界\";3)","profile":{"type":"text","value":"界"},"native":{"type":"text","value":"é界"},"matches_profile":false},
+  {"case":"utf8_searchb_cjk","function":"SEARCHB","formula":"of:=SEARCHB(\"界\";\"Aé界🙂\")","profile":{"type":"number","value":4},"native":{"type":"number","value":3},"matches_profile":false},
+  {"case":"utf8_searchb_emoji","function":"SEARCHB","formula":"of:=SEARCHB(\"🙂\";\"Aé界🙂\")","profile":{"type":"number","value":7},"native":{"type":"number","value":5},"matches_profile":false}
+]

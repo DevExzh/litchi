@@ -1,0 +1,1046 @@
+#![forbid(unsafe_code)]
+
+//! Object Reference Graph for iWork Documents
+//!
+//! Provides a bidirectional graph structure for tracking dependencies between
+//! objects in iWork documents. Objects reference each other extensively through
+//! TSP.Reference fields, creating a complex object graph.
+//!
+//! # Features
+//!
+//! - **Bidirectional tracking**: Both incoming and outgoing references
+//! - **Cycle detection**: DFS-based algorithm to detect circular references
+//! - **Transitive closure**: BFS to find all reachable objects
+//! - **Efficient deduplication**: Inline deduplication using Vec for cache locality
+//! - **Memory optimized**: Compact representation for typical small edge lists
+//!
+//! # Example
+//!
+//! ```rust,ignore
+//! use litchi_iwa_graph::{ObjectId, ReferenceGraph};
+//!
+//! let mut graph = ReferenceGraph::new();
+//!
+//! // Build the graph
+//! let one = ObjectId::try_from(1).expect("non-null object ID");
+//! let two = ObjectId::try_from(2).expect("non-null object ID");
+//! let three = ObjectId::try_from(3).expect("non-null object ID");
+//! graph.add_object_reference(one, two);
+//! graph.add_object_reference(one, three);
+//! graph.add_object_reference(two, three);
+//!
+//! // Query dependencies
+//! assert_eq!(graph.outgoing(one).map(|ids| ids.collect::<Vec<_>>()), Some(vec![two, three]));
+//! assert_eq!(graph.incoming(three).map(|ids| ids.collect::<Vec<_>>()), Some(vec![one, two]));
+//!
+//! // Check for cycles
+//! assert!(!graph.has_cycle(one));
+//!
+//! // Get transitive dependencies
+//! let reachable = graph.reachable(one);
+//! assert_eq!(reachable.len(), 3);
+//! ```
+
+use std::collections::{HashMap, HashSet};
+use std::fmt;
+use std::num::NonZeroU64;
+use std::sync::Arc;
+
+/// A validated, non-null iWork object identifier.
+#[repr(transparent)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub struct ObjectId(NonZeroU64);
+
+impl ObjectId {
+    /// Construct an object identifier, rejecting the protobuf null sentinel.
+    #[must_use]
+    pub const fn new(raw: u64) -> Option<Self> {
+        match NonZeroU64::new(raw) {
+            Some(value) => Some(Self(value)),
+            None => None,
+        }
+    }
+
+    /// Return the native identifier used at the wire boundary.
+    #[must_use]
+    pub const fn get(self) -> u64 {
+        self.0.get()
+    }
+}
+
+impl TryFrom<u64> for ObjectId {
+    type Error = ObjectIdError;
+
+    fn try_from(raw: u64) -> Result<Self, Self::Error> {
+        Self::new(raw).ok_or(ObjectIdError)
+    }
+}
+
+/// Error returned when a null protobuf reference is used as an object ID.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ObjectIdError;
+
+impl fmt::Display for ObjectIdError {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("object identifier must be non-zero")
+    }
+}
+
+impl std::error::Error for ObjectIdError {}
+
+#[derive(Debug, Clone, Default)]
+struct GraphState {
+    incoming_refs: HashMap<ObjectId, Vec<ObjectId>>,
+    outgoing_refs: HashMap<ObjectId, Vec<ObjectId>>,
+}
+
+/// Object reference graph for tracking dependencies
+///
+/// Maintains a bidirectional graph of object references with efficient
+/// deduplication and cache-friendly memory layout.
+///
+/// # Memory Optimization
+///
+/// - Uses `Vec` instead of `HashSet` for edge lists (typically small, <10 edges)
+/// - Deduplicates inline to avoid redundant storage
+/// - Compact representation reduces cache misses during traversal
+///
+/// # Performance Characteristics
+///
+/// - Add reference: O(n) where n is edge count per node (typically <10)
+/// - Get references: O(1) `HashMap` lookup
+/// - Cycle detection: O(V + E) where V is vertices, E is edges
+/// - Transitive closure: O(V + E) BFS traversal
+#[derive(Debug, Clone)]
+pub struct ReferenceGraph {
+    state: Arc<GraphState>,
+}
+
+/// An immutable, cheaply shareable typed view of a reference graph.
+#[derive(Debug, Clone)]
+pub struct ReferenceGraphSnapshot {
+    state: Arc<GraphState>,
+    ordered_ids: Arc<[ObjectId]>,
+}
+
+/// Allocation-free iterator over validated object IDs in one edge list.
+#[derive(Debug, Clone)]
+pub struct ObjectIdIter<'a> {
+    inner: std::slice::Iter<'a, ObjectId>,
+}
+
+impl Iterator for ObjectIdIter<'_> {
+    type Item = ObjectId;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next().copied()
+    }
+}
+
+/// Deterministic cardinality and degree measurements for a reference graph.
+///
+/// The degree values are zero for an empty graph. The value is cheap to copy
+/// and can be retained independently of the graph or one of its snapshots.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash)]
+pub struct ReferenceGraphStats {
+    /// Number of unique objects that participate in at least one edge.
+    pub total_objects: usize,
+    /// Number of deduplicated directed references.
+    pub total_edges: usize,
+    /// Largest outgoing edge list on any object.
+    pub max_out_degree: usize,
+    /// Largest incoming edge list on any object.
+    pub max_in_degree: usize,
+}
+
+impl ReferenceGraphStats {
+    /// Return whether the graph contains no objects or references.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.total_objects == 0
+    }
+}
+
+impl Default for ReferenceGraph {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl ReferenceGraph {
+    /// Create an empty reference graph
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let graph = ReferenceGraph::new();
+    /// assert!(graph.is_empty());
+    /// ```
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            state: Arc::new(GraphState::default()),
+        }
+    }
+
+    /// Build a graph from an iterator of edges.
+    ///
+    /// Repeated `(source, target)` pairs are ignored, and the first occurrence
+    /// of every edge determines its position in both adjacency directions.
+    /// The duplicate catalog makes this bulk path linear in the number of input
+    /// edges while retaining the graph's deduplication invariant. Endpoint
+    /// registration is intentionally outside this graph primitive: every
+    /// non-null [`ObjectId`] is admitted as a graph vertex, while callers such
+    /// as an object index may validate their own object catalog before calling.
+    ///
+    /// # Errors
+    ///
+    /// Returns the allocator's error when the duplicate catalog, graph map, or
+    /// adjacency list cannot reserve its next item.
+    pub fn try_from_edges<I>(edges: I) -> Result<Self, std::collections::TryReserveError>
+    where
+        I: IntoIterator<Item = (ObjectId, ObjectId)>,
+    {
+        let mut seen_edges = HashSet::new();
+        let mut state = GraphState::default();
+        for (source, target) in edges {
+            if seen_edges.contains(&(source, target)) {
+                continue;
+            }
+            seen_edges.try_reserve(1)?;
+            seen_edges.insert((source, target));
+
+            // Reserve before `entry`/`push` so this bulk path remains
+            // fallible at the same allocation boundaries as the index
+            // builders. The one-item reservation is a no-op while capacity
+            // remains and grows each vector geometrically when needed.
+            state.outgoing_refs.try_reserve(1)?;
+            let outgoing = state.outgoing_refs.entry(source).or_default();
+            outgoing.try_reserve(1)?;
+            outgoing.push(target);
+
+            state.incoming_refs.try_reserve(1)?;
+            let incoming = state.incoming_refs.entry(target).or_default();
+            incoming.try_reserve(1)?;
+            incoming.push(source);
+        }
+
+        Ok(Self {
+            state: Arc::new(state),
+        })
+    }
+
+    /// Freeze the current graph into a cheap immutable snapshot.
+    ///
+    /// # Errors
+    ///
+    /// Returns the allocator's error when the ordered object-ID cache cannot
+    /// reserve its storage.
+    pub fn try_snapshot(
+        &self,
+    ) -> Result<ReferenceGraphSnapshot, std::collections::TryReserveError> {
+        let ordered_ids = Arc::from(try_object_ids_in_order(&self.state)?.into_boxed_slice());
+        Ok(ReferenceGraphSnapshot {
+            state: Arc::clone(&self.state),
+            ordered_ids,
+        })
+    }
+
+    /// Freeze the current graph into a cheap immutable snapshot.
+    #[must_use]
+    pub fn snapshot(&self) -> ReferenceGraphSnapshot {
+        let ordered_ids: Arc<[ObjectId]> =
+            Arc::from(object_ids_in_order(&self.state).into_boxed_slice());
+        ReferenceGraphSnapshot {
+            state: Arc::clone(&self.state),
+            ordered_ids,
+        }
+    }
+
+    /// Get the validated objects that reference `object_id`.
+    ///
+    /// The iterator borrows the graph and performs no allocation.
+    #[must_use]
+    pub fn incoming(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.state
+            .incoming_refs
+            .get(&object_id)
+            .map(|ids| ObjectIdIter { inner: ids.iter() })
+    }
+
+    /// Get the validated objects referenced by `object_id`.
+    ///
+    /// The iterator borrows the graph and performs no allocation.
+    #[must_use]
+    pub fn outgoing(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.state
+            .outgoing_refs
+            .get(&object_id)
+            .map(|ids| ObjectIdIter { inner: ids.iter() })
+    }
+
+    /// Add a reference through the checked typed identity path.
+    ///
+    /// `ObjectId` rejects the protobuf null sentinel (`0`) before this method
+    /// can be called, so invalid wire identities cannot enter the graph.
+    pub fn add_object_reference(&mut self, source: ObjectId, target: ObjectId) {
+        let state = Arc::make_mut(&mut self.state);
+        let outgoing = state.outgoing_refs.entry(source).or_default();
+        if !outgoing.contains(&target) {
+            outgoing.push(target);
+        }
+
+        let incoming = state.incoming_refs.entry(target).or_default();
+        if !incoming.contains(&source) {
+            incoming.push(source);
+        }
+    }
+
+    /// Get all validated object IDs in the graph.
+    ///
+    /// Returns a set containing every object that either has outgoing
+    /// references or is referenced by another object. The typed result keeps
+    /// invalid raw protobuf identities out of the public API.
+    #[must_use]
+    pub fn all_object_ids(&self) -> HashSet<ObjectId> {
+        self.state
+            .incoming_refs
+            .keys()
+            .chain(self.state.outgoing_refs.keys())
+            .copied()
+            .collect()
+    }
+
+    /// Get all object IDs in deterministic numeric order.
+    ///
+    /// This is the stable, typed collection view for callers that need
+    /// reproducible traversal or diagnostics. It allocates one compact vector
+    /// and does not expose the graph's hash-map storage.
+    #[must_use]
+    pub fn object_ids(&self) -> Vec<ObjectId> {
+        object_ids_in_order(&self.state)
+    }
+
+    /// Check if there's a cycle reachable from the given object
+    ///
+    /// Uses depth-first search with a visited set to detect back edges.
+    /// This is useful for validating document integrity and detecting
+    /// corrupted or malformed iWork files.
+    ///
+    /// # Arguments
+    ///
+    /// * `start_id` - The object ID to start checking from
+    ///
+    /// # Returns
+    ///
+    /// `true` if a cycle is detected, `false` otherwise
+    ///
+    /// # Performance
+    ///
+    /// O(V + E) where V is vertices and E is edges in the reachable subgraph.
+    /// Uses an explicit stack so malformed deep graphs cannot overflow the
+    /// call stack.
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let mut graph = ReferenceGraph::new();
+    /// let one = ObjectId::try_from(1).expect("non-null object ID");
+    /// let two = ObjectId::try_from(2).expect("non-null object ID");
+    /// let three = ObjectId::try_from(3).expect("non-null object ID");
+    /// graph.add_object_reference(one, two);
+    /// graph.add_object_reference(two, three);
+    /// graph.add_object_reference(three, one);  // Creates cycle
+    /// assert!(graph.has_cycle(one));
+    /// ```
+    #[must_use]
+    pub fn has_cycle(&self, start_id: ObjectId) -> bool {
+        self.has_cycle_ids(start_id)
+    }
+
+    fn has_cycle_ids(&self, start_id: ObjectId) -> bool {
+        // 0 = unseen, 1 = active, 2 = complete. Each node is pushed once to
+        // enter and once to leave, replacing recursive DFS with bounded stack
+        // growth in the heap.
+        let mut colors = HashMap::new();
+        let mut stack = vec![(start_id, false)];
+
+        while let Some((node, leaving)) = stack.pop() {
+            if leaving {
+                colors.insert(node, 2_u8);
+                continue;
+            }
+
+            match colors.get(&node).copied() {
+                Some(1) => return true,
+                Some(2) => continue,
+                _ => {},
+            }
+
+            colors.insert(node, 1);
+            stack.push((node, true));
+
+            if let Some(neighbors) = self.state.outgoing_refs.get(&node) {
+                for &neighbor in neighbors.iter().rev() {
+                    match colors.get(&neighbor).copied() {
+                        Some(1) => return true,
+                        Some(2) => {},
+                        _ => stack.push((neighbor, false)),
+                    }
+                }
+            }
+        }
+
+        false
+    }
+
+    /// Get all objects reachable from the given object via BFS
+    ///
+    /// Performs breadth-first traversal to find all transitively referenced objects.
+    /// Useful for:
+    /// - Extracting complete sub-documents
+    /// - Determining what needs to be loaded to fully resolve an object
+    /// - Computing dependency closures
+    ///
+    /// # Arguments
+    ///
+    /// * `start_id` - The starting object ID
+    ///
+    /// # Returns
+    ///
+    /// Vector of all reachable object IDs (including `start_id`)
+    ///
+    /// # Performance
+    ///
+    /// O(V + E) where V is vertices and E is edges in the reachable subgraph.
+    /// Uses BFS for cache-friendly traversal (better locality than DFS).
+    ///
+    /// # Example
+    ///
+    /// ```rust,ignore
+    /// let mut graph = ReferenceGraph::new();
+    /// let one = ObjectId::try_from(1).expect("non-null object ID");
+    /// let two = ObjectId::try_from(2).expect("non-null object ID");
+    /// let three = ObjectId::try_from(3).expect("non-null object ID");
+    /// let four = ObjectId::try_from(4).expect("non-null object ID");
+    /// graph.add_object_reference(one, two);
+    /// graph.add_object_reference(one, three);
+    /// graph.add_object_reference(two, four);
+    /// let reachable = graph.reachable(one);
+    /// assert_eq!(reachable.len(), 4);  // [1, 2, 3, 4]
+    /// ```
+    #[must_use]
+    pub fn reachable(&self, start_id: ObjectId) -> Vec<ObjectId> {
+        use std::collections::{HashSet, VecDeque};
+
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+        let mut result = Vec::new();
+
+        // Start with the initial object
+        queue.push_back(start_id);
+        visited.insert(start_id);
+
+        // BFS traversal
+        while let Some(node) = queue.pop_front() {
+            result.push(node);
+
+            // Add all unvisited neighbors to the queue
+            if let Some(neighbors) = self.state.outgoing_refs.get(&node) {
+                for &neighbor in neighbors {
+                    if visited.insert(neighbor) {
+                        queue.push_back(neighbor);
+                    }
+                }
+            }
+        }
+
+        result
+    }
+
+    /// Get the number of objects in the graph
+    ///
+    /// Returns the count of unique objects that participate in the reference graph.
+    ///
+    /// # Performance
+    ///
+    /// O(V) where V is the number of unique objects, without allocating a
+    /// temporary set.
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        object_count(&self.state)
+    }
+
+    /// Check if the graph is empty
+    ///
+    /// Returns `true` if there are no references in the graph.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.state.incoming_refs.is_empty() && self.state.outgoing_refs.is_empty()
+    }
+
+    /// Get the total number of edges (references) in the graph
+    ///
+    /// Returns the total count of references between objects.
+    ///
+    /// # Performance
+    ///
+    /// O(V) where V is the number of objects with outgoing references
+    #[inline]
+    #[must_use]
+    pub fn edge_count(&self) -> usize {
+        self.state.outgoing_refs.values().map(Vec::len).sum()
+    }
+
+    /// Get named statistics about the reference graph.
+    ///
+    /// This computes counts directly from the compact bidirectional indexes
+    /// and allocates no temporary collection. The returned value is independent
+    /// of the graph and can be compared with a snapshot's statistics.
+    #[must_use]
+    pub fn statistics(&self) -> ReferenceGraphStats {
+        graph_statistics(&self.state)
+    }
+}
+
+impl ReferenceGraphSnapshot {
+    /// Get the validated objects that reference `object_id`.
+    ///
+    /// The iterator borrows the immutable snapshot and performs no allocation.
+    #[must_use]
+    pub fn incoming(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.state
+            .incoming_refs
+            .get(&object_id)
+            .map(|ids| ObjectIdIter { inner: ids.iter() })
+    }
+
+    /// Get the validated objects referenced by `object_id`.
+    ///
+    /// The iterator borrows the immutable snapshot and performs no allocation.
+    #[must_use]
+    pub fn outgoing(&self, object_id: ObjectId) -> Option<ObjectIdIter<'_>> {
+        self.state
+            .outgoing_refs
+            .get(&object_id)
+            .map(|ids| ObjectIdIter { inner: ids.iter() })
+    }
+
+    /// Return every non-null object participating in the graph.
+    #[must_use]
+    pub fn all_object_ids(&self) -> HashSet<ObjectId> {
+        self.state
+            .incoming_refs
+            .keys()
+            .chain(self.state.outgoing_refs.keys())
+            .copied()
+            .collect()
+    }
+
+    /// Iterate over every object ID in deterministic numeric order.
+    ///
+    /// The order is materialized once when the snapshot is created, so this
+    /// view performs no allocation or sorting and remains stable for the
+    /// lifetime of the immutable snapshot.
+    #[must_use]
+    pub fn iter_object_ids(&self) -> ObjectIdIter<'_> {
+        ObjectIdIter {
+            inner: self.ordered_ids.iter(),
+        }
+    }
+
+    /// Get all object IDs in deterministic numeric order.
+    ///
+    /// The snapshot shares its graph storage and immutable ID catalog, while
+    /// this explicit collection allocates only the result vector.
+    #[must_use]
+    pub fn object_ids(&self) -> Vec<ObjectId> {
+        self.ordered_ids.to_vec()
+    }
+
+    /// Check whether a cycle is reachable from `object_id`.
+    #[must_use]
+    pub fn has_cycle_from(&self, object_id: ObjectId) -> bool {
+        ReferenceGraph {
+            state: Arc::clone(&self.state),
+        }
+        .has_cycle(object_id)
+    }
+
+    /// Return the non-null objects reachable from `object_id`, including it.
+    #[must_use]
+    pub fn reachable(&self, object_id: ObjectId) -> Vec<ObjectId> {
+        ReferenceGraph {
+            state: Arc::clone(&self.state),
+        }
+        .reachable(object_id)
+    }
+
+    /// Return the number of non-null objects in the snapshot.
+    #[inline]
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.ordered_ids.len()
+    }
+
+    /// Return whether the snapshot contains no non-null object references.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.ordered_ids.is_empty()
+    }
+
+    /// Return the number of stored non-duplicate edges with non-null endpoints.
+    #[inline]
+    #[must_use]
+    pub fn edge_count(&self) -> usize {
+        self.state.outgoing_refs.values().map(Vec::len).sum()
+    }
+
+    /// Return named cardinality and degree statistics for this immutable view.
+    #[must_use]
+    pub fn statistics(&self) -> ReferenceGraphStats {
+        graph_statistics(&self.state)
+    }
+}
+
+fn object_count(state: &GraphState) -> usize {
+    let outgoing = &state.outgoing_refs;
+    outgoing.len()
+        + state
+            .incoming_refs
+            .keys()
+            .filter(|object_id| !outgoing.contains_key(*object_id))
+            .count()
+}
+
+fn object_ids_in_order(state: &GraphState) -> Vec<ObjectId> {
+    let mut object_ids = Vec::with_capacity(
+        state
+            .incoming_refs
+            .len()
+            .saturating_add(state.outgoing_refs.len()),
+    );
+    object_ids.extend(state.incoming_refs.keys().copied());
+    object_ids.extend(state.outgoing_refs.keys().copied());
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    object_ids
+}
+
+fn try_object_ids_in_order(
+    state: &GraphState,
+) -> Result<Vec<ObjectId>, std::collections::TryReserveError> {
+    let mut object_ids = Vec::new();
+    object_ids.try_reserve_exact(
+        state
+            .incoming_refs
+            .len()
+            .saturating_add(state.outgoing_refs.len()),
+    )?;
+    object_ids.extend(state.incoming_refs.keys().copied());
+    object_ids.extend(state.outgoing_refs.keys().copied());
+    object_ids.sort_unstable();
+    object_ids.dedup();
+    Ok(object_ids)
+}
+
+fn graph_statistics(state: &GraphState) -> ReferenceGraphStats {
+    ReferenceGraphStats {
+        total_objects: object_count(state),
+        total_edges: state.outgoing_refs.values().map(Vec::len).sum(),
+        max_out_degree: state
+            .outgoing_refs
+            .values()
+            .map(Vec::len)
+            .max()
+            .unwrap_or(0),
+        max_in_degree: state
+            .incoming_refs
+            .values()
+            .map(Vec::len)
+            .max()
+            .unwrap_or(0),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::mem::size_of;
+
+    fn object(raw: u64) -> ObjectId {
+        ObjectId::try_from(raw).expect("test object IDs are non-zero")
+    }
+
+    #[test]
+    fn test_reference_graph_basic() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(one, three);
+        graph.add_object_reference(two, three);
+
+        assert_eq!(
+            graph.outgoing(one).map(Iterator::collect),
+            Some(vec![two, three])
+        );
+        assert_eq!(
+            graph.incoming(three).map(Iterator::collect),
+            Some(vec![one, two])
+        );
+        assert!(graph.incoming(one).is_none());
+    }
+
+    #[test]
+    fn test_reference_graph_deduplication() {
+        let mut graph = ReferenceGraph::new();
+        let source = object(1);
+        let target = object(2);
+
+        // Add the same reference multiple times
+        graph.add_object_reference(source, target);
+        graph.add_object_reference(source, target);
+        graph.add_object_reference(source, target);
+
+        // Should only appear once
+        assert_eq!(
+            graph.outgoing(source).map(Iterator::collect),
+            Some(vec![target])
+        );
+        assert_eq!(
+            graph.incoming(target).map(Iterator::collect),
+            Some(vec![source])
+        );
+    }
+
+    #[test]
+    fn bulk_edges_deduplicate_and_preserve_first_edge_order() {
+        let source = ObjectId::try_from(1).unwrap();
+        let first_target = ObjectId::try_from(2).unwrap();
+        let second_target = ObjectId::try_from(3).unwrap();
+        let third_target = ObjectId::try_from(4).unwrap();
+        let graph = ReferenceGraph::try_from_edges([
+            (source, first_target),
+            (source, second_target),
+            (source, first_target),
+            (source, third_target),
+            (source, second_target),
+        ])
+        .expect("bulk graph");
+
+        assert_eq!(
+            graph.outgoing(source).unwrap().collect::<Vec<_>>(),
+            vec![first_target, second_target, third_target]
+        );
+        assert_eq!(
+            graph.incoming(first_target).unwrap().collect::<Vec<_>>(),
+            vec![source]
+        );
+        assert_eq!(graph.edge_count(), 3);
+        assert_eq!(
+            graph.try_snapshot().unwrap().object_ids(),
+            vec![source, first_target, second_target, third_target]
+        );
+    }
+
+    #[test]
+    fn bulk_edges_preserve_adversarial_star_order() {
+        const DEGREE: u64 = 1_024;
+        let source = ObjectId::try_from(1).unwrap();
+        let sink = ObjectId::try_from(DEGREE.saturating_mul(2).saturating_add(2)).unwrap();
+        let outgoing_targets = (2..=DEGREE.saturating_add(1))
+            .map(|id| ObjectId::try_from(id).unwrap())
+            .collect::<Vec<_>>();
+        let incoming_sources = (DEGREE.saturating_add(2)
+            ..=DEGREE.saturating_mul(2).saturating_add(1))
+            .map(|id| ObjectId::try_from(id).unwrap())
+            .collect::<Vec<_>>();
+        let edges = outgoing_targets
+            .iter()
+            .copied()
+            .map(|target| (source, target))
+            .chain(
+                incoming_sources
+                    .iter()
+                    .copied()
+                    .map(|source| (source, sink)),
+            );
+
+        let graph = ReferenceGraph::try_from_edges(edges).expect("bulk graph");
+
+        assert_eq!(
+            graph.outgoing(source).unwrap().collect::<Vec<_>>(),
+            outgoing_targets
+        );
+        assert_eq!(
+            graph.incoming(sink).unwrap().collect::<Vec<_>>(),
+            incoming_sources
+        );
+        assert_eq!(graph.edge_count(), usize::try_from(DEGREE * 2).unwrap());
+        let stats = graph.statistics();
+        assert_eq!(stats.max_out_degree, usize::try_from(DEGREE).unwrap());
+        assert_eq!(stats.max_in_degree, usize::try_from(DEGREE).unwrap());
+    }
+
+    #[test]
+    fn test_reference_graph_cycle_detection() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+
+        // Create a simple cycle: 1 -> 2 -> 3 -> 1
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(two, three);
+        graph.add_object_reference(three, one);
+
+        assert!(graph.has_cycle(one));
+        assert!(graph.has_cycle(two));
+        assert!(graph.has_cycle(three));
+    }
+
+    #[test]
+    fn test_reference_graph_no_cycle() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+        let four = object(4);
+
+        // Create a DAG: 1 -> 2 -> 3
+        //                 \-> 4
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(one, four);
+        graph.add_object_reference(two, three);
+
+        assert!(!graph.has_cycle(one));
+        assert!(!graph.has_cycle(two));
+        assert!(!graph.has_cycle(three));
+        assert!(!graph.has_cycle(four));
+    }
+
+    #[test]
+    fn test_reference_graph_reachability() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+        let four = object(4);
+        let five = object(5);
+
+        // Create graph: 1 -> 2 -> 3
+        //                \-> 4 -> 5
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(one, four);
+        graph.add_object_reference(two, three);
+        graph.add_object_reference(four, five);
+
+        let reachable = graph.reachable(one);
+        assert_eq!(reachable.len(), 5);
+        assert!(reachable.contains(&one));
+        assert!(reachable.contains(&two));
+        assert!(reachable.contains(&three));
+        assert!(reachable.contains(&four));
+        assert!(reachable.contains(&five));
+
+        let reachable_from_2 = graph.reachable(two);
+        assert_eq!(reachable_from_2.len(), 2);
+        assert!(reachable_from_2.contains(&two));
+        assert!(reachable_from_2.contains(&three));
+    }
+
+    #[test]
+    fn test_reference_graph_stats() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+        let four = object(4);
+
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(one, three);
+        graph.add_object_reference(one, four);
+        graph.add_object_reference(two, three);
+
+        let stats = graph.statistics();
+        assert_eq!(stats.total_objects, 4);
+        assert_eq!(stats.total_edges, 4);
+        assert_eq!(stats.max_out_degree, 3); // Node 1 has 3 outgoing edges
+        assert_eq!(stats.max_in_degree, 2); // Node 3 has 2 incoming edges
+        assert_eq!(graph.snapshot().statistics(), stats);
+    }
+
+    #[test]
+    fn test_reference_graph_empty() {
+        let graph = ReferenceGraph::new();
+
+        assert!(graph.is_empty());
+        assert_eq!(graph.len(), 0);
+
+        let stats = graph.statistics();
+        assert_eq!(stats, ReferenceGraphStats::default());
+        assert!(stats.is_empty());
+        assert_eq!(graph.snapshot().statistics(), stats);
+    }
+
+    #[test]
+    fn test_all_object_ids() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+        let four = object(4);
+        let five = object(5);
+        let six = object(6);
+
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(three, four);
+        graph.add_object_reference(five, six);
+
+        let all = graph.all_object_ids();
+        assert_eq!(all.len(), 6);
+        assert_eq!(all, HashSet::from([one, two, three, four, five, six]));
+    }
+
+    #[test]
+    fn object_ids_reject_null_and_round_trip() {
+        assert_eq!(ObjectId::new(0), None);
+
+        let object_id = ObjectId::try_from(42).expect("non-zero IDs are valid");
+        assert_eq!(object_id.get(), 42);
+        assert!(ObjectId::try_from(0).is_err());
+        assert_eq!(ObjectId::try_from(u64::MAX).unwrap().get(), u64::MAX);
+        assert_eq!(size_of::<ObjectId>(), size_of::<u64>());
+    }
+
+    #[test]
+    fn reference_graph_values_are_send_and_sync() {
+        fn assert_send_sync<T: Send + Sync>() {}
+
+        assert_send_sync::<ReferenceGraph>();
+        assert_send_sync::<ReferenceGraphSnapshot>();
+    }
+
+    #[test]
+    fn typed_snapshot_is_immutable_and_filters_null_edges() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+
+        graph.add_object_reference(one, two);
+        // A null protobuf reference is rejected before the typed graph API;
+        // it cannot be silently ignored or inserted as an edge.
+        assert!(ObjectId::try_from(0).is_err());
+        assert_eq!(graph.outgoing(one).unwrap().collect::<Vec<_>>(), vec![two]);
+        let snapshot = graph.snapshot();
+
+        graph.add_object_reference(one, three);
+
+        assert_eq!(
+            snapshot.outgoing(one).unwrap().collect::<Vec<_>>(),
+            vec![two]
+        );
+        assert_eq!(
+            snapshot.incoming(two).unwrap().collect::<Vec<_>>(),
+            vec![one]
+        );
+        assert_eq!(snapshot.reachable(one), vec![one, two]);
+        assert!(!snapshot.has_cycle_from(one));
+        assert_eq!(snapshot.all_object_ids(), HashSet::from([one, two]));
+        assert_eq!(
+            snapshot.iter_object_ids().collect::<Vec<_>>(),
+            vec![one, two]
+        );
+        assert_eq!(snapshot.object_ids(), vec![one, two]);
+        assert_eq!(snapshot.len(), 2);
+        assert_eq!(snapshot.edge_count(), 1);
+    }
+
+    #[test]
+    fn object_ids_are_sorted_and_deduplicated() {
+        let mut graph = ReferenceGraph::new();
+        let two = ObjectId::try_from(2).unwrap();
+        let four = ObjectId::try_from(4).unwrap();
+        let seven = ObjectId::try_from(7).unwrap();
+        let nine = ObjectId::try_from(9).unwrap();
+
+        graph.add_object_reference(nine, two);
+        graph.add_object_reference(two, seven);
+        graph.add_object_reference(nine, seven);
+        graph.add_object_reference(four, nine);
+
+        let expected = vec![two, four, seven, nine];
+        assert_eq!(graph.object_ids(), expected);
+        assert_eq!(graph.snapshot().object_ids(), expected);
+    }
+
+    #[test]
+    fn graph_cardinality_counts_shared_endpoints_without_materializing_a_set() {
+        let mut graph = ReferenceGraph::new();
+        let one = object(1);
+        let two = object(2);
+        let three = object(3);
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(two, three);
+
+        assert_eq!(graph.len(), 3);
+        let snapshot = graph.snapshot();
+        assert_eq!(snapshot.len(), 3);
+        assert!(!snapshot.is_empty());
+
+        let empty_snapshot = ReferenceGraph::new().snapshot();
+        assert_eq!(empty_snapshot.len(), 0);
+        assert!(empty_snapshot.is_empty());
+    }
+
+    #[test]
+    fn typed_api_rejects_null_wire_id_before_insertion() {
+        let graph = ReferenceGraph::new();
+
+        assert!(ObjectId::try_from(0).is_err());
+        assert!(graph.is_empty());
+        assert_eq!(graph.edge_count(), 0);
+        assert!(graph.all_object_ids().is_empty());
+    }
+
+    #[test]
+    fn typed_snapshot_detects_cycles_and_deduplicates_edges() {
+        let mut graph = ReferenceGraph::new();
+        let one = ObjectId::try_from(1).unwrap();
+        let two = ObjectId::try_from(2).unwrap();
+        let three = ObjectId::try_from(3).unwrap();
+
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(one, two);
+        graph.add_object_reference(two, three);
+        graph.add_object_reference(three, one);
+
+        let snapshot = graph.snapshot();
+
+        assert_eq!(snapshot.edge_count(), 3);
+        assert!(snapshot.has_cycle_from(one));
+        assert_eq!(snapshot.reachable(one), vec![one, two, three]);
+    }
+
+    #[test]
+    fn cycle_detection_handles_deep_graphs_without_recursion() {
+        const CHAIN_LENGTH: u64 = 10_000;
+        let mut graph = ReferenceGraph::new();
+
+        for object_id in 1..CHAIN_LENGTH {
+            graph.add_object_reference(object(object_id), object(object_id + 1));
+        }
+
+        assert!(!graph.has_cycle(object(1)));
+        graph.add_object_reference(object(CHAIN_LENGTH), object(1));
+        assert!(graph.has_cycle(object(1)));
+    }
+}

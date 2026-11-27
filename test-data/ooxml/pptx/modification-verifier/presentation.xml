@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:presentation xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:modifyVerifier cryptProviderType="rsaAES" cryptAlgorithmClass="hash"
+      cryptAlgorithmType="typeAny" cryptProvider="Microsoft" cryptAlgorithmSid="14"
+      hashData="legacy-hash" saltData="legacy-salt" spinCount="100000"/>
+</p:presentation>

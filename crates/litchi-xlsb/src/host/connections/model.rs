@@ -1,0 +1,520 @@
+//! Typed, inert model of the XLSB External Data Connections part
+//! (MS-XLSB 2.1.7.24).
+//!
+//! Connection strings, commands, URLs, file paths, and credential metadata
+//! are stored exactly as declared and are never resolved, opened, contacted,
+//! refreshed, or executed.
+
+use std::sync::Arc;
+
+/// `DBType` (MS-XLSB 2.5.31): the data source type of a connection.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[repr(u32)]
+pub enum SourceType {
+    /// ODBC data source (`DBTODBC`).
+    #[default]
+    Odbc = 1,
+    /// DAO data source (`DBTDAO`).
+    Dao = 2,
+    /// HTML data source (`DBTWEB`).
+    Web = 4,
+    /// OLE DB data source (`DBTOLEDB`).
+    OleDb = 5,
+    /// Text data source (`DBTTEXT`).
+    Text = 6,
+    /// ADO record set (`DBTADO`).
+    Ado = 7,
+    /// OLE DB data source created by the spreadsheet data model (`DBTOLEDBPP`).
+    OleDbDataModel = 0x64,
+    /// Data feed data source created by the spreadsheet data model (`DBTDATAFEED`).
+    DataFeed = 0x65,
+    /// Worksheet data source created by the spreadsheet data model (`DBTWORKSHEET`).
+    Worksheet = 0x66,
+    /// Text data source created by the spreadsheet data model (`DBTTEXTPP`).
+    TextDataModel = 0x67,
+}
+
+impl TryFrom<u32> for SourceType {
+    type Error = crate::package::error::Error;
+
+    fn try_from(value: u32) -> Result<Self, crate::package::error::Error> {
+        Ok(match value {
+            1 => Self::Odbc,
+            2 => Self::Dao,
+            4 => Self::Web,
+            5 => Self::OleDb,
+            6 => Self::Text,
+            7 => Self::Ado,
+            0x64 => Self::OleDbDataModel,
+            0x65 => Self::DataFeed,
+            0x66 => Self::Worksheet,
+            0x67 => Self::TextDataModel,
+            _other => {
+                return Err(crate::package::walker::malformed(
+                    "BrtBeginExtConnection",
+                    "unknown DBType",
+                ));
+            },
+        })
+    }
+}
+
+/// `CmdType` (MS-XLSB 2.5.21): the meaning of the database command.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+#[repr(u32)]
+pub enum CommandType {
+    /// No command specified (`CMDNULL`).
+    #[default]
+    None = 0,
+    /// Cube name within an OLAP database (`CMDCUBE`).
+    Cube = 1,
+    /// SQL statement (`CMDSQL`).
+    Sql = 2,
+    /// Database table name (`CMDTABLE`).
+    Table = 3,
+    /// Statement in the database's default language (`CMDDEFAULT`).
+    Default = 4,
+    /// List from a Web-based data provider (`CMDSPLIST`).
+    SpList = 5,
+}
+
+impl TryFrom<u32> for CommandType {
+    type Error = crate::package::error::Error;
+
+    fn try_from(value: u32) -> Result<Self, crate::package::error::Error> {
+        Ok(match value {
+            0 => Self::None,
+            1 => Self::Cube,
+            2 => Self::Sql,
+            3 => Self::Table,
+            4 => Self::Default,
+            5 => Self::SpList,
+            _other => {
+                return Err(crate::package::walker::malformed(
+                    "BrtBeginECDbProps",
+                    "unknown CmdType",
+                ));
+            },
+        })
+    }
+}
+
+/// Whether the password is saved in the connection string (`pc` field).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum PasswordState {
+    /// The password is saved in the connection string.
+    Saved = 1,
+    /// The password is not saved in the connection string.
+    NotSaved = 2,
+}
+
+/// The authentication method for a database connection (`iCredMethod`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum CredentialMethod {
+    /// Integrated authentication.
+    Integrated = 0,
+    /// No credentials.
+    None = 1,
+    /// Credentials stored in a single sign-on repository.
+    SingleSignOn = 2,
+}
+
+/// When connection information is retrieved from the connection file
+/// (`irecontype`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum ReconnectionType {
+    /// Retrieve updated information only after a refresh failure.
+    AsRequired = 1,
+    /// Always retrieve updated information from the connection file.
+    Always = 2,
+    /// Never retrieve updated information.
+    Never = 3,
+}
+
+/// How HTML formatting is imported by a Web connection (`wHTMLFmt`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+#[derive(Default)]
+pub enum HtmlFormat {
+    /// No formatting is imported.
+    #[default]
+    None = 0,
+    /// Rich-text formatting is imported.
+    RichText = 1,
+    /// All formatting is imported.
+    All = 2,
+    /// Any other value is preserved verbatim.
+    Other(u8),
+}
+
+/// Database command properties (`BrtBeginECDbProps`, MS-XLSB 2.4.61).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct DbProperties {
+    /// The database command type.
+    pub command_type: CommandType,
+    /// The connection string (inert).
+    pub connection_string: String,
+    /// The database command, when stored (inert).
+    pub command: Option<String>,
+    /// The server-based page-field command, when stored (inert).
+    pub server_command: Option<String>,
+}
+
+/// OLAP connection properties (`BrtBeginECOlapProps`, MS-XLSB 2.4.62).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OlapProperties {
+    /// Whether data is retrieved from a local cube file.
+    pub local_connection: bool,
+    /// Whether the provider is requested not to rebuild the local cube file.
+    pub no_refresh_cube: bool,
+    /// Server-retrieved background color is applied to cells.
+    pub server_format_back: bool,
+    /// Server-retrieved font color is applied to cells.
+    pub server_format_fore: bool,
+    /// Server-retrieved font family is applied to cells.
+    pub server_format_flags: bool,
+    /// Server-retrieved format string is applied to cells.
+    pub server_format_number: bool,
+    /// Whether the office LCID is sent to the provider.
+    pub use_office_lcid: bool,
+    /// Maximum drillthrough rows.
+    pub drillthrough_rows: u32,
+    /// The local cube connection string, when stored (inert).
+    pub local_connection_string: Option<String>,
+}
+
+/// Web connection properties (`BrtBeginECWebProps`, MS-XLSB 2.4.71).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct WebProperties {
+    /// How HTML formatting is imported.
+    pub html_format: HtmlFormat,
+    /// The source is XML rather than an HTML table.
+    pub source_is_xml: bool,
+    /// Data is imported from the URL rather than the table.
+    pub import_source_data: bool,
+    /// Pre-formatted blocks are parsed into columns.
+    pub parse_pre_formatted: bool,
+    /// Consecutive delimiters are treated as one.
+    pub consecutive_delimiters: bool,
+    /// Tables in a block share the first row's width settings.
+    pub same_settings: bool,
+    /// Created with the legacy application version.
+    pub excel97_format: bool,
+    /// Dates are imported as text.
+    pub no_date_recognition: bool,
+    /// Refreshed with a newer application version.
+    pub refreshed_in_excel9: bool,
+    /// Only works on HTML tables.
+    pub tables_only_html: bool,
+    /// The refresh URL (inert).
+    pub url: Option<String>,
+    /// The HTTP post string, when stored (inert).
+    pub web_post: Option<String>,
+    /// The user-facing edit page URL, when stored (inert).
+    pub edit_web_page: Option<String>,
+}
+
+/// Legacy character-set category; the application code-page value can override it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TextCodePage {
+    Macintosh = 0,
+    WindowsAnsi = 1,
+    Dos = 2,
+}
+/// Stored text qualifier, including the two equivalent wire spellings of None.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub enum TextQualifier {
+    DoubleQuote = 0,
+    SingleQuote = 1,
+    None = 2,
+    NoneAlternate = 3,
+}
+/// Field interpretation for text import (MS-XLSB ECTwFldInfoData).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u32)]
+pub enum TextFieldType {
+    General = 0,
+    Text = 1,
+    Mdy = 2,
+    Dmy = 3,
+    Ymd = 4,
+    Myd = 5,
+    Dym = 6,
+    Ydm = 7,
+    Skip = 8,
+    Emd = 9,
+}
+/// One imported column's stored type and fixed-width start position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextField {
+    pub field_type: TextFieldType,
+    pub start: u32,
+}
+/// Inert classic text-import options and optional field-list presence.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct TextImportProperties {
+    /// Fallback category used only when application_code_page is less than 3.
+    pub code_page: TextCodePage,
+    /// Application-specific 10-bit encoding selector, not a numeric Windows code page.
+    pub application_code_page: u16,
+    pub delimited: bool,
+    pub tab: bool,
+    pub space: bool,
+    pub comma: bool,
+    pub semicolon: bool,
+    pub consecutive: bool,
+    pub qualifier: TextQualifier,
+    pub prompt_for_file: bool,
+    pub custom_delimiter: bool,
+    /// Stored UTF-16 delimiter value; inert when custom_delimiter is false.
+    pub delimiter: u16,
+    pub first_row: u32,
+    /// Stored ISO-8859-1 separator bytes.
+    pub decimal_separator: u8,
+    pub thousands_separator: u8,
+    pub source_file: String,
+    pub fields: Option<Vec<TextField>>,
+    /// Retained must-ignore bits (bit20 and bits23..31); modeled bits are forbidden here.
+    pub ignored_flags: u32,
+}
+impl Default for TextImportProperties {
+    fn default() -> Self {
+        Self {
+            code_page: TextCodePage::WindowsAnsi,
+            application_code_page: 1,
+            delimited: true,
+            tab: true,
+            space: false,
+            comma: false,
+            semicolon: false,
+            consecutive: false,
+            qualifier: TextQualifier::DoubleQuote,
+            prompt_for_file: true,
+            custom_delimiter: false,
+            delimiter: 0,
+            first_row: 1,
+            decimal_separator: b'.',
+            thousands_separator: b',',
+            source_file: String::new(),
+            fields: None,
+            ignored_flags: 1 << 20,
+        }
+    }
+}
+
+/// The source-specific property block of a connection.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub enum Properties {
+    /// Classic text-import options, source path and field definitions.
+    Text(TextImportProperties),
+    /// ODBC or OLE DB command properties.
+    Database(DbProperties),
+    /// OLAP connection properties.
+    Olap(OlapProperties),
+    /// Web connection properties.
+    Web(WebProperties),
+    /// No modeled property block was projected; unmodeled extensions can still be retained.
+    #[default]
+    None,
+}
+
+/// The type of a connection parameter (`pbt`).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ParameterType {
+    /// The user is prompted for the value.
+    #[default]
+    Prompt,
+    /// A stored value (number, string, or Boolean).
+    Value,
+    /// A cell reference supplying the value.
+    CellReference,
+    /// Any other `pbt` value.
+    Other(u8),
+}
+
+/// A stored parameter value.
+#[derive(Debug, Clone, PartialEq)]
+pub enum ParameterValue {
+    /// A numeric value (`xnumVal`).
+    Number(f64),
+    /// A string value (`stVal`).
+    Text(String),
+    /// A Boolean value (`boolVal`).
+    Boolean(bool),
+    /// Raw formula tokens of the cell reference (inert).
+    CellFormula(Vec<u8>),
+}
+
+/// One connection parameter (`BrtBeginECParam`, MS-XLSB 2.4.63).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Parameter {
+    /// The parameter type.
+    pub parameter_type: ParameterType,
+    /// Whether data refreshes when the parameter cell changes.
+    pub auto_refresh: bool,
+    /// The SQL data type of the parameter (`TypeSql`, MS-XLSB 2.5.152).
+    pub sql_type: u16,
+    /// The parameter name.
+    pub name: String,
+    /// The prompt string, when stored.
+    pub prompt: Option<String>,
+    /// The stored value.
+    pub value: Option<ParameterValue>,
+}
+
+/// One Web query table reference (`BrtBeginEcWpTables` items).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum WebTableItem {
+    /// An HTML table by index (`BrtPCDIIndex`).
+    Index(u32),
+    /// An HTML table by `id` attribute (`BrtPCDIString`).
+    Named(String),
+    /// An invalid or missing reference (`BrtPCDIMissing`).
+    Missing,
+}
+
+/// One external connection (`BrtBeginExtConnection`, MS-XLSB 2.4.80).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Connection {
+    /// The unique connection identifier (`dwConnID`).
+    pub connection_id: u32,
+    /// The data source type (`idbtype`).
+    pub source_type: SourceType,
+    /// The connection name.
+    pub name: String,
+    /// The description, when stored.
+    pub description: Option<String>,
+    /// The external connection file path, when stored (inert).
+    pub connection_file: Option<String>,
+    /// The data file path, when stored (inert).
+    pub data_file: Option<String>,
+    /// The single sign-on application identifier, when stored.
+    pub sso_id: Option<String>,
+    /// The authentication method, when applicable.
+    pub credential_method: Option<CredentialMethod>,
+    /// Whether the password is saved in the connection string, when applicable.
+    pub password_state: Option<PasswordState>,
+    /// The data functionality level last refreshed with.
+    pub refreshed_version: u8,
+    /// The minimum data functionality level required to refresh.
+    pub refreshable_min_version: u8,
+    /// Automatic refresh interval in minutes (0 = never).
+    pub refresh_interval_minutes: u16,
+    /// Whether the connection is maintained after refresh.
+    pub maintain: bool,
+    /// Whether the connection has never been refreshed.
+    pub new_query: bool,
+    /// Whether the connection has been deleted.
+    pub deleted: bool,
+    /// Whether the connection file is always used on refresh.
+    pub always_use_connection_file: bool,
+    /// Whether refresh runs asynchronously in the background.
+    pub background_query: bool,
+    /// Whether the connection refreshes when the workbook opens.
+    pub refresh_on_load: bool,
+    /// Whether retrieved data is saved within the workbook.
+    pub save_data: bool,
+    /// When connection information is retrieved from the connection file.
+    pub reconnection_type: Option<ReconnectionType>,
+    /// The source-specific property block.
+    pub properties: Properties,
+    /// Connection parameters.
+    pub parameters: Vec<Parameter>,
+    /// Web query table references.
+    pub web_tables: Vec<WebTableItem>,
+}
+
+/// The parsed External Data Connections part.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct Connections {
+    /// The declared external connections, in part order.
+    pub connections: Vec<Connection>,
+}
+
+/// One unmodeled BIFF12 record retained by a source-bound connection
+/// snapshot.
+///
+/// The complete wire image, including its original variable-length record
+/// header, is retained.  The record is never interpreted, contacted, or
+/// executed; it is re-emitted only when its owning connection still exists.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct UnknownRecord {
+    kind: u16,
+    connection_id: Option<u32>,
+    after_known: usize,
+    bytes: Arc<[u8]>,
+    payload_start: usize,
+    pub(crate) opaque_context: bool,
+}
+
+impl UnknownRecord {
+    pub(crate) fn new(
+        kind: u16,
+        connection_id: Option<u32>,
+        after_known: usize,
+        bytes: Arc<[u8]>,
+        payload_start: usize,
+        opaque_context: bool,
+    ) -> Self {
+        Self {
+            kind,
+            connection_id,
+            after_known,
+            bytes,
+            payload_start,
+            opaque_context,
+        }
+    }
+
+    /// Numeric BIFF12 record kind.
+    #[must_use]
+    pub const fn kind(&self) -> u16 {
+        self.kind
+    }
+
+    /// Connection identifier owning this record, or `None` for a part-level
+    /// record.
+    #[must_use]
+    pub const fn connection_id(&self) -> Option<u32> {
+        self.connection_id
+    }
+
+    /// Number of modeled records preceding this record in its owner scope.
+    #[must_use]
+    pub const fn after_known(&self) -> usize {
+        self.after_known
+    }
+
+    /// Complete source wire image, including the record header.
+    #[must_use]
+    pub fn bytes(&self) -> &[u8] {
+        &self.bytes
+    }
+
+    /// Borrow the opaque record payload without reconstructing its header.
+    #[must_use]
+    pub fn payload(&self) -> &[u8] {
+        &self.bytes[self.payload_start..]
+    }
+}
+
+impl Connections {
+    /// Find a connection by its unique identifier (`dwConnID`).
+    pub fn by_id(&self, connection_id: u32) -> Option<&Connection> {
+        self.connections
+            .iter()
+            .find(|connection| connection.connection_id == connection_id)
+    }
+
+    /// Find a connection by its workbook-unique name.
+    pub fn by_name(&self, name: &str) -> Option<&Connection> {
+        self.connections
+            .iter()
+            .find(|connection| connection.name == name)
+    }
+}

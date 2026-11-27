@@ -7,8 +7,9 @@ Open Packaging Conventions (OPC) implementation: the ZIP-based container layer u
 OPC defines how `.docx`, `.xlsx`, `.pptx`, and other Office Open XML documents
 are packaged: parts, content types, and relationships inside a ZIP archive.
 This crate provides the package model, `PackURI` resolution, and reader/writer
-plumbing on top of `soapberry-zip` and `quick-xml`. It is the foundation that
-`litchi-ooxml` builds on.
+plumbing on top of `soapberry-zip` and `quick-xml`. It is consumed directly by
+`litchi-docx`, `litchi-pptx`, `litchi-xlsx`, and `litchi-xlsb`; shared OOXML
+vocabulary and graph services live in `litchi-ooxml-common`.
 
 ## Usage
 
@@ -18,14 +19,52 @@ litchi-opc = "0.0.1"
 ```
 
 ```rust
-use litchi_opc::{OpcPackage, Part};
+use litchi_opc::{OpcPackage, Part, SourceLimits};
 
-let pkg = OpcPackage::open("example.docx")?;
+let pkg = OpcPackage::open("example.docx", SourceLimits::default())?;
 for part in pkg.iter_parts() {
     println!("{} ({})", part.partname(), part.content_type());
 }
 # Ok::<(), litchi_opc::OpcError>(())
 ```
+
+## Bounded Ingestion
+
+All ordinary package constructors require a caller-selected `SourceLimits`
+profile. For untrusted or multi-tenant input, build a checked profile from
+those defaults and pass it to the canonical constructor:
+
+```rust
+use litchi_opc::{OpcPackage, SourceLimits};
+
+let limits = SourceLimits::builder()
+    .max_input_bytes(32 * 1024 * 1024)?
+    .max_members(10_000)?
+    .build()?;
+let package = OpcPackage::open("untrusted.docx", limits)?;
+# let _ = package;
+# Ok::<(), litchi_opc::OpcError>(())
+```
+
+The standard profile caps input at 512 MiB; ZIP members and materialized OPC
+parts at 100,000 each; one ZIP member and one materialized part at 512 MiB;
+and aggregate declared ZIP bytes at 2 GiB. It also bounds ZIP names, central
+directory metadata, compressed bytes, aggregate materialized parts,
+`[Content_Types].xml` and its mappings, relationship parts and XML, individual
+and aggregate relationships, graph nodes, XML events and depth, and
+relationship attribute and target lengths. `SourceLimitKind` identifies the
+specific rejected resource.
+
+These ceilings are Litchi safety policy rather than ECMA-376 size maxima. They
+implement a defensive consumer boundary for the physical package and
+relationships described by ECMA-376 Part 2 sections 7.3.6 and 10, and the
+corresponding MS-OI29500 sections 2.1.1749-1752. The OOXML format owners
+forward this same `SourceLimits` profile through their canonical open and raw
+boundaries, so callers can use one contextual policy across formats.
+
+OPC readers treat macros, VBA, ActiveX, controls, OLE objects, and embedded
+code as inert blobs only when they are retained or exposed. They are never
+executed or activated.
 
 ## Features
 
@@ -37,3 +76,112 @@ for part in pkg.iter_parts() {
 ## License
 
 Licensed under the Apache License, Version 2.0. Part of the [Litchi](https://github.com/DevExzh/litchi) workspace.
+
+## Owned XML publication
+
+`OpcPackage::source_xml_part` issues an immutable `OwnedXmlPart` token after
+validating bounded XML. Noncompact XML must match retained source bytes; new XML
+must satisfy the authored compactness audit. The token shares its source buffer.
+
+`source_content_types` and `source_relationships` capture package metadata under
+a caller-selected `SourceLimits` profile. They check XML bytes, declaration or
+relationship counts, and XML attributes for both retained and regenerated XML.
+Relationship capture compares the current graph with borrowed source bindings,
+avoiding metadata clones just to decide whether source bytes can be retained.
+
+`OwnedXmlPart::replace_attributes` accepts ordered, complete attribute-value
+ranges and XML-escaped replacements. It checks the source spans and assembled
+XML, retains all other source bytes, and caps source/output/replacement XML at
+32 MiB and edits at 65,536. `try_replace_owned_xml_part` checks exact expected
+bytes and content type before publishing; `try_add_owned_xml_part` supports exact
+restoration or transfer. Both obey signature policy. Raw `set_blob` cannot grant
+source provenance. Format owners still validate attribute semantics and their
+reference graph; these primitives only establish XML and publication safety.
+
+`insert_unqualified_attribute` verifies an exact opening tag and refuses duplicate
+attributes and namespace declarations. `append_element`, `replace_element`, and
+`remove_element` verify complete source element boundaries. New element fragments
+must independently pass XML validation and the compact authoring audit; exact
+replacement with the original subtree is a shared-buffer no-op. Empty parents
+can be expanded while retaining their existing attributes and namespace context.
+Every assembled result is bounded and validated before publication.
+
+`update_attributes` accepts ordered `OwnedAttributeUpdate` values to replace,
+insert, or remove unqualified attributes across multiple source opening tags.
+It checks exact tag spans, duplicate names, escaped values, and the caller's
+output limit before allocating the result. Attribute discovery uses one source
+scan, reuses its name lookup table, and retains source order without sorting.
+The assembled XML is validated before a new source token is returned. Update
+debug output reports value lengths rather than values.
+
+`update_elements` accepts ordered `OwnedElementUpdate` records for insertion
+before an element, child append, replacement, and removal. A single source scan
+locates complete element spans; overlapping destructive edits are rejected.
+Multiple appends to an empty parent share one expansion. New fragments pass
+standalone XML validation and the compact authoring audit, and the exact assembled
+size is checked before allocating the result. Replacing a subtree with its exact
+source bytes remains a shared-buffer no-op.
+
+`replace_child_sequence` accepts ordered source child tags and a sequence of
+`OwnedChildElement` values. Retained elements refer to positions in that selected
+source list. They can move or repeat only under their original parent, preserving
+inherited namespace and XML context. Authored elements are independently validated
+and audited. Unselected source spans keep their slots, and additional elements
+follow the last selected slot. The operation bounds its exact output size before
+allocation and validates the assembled XML. An unchanged sequence shares the
+source buffer.
+
+The Custom Data owner in `litchi-xlsx` uses this path for storage and connection
+UID edits, including exact inverse publication. Data Model load-version edits
+and descriptor graph insertion/removal also retain source publication provenance
+through saves and inverses. Survey scalar edits on existing elements use the
+batch path, preserving comments, namespace context, and lexical spelling outside
+the edited attributes. Survey property insertion, removal, and replacement with
+fresh typed properties use structural batches in schema order while retaining
+neighboring source XML. Question sequence edits move and copy opaque subtrees
+within the original parent; column-name selectors resolve against the owning
+table during ordinary edits. Survey snapshots retain source tokens for exact
+inverse publication and restoration of removed parts. The positional, budget-managed
+`SourceXmlPart` API remains available for source-backed package editing.
+
+## Retained prepared topologies
+
+`SourceBackedPackage::prepare_topology` returns a cheaply cloneable
+`PreparedTopology`. It owns the validated effective catalog, generated members,
+source authorizations and managed reservations. `with_candidate` reads that
+catalog lazily, and `publish_to_stream(&self, writer)` can publish it repeatedly
+or retry after a sink failure. Each publication rechecks base and transfer
+sources. Retained reservations are released when the last owner drops.
+
+`PreparedTopology::edit_xml` edits an existing source XML Part against the
+retained effective candidate and returns a new flat candidate. Prior topology
+changes survive; exact logical no-ops retain the candidate, and restoring every
+physical payload uses the exact-artifact path when no topology changes remain.
+Added Parts and authored replacements without source XML provenance still
+require further owner integration. General topology application is pending.
+
+`SourceXmlPart::begin_revision()` permits another positional edit over its
+current validated payload without reopening the archive or rescanning XML.
+Each call creates a distinct logical revision; range proofs from sibling or
+older revisions are refused, including proofs over equal bytes. Clones share
+one revision. A changed splice requires another explicit revision. Proofs keep
+their payload reservations alive, while successive revisions do not retain an
+ancestor chain. Physical replacement checks still use the original archive
+bytes and source identity. This per-part primitive does not yet supply chained
+package-wide effective catalogs.
+
+`PreparedTopology::part`, `iter_parts` and `main_document_part` provide owned,
+lazy `PreparedPartView` handles for both unchanged and edited candidates.
+Their `data()` handles retain the complete candidate and managed admissions,
+so views and payloads survive owner drop and stay on their captured revision.
+Added Parts and replacement bytes come from the effective catalog; removed
+Parts are absent. Metadata access is a captured read, while new payload/XML
+proof captures recheck base and transfer sources and execution contexts.
+Already captured bytes remain readable after a later physical source change.
+
+`physical_source_lineage`, `physical_source_version` and
+`physical_source_artifact` deliberately describe the original archive, excluding
+candidate edits. Use `publish_to_stream` for effective output; physical identity
+must not key caches of edited XML. `read_limits`, `execution_context`,
+`check_source` and `is_noop` let higher-level owners consume this state without
+retaining a second raw package for those duties.

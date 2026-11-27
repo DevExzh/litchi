@@ -1,10 +1,7 @@
 //! Convert an EMF or WMF file to PNG.
 //!
-//! This example demonstrates the direct entry points that take raw metafile
-//! bytes (rather than a wrapping BLIP record):
-//! [`litchi_imgconv::emf::convert_emf`] and [`litchi_imgconv::wmf::convert_wmf`].
-//! The format is dispatched by file-extension; PICT files would be routed to
-//! [`litchi_imgconv::pict::convert_pict`] in the same way.
+//! This example demonstrates the bounded, typed raw-metafile API. It dispatches
+//! EMF/WMF by extension and always requests PNG raster output.
 //!
 //! # Run
 //!
@@ -22,8 +19,7 @@
 
 use std::path::{Path, PathBuf};
 
-use image::ImageFormat;
-use litchi_imgconv::{emf, pict, wmf};
+use litchi_imgconv::{InputFormat, Options, OutputFormat, convert_metafile};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // First arg: input path (defaults to a bundled EMF sample).
@@ -49,24 +45,30 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     let bytes = std::fs::read(&input)?;
     println!("loaded {} ({} bytes)", input.display(), bytes.len());
 
-    // Pick the converter by extension. The width parameter (1024) demonstrates
-    // aspect-ratio-preserving resize: the converter computes the matching
-    // height when only one dimension is supplied.
-    let png = match extension_lower(&input).as_deref() {
-        Some("emf") => emf::convert_emf(&bytes, ImageFormat::Png, Some(1024), None)?,
-        Some("wmf") => wmf::convert_wmf(&bytes, ImageFormat::Png, Some(1024), None)?,
-        Some("pict" | "pct") => pict::convert_pict(&bytes, ImageFormat::Png, Some(1024), None)?,
+    let input_format = match extension_lower(&input).as_deref() {
+        Some("emf") => InputFormat::Emf,
+        Some("wmf") => InputFormat::Wmf,
         other => {
-            return Err(format!(
-                "unsupported extension {:?}; expected .emf, .wmf, or .pict",
-                other
-            )
-            .into());
+            return Err(format!("unsupported extension {:?}; expected .emf or .wmf", other).into());
         },
     };
 
-    std::fs::write(&output, &png)?;
-    println!("wrote {} ({} bytes PNG)", output.display(), png.len());
+    // The width demonstrates aspect-ratio-preserving resizing; the converter
+    // computes the matching height and applies its resource limits first.
+    let png = convert_metafile(
+        &bytes,
+        input_format,
+        OutputFormat::Png,
+        Options::default().width(1024),
+    )?;
+
+    std::fs::write(&output, &png.bytes)?;
+    println!(
+        "wrote {} ({} bytes {})",
+        output.display(),
+        png.bytes.len(),
+        png.mime_type
+    );
     Ok(())
 }
 

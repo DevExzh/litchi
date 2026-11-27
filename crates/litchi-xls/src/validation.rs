@@ -1,0 +1,3085 @@
+//! Bounded, non-mutating validation of legacy XLS ingress.
+//!
+//! This validator deliberately stops at the boundary that can be established
+//! without credentials or a format-specific repair policy.  It validates the
+//! CFB container, the Workbook/Book stream frame grammar, workbook-global
+//! `BoundSheet8` ownership, and the inert presence of protection, password
+//! encryption, signatures, DRM, and external-link metadata.  It never changes
+//! the positional source, resolves external targets, verifies certificates, or
+//! decrypts a Workbook stream.
+
+use std::{
+    collections::{HashMap, HashSet},
+    error::Error as StdError,
+    fmt,
+    hash::Hash,
+    sync::Arc,
+};
+
+use litchi_cfb::{BufferedOleStreamCursor, OleError, SharedOleFile, SharedOleFileLimits};
+use litchi_core::{
+    CheckCapabilityId, CheckStatus, CompatibilityImpact, EvidenceValue, IssueEvidence,
+    IssueLocation, IssueSeverity, ReadAt, RepairAvailability, ValidateReport, ValidationCheck,
+    ValidationIssue, ValidationLimits, ValidationReportError,
+};
+
+use crate::{
+    encryption::{FilePassKind, inspect_filepass},
+    external_link::{
+        CONTINUE_RECORD_TYPE, CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE,
+        SUP_BOOK_RECORD_TYPE, XCT_RECORD_TYPE,
+    },
+    protection::{
+        FILESHARING_TYPE, OBJECTPROTECT_TYPE, PASSWORD_TYPE, PROT4REV_TYPE, PROT4REVPASS_TYPE,
+        PROTECT_TYPE, SCENPROTECT_TYPE, WINPROTECT_TYPE, WRITEPROTECT_TYPE,
+    },
+    records::{BiffVersion, Encoding, SheetType},
+};
+
+const CFB: &str = "xls.cfb.ingress";
+const WORKBOOK_STREAM: &str = "xls.workbook.stream";
+const BIFF: &str = "xls.biff.parse";
+const WORKSHEETS: &str = "xls.worksheet.inventory";
+const PROTECTION: &str = "xls.protection.presence";
+const ENCRYPTION: &str = "xls.encryption.presence";
+const SIGNATURE: &str = "xls.signature.presence";
+const DRM: &str = "xls.drm.presence";
+const EXTERNAL: &str = "xls.external_reference.presence";
+
+const CHECK_IDS: [&str; 9] = [
+    CFB,
+    WORKBOOK_STREAM,
+    BIFF,
+    WORKSHEETS,
+    PROTECTION,
+    ENCRYPTION,
+    SIGNATURE,
+    DRM,
+    EXTERNAL,
+];
+
+const BOF: u16 = 0x0809;
+const EOF: u16 = 0x000a;
+const CODEPAGE: u16 = 0x0042;
+const BOUNDSHEET8: u16 = 0x0085;
+const MAX_RECORD_BYTES: usize = litchi_biff::MAX_RECORD_BYTES;
+const WORKBOOK_BOF_TYPE: u16 = 0x0005;
+const WORKSHEET_BOF_TYPE: u16 = 0x0010;
+const CHART_BOF_TYPE: u16 = 0x0020;
+const MACRO_SHEET_BOF_TYPE: u16 = 0x0040;
+const VB_MODULE_BOF_TYPE: u16 = 0x0100;
+const MAX_EXTERNAL_BOOKS: usize = 1024;
+const MAX_EXTERNAL_SHEETS: usize = 256;
+const MAX_CACHED_CELLS: usize = 65_536;
+const MAX_DDE_OLE_VALUES: usize = 65_536;
+const MAX_RETAINED_ISSUES: usize = 12;
+
+/// Finite input, BIFF, directory, semantic, and report bounds for one XLS
+/// validation pass.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Limits {
+    max_input_bytes: u64,
+    max_workbook_stream_bytes: u64,
+    max_biff_records: usize,
+    max_worksheets: usize,
+    max_external_records: usize,
+    max_directory_entries: usize,
+    max_directory_bytes: u64,
+    report: ValidationLimits,
+}
+
+impl Limits {
+    /// Creates explicit finite XLS validation limits.
+    #[must_use]
+    pub const fn new(
+        max_input_bytes: u64,
+        max_workbook_stream_bytes: u64,
+        max_biff_records: usize,
+        max_worksheets: usize,
+        max_external_records: usize,
+        max_directory_entries: usize,
+        report: ValidationLimits,
+    ) -> Self {
+        Self {
+            max_input_bytes,
+            max_workbook_stream_bytes,
+            max_biff_records,
+            max_worksheets,
+            max_external_records,
+            max_directory_entries,
+            max_directory_bytes: SharedOleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES,
+            report,
+        }
+    }
+
+    /// Maximum physical CFB source length inspected.
+    #[must_use]
+    pub const fn max_input_bytes(self) -> u64 {
+        self.max_input_bytes
+    }
+
+    /// Maximum logical Workbook/Book stream length inspected.
+    #[must_use]
+    pub const fn max_workbook_stream_bytes(self) -> u64 {
+        self.max_workbook_stream_bytes
+    }
+
+    /// Maximum BIFF frames traversed in one Workbook stream.
+    #[must_use]
+    pub const fn max_biff_records(self) -> usize {
+        self.max_biff_records
+    }
+
+    /// Maximum `BoundSheet8` entries retained for owner validation.
+    #[must_use]
+    pub const fn max_worksheets(self) -> usize {
+        self.max_worksheets
+    }
+
+    /// Maximum external-link frames handed to the semantic collector.
+    #[must_use]
+    pub const fn max_external_records(self) -> usize {
+        self.max_external_records
+    }
+
+    /// Maximum CFB directory entries inspected for security-presence markers.
+    #[must_use]
+    pub const fn max_directory_entries(self) -> usize {
+        self.max_directory_entries
+    }
+
+    /// Maximum padded CFB directory-stream size inspected during validation.
+    #[must_use]
+    pub const fn max_directory_bytes(self) -> u64 {
+        self.max_directory_bytes
+    }
+
+    /// Selects the maximum padded CFB directory-stream size inspected during
+    /// validation.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Ingress`] if the value is outside the CFB
+    /// directory limit bounds.
+    pub fn with_max_directory_bytes(mut self, max_directory_bytes: u64) -> Result<Self, Error> {
+        let limits = SharedOleFileLimits::default()
+            .with_max_directory_bytes(max_directory_bytes)
+            .map_err(Error::Ingress)?;
+        self.max_directory_bytes = limits.max_directory_bytes();
+        Ok(self)
+    }
+
+    /// Bounds for the retained format-neutral report.
+    #[must_use]
+    pub const fn report(self) -> ValidationLimits {
+        self.report
+    }
+}
+
+impl Default for Limits {
+    fn default() -> Self {
+        Self {
+            max_input_bytes: SharedOleFileLimits::MAX_INPUT_BYTES,
+            max_workbook_stream_bytes: 128 * 1024 * 1024,
+            max_biff_records: 1_000_000,
+            max_worksheets: 65_535,
+            max_external_records: 65_536,
+            max_directory_entries: 100_000,
+            max_directory_bytes: SharedOleFileLimits::DEFAULT_MAX_DIRECTORY_BYTES,
+            report: ValidationLimits::default(),
+        }
+    }
+}
+
+/// Failure to perform or retain an XLS validation report.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// CFB positional ingress or source stability failed.
+    Ingress(OleError),
+    /// A bounded validator-owned allocation failed.
+    Allocation(&'static str),
+    /// The shared bounded report rejected the retained result.
+    Report(ValidationReportError),
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Ingress(error) => write!(formatter, "XLS validation ingress failed: {error}"),
+            Self::Allocation(resource) => {
+                write!(
+                    formatter,
+                    "allocation failed while validating XLS {resource}"
+                )
+            },
+            Self::Report(error) => write!(formatter, "XLS validation report failed: {error}"),
+        }
+    }
+}
+
+impl StdError for Error {
+    fn source(&self) -> Option<&(dyn StdError + 'static)> {
+        match self {
+            Self::Ingress(error) => Some(error),
+            Self::Allocation(_) => None,
+            Self::Report(error) => Some(error),
+        }
+    }
+}
+
+impl From<ValidationReportError> for Error {
+    fn from(error: ValidationReportError) -> Self {
+        Self::Report(error)
+    }
+}
+
+impl From<OleError> for Error {
+    fn from(error: OleError) -> Self {
+        Self::Ingress(error)
+    }
+}
+
+/// Validate a positional XLS source under explicit finite bounds.
+///
+/// A source, directory, or stream ceiling produces a blocked capability. A
+/// definite CFB or BIFF grammar rejection produces a completed check with a
+/// content-free error issue; protection and external-link metadata remain
+/// blocked when their presence cannot be established safely. Encrypted semantic
+/// regions stop at the encryption dependency because credentials are
+/// intentionally not accepted by this presence-only API.
+///
+/// # Errors
+///
+/// Returns an error for source I/O/version changes, bounded allocation
+/// failure, or bounded report-construction failure.
+pub fn validate_source(source: Arc<dyn ReadAt>, limits: Limits) -> Result<ValidateReport, Error> {
+    let expected_version = source
+        .version()
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
+    let source_size = source
+        .len()
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
+    require_version(source.as_ref(), expected_version)?;
+
+    let input_ceiling = limits
+        .max_input_bytes
+        .min(SharedOleFileLimits::MAX_INPUT_BYTES);
+    if limits.max_input_bytes == 0 || source_size > input_ceiling {
+        let statuses = blocked_ingress_statuses(
+            limits.report,
+            "source exceeds the configured XLS validation input ceiling",
+        )?;
+        let report = finish_report(statuses, Vec::new(), limits.report);
+        require_version(source.as_ref(), expected_version)?;
+        return report;
+    }
+
+    let directory_ceiling = limits.max_directory_bytes;
+    let cfb_limits = SharedOleFileLimits::new(input_ceiling)
+        .and_then(|cfb_limits| cfb_limits.with_max_directory_bytes(directory_ceiling))
+        .map_err(Error::Ingress)?;
+    let shared = match SharedOleFile::open(source.clone(), cfb_limits) {
+        Ok(shared) => shared,
+        Err(error) if is_directory_limit_error(&error) => {
+            let statuses = blocked_ingress_statuses(
+                limits.report,
+                "CFB directory exceeds the configured XLS validation ceiling",
+            )?;
+            let report = finish_report(statuses, Vec::new(), limits.report);
+            require_version(source.as_ref(), expected_version)?;
+            return report;
+        },
+        Err(error) if is_structural_cfb_error(&error) => {
+            let statuses = cfb_rejection_statuses(limits.report)?;
+            let mut issues = Vec::new();
+            try_reserve(&mut issues, 1, "CFB rejection report")?;
+            try_push(
+                &mut issues,
+                cfb_issue(&error, source_size, limits.report)?,
+                "CFB rejection report",
+            )?;
+            let report = finish_report(statuses, issues, limits.report);
+            require_version(source.as_ref(), expected_version)?;
+            return report;
+        },
+        Err(error) => return Err(Error::Ingress(error)),
+    };
+
+    let (markers, directory_limited) = inspect_directory(&shared, limits)?;
+    let workbook = locate_workbook_stream(&shared)?;
+
+    let mut issues = Vec::new();
+    try_reserve(&mut issues, MAX_RETAINED_ISSUES, "XLS validation issues")?;
+
+    let mut statuses = std::array::from_fn(|_| CheckStatus::Complete);
+    statuses[5] = presence_status(markers.encryption_count, directory_limited, limits.report)?;
+    statuses[6] = presence_status(markers.signature_count, directory_limited, limits.report)?;
+    statuses[7] = presence_status(markers.drm_count, directory_limited, limits.report)?;
+
+    if !directory_limited {
+        push_presence_issue(
+            &mut issues,
+            SIGNATURE,
+            "xls.signature.infrastructure_present",
+            IssueSeverity::Info,
+            "CFB signature infrastructure is present; cryptographic validity and certificate trust were not checked.",
+            markers.signature_count,
+            "signature-infrastructure",
+            limits.report,
+        )?;
+        push_presence_issue(
+            &mut issues,
+            DRM,
+            "xls.drm.storage_present",
+            IssueSeverity::Warning,
+            "CFB DRM storage is present; protected-content access was not attempted.",
+            markers.drm_count,
+            "drm-storage",
+            limits.report,
+        )?;
+    }
+
+    let WorkbookLocation::Stream {
+        name: workbook_name,
+        size: workbook_size,
+    } = workbook
+    else {
+        if let WorkbookLocation::Invalid = workbook {
+            statuses[1] = CheckStatus::Complete;
+            try_push(
+                &mut issues,
+                simple_issue(
+                    WORKBOOK_STREAM,
+                    "xls.workbook.stream_ambiguous",
+                    IssueSeverity::Error,
+                    "The CFB directory contains ambiguous or non-stream Workbook/Book entries.",
+                    Some("compound-file"),
+                    None,
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        } else {
+            statuses[1] = CheckStatus::Complete;
+            try_push(
+                &mut issues,
+                simple_issue(
+                    WORKBOOK_STREAM,
+                    "xls.workbook.stream_missing",
+                    IssueSeverity::Error,
+                    "The CFB container has neither a Workbook nor a Book stream.",
+                    Some("compound-file"),
+                    Some("Workbook"),
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        }
+        statuses[2] = CheckStatus::blocked(
+            "Workbook stream resolution did not produce one unambiguous BIFF stream",
+            limits.report,
+        )?;
+        statuses[3] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        statuses[4] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        statuses[8] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        let report = finish_report(statuses, issues, limits.report);
+        shared.source_version().map_err(Error::Ingress)?;
+        return report;
+    };
+
+    if workbook_size > limits.max_workbook_stream_bytes {
+        statuses[1] = CheckStatus::blocked(
+            "Workbook stream exceeds the configured XLS validation byte ceiling",
+            limits.report,
+        )?;
+        statuses[2] = CheckStatus::stopped_by(check_id(WORKBOOK_STREAM, limits.report)?);
+        statuses[3] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        statuses[4] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        statuses[8] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        if markers.encryption_count == 0 {
+            statuses[5] = CheckStatus::stopped_by(check_id(WORKBOOK_STREAM, limits.report)?);
+        }
+        let report = finish_report(statuses, issues, limits.report);
+        shared.source_version().map_err(Error::Ingress)?;
+        return report;
+    }
+
+    let analysis = analyze_workbook(
+        &shared,
+        workbook_name,
+        markers.encryption_count != 0,
+        limits,
+    )?;
+
+    let encryption_count = markers
+        .encryption_count
+        .checked_add(analysis.filepass_count)
+        .ok_or(Error::Allocation("encryption presence count"))?;
+    statuses[5] = presence_status(encryption_count, directory_limited, limits.report)?;
+    if encryption_count == 0 && !analysis.scan_terminal && !directory_limited {
+        statuses[5] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+    }
+    if !directory_limited {
+        push_presence_issue(
+            &mut issues,
+            ENCRYPTION,
+            "xls.encryption.password_to_open_present",
+            IssueSeverity::Warning,
+            "Password-to-open or encrypted-container metadata is present; this validator did not decrypt the Workbook stream.",
+            encryption_count,
+            "encryption-metadata",
+            limits.report,
+        )?;
+    }
+    if analysis.filepass_invalid {
+        try_push(
+            &mut issues,
+            simple_issue(
+                ENCRYPTION,
+                "xls.encryption.filepass_invalid",
+                IssueSeverity::Error,
+                "A FILEPASS record is present but its bounded encryption header is malformed.",
+                Some("Workbook"),
+                None,
+                None,
+                limits.report,
+            )?,
+            "XLS validation issues",
+        )?;
+    }
+    if analysis.filepass_unsupported {
+        try_push(
+            &mut issues,
+            simple_issue(
+                ENCRYPTION,
+                "xls.encryption.unsupported",
+                IssueSeverity::Error,
+                "The Workbook declares a password-encryption family not supported by this presence-only validator.",
+                Some("Workbook"),
+                None,
+                None,
+                limits.report,
+            )?,
+            "XLS validation issues",
+        )?;
+    }
+    if analysis.filepass_placement_invalid {
+        try_push(
+            &mut issues,
+            simple_issue(
+                ENCRYPTION,
+                "xls.encryption.filepass_placement",
+                IssueSeverity::Error,
+                "A FILEPASS record appears outside the bounded workbook-global region after the global BOF.",
+                Some("Workbook"),
+                None,
+                None,
+                limits.report,
+            )?,
+            "XLS validation issues",
+        )?;
+    }
+
+    if analysis.biff_limit {
+        statuses[2] = CheckStatus::blocked(
+            "BIFF record traversal reached the configured record ceiling",
+            limits.report,
+        )?;
+    } else if analysis.scan_interrupted {
+        statuses[2] = CheckStatus::blocked(
+            "BIFF record traversal stopped before a complete frame boundary",
+            limits.report,
+        )?;
+    } else if analysis.worksheet_limit {
+        statuses[2] = CheckStatus::blocked(
+            "BIFF ownership traversal reached the configured worksheet ceiling",
+            limits.report,
+        )?;
+    } else if analysis.encrypted {
+        statuses[2] = CheckStatus::blocked(
+            "password-to-open encryption prevents clear BIFF semantic inspection",
+            limits.report,
+        )?;
+    } else {
+        statuses[2] = CheckStatus::Complete;
+    }
+    if analysis.biff_invalid && !analysis.biff_limit {
+        try_push(
+            &mut issues,
+            simple_issue(
+                BIFF,
+                "xls.biff.invalid",
+                IssueSeverity::Error,
+                "The Workbook stream contains malformed or incomplete BIFF ownership grammar.",
+                Some("Workbook"),
+                None,
+                None,
+                limits.report,
+            )?,
+            "XLS validation issues",
+        )?;
+    }
+
+    let biff_blocked = matches!(statuses[2], CheckStatus::Blocked { .. });
+    if biff_blocked {
+        statuses[3] = CheckStatus::stopped_by(check_id(BIFF, limits.report)?);
+        statuses[4] = if analysis.protection_invalid {
+            CheckStatus::blocked(
+                "malformed protection metadata was proven before BIFF inspection stopped",
+                limits.report,
+            )?
+        } else {
+            CheckStatus::stopped_by(check_id(BIFF, limits.report)?)
+        };
+        statuses[8] = if analysis.external_invalid {
+            CheckStatus::blocked(
+                "malformed external-link metadata was proven before BIFF inspection stopped",
+                limits.report,
+            )?
+        } else {
+            CheckStatus::stopped_by(check_id(BIFF, limits.report)?)
+        };
+        if analysis.protection_invalid {
+            try_push(
+                &mut issues,
+                simple_issue(
+                    PROTECTION,
+                    "xls.protection.invalid",
+                    IssueSeverity::Error,
+                    "Protection records are malformed, duplicated, or out of their required BIFF order.",
+                    Some("Workbook"),
+                    None,
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        }
+        if analysis.external_invalid {
+            try_push(
+                &mut issues,
+                simple_issue(
+                    EXTERNAL,
+                    "xls.external_reference.invalid",
+                    IssueSeverity::Error,
+                    "External-link records are malformed or have an invalid owner relationship.",
+                    Some("Workbook"),
+                    None,
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        }
+    } else if analysis.biff_invalid {
+        statuses[3] = CheckStatus::blocked(
+            "BIFF grammar rejection prevented worksheet inventory",
+            limits.report,
+        )?;
+        statuses[4] = CheckStatus::blocked(
+            "BIFF grammar rejection prevented protection inspection",
+            limits.report,
+        )?;
+        statuses[8] = CheckStatus::blocked(
+            "BIFF grammar rejection prevented external-link inspection",
+            limits.report,
+        )?;
+    } else {
+        statuses[3] = if analysis.worksheet_limit {
+            CheckStatus::blocked(
+                "worksheet inventory exceeded the configured sheet bound",
+                limits.report,
+            )?
+        } else {
+            CheckStatus::Complete
+        };
+        if analysis.worksheet_invalid {
+            try_push(
+                &mut issues,
+                simple_issue(
+                    WORKSHEETS,
+                    "xls.worksheet.invalid",
+                    IssueSeverity::Error,
+                    "A BoundSheet8 entry did not resolve to one bounded BOF-to-EOF worksheet owner.",
+                    Some("Workbook"),
+                    None,
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        }
+        statuses[4] = if analysis.protection_invalid {
+            CheckStatus::blocked(
+                "malformed protection metadata prevented a safe presence result",
+                limits.report,
+            )?
+        } else if analysis.protection_seen {
+            CheckStatus::Complete
+        } else {
+            CheckStatus::NotApplicable
+        };
+        if analysis.protection_invalid {
+            try_push(
+                &mut issues,
+                simple_issue(
+                    PROTECTION,
+                    "xls.protection.invalid",
+                    IssueSeverity::Error,
+                    "Protection records are malformed, duplicated, or out of their required BIFF order.",
+                    Some("Workbook"),
+                    None,
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        }
+        statuses[8] = if analysis.external_limit {
+            CheckStatus::blocked(
+                "external-link metadata exceeded the configured record bound",
+                limits.report,
+            )?
+        } else if analysis.external_invalid {
+            CheckStatus::blocked(
+                "malformed external-link metadata prevented a safe presence result",
+                limits.report,
+            )?
+        } else if analysis.external_present {
+            CheckStatus::Complete
+        } else {
+            CheckStatus::NotApplicable
+        };
+        if analysis.external_invalid {
+            try_push(
+                &mut issues,
+                simple_issue(
+                    EXTERNAL,
+                    "xls.external_reference.invalid",
+                    IssueSeverity::Error,
+                    "External-link records are malformed or have an invalid owner relationship.",
+                    Some("Workbook"),
+                    None,
+                    None,
+                    limits.report,
+                )?,
+                "XLS validation issues",
+            )?;
+        }
+        if analysis.external_present {
+            push_presence_issue(
+                &mut issues,
+                EXTERNAL,
+                "xls.external_reference.present",
+                IssueSeverity::Info,
+                "External-reference metadata is present; targets were not resolved or fetched.",
+                analysis.external_count,
+                "external-reference-records",
+                limits.report,
+            )?;
+        }
+    }
+
+    let report = finish_report(statuses, issues, limits.report);
+    shared.source_version().map_err(Error::Ingress)?;
+    report
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct MarkerCounts {
+    encryption_count: u64,
+    signature_count: u64,
+    drm_count: u64,
+}
+
+#[derive(Debug, Default)]
+struct Analysis {
+    filepass_count: u64,
+    filepass_invalid: bool,
+    filepass_unsupported: bool,
+    filepass_placement_invalid: bool,
+    stopped_at_filepass: bool,
+    encrypted: bool,
+    biff_invalid: bool,
+    biff_limit: bool,
+    worksheet_invalid: bool,
+    worksheet_limit: bool,
+    protection_seen: bool,
+    protection_invalid: bool,
+    external_present: bool,
+    external_count: u64,
+    external_invalid: bool,
+    external_limit: bool,
+    scan_terminal: bool,
+    scan_interrupted: bool,
+}
+
+/// The lifecycle of one bound sheet's substream.
+///
+/// ```text
+/// Pending --BOF at the BoundSheet8 position--> Open --EOF--> Closed
+/// ```
+///
+/// A workbook is complete only when every bound sheet is `Closed`.
+#[derive(Debug, Clone, Copy)]
+enum SubstreamState {
+    Pending,
+    Open,
+    Closed,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct SheetObservation {
+    sheet_type: SheetType,
+    expected_dt: u16,
+    substream: SubstreamState,
+}
+
+struct ActiveSheet {
+    index: usize,
+    protection: SheetProtectionState,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct BofInfo {
+    version: BiffVersion,
+    dt: u16,
+}
+
+fn parse_bof(data: &[u8]) -> Option<BofInfo> {
+    let version = BiffVersion::from_bof_version(read_u16(data, 0)?)?;
+    let expected_len = match version {
+        BiffVersion::Biff2 => 4,
+        BiffVersion::Biff3 | BiffVersion::Biff4 | BiffVersion::Biff5 => 8,
+        BiffVersion::Biff8 => 16,
+    };
+    if data.len() != expected_len {
+        return None;
+    }
+    let dt = read_u16(data, 2)?;
+    if !matches!(
+        dt,
+        WORKBOOK_BOF_TYPE
+            | WORKSHEET_BOF_TYPE
+            | CHART_BOF_TYPE
+            | MACRO_SHEET_BOF_TYPE
+            | VB_MODULE_BOF_TYPE
+    ) {
+        return None;
+    }
+    Some(BofInfo { version, dt })
+}
+
+fn expected_sheet_bof_type(sheet_type: SheetType) -> u16 {
+    match sheet_type {
+        SheetType::WorkSheet => WORKSHEET_BOF_TYPE,
+        SheetType::MacroSheet => MACRO_SHEET_BOF_TYPE,
+        SheetType::ChartSheet => CHART_BOF_TYPE,
+        SheetType::VBModule => VB_MODULE_BOF_TYPE,
+    }
+}
+
+fn parse_bound_sheet(data: &[u8]) -> Option<(u32, SheetType)> {
+    if data.len() < 8 {
+        return None;
+    }
+    if data[4] & !0x03 != 0 || data[4] & 0x03 == 0x03 {
+        return None;
+    }
+    let sheet_type = match data[5] {
+        0x00 => SheetType::WorkSheet,
+        0x01 => SheetType::MacroSheet,
+        0x02 => SheetType::ChartSheet,
+        0x06 => SheetType::VBModule,
+        _ => return None,
+    };
+    let character_count = usize::from(data[6]);
+    if !(1..=31).contains(&character_count) || data[7] & !1 != 0 {
+        return None;
+    }
+    let wide = data[7] == 1;
+    let name_bytes = character_count.checked_mul(if wide { 2 } else { 1 })?;
+    if data.len() != 8usize.checked_add(name_bytes)? {
+        return None;
+    }
+    let name = data.get(8..)?;
+    if wide {
+        let (pairs, remainder) = name.as_chunks::<2>();
+        let units = pairs.iter().map(|pair| u16::from_le_bytes(*pair));
+        let mut first = None;
+        let mut last = None;
+        for decoded in std::char::decode_utf16(units) {
+            let character = decoded.ok()?;
+            if first.is_none() {
+                first = Some(character);
+            }
+            last = Some(character);
+            if matches!(
+                character,
+                '\0' | '\u{0003}' | ':' | '\\' | '*' | '?' | '/' | '[' | ']'
+            ) {
+                return None;
+            }
+        }
+        if !remainder.is_empty() || first == Some('\'') || last == Some('\'') {
+            return None;
+        }
+    } else {
+        let first = *name.first()?;
+        let last = *name.last()?;
+        if first == b'\''
+            || last == b'\''
+            || name.iter().any(|character| {
+                matches!(
+                    *character,
+                    0 | 3 | b':' | b'\\' | b'*' | b'?' | b'/' | b'[' | b']'
+                )
+            })
+        {
+            return None;
+        }
+    }
+    Some((
+        u32::from_le_bytes([data[0], data[1], data[2], data[3]]),
+        sheet_type,
+    ))
+}
+
+fn read_u16(data: &[u8], offset: usize) -> Option<u16> {
+    let bytes = data.get(offset..offset.checked_add(2)?)?;
+    Some(u16::from_le_bytes([bytes[0], bytes[1]]))
+}
+
+fn inspect_filepass_record(output: &mut Analysis, payload: &[u8]) -> Result<(), Error> {
+    output.filepass_count = output
+        .filepass_count
+        .checked_add(1)
+        .ok_or(Error::Allocation("FILEPASS count"))?;
+    if output.filepass_count > 1 {
+        output.filepass_invalid = true;
+        output.biff_invalid = true;
+    }
+    match inspect_filepass(payload) {
+        Ok(FilePassKind::Unsupported(_)) => output.filepass_unsupported = true,
+        Ok(FilePassKind::Xor | FilePassKind::BinaryRc4 | FilePassKind::CryptoApi) => {},
+        Err(_) => {
+            output.filepass_invalid = true;
+            output.biff_invalid = true;
+        },
+    }
+    output.encrypted = true;
+    Ok(())
+}
+
+fn inspect_incomplete_filepass_record(
+    output: &mut Analysis,
+    valid_position: bool,
+) -> Result<(), Error> {
+    output.filepass_count = output
+        .filepass_count
+        .checked_add(1)
+        .ok_or(Error::Allocation("FILEPASS count"))?;
+    output.filepass_invalid = true;
+    output.encrypted = true;
+    if !valid_position {
+        output.filepass_placement_invalid = true;
+    }
+    Ok(())
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct WorkbookProtectionState {
+    structure: bool,
+    structure_value: bool,
+    password: bool,
+    password_set: bool,
+    windows: bool,
+    windows_value: bool,
+    revisions: bool,
+    revisions_value: bool,
+    revision_password: bool,
+    revision_password_set: bool,
+    write_protect: bool,
+    file_sharing: bool,
+    previous: Option<u16>,
+}
+
+impl WorkbookProtectionState {
+    fn feed(&mut self, record_type: u16, data: &[u8]) -> bool {
+        let valid = match record_type {
+            PROTECT_TYPE => {
+                if self.structure {
+                    false
+                } else if let Some(value) = protection_bool(data) {
+                    self.structure = true;
+                    self.structure_value = value;
+                    true
+                } else {
+                    false
+                }
+            },
+            PASSWORD_TYPE => {
+                if self.password {
+                    false
+                } else if let Some(value) = protection_word(data) {
+                    self.password = true;
+                    self.password_set = value != 0;
+                    true
+                } else {
+                    false
+                }
+            },
+            WINPROTECT_TYPE => {
+                if self.windows {
+                    false
+                } else if let Some(value) = protection_bool(data) {
+                    self.windows = true;
+                    self.windows_value = value;
+                    true
+                } else {
+                    false
+                }
+            },
+            PROT4REV_TYPE => {
+                if self.revisions {
+                    false
+                } else if let Some(value) = protection_bool(data) {
+                    self.revisions = true;
+                    self.revisions_value = value;
+                    true
+                } else {
+                    false
+                }
+            },
+            PROT4REVPASS_TYPE => {
+                if self.revision_password || self.previous != Some(PROT4REV_TYPE) {
+                    false
+                } else if let Some(value) = protection_word(data) {
+                    self.revision_password = true;
+                    self.revision_password_set = value != 0;
+                    self.revisions_value || value == 0
+                } else {
+                    false
+                }
+            },
+            WRITEPROTECT_TYPE => {
+                if self.write_protect || !data.is_empty() {
+                    false
+                } else {
+                    self.write_protect = true;
+                    true
+                }
+            },
+            FILESHARING_TYPE => {
+                if self.file_sharing || !valid_file_sharing(data) {
+                    false
+                } else {
+                    self.file_sharing = true;
+                    true
+                }
+            },
+            _ => true,
+        };
+        self.previous = Some(record_type);
+        valid
+    }
+
+    fn finish(self) -> bool {
+        self.revisions == self.revision_password
+    }
+
+    fn is_present(self) -> bool {
+        self.structure_value
+            || self.password_set
+            || self.windows_value
+            || self.revisions_value
+            || self.revision_password_set
+            || self.write_protect
+            || self.file_sharing
+    }
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+struct SheetProtectionState {
+    protect: bool,
+    objects: bool,
+    scenarios: bool,
+    password: bool,
+    present: bool,
+}
+
+impl SheetProtectionState {
+    fn feed(&mut self, record_type: u16, data: &[u8]) -> bool {
+        match record_type {
+            PROTECT_TYPE => {
+                if self.protect || protection_bool(data) != Some(true) {
+                    false
+                } else {
+                    self.protect = true;
+                    self.present = true;
+                    true
+                }
+            },
+            OBJECTPROTECT_TYPE => {
+                if self.objects || protection_bool(data) != Some(true) {
+                    false
+                } else {
+                    self.objects = true;
+                    self.present = true;
+                    true
+                }
+            },
+            SCENPROTECT_TYPE => {
+                if self.scenarios {
+                    false
+                } else if let Some(value) = protection_bool(data) {
+                    self.scenarios = true;
+                    self.present |= value;
+                    true
+                } else {
+                    false
+                }
+            },
+            PASSWORD_TYPE => {
+                if self.password {
+                    false
+                } else if let Some(value) = protection_word(data) {
+                    self.password = true;
+                    if value == 0 {
+                        false
+                    } else {
+                        self.present = true;
+                        true
+                    }
+                } else {
+                    false
+                }
+            },
+            _ => true,
+        }
+    }
+
+    fn finish(self) -> bool {
+        self.protect || (!self.objects && !self.scenarios && !self.password)
+    }
+
+    const fn is_present(self) -> bool {
+        self.present
+    }
+}
+
+fn protection_word(data: &[u8]) -> Option<u16> {
+    read_u16(data, 0).filter(|_| data.len() == 2)
+}
+
+fn protection_bool(data: &[u8]) -> Option<bool> {
+    match protection_word(data)? {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+
+fn valid_file_sharing(data: &[u8]) -> bool {
+    if protection_bool(data.get(..2).unwrap_or_default()).is_none() {
+        return false;
+    }
+    let Some(write_password) = protection_word(data.get(2..4).unwrap_or_default()) else {
+        return false;
+    };
+    let Some(cch_or_marker) = protection_word(data.get(4..6).unwrap_or_default()) else {
+        return false;
+    };
+    if write_password == 0 {
+        return cch_or_marker == 0 && data.len() == 6;
+    }
+    let cch = usize::from(cch_or_marker);
+    if cch > 54 || data.len() < 7 {
+        return false;
+    }
+    let flags = data[6];
+    if flags & !1 != 0 {
+        return false;
+    }
+    let expected = 7 + cch * if flags == 1 { 2 } else { 1 };
+    if data.len() != expected {
+        return false;
+    }
+    if flags == 1 {
+        valid_utf16le(data.get(7..).unwrap_or_default())
+    } else {
+        true
+    }
+}
+
+fn valid_utf16le(data: &[u8]) -> bool {
+    let (pairs, remainder) = data.as_chunks::<2>();
+    let valid = std::char::decode_utf16(pairs.iter().map(|pair| u16::from_le_bytes(*pair)))
+        .all(|value| value.is_ok());
+    valid && remainder.is_empty()
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+enum ExternalBookKind {
+    #[default]
+    SelfReference,
+    AddIn,
+    External {
+        sheets: usize,
+    },
+    SameSheet,
+    Unused {
+        sheets: usize,
+    },
+    DdeOrOle,
+}
+
+/// Where the workbook globals stand relative to their one external-link block
+/// (the SupBook records with their ExternName, XCT, CRN and ExternSheet
+/// records).
+///
+/// ```text
+/// Before --SupBook--> Open { names_allowed: true } --record outside the family--> Closed
+/// Open   --SupBook--> Open { names_allowed: true } (the new book becomes current)
+/// Open   --XCT or ExternSheet--> Open { names_allowed: false }
+/// Open   --ExternName, CRN--> Open (unchanged)
+/// ```
+///
+/// Continue never moves the state. A family record other than SupBook leaves
+/// `Before` unchanged. Every family record is refused in `Closed`. ExternName
+/// is accepted only in `Open { names_allowed: true }`, so the names of a book
+/// must come before its caches and before any ExternSheet.
+#[derive(Debug, Clone, Copy)]
+enum ExternalBlockState {
+    Before,
+    Open {
+        current_book: usize,
+        names_allowed: bool,
+    },
+    Closed,
+}
+
+/// Which records must come next because an earlier record declared them.
+///
+/// ```text
+/// Idle --XCT declaring n > 0 CRN--> CrnRun { remaining: n }
+/// CrnRun { remaining: n } --CRN--> CrnRun { remaining: n - 1 }, or Idle when n is 1
+/// Idle --ExternName declaring n > 0 more matrix values--> DdeValues { remaining: n }
+/// DdeValues { remaining: n } --Continue with k values--> DdeValues { remaining: n - k }, or Idle
+/// ```
+///
+/// In `CrnRun` every record other than CRN, and in `DdeValues` every record
+/// other than Continue, is refused. `remaining` is never zero. The stream must
+/// end in `Idle`.
+#[derive(Debug, Clone, Copy)]
+enum ContinuationState {
+    Idle,
+    CrnRun {
+        owner: (usize, usize),
+        remaining: usize,
+    },
+    DdeValues {
+        remaining: usize,
+    },
+}
+
+#[derive(Debug)]
+struct ExternalPresenceState {
+    books: [ExternalBookKind; MAX_EXTERNAL_BOOKS],
+    book_count: usize,
+    block: ExternalBlockState,
+    extern_sheet_seen: bool,
+    continuation: ContinuationState,
+    cached_cells: usize,
+    external_names: usize,
+    sheet_references: usize,
+    external_present: bool,
+    max_self_sheet: Option<usize>,
+    seen_xct: HashSet<(usize, usize)>,
+    cache_cells: HashSet<(usize, usize, u16, u8)>,
+}
+
+impl Default for ExternalPresenceState {
+    fn default() -> Self {
+        Self {
+            books: [ExternalBookKind::SelfReference; MAX_EXTERNAL_BOOKS],
+            book_count: 0,
+            block: ExternalBlockState::Before,
+            extern_sheet_seen: false,
+            continuation: ContinuationState::Idle,
+            cached_cells: 0,
+            external_names: 0,
+            sheet_references: 0,
+            external_present: false,
+            max_self_sheet: None,
+            seen_xct: HashSet::new(),
+            cache_cells: HashSet::new(),
+        }
+    }
+}
+
+impl ExternalPresenceState {
+    fn feed(&mut self, record_type: u16, data: &[u8]) -> Result<bool, Error> {
+        if matches!(self.continuation, ContinuationState::CrnRun { .. })
+            && record_type != CRN_RECORD_TYPE
+        {
+            return Ok(false);
+        }
+        if matches!(self.continuation, ContinuationState::DdeValues { .. })
+            && record_type != CONTINUE_RECORD_TYPE
+        {
+            return Ok(false);
+        }
+        if record_type == CONTINUE_RECORD_TYPE {
+            let ContinuationState::DdeValues { remaining } = self.continuation else {
+                return Ok(match self.block {
+                    ExternalBlockState::Before | ExternalBlockState::Closed => true,
+                    ExternalBlockState::Open { .. } => false,
+                });
+            };
+            let Some((count, consumed)) = count_ser_ar_values(data, remaining) else {
+                return Ok(false);
+            };
+            if count == 0 || consumed != data.len() || count > remaining {
+                return Ok(false);
+            }
+            self.continuation = if count == remaining {
+                ContinuationState::Idle
+            } else {
+                ContinuationState::DdeValues {
+                    remaining: remaining - count,
+                }
+            };
+            return Ok(true);
+        }
+
+        let is_target = is_external_record(record_type);
+        if !is_target {
+            self.block = match self.block {
+                ExternalBlockState::Before => ExternalBlockState::Before,
+                ExternalBlockState::Open { .. } | ExternalBlockState::Closed => {
+                    ExternalBlockState::Closed
+                },
+            };
+            return Ok(true);
+        }
+        match self.block {
+            ExternalBlockState::Before | ExternalBlockState::Open { .. } => {},
+            ExternalBlockState::Closed => return Ok(false),
+        }
+
+        match record_type {
+            SUP_BOOK_RECORD_TYPE => Ok(self.feed_sup_book(data)),
+            EXTERN_NAME_RECORD_TYPE => Ok(self.feed_extern_name(data)),
+            XCT_RECORD_TYPE => self.feed_xct(data),
+            CRN_RECORD_TYPE => self.feed_crn(data),
+            EXTERN_SHEET_RECORD_TYPE => Ok(self.feed_extern_sheet(data)),
+            CONTINUE_RECORD_TYPE => unreachable!(),
+            _ => Ok(false),
+        }
+    }
+
+    fn feed_sup_book(&mut self, data: &[u8]) -> bool {
+        if self.extern_sheet_seen || self.book_count >= MAX_EXTERNAL_BOOKS {
+            return false;
+        }
+        let Some(kind) = parse_external_book(data) else {
+            return false;
+        };
+        let index = self.book_count;
+        self.books[index] = kind;
+        self.book_count += 1;
+        self.block = ExternalBlockState::Open {
+            current_book: index,
+            names_allowed: true,
+        };
+        self.external_present |= matches!(
+            kind,
+            ExternalBookKind::External { .. }
+                | ExternalBookKind::AddIn
+                | ExternalBookKind::DdeOrOle
+        );
+        true
+    }
+
+    fn feed_extern_name(&mut self, data: &[u8]) -> bool {
+        let ExternalBlockState::Open {
+            current_book: book_index,
+            names_allowed,
+        } = self.block
+        else {
+            return false;
+        };
+        if !names_allowed || book_index >= self.book_count {
+            return false;
+        }
+        let Some(next_pending) = parse_external_name_presence(data, self.books[book_index]) else {
+            return false;
+        };
+        self.continuation = if next_pending == 0 {
+            ContinuationState::Idle
+        } else {
+            ContinuationState::DdeValues {
+                remaining: next_pending,
+            }
+        };
+        let Some(next_count) = self.external_names.checked_add(1) else {
+            return false;
+        };
+        self.external_names = next_count;
+        true
+    }
+
+    fn feed_xct(&mut self, data: &[u8]) -> Result<bool, Error> {
+        let ExternalBlockState::Open {
+            current_book: book_index,
+            ..
+        } = self.block
+        else {
+            return Ok(false);
+        };
+        let Some(declared) = read_i16(data, 0) else {
+            return Ok(false);
+        };
+        let Some(sheet_index) = read_u16(data, 2).map(usize::from) else {
+            return Ok(false);
+        };
+        if data.len() != 4
+            || declared == i16::MIN
+            || book_index >= self.book_count
+            || !matches!(self.books[book_index], ExternalBookKind::External { .. })
+            || !matches!(self.books[book_index], ExternalBookKind::External { sheets } if sheet_index < sheets)
+        {
+            return Ok(false);
+        }
+        let owner = (book_index, sheet_index);
+        if self.seen_xct.len() >= MAX_CACHED_CELLS || self.seen_xct.contains(&owner) {
+            return Ok(false);
+        }
+        try_hash_set_reserve(&mut self.seen_xct, 1, "external-link XCT ownership")?;
+        self.seen_xct.insert(owner);
+        let remaining = usize::from(declared.unsigned_abs());
+        self.continuation = if remaining == 0 {
+            ContinuationState::Idle
+        } else {
+            ContinuationState::CrnRun { owner, remaining }
+        };
+        self.block = ExternalBlockState::Open {
+            current_book: book_index,
+            names_allowed: false,
+        };
+        Ok(true)
+    }
+
+    fn feed_crn(&mut self, data: &[u8]) -> Result<bool, Error> {
+        let ContinuationState::CrnRun { owner, remaining } = self.continuation else {
+            return Ok(false);
+        };
+        if data.len() < 4 {
+            return Ok(false);
+        }
+        let Some(last_column) = data.first().copied() else {
+            return Ok(false);
+        };
+        let first_column = data[1];
+        if last_column < first_column {
+            return Ok(false);
+        }
+        let values = usize::from(last_column - first_column) + 1;
+        let Some((count, consumed)) = count_ser_ar_values(&data[4..], values) else {
+            return Ok(false);
+        };
+        if count != values || consumed.checked_add(4) != Some(data.len()) {
+            return Ok(false);
+        }
+        let Some(next_cached_cells) = self.cached_cells.checked_add(count) else {
+            return Ok(false);
+        };
+        if next_cached_cells > MAX_CACHED_CELLS {
+            return Ok(false);
+        }
+        let row = u16::from_le_bytes([data[2], data[3]]);
+        for column in first_column..=last_column {
+            if self.cache_cells.contains(&(owner.0, owner.1, row, column)) {
+                return Ok(false);
+            }
+        }
+        try_hash_set_reserve(
+            &mut self.cache_cells,
+            count,
+            "external-link cached-cell ownership",
+        )?;
+        for column in first_column..=last_column {
+            self.cache_cells.insert((owner.0, owner.1, row, column));
+        }
+        self.cached_cells = next_cached_cells;
+        self.continuation = if remaining == 1 {
+            ContinuationState::Idle
+        } else {
+            ContinuationState::CrnRun {
+                owner,
+                remaining: remaining - 1,
+            }
+        };
+        Ok(true)
+    }
+
+    fn feed_extern_sheet(&mut self, data: &[u8]) -> bool {
+        let Some(count) = read_u16(data, 0).map(usize::from) else {
+            return false;
+        };
+        let Some(expected) = count.checked_mul(6).and_then(|value| value.checked_add(2)) else {
+            return false;
+        };
+        if data.len() != expected {
+            return false;
+        }
+        let mut offset = 2;
+        for _ in 0..count {
+            let Some(book_index) = read_u16(data, offset).map(usize::from) else {
+                return false;
+            };
+            let Some(first) = read_i16(data, offset + 2) else {
+                return false;
+            };
+            let Some(last) = read_i16(data, offset + 4) else {
+                return false;
+            };
+            if book_index >= self.book_count
+                || !self.valid_scope(self.books[book_index], first, last)
+            {
+                return false;
+            }
+            offset += 6;
+        }
+        self.extern_sheet_seen = true;
+        match &mut self.block {
+            ExternalBlockState::Open { names_allowed, .. } => *names_allowed = false,
+            ExternalBlockState::Before | ExternalBlockState::Closed => {},
+        }
+        self.sheet_references = self.sheet_references.saturating_add(count);
+        self.sheet_references <= 1_370
+    }
+
+    fn valid_scope(&mut self, book: ExternalBookKind, first: i16, last: i16) -> bool {
+        if first == -2 {
+            return last == -2;
+        }
+        if matches!(
+            book,
+            ExternalBookKind::AddIn | ExternalBookKind::SameSheet | ExternalBookKind::DdeOrOle
+        ) {
+            return false;
+        }
+        if first == -1 || last == -1 {
+            return first >= -1 && last >= -1;
+        }
+        if first < 0 || last < first {
+            return false;
+        }
+        let first = usize::try_from(first).ok();
+        let last = usize::try_from(last).ok();
+        let (Some(first), Some(last)) = (first, last) else {
+            return false;
+        };
+        match book {
+            ExternalBookKind::SelfReference => {
+                self.max_self_sheet = Some(self.max_self_sheet.unwrap_or(0).max(last));
+                first <= last
+            },
+            ExternalBookKind::External { sheets } | ExternalBookKind::Unused { sheets } => {
+                last < sheets
+            },
+            ExternalBookKind::AddIn | ExternalBookKind::SameSheet | ExternalBookKind::DdeOrOle => {
+                false
+            },
+        }
+    }
+
+    fn finish(&self, internal_sheet_count: usize) -> bool {
+        matches!(self.continuation, ContinuationState::Idle)
+            && self
+                .max_self_sheet
+                .is_none_or(|maximum| maximum < internal_sheet_count)
+    }
+
+    fn observed_count(&self) -> u64 {
+        u64::try_from(self.book_count)
+            .unwrap_or(u64::MAX)
+            .saturating_add(u64::try_from(self.external_names).unwrap_or(u64::MAX))
+            .saturating_add(u64::try_from(self.sheet_references).unwrap_or(u64::MAX))
+    }
+}
+
+fn read_i16(data: &[u8], offset: usize) -> Option<i16> {
+    read_u16(data, offset).map(|value| i16::from_le_bytes(value.to_le_bytes()))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnicodeMarker {
+    Other,
+    Nul,
+    Space,
+}
+
+fn unicode_span(data: &[u8], offset: usize, count: usize) -> Option<(usize, UnicodeMarker)> {
+    let flags = *data.get(offset)?;
+    if flags & !1 != 0 {
+        return None;
+    }
+    let wide = flags == 1;
+    let byte_count = count.checked_mul(if wide { 2 } else { 1 })?;
+    let start = offset.checked_add(1)?;
+    let end = start.checked_add(byte_count)?;
+    let encoded = data.get(start..end)?;
+    if wide && !valid_utf16le(encoded) {
+        return None;
+    }
+    let mut all_nul = count == 1;
+    let mut all_space = count == 1;
+    if wide {
+        for pair in encoded.as_chunks::<2>().0.iter() {
+            let value = u16::from_le_bytes([pair[0], pair[1]]);
+            all_nul &= value == 0;
+            all_space &= value == u16::from(b' ');
+        }
+    } else {
+        for value in encoded {
+            all_nul &= *value == 0;
+            all_space &= *value == b' ';
+        }
+    }
+    let marker = if all_nul {
+        UnicodeMarker::Nul
+    } else if all_space {
+        UnicodeMarker::Space
+    } else {
+        UnicodeMarker::Other
+    };
+    Some((end, marker))
+}
+
+fn unicode_string_span(
+    data: &[u8],
+    offset: usize,
+    max_count: usize,
+) -> Option<(usize, UnicodeMarker)> {
+    let count = usize::from(read_u16(data, offset)?);
+    if count > max_count {
+        return None;
+    }
+    unicode_span(data, offset.checked_add(2)?, count)
+}
+
+fn short_unicode_span(data: &[u8], offset: usize) -> Option<(usize, UnicodeMarker)> {
+    unicode_span(
+        data,
+        offset.checked_add(1)?,
+        usize::from(*data.get(offset)?),
+    )
+}
+
+fn unicode_equals_ascii(data: &[u8], offset: usize, text: &[u8]) -> bool {
+    if data.get(offset).copied().map(usize::from) != Some(text.len()) {
+        return false;
+    }
+    let Some(flags) = data.get(offset + 1).copied() else {
+        return false;
+    };
+    if flags != 0 {
+        return false;
+    }
+    let Some(end) = offset
+        .checked_add(2)
+        .and_then(|value| value.checked_add(text.len()))
+    else {
+        return false;
+    };
+    data.get(offset + 2..end) == Some(text)
+}
+
+fn parse_external_book(data: &[u8]) -> Option<ExternalBookKind> {
+    if !(4..=MAX_RECORD_BYTES).contains(&data.len()) {
+        return None;
+    }
+    let sheet_count = usize::from(read_u16(data, 0)?);
+    let cch = read_u16(data, 2)?;
+    if data.len() == 4 {
+        return match cch {
+            0x0401 => Some(ExternalBookKind::SelfReference),
+            0x3a01 if sheet_count == 1 => Some(ExternalBookKind::AddIn),
+            _ => None,
+        };
+    }
+    if !(1..=255).contains(&cch) {
+        return None;
+    }
+    let (mut offset, path_marker) = unicode_span(data, 4, usize::from(cch))?;
+    if path_marker == UnicodeMarker::Nul {
+        return (sheet_count == 0 && offset == data.len()).then_some(ExternalBookKind::SameSheet);
+    }
+    if sheet_count == 0 {
+        return (offset == data.len()).then_some(ExternalBookKind::DdeOrOle);
+    }
+    if sheet_count > MAX_EXTERNAL_SHEETS {
+        return None;
+    }
+    let mut all_sheet_placeholders = true;
+    for _ in 0..sheet_count {
+        let sheet_name_length = usize::from(read_u16(data, offset)?);
+        if !(1..=31).contains(&sheet_name_length) {
+            return None;
+        }
+        let (next, marker) = unicode_string_span(data, offset, 31)?;
+        if marker == UnicodeMarker::Nul {
+            return None;
+        }
+        all_sheet_placeholders &= marker == UnicodeMarker::Space;
+        offset = next;
+    }
+    if offset != data.len() {
+        return None;
+    }
+    if path_marker == UnicodeMarker::Space {
+        if cch == 1 {
+            all_sheet_placeholders.then_some(ExternalBookKind::Unused {
+                sheets: sheet_count,
+            })
+        } else {
+            Some(ExternalBookKind::External {
+                sheets: sheet_count,
+            })
+        }
+    } else {
+        Some(ExternalBookKind::External {
+            sheets: sheet_count,
+        })
+    }
+}
+
+fn parse_external_name_presence(data: &[u8], book: ExternalBookKind) -> Option<usize> {
+    if !(8..=MAX_RECORD_BYTES).contains(&data.len()) {
+        return None;
+    }
+    let flags = read_u16(data, 0)?;
+    if !valid_clipboard_format((flags >> 5) & 0x03ff) {
+        return None;
+    }
+    let standard_document_name = flags & 0x0008 != 0;
+    let ole_link = flags & 0x0010 != 0;
+    let displayed_as_icon = flags & 0x8000 != 0;
+    if standard_document_name && ole_link {
+        return None;
+    }
+    let name = short_unicode_span(data, 6)?;
+    let offset = name.0;
+    match book {
+        ExternalBookKind::External { sheets } => {
+            if flags & !0x0001 != 0
+                || read_u16(data, 4)? != 0
+                || usize::from(read_u16(data, 2)?) > sheets
+            {
+                return None;
+            }
+            let formula_len = usize::from(read_u16(data, offset)?);
+            let formula_start = offset.checked_add(2)?;
+            let formula_end = formula_start.checked_add(formula_len)?;
+            if formula_end != data.len()
+                || data
+                    .get(formula_start)
+                    .is_some_and(|token| !matches!(token, 0x1c | 0x3a | 0x3b | 0x3c | 0x3d))
+            {
+                return None;
+            }
+            Some(0)
+        },
+        ExternalBookKind::AddIn => {
+            if flags != 0 || read_u16(data, 2)? != 0 || read_u16(data, 4)? != 0 {
+                return None;
+            }
+            let unused_len = usize::from(read_u16(data, offset)?);
+            (offset.checked_add(2)?.checked_add(unused_len)? == data.len()).then_some(0)
+        },
+        ExternalBookKind::DdeOrOle => {
+            let storage_id = read_u32(data, 2)?;
+            if flags & 0x0001 != 0 {
+                return None;
+            }
+            if standard_document_name {
+                return (!displayed_as_icon
+                    && storage_id == 0
+                    && unicode_equals_ascii(data, 6, b"StdDocumentName")
+                    && offset == data.len())
+                .then_some(0);
+            }
+            if (!ole_link && storage_id != 0) || (displayed_as_icon && !ole_link) {
+                return None;
+            }
+            if offset == data.len() {
+                return Some(0);
+            }
+            let last_column = *data.get(offset)?;
+            let last_row = usize::from(read_u16(data, offset.checked_add(1)?)?);
+            let expected = (usize::from(last_column) + 1).checked_mul(last_row + 1)?;
+            if expected > MAX_DDE_OLE_VALUES {
+                return None;
+            }
+            let values_start = offset.checked_add(3)?;
+            let (count, consumed) = count_ser_ar_values(data.get(values_start..)?, expected)?;
+            if consumed != data.len().checked_sub(values_start)? || count > expected {
+                return None;
+            }
+            Some(expected - count)
+        },
+        ExternalBookKind::SelfReference
+        | ExternalBookKind::SameSheet
+        | ExternalBookKind::Unused { .. } => None,
+    }
+}
+
+fn valid_clipboard_format(value: u16) -> bool {
+    let value = if value & 0x0200 != 0 {
+        i32::from(value) - 1024
+    } else {
+        i32::from(value)
+    };
+    matches!(
+        value,
+        -1 | 0 | 2 | 5 | 6 | 7 | 8 | 9 | 16 | 20 | 30 | 36 | 44 | 63
+    )
+}
+
+fn read_u32(data: &[u8], offset: usize) -> Option<u32> {
+    let bytes = data.get(offset..offset.checked_add(4)?)?;
+    Some(u32::from_le_bytes([bytes[0], bytes[1], bytes[2], bytes[3]]))
+}
+
+fn count_ser_ar_values(data: &[u8], maximum: usize) -> Option<(usize, usize)> {
+    let mut offset = 0;
+    let mut count = 0;
+    while offset < data.len() {
+        if count >= maximum {
+            return None;
+        }
+        let tag = *data.get(offset)?;
+        let next = match tag {
+            0x00 | 0x01 => offset.checked_add(9)?,
+            0x02 => unicode_string_span(data, offset.checked_add(1)?, 255)?.0,
+            0x04 => {
+                if *data.get(offset.checked_add(2)?)? != 0
+                    || !matches!(*data.get(offset.checked_add(1)?)?, 0 | 1)
+                {
+                    return None;
+                }
+                offset.checked_add(9)?
+            },
+            0x10 => {
+                if *data.get(offset.checked_add(2)?)? != 0
+                    || !matches!(
+                        *data.get(offset.checked_add(1)?)?,
+                        0x00 | 0x07 | 0x0f | 0x17 | 0x1d | 0x24 | 0x2a | 0x2b
+                    )
+                {
+                    return None;
+                }
+                offset.checked_add(9)?
+            },
+            _ => return None,
+        };
+        if next > data.len() {
+            return None;
+        }
+        count += 1;
+        offset = next;
+    }
+    Some((count, offset))
+}
+
+fn inspect_directory(
+    shared: &SharedOleFile,
+    limits: Limits,
+) -> Result<(MarkerCounts, bool), Error> {
+    let mut counts = MarkerCounts::default();
+    let mut entries = 0_usize;
+    for entry in shared.directory_entries() {
+        if entries >= limits.max_directory_entries {
+            return Ok((counts, true));
+        }
+        entries = entries
+            .checked_add(1)
+            .ok_or(Error::Allocation("CFB directory count"))?;
+        if is_signature_component(&entry.name) {
+            counts.signature_count = counts
+                .signature_count
+                .checked_add(1)
+                .ok_or(Error::Allocation("signature presence count"))?;
+        }
+        if is_encryption_component(&entry.name) {
+            counts.encryption_count = counts
+                .encryption_count
+                .checked_add(1)
+                .ok_or(Error::Allocation("encryption presence count"))?;
+        }
+        if is_drm_component(&entry.name) {
+            counts.drm_count = counts
+                .drm_count
+                .checked_add(1)
+                .ok_or(Error::Allocation("DRM presence count"))?;
+        }
+    }
+    Ok((counts, false))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum WorkbookLocation {
+    Missing,
+    Invalid,
+    Stream { name: &'static str, size: u64 },
+}
+
+fn locate_workbook_stream(shared: &SharedOleFile) -> Result<WorkbookLocation, Error> {
+    // `directory_entries` is a flattened SID index and does not carry the
+    // parent storage path. Resolve only the two root-level logical paths so a
+    // nested `Workbook`/`Book` member cannot shadow the workbook stream.
+    let workbook = logical_stream_len(shared, "Workbook")?;
+    let book = logical_stream_len(shared, "Book")?;
+
+    if matches!(workbook, LogicalEntry::NonStream)
+        || matches!(book, LogicalEntry::NonStream)
+        || matches!(workbook, LogicalEntry::Stream(_)) && matches!(book, LogicalEntry::Stream(_))
+    {
+        return Ok(WorkbookLocation::Invalid);
+    }
+    if let LogicalEntry::Stream(size) = workbook {
+        return Ok(WorkbookLocation::Stream {
+            name: "Workbook",
+            size,
+        });
+    }
+    if let LogicalEntry::Stream(size) = book {
+        return Ok(WorkbookLocation::Stream { name: "Book", size });
+    }
+    Ok(WorkbookLocation::Missing)
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum LogicalEntry {
+    Missing,
+    NonStream,
+    Stream(u64),
+}
+
+fn logical_stream_len(shared: &SharedOleFile, name: &str) -> Result<LogicalEntry, Error> {
+    match shared.stream_len(&[name]) {
+        Ok(size) => Ok(LogicalEntry::Stream(size)),
+        Err(OleError::StreamNotFound) => Ok(LogicalEntry::Missing),
+        Err(OleError::InvalidFormat(_)) => Ok(LogicalEntry::NonStream),
+        Err(error) => Err(Error::Ingress(error)),
+    }
+}
+
+struct StreamingRecord<'a> {
+    kind: u16,
+    payload: &'a [u8],
+    offset: u64,
+}
+
+impl StreamingRecord<'_> {
+    fn kind(&self) -> litchi_biff::Kind {
+        litchi_biff::Kind::from_wire(self.kind)
+    }
+
+    fn payload(&self) -> &[u8] {
+        self.payload
+    }
+
+    fn offset(&self) -> u64 {
+        self.offset
+    }
+}
+
+enum StreamingRecordStep<'a> {
+    End,
+    Invalid { kind: Option<u16> },
+    Limit { kind: Option<u16> },
+    Record(StreamingRecord<'a>),
+}
+
+struct StreamingRecordReader<'a> {
+    cursor: BufferedOleStreamCursor<'a>,
+    max_records: usize,
+    record_count: usize,
+    header: [u8; 4],
+    payload: [u8; MAX_RECORD_BYTES],
+}
+
+impl<'a> StreamingRecordReader<'a> {
+    fn new(
+        shared: &'a SharedOleFile,
+        workbook_name: &str,
+        max_records: usize,
+    ) -> Result<Self, Error> {
+        // The reader starts without read-ahead. MS-XLS admits FILEPASS only
+        // immediately after the workbook-global BOF, optionally behind
+        // WRITEPROTECT records, and the walk stops there without reading the
+        // ciphertext that follows. A window filled before that point would
+        // read some of that ciphertext, so `open_window` is called by
+        // `analyze_workbook` only once a FILEPASS can no longer legitimately
+        // appear.
+        let cursor = BufferedOleStreamCursor::new(
+            shared
+                .stream_cursor_at(&[workbook_name], 0)
+                .map_err(Error::Ingress)?,
+            0,
+        );
+        Ok(Self {
+            cursor,
+            max_records,
+            record_count: 0,
+            header: [0; 4],
+            payload: [0; MAX_RECORD_BYTES],
+        })
+    }
+
+    /// Turns on the cursor's bounded read-ahead for the rest of the walk.
+    ///
+    /// Every record is framed here as a four-byte header and then a payload,
+    /// so without a window this walk costs two positional requests and two
+    /// source observations per record. With one, those two reads are memory
+    /// copies and the walk pays one request per contiguous run of the
+    /// allocation chain. The closing `SharedOleFile::source_version` that
+    /// every exit of `validate_source` already takes still
+    /// brackets the whole analysis, so a mutation during it is refused as
+    /// before; what moves is which read reports it.
+    fn open_window(&mut self) {
+        self.cursor
+            .set_read_ahead(BufferedOleStreamCursor::MAX_READ_AHEAD_BYTES);
+    }
+
+    fn read_next(&mut self) -> Result<StreamingRecordStep<'_>, Error> {
+        let offset = self.cursor.position();
+        let length = self.cursor.len();
+        if offset == length {
+            return Ok(StreamingRecordStep::End);
+        }
+
+        let next_count = match self.record_count.checked_add(1) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: None }),
+        };
+        if next_count > self.max_records {
+            return Ok(StreamingRecordStep::Limit { kind: None });
+        }
+
+        let header_end = match offset.checked_add(self.header.len() as u64) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: None }),
+        };
+        if header_end > length {
+            return Ok(StreamingRecordStep::Invalid { kind: None });
+        }
+        self.cursor
+            .read_exact(&mut self.header)
+            .map_err(Error::Ingress)?;
+
+        let kind = u16::from_le_bytes([self.header[0], self.header[1]]);
+        let payload_len = usize::from(u16::from_le_bytes([self.header[2], self.header[3]]));
+        if payload_len > MAX_RECORD_BYTES {
+            return Ok(StreamingRecordStep::Limit { kind: Some(kind) });
+        }
+        let frame_len = match 4_u64.checked_add(payload_len as u64) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: Some(kind) }),
+        };
+        let frame_end = match offset.checked_add(frame_len) {
+            Some(value) => value,
+            None => return Ok(StreamingRecordStep::Invalid { kind: Some(kind) }),
+        };
+        if frame_end > length {
+            return Ok(StreamingRecordStep::Invalid { kind: Some(kind) });
+        }
+        self.cursor
+            .read_exact(&mut self.payload[..payload_len])
+            .map_err(Error::Ingress)?;
+        self.record_count = next_count;
+        Ok(StreamingRecordStep::Record(StreamingRecord {
+            kind,
+            payload: &self.payload[..payload_len],
+            offset,
+        }))
+    }
+}
+
+fn analyze_workbook(
+    shared: &SharedOleFile,
+    workbook_name: &str,
+    container_encrypted: bool,
+    limits: Limits,
+) -> Result<Analysis, Error> {
+    let mut output = Analysis {
+        encrypted: container_encrypted,
+        ..Analysis::default()
+    };
+    if container_encrypted {
+        return Ok(output);
+    }
+
+    let mut records = StreamingRecordReader::new(shared, workbook_name, limits.max_biff_records)?;
+
+    let mut first_record = true;
+    let mut globals_done = false;
+    let mut saw_global_eof = false;
+    let mut global_bof = None;
+    let mut codepage_seen = false;
+    let mut boundsheet_seen = false;
+    let mut writeprotect_seen = false;
+    let mut filepass_slot_open = true;
+    let mut bound_sheets = Vec::<SheetObservation>::new();
+    try_reserve(
+        &mut bound_sheets,
+        limits.max_worksheets.min(4_096),
+        "BoundSheet8 inventory",
+    )?;
+    let mut targets = HashMap::<u64, usize>::new();
+    let mut protection_collector = WorkbookProtectionState::default();
+    let mut external_collector = ExternalPresenceState::default();
+    let mut protection_seen = false;
+    let mut protection_feed_failed = false;
+    let mut external_feed_failed = false;
+    let mut external_record_count = 0_usize;
+    let mut active_sheet: Option<ActiveSheet> = None;
+    let mut scan_interrupted = false;
+
+    let mut window_open = false;
+    loop {
+        // A FILEPASS can only follow the global BOF and its WRITEPROTECT
+        // records, so once the slot has closed the rest of the stream is
+        // ordinary BIFF and may be read ahead. Opening the window earlier
+        // would read ciphertext an encrypted workbook stops the walk before.
+        if !filepass_slot_open && !window_open {
+            records.open_window();
+            window_open = true;
+        }
+        let record = match records.read_next()? {
+            StreamingRecordStep::End => break,
+            StreamingRecordStep::Limit { kind } => {
+                scan_interrupted = true;
+                if kind == Some(FILEPASS_RECORD_TYPE) {
+                    let valid_position = !globals_done
+                        && global_bof.is_some()
+                        && !output.biff_invalid
+                        && filepass_slot_open;
+                    inspect_incomplete_filepass_record(&mut output, valid_position)?;
+                }
+                output.biff_limit = true;
+                break;
+            },
+            StreamingRecordStep::Invalid { kind } => {
+                scan_interrupted = true;
+                if kind == Some(FILEPASS_RECORD_TYPE) {
+                    let valid_position = !globals_done
+                        && global_bof.is_some()
+                        && !output.biff_invalid
+                        && filepass_slot_open;
+                    inspect_incomplete_filepass_record(&mut output, valid_position)?;
+                }
+                output.biff_invalid = true;
+                break;
+            },
+            StreamingRecordStep::Record(record) => record,
+        };
+        let kind = record.kind().get();
+        let is_first_record = first_record;
+
+        if first_record {
+            first_record = false;
+            if kind != BOF {
+                output.biff_invalid = true;
+            } else if let Some(bof) = parse_bof(record.payload()) {
+                if bof.dt != WORKBOOK_BOF_TYPE {
+                    output.biff_invalid = true;
+                } else {
+                    global_bof = Some(bof);
+                }
+            } else {
+                output.biff_invalid = true;
+            }
+        }
+
+        if !globals_done {
+            if kind == FILEPASS_RECORD_TYPE {
+                let valid_position =
+                    global_bof.is_some() && !output.biff_invalid && filepass_slot_open;
+                inspect_filepass_record(&mut output, record.payload())?;
+                if !valid_position {
+                    output.filepass_placement_invalid = true;
+                    output.biff_invalid = true;
+                }
+                output.stopped_at_filepass = true;
+                break;
+            }
+
+            if !is_first_record {
+                if kind == WRITEPROTECT_TYPE {
+                    if writeprotect_seen {
+                        output.biff_invalid = true;
+                        filepass_slot_open = false;
+                    } else {
+                        writeprotect_seen = true;
+                    }
+                } else {
+                    filepass_slot_open = false;
+                }
+            }
+
+            if kind == BOF {
+                if !is_first_record {
+                    output.biff_invalid = true;
+                }
+            } else if kind == EOF {
+                if !record.payload().is_empty() {
+                    output.biff_invalid = true;
+                }
+                globals_done = true;
+                saw_global_eof = true;
+            } else if kind == CODEPAGE {
+                if codepage_seen || boundsheet_seen {
+                    output.biff_invalid = true;
+                }
+                codepage_seen = true;
+                if record.payload().len() != 2 {
+                    output.biff_invalid = true;
+                } else {
+                    let codepage = u16::from_le_bytes([record.payload()[0], record.payload()[1]]);
+                    if Encoding::from_codepage(codepage).is_err() {
+                        output.biff_invalid = true;
+                    }
+                }
+            } else if kind == BOUNDSHEET8 {
+                boundsheet_seen = true;
+                if bound_sheets.len() >= limits.max_worksheets {
+                    output.worksheet_limit = true;
+                } else {
+                    match parse_bound_sheet(record.payload()) {
+                        Some((position, sheet_type)) => {
+                            let position = u64::from(position);
+                            if targets.contains_key(&position) {
+                                output.biff_invalid = true;
+                            } else {
+                                let index = bound_sheets.len();
+                                try_push(
+                                    &mut bound_sheets,
+                                    SheetObservation {
+                                        sheet_type,
+                                        expected_dt: expected_sheet_bof_type(sheet_type),
+                                        substream: SubstreamState::Pending,
+                                    },
+                                    "BoundSheet8 inventory",
+                                )?;
+                                try_hash_insert(
+                                    &mut targets,
+                                    position,
+                                    index,
+                                    "BoundSheet8 owners",
+                                )?;
+                            }
+                        },
+                        None => output.biff_invalid = true,
+                    }
+                }
+            }
+
+            if !protection_feed_failed && !protection_collector.feed(kind, record.payload()) {
+                protection_feed_failed = true;
+            }
+            if !external_feed_failed && !output.external_limit {
+                if is_external_record(kind) {
+                    external_record_count = external_record_count
+                        .checked_add(1)
+                        .ok_or(Error::Allocation("external-link record count"))?;
+                    if external_record_count > limits.max_external_records {
+                        output.external_limit = true;
+                    }
+                }
+                if !output.external_limit {
+                    match external_collector.feed(kind, record.payload())? {
+                        true => {},
+                        false => external_feed_failed = true,
+                    }
+                }
+            }
+            continue;
+        }
+
+        if kind == FILEPASS_RECORD_TYPE {
+            inspect_filepass_record(&mut output, record.payload())?;
+            output.filepass_placement_invalid = true;
+            output.biff_invalid = true;
+            output.stopped_at_filepass = true;
+            break;
+        }
+
+        let offset = record.offset();
+        if active_sheet.is_none() {
+            if let Some(index) = targets.get(&offset).copied() {
+                let Some(observation) = bound_sheets.get_mut(index) else {
+                    output.worksheet_invalid = true;
+                    output.biff_invalid = true;
+                    continue;
+                };
+                let already_started = match observation.substream {
+                    SubstreamState::Pending => false,
+                    SubstreamState::Open | SubstreamState::Closed => true,
+                };
+                if already_started || kind != BOF {
+                    output.worksheet_invalid = true;
+                    output.biff_invalid = true;
+                } else {
+                    observation.substream = SubstreamState::Open;
+                    let expected_dt = observation.expected_dt;
+                    let bof = parse_bof(record.payload());
+                    let version_matches = global_bof
+                        .zip(bof)
+                        .is_some_and(|(global, sheet)| global.version == sheet.version);
+                    if !version_matches || bof.is_none_or(|value| value.dt != expected_dt) {
+                        output.worksheet_invalid = true;
+                        output.biff_invalid = true;
+                    }
+                    active_sheet = Some(ActiveSheet {
+                        index,
+                        protection: SheetProtectionState::default(),
+                    });
+                }
+            } else if !output.worksheet_limit {
+                output.biff_invalid = true;
+            }
+        } else if let Some(active) = active_sheet.as_mut() {
+            if kind == EOF {
+                if !record.payload().is_empty() {
+                    output.biff_invalid = true;
+                    output.worksheet_invalid = true;
+                }
+                if let Some(observation) = bound_sheets.get_mut(active.index) {
+                    observation.substream = SubstreamState::Closed;
+                }
+                if !active.protection.finish() {
+                    protection_feed_failed = true;
+                } else if active.protection.is_present() {
+                    protection_seen = true;
+                }
+                active_sheet = None;
+            } else {
+                if kind == BOF {
+                    output.biff_invalid = true;
+                    output.worksheet_invalid = true;
+                }
+                if bound_sheets
+                    .get(active.index)
+                    .is_some_and(|sheet| sheet.sheet_type == SheetType::WorkSheet)
+                    && !protection_feed_failed
+                    && !active.protection.feed(kind, record.payload())
+                {
+                    protection_feed_failed = true;
+                }
+            }
+        }
+    }
+
+    if !output.stopped_at_filepass && (first_record || !saw_global_eof) {
+        output.biff_invalid = true;
+    }
+    if output.stopped_at_filepass {
+        if !protection_collector.finish() {
+            protection_feed_failed = true;
+        }
+        if let Some(active) = active_sheet.take() {
+            if !active.protection.finish() {
+                protection_feed_failed = true;
+            }
+            if active.protection.is_present() {
+                protection_seen = true;
+            }
+        }
+        let external_finished = external_collector.finish(bound_sheets.len());
+        if !output.external_limit && !external_finished {
+            external_feed_failed = true;
+        }
+        output.protection_seen = protection_seen || protection_collector.is_present();
+        output.protection_invalid = protection_feed_failed;
+        output.external_present = external_collector.external_present;
+        output.external_count = external_collector.observed_count();
+        output.external_invalid = external_feed_failed;
+        output.scan_terminal = true;
+        output.scan_interrupted = scan_interrupted;
+        return Ok(output);
+    }
+    if active_sheet.is_some() {
+        output.worksheet_invalid = true;
+        output.biff_invalid = true;
+    }
+    if bound_sheets.is_empty() && !output.worksheet_limit {
+        output.worksheet_invalid = true;
+    }
+    if bound_sheets.iter().any(|sheet| match sheet.substream {
+        SubstreamState::Pending | SubstreamState::Open => true,
+        SubstreamState::Closed => false,
+    }) {
+        output.worksheet_invalid = true;
+    }
+
+    if saw_global_eof && !output.biff_invalid {
+        if !protection_collector.finish() {
+            protection_feed_failed = true;
+        } else if protection_collector.is_present() {
+            protection_seen = true;
+        }
+        if !output.external_limit && !external_feed_failed {
+            if !external_collector.finish(bound_sheets.len()) {
+                external_feed_failed = true;
+            } else {
+                output.external_present = external_collector.external_present;
+                output.external_count = external_collector.observed_count();
+            }
+        }
+    }
+    output.protection_seen = protection_seen;
+    output.protection_invalid = protection_feed_failed;
+    output.external_invalid = external_feed_failed;
+    output.scan_terminal = !scan_interrupted;
+    output.scan_interrupted = scan_interrupted;
+    Ok(output)
+}
+
+const FILEPASS_RECORD_TYPE: u16 = 0x002f;
+
+fn is_external_record(kind: u16) -> bool {
+    matches!(
+        kind,
+        SUP_BOOK_RECORD_TYPE
+            | EXTERN_NAME_RECORD_TYPE
+            | EXTERN_SHEET_RECORD_TYPE
+            | XCT_RECORD_TYPE
+            | CRN_RECORD_TYPE
+            | CONTINUE_RECORD_TYPE
+    )
+}
+
+fn is_signature_component(name: &str) -> bool {
+    [
+        "_xmlsignatures",
+        "_signatures",
+        "DigitalSignature",
+        "\u{0005}DigitalSignature",
+    ]
+    .iter()
+    .any(|marker| name.eq_ignore_ascii_case(marker))
+}
+
+fn is_encryption_component(name: &str) -> bool {
+    [
+        "\u{0006}DataSpaces",
+        "\u{0006}DataSpaceInfo",
+        "\u{0006}TransformInfo",
+        "\u{0006}Primary",
+        "EncryptedPackage",
+        "EncryptionInfo",
+    ]
+    .iter()
+    .any(|marker| name.eq_ignore_ascii_case(marker))
+}
+
+fn is_drm_component(name: &str) -> bool {
+    ["\u{0009}DRMContent", "\u{0009}DRMViewerContent"]
+        .iter()
+        .any(|marker| name.eq_ignore_ascii_case(marker))
+}
+
+fn presence_status(
+    count: u64,
+    directory_limited: bool,
+    limits: ValidationLimits,
+) -> Result<CheckStatus, Error> {
+    if directory_limited {
+        CheckStatus::blocked(
+            "CFB directory inspection reached the configured entry ceiling",
+            limits,
+        )
+        .map_err(Into::into)
+    } else if count == 0 {
+        Ok(CheckStatus::NotApplicable)
+    } else {
+        Ok(CheckStatus::Complete)
+    }
+}
+
+fn push_presence_issue(
+    issues: &mut Vec<ValidationIssue>,
+    check: &str,
+    code: &str,
+    severity: IssueSeverity,
+    message: &str,
+    count: u64,
+    part: &str,
+    limits: ValidationLimits,
+) -> Result<(), Error> {
+    if count == 0 {
+        return Ok(());
+    }
+    try_push(
+        issues,
+        ValidationIssue::try_new(
+            check_id(check, limits)?,
+            code,
+            severity,
+            message,
+            [IssueLocation::try_new(
+                Some(part),
+                None,
+                None,
+                None,
+                None,
+                limits,
+            )?],
+            [IssueEvidence::try_new(
+                "observed.count",
+                EvidenceValue::Count(count),
+                limits,
+            )?],
+            None,
+            if severity >= IssueSeverity::Error {
+                CompatibilityImpact::Interoperability
+            } else {
+                CompatibilityImpact::None
+            },
+            RepairAvailability::Unavailable,
+            limits,
+        )?,
+        "XLS validation issues",
+    )?;
+    Ok(())
+}
+
+fn simple_issue(
+    check: &str,
+    code: &str,
+    severity: IssueSeverity,
+    message: &str,
+    part: Option<&str>,
+    path: Option<&str>,
+    offset: Option<u64>,
+    limits: ValidationLimits,
+) -> Result<ValidationIssue, Error> {
+    Ok(ValidationIssue::try_new(
+        check_id(check, limits)?,
+        code,
+        severity,
+        message,
+        [IssueLocation::try_new(
+            part, path, offset, None, None, limits,
+        )?],
+        [],
+        None,
+        if severity >= IssueSeverity::Error {
+            CompatibilityImpact::Interoperability
+        } else {
+            CompatibilityImpact::None
+        },
+        RepairAvailability::Unavailable,
+        limits,
+    )?)
+}
+
+fn cfb_issue(
+    error: &OleError,
+    source_size: u64,
+    limits: ValidationLimits,
+) -> Result<ValidationIssue, Error> {
+    let (code, message) = match error {
+        OleError::NotOleFile => (
+            "xls.cfb.not_ole",
+            "The source is not a recognizable CFB compound file.",
+        ),
+        OleError::InvalidFormat(_) => (
+            "xls.cfb.invalid_format",
+            "CFB ingress rejected invalid format metadata.",
+        ),
+        OleError::InvalidData(_) => (
+            "xls.cfb.invalid_data",
+            "CFB ingress rejected invalid structural data.",
+        ),
+        OleError::CorruptedFile(_) => (
+            "xls.cfb.corrupted",
+            "CFB ingress detected corrupted container topology.",
+        ),
+        OleError::StreamNotFound => (
+            "xls.cfb.missing_stream",
+            "CFB ingress could not resolve a required structural stream.",
+        ),
+        OleError::LimitExceeded { .. } | OleError::InvalidLimit { .. } => (
+            "xls.cfb.limit",
+            "CFB ingress rejected the source or caller limit bounds.",
+        ),
+        OleError::Io(_)
+        | OleError::Allocation { .. }
+        | OleError::Committed { .. }
+        | OleError::SourceChanged { .. } => (
+            "xls.cfb.invalid_data",
+            "CFB ingress did not produce a stable structural result.",
+        ),
+    };
+    Ok(ValidationIssue::try_new(
+        check_id(CFB, limits)?,
+        code,
+        IssueSeverity::Error,
+        message,
+        [IssueLocation::try_new(
+            Some("compound-file"),
+            None,
+            None,
+            None,
+            None,
+            limits,
+        )?],
+        [IssueEvidence::try_new(
+            "source.size",
+            EvidenceValue::Size(source_size),
+            limits,
+        )?],
+        None,
+        CompatibilityImpact::Interoperability,
+        RepairAvailability::Unavailable,
+        limits,
+    )?)
+}
+
+fn finish_report(
+    statuses: [CheckStatus; CHECK_IDS.len()],
+    issues: Vec<ValidationIssue>,
+    limits: ValidationLimits,
+) -> Result<ValidateReport, Error> {
+    let mut checks = Vec::new();
+    try_reserve(&mut checks, CHECK_IDS.len(), "XLS validation checks")?;
+    for (id, status) in CHECK_IDS.into_iter().zip(statuses) {
+        try_push(
+            &mut checks,
+            ValidationCheck::new(check_id(id, limits)?, status),
+            "XLS validation checks",
+        )?;
+    }
+    ValidateReport::try_new(checks, issues, limits).map_err(Into::into)
+}
+
+fn check_id(id: &str, limits: ValidationLimits) -> Result<CheckCapabilityId, Error> {
+    CheckCapabilityId::try_new(id, limits).map_err(Into::into)
+}
+
+fn blocked_ingress_statuses(
+    limits: ValidationLimits,
+    reason: &str,
+) -> Result<[CheckStatus; CHECK_IDS.len()], Error> {
+    let ingress = check_id(CFB, limits)?;
+    let blocked = CheckStatus::blocked(reason, limits)?;
+    Ok([
+        blocked,
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress.clone()),
+        CheckStatus::stopped_by(ingress),
+    ])
+}
+
+fn cfb_rejection_statuses(
+    limits: ValidationLimits,
+) -> Result<[CheckStatus; CHECK_IDS.len()], Error> {
+    let blocked = CheckStatus::blocked("CFB ingress was structurally rejected", limits)?;
+    Ok([
+        CheckStatus::Complete,
+        blocked.clone(),
+        blocked.clone(),
+        blocked.clone(),
+        blocked.clone(),
+        blocked.clone(),
+        blocked.clone(),
+        blocked.clone(),
+        blocked,
+    ])
+}
+
+fn is_structural_cfb_error(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::InvalidFormat(_)
+            | OleError::InvalidData(_)
+            | OleError::NotOleFile
+            | OleError::CorruptedFile(_)
+            | OleError::StreamNotFound
+    )
+}
+
+fn is_directory_limit_error(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::LimitExceeded {
+            resource: "directory bytes",
+            ..
+        }
+    )
+}
+
+fn require_version(source: &dyn ReadAt, expected: litchi_core::SourceVersion) -> Result<(), Error> {
+    let observed = source
+        .version()
+        .map_err(|error| Error::Ingress(OleError::Io(error)))?;
+    if observed == expected {
+        Ok(())
+    } else {
+        Err(Error::Ingress(OleError::SourceChanged {
+            expected,
+            observed,
+        }))
+    }
+}
+
+fn try_reserve<T>(
+    values: &mut Vec<T>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), Error> {
+    values
+        .try_reserve(additional)
+        .map_err(|_| Error::Allocation(resource))
+}
+
+fn try_push<T>(values: &mut Vec<T>, value: T, resource: &'static str) -> Result<(), Error> {
+    if values.len() == values.capacity() {
+        try_reserve(values, 1, resource)?;
+    }
+    values.push(value);
+    Ok(())
+}
+
+fn try_hash_insert(
+    values: &mut HashMap<u64, usize>,
+    key: u64,
+    value: usize,
+    resource: &'static str,
+) -> Result<(), Error> {
+    if values.len() == values.capacity() {
+        values
+            .try_reserve(1)
+            .map_err(|_| Error::Allocation(resource))?;
+    }
+    values.insert(key, value);
+    Ok(())
+}
+
+fn try_hash_set_reserve<T: Eq + Hash>(
+    values: &mut HashSet<T>,
+    additional: usize,
+    resource: &'static str,
+) -> Result<(), Error> {
+    if additional > values.capacity().saturating_sub(values.len()) {
+        values
+            .try_reserve(additional)
+            .map_err(|_| Error::Allocation(resource))?;
+    }
+    Ok(())
+}
+
+#[cfg(test)]
+mod external_presence_order_tests {
+    use super::{
+        CONTINUE_RECORD_TYPE, CRN_RECORD_TYPE, EXTERN_NAME_RECORD_TYPE, EXTERN_SHEET_RECORD_TYPE,
+        ExternalPresenceState, SUP_BOOK_RECORD_TYPE, XCT_RECORD_TYPE,
+    };
+
+    /// One record per letter:
+    /// - `W` an external-workbook SupBook with one sheet, `N` a name for it;
+    /// - `A` an add-in SupBook, `a` an add-in name;
+    /// - `D` a DDE SupBook, `M` a DDE name whose one matrix value follows in a
+    ///   Continue, `K` that Continue (one value);
+    /// - `S` a self-reference SupBook;
+    /// - `X` an XCT declaring one CRN for sheet 0, `Z` one declaring none, `C`
+    ///   a one-value CRN;
+    /// - `H` an empty ExternSheet, `R` one referencing book 0 with scope -2;
+    /// - `O` an unrelated record.
+    fn record(letter: char) -> (u16, &'static [u8]) {
+        match letter {
+            'W' => (
+                SUP_BOOK_RECORD_TYPE,
+                &[1, 0, 2, 0, 0, 1, b'A', 1, 0, 0, b'S'],
+            ),
+            'N' => (
+                EXTERN_NAME_RECORD_TYPE,
+                &[0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x3a, 0],
+            ),
+            'A' => (SUP_BOOK_RECORD_TYPE, &[1, 0, 1, 0x3a]),
+            'a' => (
+                EXTERN_NAME_RECORD_TYPE,
+                &[0, 0, 0, 0, 0, 0, 1, 0, b'F', 2, 0, 0x1c, 0x17],
+            ),
+            'D' => (SUP_BOOK_RECORD_TYPE, &[0, 0, 1, 0, 0, b'D']),
+            'M' => (
+                EXTERN_NAME_RECORD_TYPE,
+                &[0, 0, 0, 0, 0, 0, 1, 0, b'X', 0, 0, 0],
+            ),
+            'K' => (CONTINUE_RECORD_TYPE, &[0; 9]),
+            'S' => (SUP_BOOK_RECORD_TYPE, &[1, 0, 1, 4]),
+            'X' => (XCT_RECORD_TYPE, &[1, 0, 0, 0]),
+            'Z' => (XCT_RECORD_TYPE, &[0, 0, 0, 0]),
+            'C' => (CRN_RECORD_TYPE, &[0, 0, 7, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
+            'H' => (EXTERN_SHEET_RECORD_TYPE, &[0, 0]),
+            'R' => (
+                EXTERN_SHEET_RECORD_TYPE,
+                &[1, 0, 0, 0, 0xfe, 0xff, 0xfe, 0xff],
+            ),
+            'O' => (0x0018, &[]),
+            other => panic!("unknown test record letter {other}"),
+        }
+    }
+
+    /// Feeds the records the way the workbook scan does (no record after the
+    /// first refusal) and reports each answer, then the end-of-stream verdict
+    /// for one internal sheet and the counters the report exposes.
+    fn outcome(letters: &str) -> String {
+        let mut state = ExternalPresenceState::default();
+        let mut answers = String::new();
+        for letter in letters.chars() {
+            let (record_type, data) = record(letter);
+            match state.feed(record_type, data) {
+                Ok(true) => answers.push('t'),
+                Ok(false) => {
+                    answers.push('f');
+                    break;
+                },
+                Err(error) => {
+                    answers.push_str(&format!("[{error}]"));
+                    break;
+                },
+            }
+        }
+        format!(
+            "{letters} => {answers} finish={} count={} present={}",
+            state.finish(1),
+            state.observed_count(),
+            state.external_present
+        )
+    }
+
+    fn sequences(alphabet: &str, length: usize) -> Vec<String> {
+        let mut all = vec![String::new()];
+        let mut previous = vec![String::new()];
+        for _ in 0..length {
+            let mut next = Vec::new();
+            for prefix in &previous {
+                for letter in alphabet.chars() {
+                    next.push(format!("{prefix}{letter}"));
+                }
+            }
+            all.extend(next.iter().cloned());
+            previous = next;
+        }
+        all
+    }
+
+    /// The external-link presence scan is fed every pair of its records and
+    /// longer orders that walk the name window, the CRN run after an XCT, the
+    /// DDE matrix continuation and the end of the block.
+    #[test]
+    fn external_presence_scan_accepts_and_rejects_record_orders() {
+        let mut cases = sequences("WNAaDMKSXZCHRO", 2);
+        cases.extend(
+            [
+                "WNN", "WNXC", "WXCN", "WXNC", "WXCC", "WXCXC", "WZC", "WZN", "WZXC", "WXOC",
+                "WXHC", "WHN", "WHW", "WHR", "WRW", "WOW", "WON", "WOX", "WOC", "WOH", "WOK",
+                "WOO", "WXCO", "WXCOW", "WXCH", "WXCHN", "WNWN", "WXCWN", "WXCWXC", "AaH", "AaaH",
+                "AHa", "AOa", "ARa", "DMK", "DMKK", "DMKM", "DMKMK", "DMO", "DMKO", "DMKH", "DMX",
+                "DMKW", "DMH", "SRO", "SRW", "SHS", "OSO", "OKO", "SKO", "SOK", "HOW", "HW", "WSa",
+                "AWN", "WAa", "WAN", "SWN", "WSN",
+            ]
+            .map(str::to_string),
+        );
+        let actual: Vec<String> = cases.iter().map(|case| outcome(case)).collect();
+        assert_eq!(actual, EXTERNAL_PRESENCE_EXPECTED);
+    }
+
+    const EXTERNAL_PRESENCE_EXPECTED: &[&str] = &[
+        " =>  finish=true count=0 present=false",
+        "W => t finish=true count=1 present=true",
+        "N => f finish=true count=0 present=false",
+        "A => t finish=true count=1 present=true",
+        "a => f finish=true count=0 present=false",
+        "D => t finish=true count=1 present=true",
+        "M => f finish=true count=0 present=false",
+        "K => t finish=true count=0 present=false",
+        "S => t finish=true count=1 present=false",
+        "X => f finish=true count=0 present=false",
+        "Z => f finish=true count=0 present=false",
+        "C => f finish=true count=0 present=false",
+        "H => t finish=true count=0 present=false",
+        "R => f finish=true count=0 present=false",
+        "O => t finish=true count=0 present=false",
+        "WW => tt finish=true count=2 present=true",
+        "WN => tt finish=true count=2 present=true",
+        "WA => tt finish=true count=2 present=true",
+        "Wa => tt finish=true count=2 present=true",
+        "WD => tt finish=true count=2 present=true",
+        "WM => tf finish=true count=1 present=true",
+        "WK => tf finish=true count=1 present=true",
+        "WS => tt finish=true count=2 present=true",
+        "WX => tt finish=false count=1 present=true",
+        "WZ => tt finish=true count=1 present=true",
+        "WC => tf finish=true count=1 present=true",
+        "WH => tt finish=true count=1 present=true",
+        "WR => tt finish=true count=2 present=true",
+        "WO => tt finish=true count=1 present=true",
+        "NW => f finish=true count=0 present=false",
+        "NN => f finish=true count=0 present=false",
+        "NA => f finish=true count=0 present=false",
+        "Na => f finish=true count=0 present=false",
+        "ND => f finish=true count=0 present=false",
+        "NM => f finish=true count=0 present=false",
+        "NK => f finish=true count=0 present=false",
+        "NS => f finish=true count=0 present=false",
+        "NX => f finish=true count=0 present=false",
+        "NZ => f finish=true count=0 present=false",
+        "NC => f finish=true count=0 present=false",
+        "NH => f finish=true count=0 present=false",
+        "NR => f finish=true count=0 present=false",
+        "NO => f finish=true count=0 present=false",
+        "AW => tt finish=true count=2 present=true",
+        "AN => tt finish=true count=2 present=true",
+        "AA => tt finish=true count=2 present=true",
+        "Aa => tt finish=true count=2 present=true",
+        "AD => tt finish=true count=2 present=true",
+        "AM => tf finish=true count=1 present=true",
+        "AK => tf finish=true count=1 present=true",
+        "AS => tt finish=true count=2 present=true",
+        "AX => tf finish=true count=1 present=true",
+        "AZ => tf finish=true count=1 present=true",
+        "AC => tf finish=true count=1 present=true",
+        "AH => tt finish=true count=1 present=true",
+        "AR => tt finish=true count=2 present=true",
+        "AO => tt finish=true count=1 present=true",
+        "aW => f finish=true count=0 present=false",
+        "aN => f finish=true count=0 present=false",
+        "aA => f finish=true count=0 present=false",
+        "aa => f finish=true count=0 present=false",
+        "aD => f finish=true count=0 present=false",
+        "aM => f finish=true count=0 present=false",
+        "aK => f finish=true count=0 present=false",
+        "aS => f finish=true count=0 present=false",
+        "aX => f finish=true count=0 present=false",
+        "aZ => f finish=true count=0 present=false",
+        "aC => f finish=true count=0 present=false",
+        "aH => f finish=true count=0 present=false",
+        "aR => f finish=true count=0 present=false",
+        "aO => f finish=true count=0 present=false",
+        "DW => tt finish=true count=2 present=true",
+        "DN => tf finish=true count=1 present=true",
+        "DA => tt finish=true count=2 present=true",
+        "Da => tf finish=true count=1 present=true",
+        "DD => tt finish=true count=2 present=true",
+        "DM => tt finish=false count=2 present=true",
+        "DK => tf finish=true count=1 present=true",
+        "DS => tt finish=true count=2 present=true",
+        "DX => tf finish=true count=1 present=true",
+        "DZ => tf finish=true count=1 present=true",
+        "DC => tf finish=true count=1 present=true",
+        "DH => tt finish=true count=1 present=true",
+        "DR => tt finish=true count=2 present=true",
+        "DO => tt finish=true count=1 present=true",
+        "MW => f finish=true count=0 present=false",
+        "MN => f finish=true count=0 present=false",
+        "MA => f finish=true count=0 present=false",
+        "Ma => f finish=true count=0 present=false",
+        "MD => f finish=true count=0 present=false",
+        "MM => f finish=true count=0 present=false",
+        "MK => f finish=true count=0 present=false",
+        "MS => f finish=true count=0 present=false",
+        "MX => f finish=true count=0 present=false",
+        "MZ => f finish=true count=0 present=false",
+        "MC => f finish=true count=0 present=false",
+        "MH => f finish=true count=0 present=false",
+        "MR => f finish=true count=0 present=false",
+        "MO => f finish=true count=0 present=false",
+        "KW => tt finish=true count=1 present=true",
+        "KN => tf finish=true count=0 present=false",
+        "KA => tt finish=true count=1 present=true",
+        "Ka => tf finish=true count=0 present=false",
+        "KD => tt finish=true count=1 present=true",
+        "KM => tf finish=true count=0 present=false",
+        "KK => tt finish=true count=0 present=false",
+        "KS => tt finish=true count=1 present=false",
+        "KX => tf finish=true count=0 present=false",
+        "KZ => tf finish=true count=0 present=false",
+        "KC => tf finish=true count=0 present=false",
+        "KH => tt finish=true count=0 present=false",
+        "KR => tf finish=true count=0 present=false",
+        "KO => tt finish=true count=0 present=false",
+        "SW => tt finish=true count=2 present=true",
+        "SN => tf finish=true count=1 present=false",
+        "SA => tt finish=true count=2 present=true",
+        "Sa => tf finish=true count=1 present=false",
+        "SD => tt finish=true count=2 present=true",
+        "SM => tf finish=true count=1 present=false",
+        "SK => tf finish=true count=1 present=false",
+        "SS => tt finish=true count=2 present=false",
+        "SX => tf finish=true count=1 present=false",
+        "SZ => tf finish=true count=1 present=false",
+        "SC => tf finish=true count=1 present=false",
+        "SH => tt finish=true count=1 present=false",
+        "SR => tt finish=true count=2 present=false",
+        "SO => tt finish=true count=1 present=false",
+        "XW => f finish=true count=0 present=false",
+        "XN => f finish=true count=0 present=false",
+        "XA => f finish=true count=0 present=false",
+        "Xa => f finish=true count=0 present=false",
+        "XD => f finish=true count=0 present=false",
+        "XM => f finish=true count=0 present=false",
+        "XK => f finish=true count=0 present=false",
+        "XS => f finish=true count=0 present=false",
+        "XX => f finish=true count=0 present=false",
+        "XZ => f finish=true count=0 present=false",
+        "XC => f finish=true count=0 present=false",
+        "XH => f finish=true count=0 present=false",
+        "XR => f finish=true count=0 present=false",
+        "XO => f finish=true count=0 present=false",
+        "ZW => f finish=true count=0 present=false",
+        "ZN => f finish=true count=0 present=false",
+        "ZA => f finish=true count=0 present=false",
+        "Za => f finish=true count=0 present=false",
+        "ZD => f finish=true count=0 present=false",
+        "ZM => f finish=true count=0 present=false",
+        "ZK => f finish=true count=0 present=false",
+        "ZS => f finish=true count=0 present=false",
+        "ZX => f finish=true count=0 present=false",
+        "ZZ => f finish=true count=0 present=false",
+        "ZC => f finish=true count=0 present=false",
+        "ZH => f finish=true count=0 present=false",
+        "ZR => f finish=true count=0 present=false",
+        "ZO => f finish=true count=0 present=false",
+        "CW => f finish=true count=0 present=false",
+        "CN => f finish=true count=0 present=false",
+        "CA => f finish=true count=0 present=false",
+        "Ca => f finish=true count=0 present=false",
+        "CD => f finish=true count=0 present=false",
+        "CM => f finish=true count=0 present=false",
+        "CK => f finish=true count=0 present=false",
+        "CS => f finish=true count=0 present=false",
+        "CX => f finish=true count=0 present=false",
+        "CZ => f finish=true count=0 present=false",
+        "CC => f finish=true count=0 present=false",
+        "CH => f finish=true count=0 present=false",
+        "CR => f finish=true count=0 present=false",
+        "CO => f finish=true count=0 present=false",
+        "HW => tf finish=true count=0 present=false",
+        "HN => tf finish=true count=0 present=false",
+        "HA => tf finish=true count=0 present=false",
+        "Ha => tf finish=true count=0 present=false",
+        "HD => tf finish=true count=0 present=false",
+        "HM => tf finish=true count=0 present=false",
+        "HK => tt finish=true count=0 present=false",
+        "HS => tf finish=true count=0 present=false",
+        "HX => tf finish=true count=0 present=false",
+        "HZ => tf finish=true count=0 present=false",
+        "HC => tf finish=true count=0 present=false",
+        "HH => tt finish=true count=0 present=false",
+        "HR => tf finish=true count=0 present=false",
+        "HO => tt finish=true count=0 present=false",
+        "RW => f finish=true count=0 present=false",
+        "RN => f finish=true count=0 present=false",
+        "RA => f finish=true count=0 present=false",
+        "Ra => f finish=true count=0 present=false",
+        "RD => f finish=true count=0 present=false",
+        "RM => f finish=true count=0 present=false",
+        "RK => f finish=true count=0 present=false",
+        "RS => f finish=true count=0 present=false",
+        "RX => f finish=true count=0 present=false",
+        "RZ => f finish=true count=0 present=false",
+        "RC => f finish=true count=0 present=false",
+        "RH => f finish=true count=0 present=false",
+        "RR => f finish=true count=0 present=false",
+        "RO => f finish=true count=0 present=false",
+        "OW => tt finish=true count=1 present=true",
+        "ON => tf finish=true count=0 present=false",
+        "OA => tt finish=true count=1 present=true",
+        "Oa => tf finish=true count=0 present=false",
+        "OD => tt finish=true count=1 present=true",
+        "OM => tf finish=true count=0 present=false",
+        "OK => tt finish=true count=0 present=false",
+        "OS => tt finish=true count=1 present=false",
+        "OX => tf finish=true count=0 present=false",
+        "OZ => tf finish=true count=0 present=false",
+        "OC => tf finish=true count=0 present=false",
+        "OH => tt finish=true count=0 present=false",
+        "OR => tf finish=true count=0 present=false",
+        "OO => tt finish=true count=0 present=false",
+        "WNN => ttt finish=true count=3 present=true",
+        "WNXC => tttt finish=true count=2 present=true",
+        "WXCN => tttf finish=true count=1 present=true",
+        "WXNC => ttf finish=false count=1 present=true",
+        "WXCC => tttf finish=true count=1 present=true",
+        "WXCXC => tttf finish=true count=1 present=true",
+        "WZC => ttf finish=true count=1 present=true",
+        "WZN => ttf finish=true count=1 present=true",
+        "WZXC => ttf finish=true count=1 present=true",
+        "WXOC => ttf finish=false count=1 present=true",
+        "WXHC => ttf finish=false count=1 present=true",
+        "WHN => ttf finish=true count=1 present=true",
+        "WHW => ttf finish=true count=1 present=true",
+        "WHR => ttt finish=true count=2 present=true",
+        "WRW => ttf finish=true count=2 present=true",
+        "WOW => ttf finish=true count=1 present=true",
+        "WON => ttf finish=true count=1 present=true",
+        "WOX => ttf finish=true count=1 present=true",
+        "WOC => ttf finish=true count=1 present=true",
+        "WOH => ttf finish=true count=1 present=true",
+        "WOK => ttt finish=true count=1 present=true",
+        "WOO => ttt finish=true count=1 present=true",
+        "WXCO => tttt finish=true count=1 present=true",
+        "WXCOW => ttttf finish=true count=1 present=true",
+        "WXCH => tttt finish=true count=1 present=true",
+        "WXCHN => ttttf finish=true count=1 present=true",
+        "WNWN => tttt finish=true count=4 present=true",
+        "WXCWN => ttttt finish=true count=3 present=true",
+        "WXCWXC => tttttt finish=true count=2 present=true",
+        "AaH => ttt finish=true count=2 present=true",
+        "AaaH => tttt finish=true count=3 present=true",
+        "AHa => ttf finish=true count=1 present=true",
+        "AOa => ttf finish=true count=1 present=true",
+        "ARa => ttf finish=true count=2 present=true",
+        "DMK => ttt finish=true count=2 present=true",
+        "DMKK => tttf finish=true count=2 present=true",
+        "DMKM => tttt finish=false count=3 present=true",
+        "DMKMK => ttttt finish=true count=3 present=true",
+        "DMO => ttf finish=false count=2 present=true",
+        "DMKO => tttt finish=true count=2 present=true",
+        "DMKH => tttt finish=true count=2 present=true",
+        "DMX => ttf finish=false count=2 present=true",
+        "DMKW => tttt finish=true count=3 present=true",
+        "DMH => ttf finish=false count=2 present=true",
+        "SRO => ttt finish=true count=2 present=false",
+        "SRW => ttf finish=true count=2 present=false",
+        "SHS => ttf finish=true count=1 present=false",
+        "OSO => ttt finish=true count=1 present=false",
+        "OKO => ttt finish=true count=0 present=false",
+        "SKO => tf finish=true count=1 present=false",
+        "SOK => ttt finish=true count=1 present=false",
+        "HOW => ttf finish=true count=0 present=false",
+        "HW => tf finish=true count=0 present=false",
+        "WSa => ttf finish=true count=2 present=true",
+        "AWN => ttt finish=true count=3 present=true",
+        "WAa => ttt finish=true count=3 present=true",
+        "WAN => ttt finish=true count=3 present=true",
+        "SWN => ttt finish=true count=3 present=true",
+        "WSN => ttf finish=true count=2 present=true",
+    ];
+}

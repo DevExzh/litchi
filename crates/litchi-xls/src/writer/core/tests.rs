@@ -1,0 +1,1176 @@
+use super::*;
+use crate::writer::biff::AutoFilterConditionWrite;
+use crate::{Error, Result};
+use litchi_core::sheet::Cell;
+use std::io::Cursor;
+
+use crate::formula_metadata::{Cell as FormulaCell, Range as FormulaRange};
+
+#[test]
+fn test_create_writer() {
+    let writer = Builder::new();
+    assert_eq!(writer.worksheets.len(), 0);
+    assert!(writer.shared_string_table().unwrap().strings().is_empty());
+}
+
+#[test]
+fn test_add_worksheet() {
+    let mut writer = Builder::new();
+    let idx = writer.add_worksheet("Sheet1").unwrap();
+    assert_eq!(idx, 0);
+    assert_eq!(writer.worksheets.len(), 1);
+    assert_eq!(writer.worksheets[0].name, "Sheet1");
+}
+
+#[test]
+fn test_add_multiple_worksheets() {
+    let mut writer = Builder::new();
+    let idx1 = writer.add_worksheet("Sheet1").unwrap();
+    let idx2 = writer.add_worksheet("Sheet2").unwrap();
+    let idx3 = writer.add_worksheet("Sheet3").unwrap();
+
+    assert_eq!(idx1, 0);
+    assert_eq!(idx2, 1);
+    assert_eq!(idx3, 2);
+    assert_eq!(writer.worksheets.len(), 3);
+}
+
+#[test]
+fn test_add_worksheet_empty_name() {
+    let mut writer = Builder::new();
+    let result = writer.add_worksheet("");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_add_worksheet_long_name() {
+    let mut writer = Builder::new();
+    let long_name = "A".repeat(50);
+    let result = writer.add_worksheet(&long_name);
+    assert!(result.is_err()); // Name too long
+}
+
+#[test]
+fn test_add_worksheet_duplicate_name() {
+    let mut writer = Builder::new();
+    writer.add_worksheet("Sheet1").unwrap();
+    let result = writer.add_worksheet("Sheet1");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_add_worksheet_duplicate_name_is_case_insensitive() {
+    let mut writer = Builder::new();
+    writer.add_worksheet("Sheet1").unwrap();
+    let result = writer.add_worksheet("sheet1");
+    assert!(result.is_err());
+}
+
+#[test]
+fn test_write_string() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_string(sheet, 0, 0, "Hello").unwrap();
+    assert_eq!(writer.worksheets[0].cells.len(), 1);
+
+    let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
+    assert_eq!(cell.row(), 0);
+    assert_eq!(cell.col(), 0);
+    assert!(matches!(&cell.value, CellValue::String(s) if s == "Hello"));
+}
+
+#[test]
+fn test_write_number() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 0, 0, 42.5).unwrap();
+    assert_eq!(writer.worksheets[0].cells.len(), 1);
+
+    let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
+    assert!(matches!(&cell.value, CellValue::Number(n) if *n == 42.5));
+}
+
+#[test]
+fn non_finite_cell_numbers_are_rejected_before_mutation() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+    for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.write_number(sheet, 0, 0, value)
+        }));
+        assert!(matches!(
+            result,
+            Ok(Err(Error::InvalidData(message)))
+                if message == "cell number must be finite for BIFF8 serialization"
+        ));
+        assert!(writer.worksheets[sheet].cells.is_empty());
+    }
+}
+
+#[test]
+fn cell_grid_bounds_are_atomic_and_never_unwind() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+    let max = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.write_number(sheet, u32::from(u16::MAX), u16::from(u8::MAX), 42.5)
+    }));
+    assert!(matches!(max, Ok(Ok(()))));
+    let state = |writer: &Builder| {
+        let worksheet = &writer.worksheets[sheet];
+        (
+            worksheet.cells.len(),
+            worksheet.first_row,
+            worksheet.last_row,
+            worksheet.first_col,
+            worksheet.last_col,
+        )
+    };
+    let max_state = (1, 65_535, 65_536, 255, 256);
+    assert_eq!(state(&writer), max_state);
+
+    let oversized_row = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.write_string(sheet, 65_536, 0, "outside")
+    }));
+    assert!(matches!(
+        oversized_row,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(state(&writer), max_state);
+
+    let adversarial_row = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.write_number(sheet, u32::MAX, 0, 1.0)
+    }));
+    assert!(matches!(
+        adversarial_row,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(state(&writer), max_state);
+
+    let oversized_col = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.write_formula(sheet, 0, 256, "1")
+    }));
+    assert!(matches!(
+        oversized_col,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(state(&writer), max_state);
+
+    let table = crate::DataTable::one_variable(
+        crate::DataTableRange::new(2, 8, 3, 5).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    let adversarial_col = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_data_table(sheet, 0, u16::MAX, table)
+    }));
+    assert!(matches!(
+        adversarial_col,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(state(&writer), max_state);
+    assert!(writer.worksheets[sheet].data_tables.is_empty());
+
+    let mut output = Cursor::new(Vec::new());
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    output.set_position(0);
+    let workbook = crate::raw::Reader::new(output).unwrap();
+    let cell = workbook
+        .xls_worksheet(0)
+        .unwrap()
+        .get_cell(u32::from(u16::MAX), u32::from(u8::MAX))
+        .unwrap();
+    assert!(matches!(
+        cell.value(),
+        litchi_core::sheet::CellValue::Float(value) if *value == 42.5
+    ));
+}
+
+#[test]
+fn worksheet_location_bounds_are_atomic_and_never_unwind() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Grid").unwrap();
+
+    writer.merge_cells(sheet, 65_534, 65_535, 254, 255).unwrap();
+    writer
+        .add_horizontal_page_break(sheet, 65_535, 0, 16_383)
+        .unwrap();
+    writer
+        .add_vertical_page_break(sheet, 255, 0, 65_535)
+        .unwrap();
+    let max_range = DataValidationRange::new(65_535, 65_535, 255, 255).unwrap();
+    writer
+        .add_data_validation(
+            sheet,
+            DataValidation::new(max_range, DataValidationType::Any),
+        )
+        .unwrap();
+
+    let state = |writer: &Builder| {
+        let worksheet = &writer.worksheets[sheet];
+        (
+            worksheet.merged_ranges.len(),
+            worksheet.horizontal_page_breaks.len(),
+            worksheet.vertical_page_breaks.len(),
+            worksheet.data_validations.len(),
+            writer.real_time_data.len(),
+            writer.web_publications.len(),
+        )
+    };
+    let max_state = (1, 1, 1, 1, 0, 0);
+    assert_eq!(state(&writer), max_state);
+
+    for outcome in [
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.merge_cells(sheet, 65_536, 65_536, 0, 0)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.merge_cells(sheet, 0, 0, 256, 256)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.merge_cells(sheet, 2, 1, 0, 0)
+        })),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(state(&writer), max_state);
+    }
+    let merge_overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.merge_cells(sheet, 65_535, 65_535, 255, 255)
+    }));
+    assert!(matches!(merge_overlap, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(state(&writer), max_state);
+
+    for outcome in [
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_horizontal_page_break(sheet, 65_536, 0, 1)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_horizontal_page_break(sheet, 0, 0, 16_384)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_vertical_page_break(sheet, 256, 0, 1)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.add_vertical_page_break(sheet, 0, 0, 65_536)
+        })),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(state(&writer), max_state);
+    }
+
+    let overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_horizontal_page_break(sheet, 65_535, 1, 2)
+    }));
+    assert!(matches!(overlap, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(state(&writer), max_state);
+    let overlap = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_vertical_page_break(sheet, 255, 1, 2)
+    }));
+    assert!(matches!(overlap, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(state(&writer), max_state);
+
+    for outcome in [
+        std::panic::catch_unwind(|| DataValidationRange::new(65_536, 65_536, 0, 0)),
+        std::panic::catch_unwind(|| DataValidationRange::new(0, 0, 256, 256)),
+        std::panic::catch_unwind(|| DataValidationRange::new(1, 0, 0, 0)),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(state(&writer), max_state);
+    }
+
+    let too_many_ranges = vec![max_range; 432];
+    let count_error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_data_validation_with_options(
+            sheet,
+            DataValidation::new(max_range, DataValidationType::Any),
+            &too_many_ranges,
+            DataValidationOptions::default(),
+        )
+    }));
+    assert!(matches!(count_error, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(state(&writer), max_state);
+
+    let invalid_rule = DataValidation::new(
+        max_range,
+        DataValidationType::Whole {
+            operator: DataValidationOperator::Between,
+            value1: 1,
+            value2: None,
+        },
+    );
+    let rule_error = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_data_validation(sheet, invalid_rule)
+    }));
+    assert!(matches!(rule_error, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(state(&writer), max_state);
+
+    assert!(matches!(
+        crate::DataTableInputCell::present(65_535, 255),
+        Ok(crate::DataTableInputCell::Present {
+            row: 65_535,
+            col: 255
+        })
+    ));
+    for outcome in [
+        std::panic::catch_unwind(|| crate::DataTableInputCell::present(65_536, 0)),
+        std::panic::catch_unwind(|| crate::DataTableInputCell::present(u32::MAX, 0)),
+        std::panic::catch_unwind(|| crate::DataTableInputCell::present(0, 256)),
+        std::panic::catch_unwind(|| crate::DataTableInputCell::present(0, u16::MAX)),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(state(&writer), max_state);
+    }
+    let invalid_publication = crate::WebPub {
+        source: crate::WebSourceType::Workbook,
+        page_type: crate::WebPageType::ViewOnly,
+        range: Some(crate::WebPubRange::new(0, 0, 0, 0).unwrap()),
+        auto_republish: false,
+        single_file: false,
+        style_id: 1,
+        source_name: None,
+        file_destination: "x.htm".to_string(),
+        div_id: String::new(),
+        title: "x".to_string(),
+        chart_shape_id: None,
+        reserved: Vec::new(),
+    };
+    let invalid_publication = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_web_publication(invalid_publication)
+    }));
+    assert!(matches!(
+        invalid_publication,
+        Ok(Err(Error::InvalidData(_)))
+    ));
+    assert_eq!(state(&writer), max_state);
+
+    for outcome in [
+        std::panic::catch_unwind(|| crate::WebPubRange::new(65_536, 65_536, 0, 0)),
+        std::panic::catch_unwind(|| crate::WebPubRange::new(0, 0, 256, 256)),
+        std::panic::catch_unwind(|| crate::WebPubRange::new(1, 0, 0, 0)),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(state(&writer), max_state);
+    }
+
+    for outcome in [
+        std::panic::catch_unwind(|| crate::real_time_data::Cell::new(65_536, 0, 0)),
+        std::panic::catch_unwind(|| crate::real_time_data::Cell::new(0, 256, 0)),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(state(&writer), max_state);
+    }
+    let invalid_topic = crate::real_time_data::Record {
+        common_prefix_len: 0,
+        topic_segments: vec!["server".to_string(), String::new()],
+        topic: "server".to_string(),
+        value: crate::real_time_data::Value::Integer(1),
+        cells: vec![crate::real_time_data::Cell::new(0, 0, 1).unwrap()],
+    };
+    let missing_sheet = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_real_time_data(invalid_topic)
+    }));
+    assert!(matches!(
+        missing_sheet,
+        Ok(Err(Error::WorksheetNotFound(_)))
+    ));
+    assert_eq!(state(&writer), max_state);
+
+    writer
+        .set_page_setup(sheet, PageSetupOptions::default())
+        .unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    output.set_position(0);
+    let workbook = crate::raw::Reader::new(output).unwrap();
+    let worksheet = workbook.xls_worksheet(sheet).unwrap();
+    assert!(
+        worksheet
+            .merged_cells()
+            .iter()
+            .any(|range| range.first_row == 65_534
+                && range.last_row == 65_535
+                && range.first_col == 254
+                && range.last_col == 255)
+    );
+    let page_setup = worksheet.page_setup().unwrap();
+    assert_eq!(page_setup.horizontal_page_breaks()[0].position(), 65_535);
+    assert_eq!(page_setup.horizontal_page_breaks()[0].range_end(), 16_383);
+    assert_eq!(page_setup.vertical_page_breaks()[0].position(), 255);
+    assert_eq!(page_setup.vertical_page_breaks()[0].range_end(), 65_535);
+}
+
+#[test]
+fn page_break_entry_limits_are_failure_atomic() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Break limits").unwrap();
+
+    for row in 0..1_026 {
+        writer.add_horizontal_page_break(sheet, row, 0, 1).unwrap();
+    }
+    for column in 0..255 {
+        writer.add_vertical_page_break(sheet, column, 0, 1).unwrap();
+    }
+    assert_eq!(writer.worksheets[sheet].horizontal_page_breaks.len(), 1_026);
+    assert_eq!(writer.worksheets[sheet].vertical_page_breaks.len(), 255);
+
+    let horizontal = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_horizontal_page_break(sheet, 1_026, 0, 1)
+    }));
+    assert!(matches!(horizontal, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(writer.worksheets[sheet].horizontal_page_breaks.len(), 1_026);
+
+    let vertical = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_vertical_page_break(sheet, 255, 0, 1)
+    }));
+    assert!(matches!(vertical, Ok(Err(Error::InvalidData(_)))));
+    assert_eq!(writer.worksheets[sheet].vertical_page_breaks.len(), 255);
+}
+
+#[test]
+fn filter_sort_and_pivot_locations_fail_before_mutation() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Locations").unwrap();
+    writer.set_auto_filter(sheet, 0, 65_535, 0, 255).unwrap();
+    let filter_state = |writer: &Builder| {
+        let worksheet = &writer.worksheets[sheet];
+        (
+            worksheet.auto_filter.map(|range| {
+                (
+                    range.first_row,
+                    range.last_row,
+                    range.first_col,
+                    range.last_col,
+                )
+            }),
+            worksheet.auto_filter_columns.len(),
+            worksheet.sort_config.is_some(),
+            worksheet.pivot_tables.len(),
+            worksheet.cells.len(),
+            writer.defined_names.len(),
+        )
+    };
+    let initial = (Some((0, 65_535, 0, 255)), 0, false, 0, 0, 1);
+    assert_eq!(filter_state(&writer), initial);
+
+    for outcome in [
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.set_auto_filter(sheet, 0, 65_536, 0, 0)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.set_auto_filter(sheet, 0, 0, 0, 256)
+        })),
+        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            writer.set_auto_filter(sheet, 1, 0, 0, 0)
+        })),
+    ] {
+        assert!(matches!(outcome, Ok(Err(Error::InvalidCellReference(_)))));
+        assert_eq!(filter_state(&writer), initial);
+    }
+
+    let invalid_filter = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_filter_condition(
+            sheet,
+            256,
+            false,
+            AutoFilterConditionWrite::None,
+            AutoFilterConditionWrite::None,
+        )
+    }));
+    assert!(matches!(
+        invalid_filter,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(filter_state(&writer), initial);
+
+    let invalid_sort = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.set_sort(sheet, false, false, &[(256, false)])
+    }));
+    assert!(matches!(
+        invalid_sort,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(filter_state(&writer), initial);
+
+    let invalid_pivot = PivotTableConfig {
+        name: "InvalidPivot".to_string(),
+        source_type: 1,
+        source_sheet_name: "Locations".to_string(),
+        source_first_row: 0,
+        source_last_row: 0,
+        source_first_col: 0,
+        source_last_col: 256,
+        first_row: 0,
+        last_row: 1,
+        first_col: 0,
+        last_col: 1,
+        first_header_row: 0,
+        first_data_row: 1,
+        first_data_col: 1,
+        data_field_name: "Values".to_string(),
+        data_axis: 0,
+        data_position: 0,
+        fields: Vec::new(),
+        data_items: Vec::new(),
+        page_entries: Vec::new(),
+        source_data: Vec::new(),
+    };
+    let invalid_pivot = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        writer.add_pivot_table(sheet, invalid_pivot)
+    }));
+    assert!(matches!(
+        invalid_pivot,
+        Ok(Err(Error::InvalidCellReference(_)))
+    ));
+    assert_eq!(filter_state(&writer), initial);
+}
+
+#[test]
+fn test_write_boolean() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_boolean(sheet, 0, 0, true).unwrap();
+    writer.write_boolean(sheet, 1, 0, false).unwrap();
+
+    assert_eq!(writer.worksheets[0].cells.len(), 2);
+    assert!(matches!(
+        writer.worksheets[0].cells.get(&(0, 0)).unwrap().value,
+        CellValue::Boolean(true)
+    ));
+    assert!(matches!(
+        writer.worksheets[0].cells.get(&(1, 0)).unwrap().value,
+        CellValue::Boolean(false)
+    ));
+}
+
+#[test]
+fn test_write_formula() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_formula(sheet, 0, 0, "SUM(A1:B1)").unwrap();
+    let metadata = crate::FormulaMetadata::new()
+        .with_fill_alignment(true)
+        .with_clear_errors(true)
+        .with_calculation_cache(0xCAFE_BABE);
+    writer
+        .write_formula_with_metadata(sheet, 0, 1, "A1+1", metadata.clone())
+        .unwrap();
+
+    let cell = writer.worksheets[0].cells.get(&(0, 0)).unwrap();
+    assert!(matches!(&cell.value, CellValue::Formula(f) if f == "SUM(A1:B1)"));
+    assert_eq!(
+        writer.worksheets[0]
+            .cells
+            .get(&(0, 1))
+            .and_then(|cell| cell.formula_metadata.clone()),
+        Some(metadata)
+    );
+}
+
+#[test]
+fn invalid_formula_reference_returns_error_without_unwinding() {
+    let outcome = std::panic::catch_unwind(|| -> Result<()> {
+        let mut writer = Builder::new();
+        let sheet = writer.add_worksheet("Sheet1")?;
+        writer.write_formula(sheet, 0, 0, "ZZZZ1")?;
+        match writer.build() {
+            Err(crate::package::Error::Reader(error)) => Err(error),
+            Err(error) => Err(Error::InvalidData(error.to_string())),
+            Ok(package) => package
+                .write_to(&mut Cursor::new(Vec::new()))
+                .map_err(|error| Error::InvalidData(error.to_string())),
+        }
+    });
+
+    assert!(matches!(
+        outcome,
+        Ok(Err(Error::InvalidCellReference(reference))) if reference == "ZZZZ1"
+    ));
+}
+
+#[test]
+fn test_formula_round_trips_through_xls_reader() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 0, 0, 2.0).unwrap();
+    writer.write_number(sheet, 0, 1, 3.0).unwrap();
+    writer.write_formula(sheet, 0, 2, "SUM(A1:B1)").unwrap();
+    let metadata = crate::FormulaMetadata::new()
+        .with_fill_alignment(true)
+        .with_clear_errors(true)
+        .with_calculation_cache(0x1020_3040);
+    writer
+        .write_formula_with_metadata(sheet, 0, 4, "A1+1", metadata.clone())
+        .unwrap();
+    writer
+        .write_formula(sheet, 0, 3, "IF(TRUE,\"a\"\"b\",FALSE)")
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    output.set_position(0);
+    let workbook = crate::raw::Reader::new(output).unwrap();
+    let formula_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 2).unwrap();
+
+    assert!(formula_cell.is_formula());
+    assert_eq!(formula_cell.formula(), Some("=SUM((A1:B1))"));
+    assert!(!formula_cell.formula_bytes().unwrap().is_empty());
+    assert_eq!(
+        formula_cell.formula_metadata(),
+        Some(&crate::FormulaMetadata::new().with_always_calculate(true))
+    );
+    let metadata_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 4).unwrap();
+    assert_eq!(metadata_cell.formula_metadata(), Some(&metadata));
+    assert_eq!(
+        workbook
+            .xls_worksheet(0)
+            .unwrap()
+            .get_cell(0, 3)
+            .unwrap()
+            .formula(),
+        Some("=IF(TRUE,\"a\"\"b\",FALSE)")
+    );
+}
+
+#[test]
+fn shared_formula_round_trips_with_inert_relative_references() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let anchor = FormulaCell::new(0, 0);
+    let participants = [anchor, FormulaCell::new(1, 0)];
+    writer
+        .write_shared_formula(
+            sheet,
+            FormulaRange::try_new(0, 0, 1, 0).unwrap(),
+            anchor,
+            "A1*2",
+            &participants,
+        )
+        .unwrap();
+
+    let mut output = Cursor::new(Vec::new());
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    output.set_position(0);
+    let workbook = crate::raw::Reader::new(output).unwrap();
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    let first = worksheet.get_cell(0, 0).unwrap();
+    let second = worksheet.get_cell(1, 0).unwrap();
+
+    assert_eq!(first.formula(), Some("=(A1*2)"));
+    assert_eq!(second.formula(), Some("=(A2*2)"));
+    assert_eq!(first.formula_bytes(), Some(&[0x01, 0, 0, 0, 0][..]));
+    assert_eq!(second.formula_bytes(), Some(&[0x01, 0, 0, 0, 0][..]));
+    assert!(first.formula_metadata().unwrap().shared_formula());
+    assert!(second.formula_metadata().unwrap().shared_formula());
+}
+
+#[test]
+fn array_formula_staging_is_atomic_complete_and_protected() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_number(sheet, 1, 1, 7.0).unwrap();
+    let occupied = FormulaRange::try_new(0, 0, 1, 1).unwrap();
+    assert!(matches!(
+        writer.write_array_formula(sheet, occupied, "A1+1"),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), 1);
+
+    let range = FormulaRange::try_new(3, 2, 4, 3).unwrap();
+    writer
+        .write_array_formula_with_format(
+            sheet,
+            range,
+            "A1+1",
+            0,
+            crate::formula_metadata::array::Limits::default(),
+        )
+        .unwrap();
+    assert_eq!(writer.worksheets[sheet].cells.len(), 5);
+    let owners: Vec<_> = [(3, 2), (3, 3), (4, 2), (4, 3)]
+        .into_iter()
+        .map(|key| {
+            let cell = writer.worksheets[sheet].cells.get(&key).unwrap();
+            assert!(matches!(&cell.value, CellValue::Formula(value) if value.is_empty()));
+            cell.formula_metadata
+                .as_ref()
+                .and_then(crate::FormulaMetadata::array_owner)
+                .unwrap()
+        })
+        .collect();
+    assert!(owners.iter().all(|owner| std::ptr::eq(*owner, owners[0])));
+    assert_eq!(owners[0].range(), range);
+    assert_eq!(owners[0].cell_count(), 4);
+    assert!(owners[0].always_calculate());
+
+    let before = writer.worksheets[sheet].cells.len();
+    assert!(matches!(
+        writer.write_string(sheet, 4, 3, "break the group"),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+}
+
+#[test]
+fn array_formula_rejects_data_tables_and_cell_limit_without_mutation() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let table = crate::DataTable::one_variable(
+        crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    writer.add_data_table(sheet, 0, 0, table).unwrap();
+    let before = writer.worksheets[sheet].cells.len();
+    assert!(matches!(
+        writer.write_array_formula(sheet, FormulaRange::try_new(1, 1, 2, 2).unwrap(), "A1+1"),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+
+    assert!(matches!(
+        writer.write_array_formula(
+            sheet,
+            FormulaRange::try_new(0, 0, u32::from(u16::MAX), u16::from(u8::MAX)).unwrap(),
+            "A1+1"
+        ),
+        Err(Error::InvalidFormula(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+
+    writer
+        .write_array_formula(sheet, FormulaRange::try_new(4, 4, 4, 5).unwrap(), "A1+1")
+        .unwrap();
+}
+
+#[test]
+fn data_table_after_array_formula_is_rejected_atomically_and_retryable() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer
+        .write_array_formula(sheet, FormulaRange::try_new(1, 1, 2, 2).unwrap(), "A1+1")
+        .unwrap();
+    let overlapping = crate::DataTable::one_variable(
+        crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    let before = writer.worksheets[sheet].cells.len();
+    assert!(matches!(
+        writer.add_data_table(sheet, 0, 0, overlapping),
+        Err(Error::InvalidData(_))
+    ));
+    assert_eq!(writer.worksheets[sheet].cells.len(), before);
+    assert!(!writer.worksheets[sheet].cells.contains_key(&(0, 0)));
+    assert!(writer.worksheets[sheet].data_tables.is_empty());
+
+    let disjoint = crate::DataTable::one_variable(
+        crate::DataTableRange::new(5, 6, 5, 6).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    writer.add_data_table(sheet, 0, 0, disjoint).unwrap();
+    assert_eq!(writer.worksheets[sheet].data_tables.len(), 1);
+}
+
+#[test]
+fn array_formula_explicit_limits_fail_without_mutation_and_can_retry() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let range = FormulaRange::try_new(0, 0, 0, 1).unwrap();
+    let one_cell = crate::formula_metadata::array::Limits::default()
+        .with_max_cells(1)
+        .unwrap();
+    assert!(matches!(
+        writer.write_array_formula_with_format(sheet, range, "A1+1", 0, one_cell),
+        Err(Error::InvalidFormula(_))
+    ));
+    assert!(writer.worksheets[sheet].cells.is_empty());
+
+    let two_cells = one_cell.with_max_cells(2).unwrap();
+    writer
+        .write_array_formula_with_format(sheet, range, "A1+1", 0, two_cells)
+        .unwrap();
+    assert_eq!(writer.worksheets[sheet].cells.len(), 2);
+}
+
+#[test]
+fn test_write_multiple_cells() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+    writer.write_string(sheet, 0, 0, "A1").unwrap();
+    writer.write_string(sheet, 0, 1, "B1").unwrap();
+    writer.write_string(sheet, 1, 0, "A2").unwrap();
+    writer.write_string(sheet, 1, 1, "B2").unwrap();
+
+    assert_eq!(writer.worksheets[0].cells.len(), 4);
+}
+
+#[test]
+fn test_shared_strings_build() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+
+    writer.write_string(sheet, 0, 0, "Hello").unwrap();
+    writer.write_string(sheet, 0, 1, "Hello").unwrap();
+    writer.write_string(sheet, 1, 0, "World").unwrap();
+
+    // Stage the shared string table (normally done during write)
+    let table = writer.shared_string_table().unwrap();
+
+    // Should only have 2 unique strings, from 3 string cells
+    assert_eq!(table.strings().len(), 2);
+    assert_eq!(table.total(), 3);
+}
+
+#[test]
+fn test_write_to_memory() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_string(sheet, 0, 0, "Test").unwrap();
+    writer.write_number(sheet, 0, 1, 123.45).unwrap();
+
+    let mut cursor = Cursor::new(Vec::new());
+    let result = writer
+        .build()
+        .and_then(|package| package.write_to(&mut cursor));
+    assert!(result.is_ok());
+
+    let data = cursor.into_inner();
+    assert!(!data.is_empty());
+    // Should start with OLE compound document signature
+    assert_eq!(
+        &data[0..8],
+        [0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1]
+    );
+}
+
+#[test]
+fn test_save_to_file() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_string(sheet, 0, 0, "Hello").unwrap();
+
+    let temp_path = std::env::temp_dir().join("test_xls_writer.xls");
+    let result = writer.build().and_then(|package| package.save(&temp_path));
+    assert!(result.is_ok());
+
+    // Verify file was created
+    assert!(temp_path.exists());
+
+    // Clean up
+    let _ = std::fs::remove_file(temp_path);
+}
+
+#[test]
+fn test_xls_writer_default() {
+    let writer: Builder = Default::default();
+    assert_eq!(writer.worksheets.len(), 0);
+    assert!(writer.shared_string_table().unwrap().strings().is_empty());
+}
+
+#[test]
+fn test_xlscellvalue_variants() {
+    let string_val = CellValue::String("test".to_string());
+    let number_val = CellValue::Number(42.0);
+    let bool_val = CellValue::Boolean(true);
+    let formula_val = CellValue::Formula("A1+B1".to_string());
+    let blank_val = CellValue::Blank;
+
+    assert!(matches!(string_val, CellValue::String(_)));
+    assert!(matches!(number_val, CellValue::Number(_)));
+    assert!(matches!(bool_val, CellValue::Boolean(_)));
+    assert!(matches!(formula_val, CellValue::Formula(_)));
+    assert!(matches!(blank_val, CellValue::Blank));
+}
+
+#[test]
+fn test_xlscellvalue_debug() {
+    let val = CellValue::String("test".to_string());
+    let debug = format!("{:?}", val);
+    assert!(debug.contains("String"));
+}
+
+#[test]
+fn test_xlscellvalue_clone() {
+    let val = CellValue::Number(42.0);
+    let cloned = val.clone();
+    assert!(matches!(cloned, CellValue::Number(42.0)));
+}
+
+#[test]
+fn test_writablecell_creation() {
+    let cell = WritableCell::new(
+        CellPos::try_new(5, 3).unwrap(),
+        CellValue::String("Test".to_string()),
+        15,
+        None,
+    );
+
+    assert_eq!(cell.row(), 5);
+    assert_eq!(cell.col(), 3);
+    assert_eq!(cell.format_idx, 15);
+    assert!(matches!(
+        CellPos::try_new(65_536, 0),
+        Err(Error::InvalidCellReference(_))
+    ));
+    assert!(matches!(
+        CellPos::try_new(0, 256),
+        Err(Error::InvalidCellReference(_))
+    ));
+}
+
+#[test]
+fn test_writableworksheet_creation() {
+    let ws = WritableWorksheet::new("TestSheet".to_string());
+    assert_eq!(ws.name, "TestSheet");
+    assert!(ws.cells.is_empty());
+    assert!(ws.merged_ranges.is_empty());
+    assert!(ws.column_widths.is_empty());
+}
+
+#[test]
+fn test_writableworksheet_add_cell() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    let cell = WritableCell::new(
+        CellPos::try_new(0, 0).unwrap(),
+        CellValue::Number(100.0),
+        0,
+        None,
+    );
+    ws.add_cell(cell);
+    assert_eq!(ws.cells.len(), 1);
+}
+
+#[test]
+fn test_writableworksheet_set_column_width() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    ws.set_column_width(crate::writer::Column::new(0).unwrap(), 2560); // ~10 characters
+    assert_eq!(ws.column_widths.get(&0), Some(&2560));
+}
+
+#[test]
+fn test_writableworksheet_merge_cells() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    ws.add_merged_range(MergedRange::try_new(0, 1, 0, 2).unwrap()); // Merge A1:C2
+    assert_eq!(ws.merged_ranges.len(), 1);
+    assert_eq!(ws.merged_ranges[0].fields(), (0, 1, 0, 2));
+}
+
+#[test]
+fn test_writableworksheet_freeze_panes() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    assert!(ws.view.pane().is_none());
+    ws.set_freeze_panes(crate::writer::FrozenPanes::new(
+        crate::writer::Row::new(1).unwrap(),
+        crate::writer::Column::new(2).unwrap(),
+    ))
+    .unwrap();
+    let pane = ws.view.pane().unwrap();
+    assert_eq!(pane.vertical(), 1);
+    assert_eq!(pane.horizontal(), 2);
+}
+
+#[test]
+fn test_writableworksheet_add_conditional_format() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    let cf = ConditionalFormat {
+        first_row: 0,
+        last_row: 10,
+        first_col: 0,
+        last_col: 0,
+        format_type: ConditionalFormatType::Formula {
+            formula: "A1>100".to_string(),
+        },
+        pattern: None,
+    };
+    ws.add_conditional_format(cf);
+    assert_eq!(ws.conditional_formats.len(), 1);
+}
+
+#[test]
+fn test_writableworksheet_add_data_validation() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    let dv = DataValidation {
+        range: DataValidationRange::new(0, 10, 0, 0).unwrap(),
+        validation_type: DataValidationType::List {
+            values: vec!["Option1".to_string(), "Option2".to_string()],
+        },
+        show_input_message: true,
+        input_title: None,
+        input_message: None,
+        show_error_alert: true,
+        error_title: None,
+        error_message: None,
+    };
+    let payload = dv.validation_type.to_biff_payload().unwrap();
+    ws.add_data_validation(
+        dv,
+        payload,
+        vec![DataValidationRange::new(0, 9, 0, 0).unwrap()],
+        DataValidationOptions::default(),
+    );
+    assert_eq!(ws.data_validations.len(), 1);
+}
+
+#[test]
+fn test_writableworksheet_add_hyperlink() {
+    let mut ws = WritableWorksheet::new("Sheet1".to_string());
+    let link = Hyperlink {
+        first_row: 0,
+        last_row: 0,
+        first_col: 0,
+        last_col: 0,
+        url: "https://example.com".to_string(),
+    };
+    ws.add_hyperlink(link);
+    assert_eq!(ws.hyperlinks.len(), 1);
+    assert_eq!(ws.hyperlinks[0].url, "https://example.com");
+}
+
+#[test]
+fn test_xls_defined_name_basic() {
+    let name = DefinedName {
+        name: "TestRange".to_string(),
+        reference: "A1:B10".to_string(),
+        comment: None,
+        local_sheet: None,
+        target_sheet: Some(0),
+        hidden: false,
+        is_function: false,
+        is_built_in: false,
+        built_in_code: None,
+    };
+    assert_eq!(name.name, "TestRange");
+    assert_eq!(name.reference, "A1:B10");
+    assert_eq!(name.target_sheet, Some(0));
+}
+
+#[test]
+fn test_xls_defined_name_to_biff_formula_area() {
+    let name = DefinedName {
+        name: "TestRange".to_string(),
+        reference: "A1:B10".to_string(),
+        comment: None,
+        local_sheet: None,
+        target_sheet: Some(0),
+        hidden: false,
+        is_function: false,
+        is_built_in: false,
+        built_in_code: None,
+    };
+    let formula = name.to_biff_formula().unwrap();
+    assert!(!formula.is_empty());
+}
+
+#[test]
+fn test_xls_defined_name_normalizes_reversed_area_corners() {
+    let forward = DefinedName {
+        name: "Forward".to_string(),
+        reference: "A1:B10".to_string(),
+        comment: None,
+        local_sheet: None,
+        target_sheet: Some(0),
+        hidden: false,
+        is_function: false,
+        is_built_in: false,
+        built_in_code: None,
+    };
+    let reversed = DefinedName {
+        name: "Reversed".to_string(),
+        reference: "B10:A1".to_string(),
+        ..forward.clone()
+    };
+
+    assert_eq!(
+        reversed.to_biff_formula().unwrap(),
+        forward.to_biff_formula().unwrap()
+    );
+}
+
+#[test]
+fn test_xls_defined_name_to_biff_formula_single() {
+    let name = DefinedName {
+        name: "SingleCell".to_string(),
+        reference: "C5".to_string(),
+        comment: None,
+        local_sheet: None,
+        target_sheet: None,
+        hidden: false,
+        is_function: false,
+        is_built_in: false,
+        built_in_code: None,
+    };
+    let formula = name.to_biff_formula().unwrap();
+    assert!(!formula.is_empty());
+}
+
+/// A string cell that did not come through `write_string` (a pivot label or
+/// table header could be one) is still refused when it cannot be an SST entry,
+/// before anything reaches the destination.
+#[test]
+fn a_string_cell_longer_than_an_sst_entry_is_refused_before_any_output() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    writer.write_string(sheet, 0, 0, "fits").unwrap();
+    for value in ["x".repeat(0x1_0000), format!("{}😀", "a".repeat(0xFFFE))] {
+        writer.worksheets[sheet].add_cell(WritableCell::new(
+            CellPos::try_new(5, 2).unwrap(),
+            CellValue::String(value),
+            0,
+            None,
+        ));
+        let result = writer.build();
+        assert!(
+            matches!(
+                result,
+                Err(crate::package::Error::Reader(Error::StringTooLong {
+                    field: "shared string",
+                    utf16_units: 0x1_0000,
+                    limit: 0xFFFF,
+                }))
+            ),
+            "{result:?}"
+        );
+    }
+}
+
+/// A string written over a data-table anchor is emitted as the anchor's
+/// `PtgTbl` formula, not as a `LabelSst`; the string cells after it in row
+/// and column order must still take their own indices.
+#[test]
+fn string_cells_after_a_data_table_anchor_keep_their_shared_strings() {
+    let mut writer = Builder::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    let table = crate::DataTable::one_variable(
+        crate::DataTableRange::new(1, 2, 1, 2).unwrap(),
+        false,
+        crate::DataTableInputCell::Deleted,
+    );
+    writer.add_data_table(sheet, 0, 0, table).unwrap();
+    writer.write_string(sheet, 0, 0, "shadowed").unwrap();
+    let expected = [
+        (0u32, 1u16, "first"),
+        (0, 4, "shadowed"),
+        (3, 0, "second"),
+        (3, 1, "first"),
+        (7, 3, "third"),
+    ];
+    for (row, col, value) in expected.iter().rev() {
+        writer.write_string(sheet, *row, *col, value).unwrap();
+    }
+
+    let mut output = Cursor::new(Vec::new());
+    writer.build().unwrap().write_to(&mut output).unwrap();
+    let workbook = crate::raw::Reader::new(Cursor::new(output.into_inner())).unwrap();
+    let worksheet = workbook.xls_worksheet(0).unwrap();
+    assert!(worksheet.get_cell(0, 0).unwrap().formula_bytes().is_some());
+    for (row, col, value) in expected {
+        assert_eq!(
+            worksheet.get_cell(row, u32::from(col)).unwrap().value(),
+            &litchi_core::sheet::CellValue::String(value.to_string()),
+            "{row} {col}"
+        );
+    }
+}

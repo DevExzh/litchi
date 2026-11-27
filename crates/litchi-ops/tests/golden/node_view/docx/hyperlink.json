@@ -1,0 +1,12 @@
+{
+  "path": "/body/p[2]/hyperlink[1]",
+  "type": "hyperlink",
+  "text": "the report",
+  "childCount": 0,
+  "format": {
+    "url": "https://example.com/report",
+    "tooltip": "Open the report",
+    "rStyle": "Hyperlink"
+  },
+  "children": []
+}

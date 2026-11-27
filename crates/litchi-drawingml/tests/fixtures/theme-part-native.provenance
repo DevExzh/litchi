@@ -1,0 +1,8 @@
+Source archive: test-data/ooxml/xlsb/hyperlink.xlsb
+Source archive SHA-256: 6675f4bde45d1291e1d56783b7abe2857f56837ca674c7877dfc125fb49a4724
+ZIP member: xl/theme/theme1.xml
+ZIP member SHA-256: 50b662d8ff0e562157ff80aa19c85ff214cd21357d66457661d070f50c6fdc59
+Extraction: exact unmodified member bytes, including XML declaration and final newline.
+Native extension: a:ext uri="{05A4C25C-085E-4340-85A3-A5531E510DB2}" containing thm15:themeFamily.
+Shared family namespace: http://schemas.microsoft.com/office/thememl/2012/main
+Normative owner: MS-XLSB 2.1.7.52 delegates Theme XML to ECMA-376 Theme content.

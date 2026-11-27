@@ -55,36 +55,117 @@
 //! - MS-CFB specification: Section 2.6 (Compound File Directory Sectors)
 //! - MS-DOC specification: Section 2.3 (File Structure)
 
-use super::super::consts::*;
+use super::super::consts::{DIRENTRY_SIZE, NOSTREAM, STGTY_ROOT, STGTY_STORAGE, STGTY_STREAM};
+use super::super::file::OleError;
+use crate::directory_name::{DirectoryNameData, directory_name_data as parse_directory_name};
+use smallvec::SmallVec;
+use std::cmp::Ordering;
 use std::collections::HashMap;
+
+const DIRECTORY_BITSET_WORD_BITS: usize = u64::BITS as usize;
+
+/// Fallible compact membership tracking for directory-tree validation.
+///
+/// The bounded writer must not let a validation bitmap allocation panic after
+/// planning has accepted a finite directory.  This is intentionally local to
+/// the writer so the established reader and writer share no mutable state.
+#[derive(Debug)]
+struct DirectoryBitSet {
+    words: Vec<u64>,
+    bit_len: usize,
+}
+
+impl DirectoryBitSet {
+    fn try_with_capacity(bit_len: usize) -> Result<Self, OleError> {
+        let word_count = bit_len.div_ceil(DIRECTORY_BITSET_WORD_BITS);
+        let mut words = Vec::new();
+        words
+            .try_reserve_exact(word_count)
+            .map_err(|source| OleError::allocation("directory validation bitmap", source))?;
+        words.resize(word_count, 0);
+        Ok(Self { words, bit_len })
+    }
+
+    #[inline]
+    fn contains(&self, bit: usize) -> bool {
+        if bit >= self.bit_len {
+            return false;
+        }
+        let word = bit / DIRECTORY_BITSET_WORD_BITS;
+        let mask = 1_u64 << (bit % DIRECTORY_BITSET_WORD_BITS);
+        self.words.get(word).is_some_and(|value| value & mask != 0)
+    }
+
+    #[inline]
+    fn insert(&mut self, bit: usize) -> Result<(), OleError> {
+        if bit >= self.bit_len {
+            return Err(OleError::InvalidData(
+                "CFB directory validation bit index is out of range".to_string(),
+            ));
+        }
+        let word = bit / DIRECTORY_BITSET_WORD_BITS;
+        let mask = 1_u64 << (bit % DIRECTORY_BITSET_WORD_BITS);
+        self.words[word] |= mask;
+        Ok(())
+    }
+
+    fn count_ones(&self) -> usize {
+        self.words
+            .iter()
+            .map(|word| usize::try_from(word.count_ones()).unwrap_or(usize::MAX))
+            .sum()
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+enum NodeColor {
+    Red = 0,
+    Black = 1,
+}
 
 /// Directory entry builder
 #[derive(Debug, Clone)]
-pub struct DirectoryEntryBuilder {
+struct DirectoryEntryBuilder {
     /// Entry name
-    pub name: String,
-    /// Entry type (STGTY_STORAGE, STGTY_STREAM, etc.)
-    pub entry_type: u8,
+    name: String,
+    /// Entry type (`STGTY_STORAGE`, `STGTY_STREAM`, etc.)
+    entry_type: u8,
     /// Starting sector
-    pub start_sector: u32,
+    start_sector: u32,
     /// Stream size
-    pub size: u64,
+    size: u64,
     /// Left sibling SID
-    pub sid_left: u32,
+    sid_left: u32,
     /// Right sibling SID
-    pub sid_right: u32,
+    sid_right: u32,
     /// Child SID
-    pub sid_child: u32,
+    sid_child: u32,
     /// CLSID (Class ID) - 16 bytes, optional
-    pub clsid: Option<[u8; 16]>,
+    clsid: Option<[u8; 16]>,
+    /// User-defined state bits.
+    state_bits: u32,
+    /// Exact Windows FILETIME creation value.
+    creation_time: u64,
+    /// Exact Windows FILETIME modification value.
+    modified_time: u64,
+    name_utf16: SmallVec<[u16; 32]>,
+    comparison_name: SmallVec<[u16; 32]>,
+    node_color: NodeColor,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl DirectoryEntryBuilder {
     /// Create a new root entry
-    pub fn root(start_sector: u32, size: u64) -> Self {
+    fn root(start_sector: u32, size: u64) -> Self {
+        let name = "Root Entry".to_string();
+        let name_utf16 = "Root Entry".encode_utf16().collect();
+        let comparison_name = "ROOT ENTRY".encode_utf16().collect();
         Self {
-            name: "Root Entry".to_string(),
+            name,
             entry_type: STGTY_ROOT,
             start_sector,
             size,
@@ -92,6 +173,12 @@ impl DirectoryEntryBuilder {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: None,
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+            name_utf16,
+            comparison_name,
+            node_color: NodeColor::Black,
         }
     }
 
@@ -112,13 +199,14 @@ impl DirectoryEntryBuilder {
     /// let mut root = DirectoryEntryBuilder::root();
     /// root.set_clsid(word_clsid);
     /// ```
-    pub fn set_clsid(&mut self, clsid: [u8; 16]) {
+    fn set_clsid(&mut self, clsid: [u8; 16]) {
         self.clsid = Some(clsid);
     }
 
     /// Create a new stream entry
-    pub fn stream(name: String, start_sector: u32, size: u64) -> Self {
-        Self {
+    fn stream(name: String, start_sector: u32, size: u64) -> Result<Self, OleError> {
+        let (name_utf16, comparison_name) = directory_name_data(&name)?;
+        Ok(Self {
             name,
             entry_type: STGTY_STREAM,
             start_sector,
@@ -127,12 +215,19 @@ impl DirectoryEntryBuilder {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: None,
-        }
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+            name_utf16,
+            comparison_name,
+            node_color: NodeColor::Black,
+        })
     }
 
     /// Create a new storage entry
-    pub fn storage(name: String) -> Self {
-        Self {
+    fn storage(name: String) -> Result<Self, OleError> {
+        let (name_utf16, comparison_name) = directory_name_data(&name)?;
+        Ok(Self {
             name,
             entry_type: STGTY_STORAGE,
             start_sector: 0,
@@ -141,32 +236,41 @@ impl DirectoryEntryBuilder {
             sid_right: NOSTREAM,
             sid_child: NOSTREAM,
             clsid: None,
-        }
+            state_bits: 0,
+            creation_time: 0,
+            modified_time: 0,
+            name_utf16,
+            comparison_name,
+            node_color: NodeColor::Black,
+        })
     }
 
     /// Write this entry to bytes (128 bytes per OLE2 spec)
-    pub fn to_bytes(&self) -> Vec<u8> {
-        let mut data = vec![0u8; 128];
+    fn to_bytes(&self) -> Result<[u8; DIRENTRY_SIZE], OleError> {
+        let (name_utf16, comparison_name) = directory_name_data(&self.name)?;
+        if name_utf16 != self.name_utf16 || comparison_name != self.comparison_name {
+            return Err(OleError::InvalidData(
+                "CFB directory entry name was mutated after validation".to_string(),
+            ));
+        }
 
-        // Encode name to UTF-16LE (max 31 characters + null)
-        let utf16: Vec<u16> = self.name.encode_utf16().collect();
-        let name_len = utf16.len().min(31);
-
-        for (i, &ch) in utf16.iter().take(name_len).enumerate() {
+        let mut data = [0u8; DIRENTRY_SIZE];
+        for (i, &ch) in self.name_utf16.iter().enumerate() {
             let bytes = ch.to_le_bytes();
             data[i * 2] = bytes[0];
             data[i * 2 + 1] = bytes[1];
         }
 
         // Name length in bytes (including null terminator)
-        let name_len_bytes = ((name_len + 1) * 2) as u16;
+        let name_len_bytes = u16::try_from((self.name_utf16.len() + 1) * 2).map_err(|_err| {
+            OleError::InvalidData("CFB directory name length exceeds u16".to_string())
+        })?;
         data[64..66].copy_from_slice(&name_len_bytes.to_le_bytes());
 
         // Entry type
         data[66] = self.entry_type;
 
-        // Node color (always black = 1 for simplicity)
-        data[67] = 1;
+        data[67] = self.node_color as u8;
 
         // Sibling and child SIDs
         data[68..72].copy_from_slice(&self.sid_left.to_le_bytes());
@@ -180,11 +284,9 @@ impl DirectoryEntryBuilder {
         }
         // Otherwise data[80..96] remains zeros
 
-        // State bits (all zeros)
-        // data[96..100] already zeros
-
-        // Creation and modification times (all zeros for now)
-        // data[100..116] already zeros
+        data[96..100].copy_from_slice(&self.state_bits.to_le_bytes());
+        data[100..108].copy_from_slice(&self.creation_time.to_le_bytes());
+        data[108..116].copy_from_slice(&self.modified_time.to_le_bytes());
 
         // Starting sector
         data[116..120].copy_from_slice(&self.start_sector.to_le_bytes());
@@ -192,7 +294,7 @@ impl DirectoryEntryBuilder {
         // Stream size (8 bytes)
         data[120..128].copy_from_slice(&self.size.to_le_bytes());
 
-        data
+        Ok(data)
     }
 }
 
@@ -200,7 +302,7 @@ impl DirectoryEntryBuilder {
 ///
 /// Builds a directory tree from streams and storages, organizing them
 /// as a simple list (not a true red-black tree for simplicity).
-pub struct DirectoryBuilder {
+pub(crate) struct DirectoryBuilder {
     /// List of directory entries; index is the SID
     entries: Vec<DirectoryEntryBuilder>,
     /// Map from full path components to SID for storage nodes
@@ -209,10 +311,40 @@ pub struct DirectoryBuilder {
     children: HashMap<u32, Vec<u32>>,
 }
 
-#[allow(dead_code)] // These methods are part of the public API for future use
+#[allow(
+    dead_code,
+    reason = "builder API kept complete for symmetry and future use"
+)]
 impl DirectoryBuilder {
+    /// Fallible constructor used by bounded writers.
+    pub(crate) fn try_new(ministream_start: u32, ministream_size: u64) -> Result<Self, OleError> {
+        let root = DirectoryEntryBuilder::root(ministream_start, ministream_size);
+        let mut entries = Vec::new();
+        entries
+            .try_reserve_exact(1)
+            .map_err(|source| OleError::allocation("directory entries", source))?;
+        entries.push(root);
+
+        let mut path_to_sid = HashMap::new();
+        path_to_sid
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory path index", source))?;
+        path_to_sid.insert(Vec::new(), 0);
+
+        let mut children = HashMap::new();
+        children
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory child index", source))?;
+        children.insert(0, Vec::new());
+        Ok(Self {
+            entries,
+            path_to_sid,
+            children,
+        })
+    }
+
     /// Create a new directory builder with root entry
-    pub fn new(ministream_start: u32, ministream_size: u64) -> Self {
+    pub(crate) fn new(ministream_start: u32, ministream_size: u64) -> Self {
         let root = DirectoryEntryBuilder::root(ministream_start, ministream_size);
         let mut path_to_sid = HashMap::new();
         path_to_sid.insert(Vec::new(), 0);
@@ -230,62 +362,221 @@ impl DirectoryBuilder {
     /// # Arguments
     ///
     /// * `clsid` - 16-byte CLSID
-    pub fn set_root_clsid(&mut self, clsid: [u8; 16]) {
+    pub(crate) fn set_root_clsid(&mut self, clsid: [u8; 16]) {
         if !self.entries.is_empty() {
             self.entries[0].set_clsid(clsid);
         }
     }
 
+    /// Set the root storage state bits.
+    pub(crate) fn set_root_state_bits(&mut self, state_bits: u32) {
+        if let Some(root) = self.entries.first_mut() {
+            root.state_bits = state_bits;
+        }
+    }
+
+    /// Set the fresh root storage creation time, which must be zero.
+    pub(crate) fn set_root_creation_time(&mut self, creation_time: u64) -> Result<(), OleError> {
+        if creation_time != 0 {
+            return Err(OleError::InvalidData(
+                "CFB fresh root creation time must be zero".to_string(),
+            ));
+        }
+        self.set_root_creation_time_from_source(0);
+        Ok(())
+    }
+
+    /// Set the root storage creation time exactly as supplied by a source.
+    pub(crate) fn set_root_creation_time_from_source(&mut self, creation_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.creation_time = creation_time;
+        }
+    }
+
+    /// Set the root storage modification time.
+    pub(crate) fn set_root_modified_time(&mut self, modified_time: u64) {
+        if let Some(root) = self.entries.first_mut() {
+            root.modified_time = modified_time;
+        }
+    }
+
+    /// Set the CLSID for an existing storage path.
+    pub(crate) fn set_storage_clsid(
+        &mut self,
+        path: &[String],
+        clsid: [u8; 16],
+    ) -> Result<(), OleError> {
+        let sid = self.path_to_sid.get(path).copied().ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {path:?} does not exist"))
+        })?;
+        self.entries[sid as usize].set_clsid(clsid);
+        Ok(())
+    }
+
+    /// Set the raw state and FILETIME fields for an existing storage.
+    pub(crate) fn set_storage_metadata(
+        &mut self,
+        path: &[String],
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let sid = self.path_to_sid.get(path).copied().ok_or_else(|| {
+            OleError::InvalidData(format!("CFB storage path {path:?} does not exist"))
+        })?;
+        let entry = self.entries.get_mut(sid as usize).ok_or_else(|| {
+            OleError::InvalidData("CFB storage metadata SID is out of range".to_string())
+        })?;
+        if entry.entry_type != STGTY_STORAGE {
+            return Err(OleError::InvalidData(
+                "CFB directory metadata target is not a storage".to_string(),
+            ));
+        }
+        entry.state_bits = state_bits;
+        entry.creation_time = creation_time;
+        entry.modified_time = modified_time;
+        Ok(())
+    }
+
+    /// Set the raw state and FILETIME fields for an entry just added as a
+    /// stream. The SID returned by [`Self::add_stream_path`] avoids retaining
+    /// a cloned full stream path in the storage-only path index.
+    pub(crate) fn set_stream_metadata_sid(
+        &mut self,
+        sid: u32,
+        state_bits: u32,
+        creation_time: u64,
+        modified_time: u64,
+    ) -> Result<(), OleError> {
+        let entry = self.entries.get_mut(sid as usize).ok_or_else(|| {
+            OleError::InvalidData("CFB stream metadata SID is out of range".to_string())
+        })?;
+        if entry.entry_type != STGTY_STREAM {
+            return Err(OleError::InvalidData(
+                "CFB directory metadata target is not a stream".to_string(),
+            ));
+        }
+        entry.state_bits = state_bits;
+        entry.creation_time = creation_time;
+        entry.modified_time = modified_time;
+        Ok(())
+    }
+
     /// Ensure a storage path exists, creating missing storages.
     /// Returns the SID of the storage at the given path.
-    pub fn add_storage_path(&mut self, path: &[String]) -> u32 {
+    pub(crate) fn add_storage_path(&mut self, path: &[String]) -> Result<u32, OleError> {
         // parent path accumulates
         let mut current_path: Vec<String> = Vec::new();
         let mut parent_sid = 0u32;
 
         for component in path {
-            current_path.push(component.clone());
+            current_path
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory current path", source))?;
+            current_path.push(clone_string(component, "directory path component")?);
             if let Some(&sid) = self.path_to_sid.get(&current_path) {
                 parent_sid = sid;
                 continue;
             }
 
             // create new storage
-            let sid = self.entries.len() as u32;
-            let entry = DirectoryEntryBuilder::storage(component.clone());
+            let entry =
+                DirectoryEntryBuilder::storage(clone_string(component, "directory storage name")?)?;
+            self.ensure_unique_child(parent_sid, &entry)?;
+            let sid = u32::try_from(self.entries.len()).map_err(|_err| {
+                OleError::InvalidData("CFB directory contains too many entries".to_string())
+            })?;
+            let key = clone_path(&current_path, "directory path index")?;
+            self.entries
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory entries", source))?;
+            self.path_to_sid
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory path index", source))?;
+            self.children
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory child index", source))?;
+            self.children
+                .get_mut(&parent_sid)
+                .ok_or_else(|| {
+                    OleError::InvalidData("CFB directory parent is missing".to_string())
+                })?
+                .try_reserve(1)
+                .map_err(|source| OleError::allocation("directory sibling list", source))?;
             self.entries.push(entry);
-            self.path_to_sid.insert(current_path.clone(), sid);
+            self.path_to_sid.insert(key, sid);
 
             // register as child of previous parent
-            self.children.entry(parent_sid).or_default().push(sid);
+            self.children
+                .get_mut(&parent_sid)
+                .ok_or_else(|| {
+                    OleError::InvalidData("CFB directory parent is missing".to_string())
+                })?
+                .push(sid);
             // initialize its children vec
-            self.children.entry(sid).or_default();
+            self.children.insert(sid, Vec::new());
 
             parent_sid = sid;
         }
 
-        parent_sid
+        Ok(parent_sid)
     }
 
     /// Add a stream at the given full path (parent storages will be created automatically)
-    pub fn add_stream_path(&mut self, full_path: &[String], start_sector: u32, size: u64) -> u32 {
-        assert!(!full_path.is_empty(), "stream path must not be empty");
+    pub(crate) fn add_stream_path(
+        &mut self,
+        full_path: &[String],
+        start_sector: u32,
+        size: u64,
+    ) -> Result<u32, OleError> {
+        if full_path.is_empty() {
+            return Err(OleError::InvalidData(
+                "CFB stream path must not be empty".to_string(),
+            ));
+        }
         let parent_sid = if full_path.len() > 1 {
-            self.add_storage_path(&full_path[..full_path.len() - 1])
+            self.add_storage_path(&full_path[..full_path.len() - 1])?
         } else {
             0
         };
 
-        let name = full_path.last().unwrap().clone();
-        let sid = self.entries.len() as u32;
-        let entry = DirectoryEntryBuilder::stream(name, start_sector, size);
+        let Some(name) = full_path.last() else {
+            return Err(OleError::InvalidData(
+                "CFB stream path must not be empty".to_string(),
+            ));
+        };
+        let entry = DirectoryEntryBuilder::stream(
+            clone_string(name, "directory stream name")?,
+            start_sector,
+            size,
+        )?;
+        self.ensure_unique_child(parent_sid, &entry)?;
+        let sid = u32::try_from(self.entries.len()).map_err(|_err| {
+            OleError::InvalidData("CFB directory contains too many entries".to_string())
+        })?;
+        self.entries
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory entries", source))?;
+        self.children
+            .get_mut(&parent_sid)
+            .ok_or_else(|| OleError::InvalidData("CFB directory parent is missing".to_string()))?
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory sibling list", source))?;
         self.entries.push(entry);
-        self.children.entry(parent_sid).or_default().push(sid);
-        sid
+        self.children
+            .get_mut(&parent_sid)
+            .ok_or_else(|| OleError::InvalidData("CFB directory parent is missing".to_string()))?
+            .push(sid);
+        Ok(sid)
     }
 
     /// Add a stream to the root directory (compat wrapper)
-    pub fn add_stream(&mut self, name: String, start_sector: u32, size: u64) -> u32 {
+    pub(crate) fn add_stream(
+        &mut self,
+        name: String,
+        start_sector: u32,
+        size: u64,
+    ) -> Result<u32, OleError> {
         let path = vec![name];
         self.add_stream_path(&path, start_sector, size)
     }
@@ -299,13 +590,30 @@ impl DirectoryBuilder {
     /// # Returns
     ///
     /// * `u32` - SID of the added storage
-    pub fn add_storage(&mut self, name: String) -> u32 {
-        let sid = self.entries.len() as u32;
-        let entry = DirectoryEntryBuilder::storage(name);
+    pub(crate) fn add_storage(&mut self, name: String) -> Result<u32, OleError> {
+        let entry = DirectoryEntryBuilder::storage(name)?;
+        self.ensure_unique_child(0, &entry)?;
+        let sid = u32::try_from(self.entries.len()).map_err(|_err| {
+            OleError::InvalidData("CFB directory contains too many entries".to_string())
+        })?;
+        self.entries
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory entries", source))?;
+        self.children
+            .get_mut(&0)
+            .ok_or_else(|| OleError::InvalidData("CFB directory root is missing".to_string()))?
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory sibling list", source))?;
+        self.children
+            .try_reserve(1)
+            .map_err(|source| OleError::allocation("directory child index", source))?;
         self.entries.push(entry);
-
-        // Tree will be built when generating directory stream
-        sid
+        self.children
+            .get_mut(&0)
+            .ok_or_else(|| OleError::InvalidData("CFB directory root is missing".to_string()))?
+            .push(sid);
+        self.children.insert(sid, Vec::new());
+        Ok(sid)
     }
 
     /// Generate directory sectors as bytes
@@ -313,118 +621,378 @@ impl DirectoryBuilder {
     /// # Returns
     ///
     /// * `Vec<u8>` - Concatenated directory entries (128 bytes each)
-    pub fn generate_directory_stream(&mut self) -> Vec<u8> {
-        // Link children for each storage/root using POI comparator and midpoint rules
-        let storage_sids: Vec<u32> = self
+    pub(crate) fn generate_directory_stream(&mut self) -> Result<Vec<u8>, OleError> {
+        // Prepare all fallible serialization work before linking the sibling
+        // trees.  A name can be mutated through the builder's `name` field after
+        // construction; `to_bytes` rejects that stale cached state.  Keeping
+        // this validation (and the output allocation) ahead of tree mutation
+        // makes serialization-preparation failures leave the builder unchanged.
+        let byte_len = self
             .entries
-            .iter()
-            .enumerate()
-            .filter_map(|(sid, e)| {
-                if e.entry_type == STGTY_ROOT || e.entry_type == STGTY_STORAGE {
-                    Some(sid as u32)
-                } else {
-                    None
-                }
-            })
-            .collect();
+            .len()
+            .checked_mul(DIRENTRY_SIZE)
+            .ok_or_else(|| {
+                OleError::InvalidData("CFB directory stream size overflows usize".to_string())
+            })?;
+        let mut data = Vec::new();
+        data.try_reserve_exact(byte_len)
+            .map_err(|source| OleError::allocation("directory stream", source))?;
+        for entry in &self.entries {
+            entry.to_bytes()?;
+        }
 
+        let mut storage_sids = Vec::new();
+        storage_sids
+            .try_reserve_exact(self.entries.len())
+            .map_err(|source| OleError::allocation("directory storage IDs", source))?;
+        for (sid, entry) in self.entries.iter().enumerate() {
+            if entry.entry_type == STGTY_ROOT || entry.entry_type == STGTY_STORAGE {
+                storage_sids.push(u32::try_from(sid).map_err(|_err| {
+                    OleError::InvalidData("CFB directory contains too many entries".to_string())
+                })?);
+            }
+        }
+
+        let children = &self.children;
+        let entries = &mut self.entries;
         for parent_sid in storage_sids {
-            if let Some(children) = self.children.get(&parent_sid).cloned() {
-                Self::link_children(parent_sid, &children, &mut self.entries);
+            if let Some(child_sids) = children.get(&parent_sid) {
+                Self::link_children(parent_sid, child_sids, entries)?;
             } else {
                 // no children: ensure sid_child remains NOSTREAM
-                self.entries[parent_sid as usize].sid_child = NOSTREAM;
+                entries[parent_sid as usize].sid_child = NOSTREAM;
             }
         }
 
         // Serialize entries in SID order
-        let mut data = Vec::with_capacity(self.entries.len() * 128);
-        for entry in &self.entries {
-            data.extend_from_slice(&entry.to_bytes());
+        for entry in entries {
+            data.extend_from_slice(&entry.to_bytes()?);
         }
-        data
+        Ok(data)
     }
 
-    /// Link a parent's children list using POI's comparator and midpoint rules
-    fn link_children(parent_sid: u32, child_sids: &[u32], entries: &mut [DirectoryEntryBuilder]) {
+    fn compare_entries(left: &DirectoryEntryBuilder, right: &DirectoryEntryBuilder) -> Ordering {
+        left.name_utf16
+            .len()
+            .cmp(&right.name_utf16.len())
+            .then_with(|| left.comparison_name.cmp(&right.comparison_name))
+    }
+
+    fn ensure_unique_child(
+        &self,
+        parent_sid: u32,
+        candidate: &DirectoryEntryBuilder,
+    ) -> Result<(), OleError> {
+        if self
+            .children
+            .get(&parent_sid)
+            .into_iter()
+            .flatten()
+            .any(|sid| {
+                Self::compare_entries(&self.entries[*sid as usize], candidate) == Ordering::Equal
+            })
+        {
+            return Err(OleError::InvalidData(format!(
+                "duplicate CFB sibling name {:?}",
+                candidate.name
+            )));
+        }
+        Ok(())
+    }
+
+    fn color(entries: &[DirectoryEntryBuilder], sid: u32) -> NodeColor {
+        if sid == NOSTREAM {
+            NodeColor::Black
+        } else {
+            entries[sid as usize].node_color
+        }
+    }
+
+    fn rotate_left(
+        root: &mut u32,
+        pivot: u32,
+        parents: &mut [u32],
+        entries: &mut [DirectoryEntryBuilder],
+    ) {
+        let child = entries[pivot as usize].sid_right;
+        let child_left = entries[child as usize].sid_left;
+        entries[pivot as usize].sid_right = child_left;
+        if child_left != NOSTREAM {
+            parents[child_left as usize] = pivot;
+        }
+        let pivot_parent = parents[pivot as usize];
+        parents[child as usize] = pivot_parent;
+        if pivot_parent == NOSTREAM {
+            *root = child;
+        } else if pivot == entries[pivot_parent as usize].sid_left {
+            entries[pivot_parent as usize].sid_left = child;
+        } else {
+            entries[pivot_parent as usize].sid_right = child;
+        }
+        entries[child as usize].sid_left = pivot;
+        parents[pivot as usize] = child;
+    }
+
+    fn rotate_right(
+        root: &mut u32,
+        pivot: u32,
+        parents: &mut [u32],
+        entries: &mut [DirectoryEntryBuilder],
+    ) {
+        let child = entries[pivot as usize].sid_left;
+        let child_right = entries[child as usize].sid_right;
+        entries[pivot as usize].sid_left = child_right;
+        if child_right != NOSTREAM {
+            parents[child_right as usize] = pivot;
+        }
+        let pivot_parent = parents[pivot as usize];
+        parents[child as usize] = pivot_parent;
+        if pivot_parent == NOSTREAM {
+            *root = child;
+        } else if pivot == entries[pivot_parent as usize].sid_right {
+            entries[pivot_parent as usize].sid_right = child;
+        } else {
+            entries[pivot_parent as usize].sid_left = child;
+        }
+        entries[child as usize].sid_right = pivot;
+        parents[pivot as usize] = child;
+    }
+
+    fn fix_after_insert(
+        root: &mut u32,
+        mut sid: u32,
+        parents: &mut [u32],
+        entries: &mut [DirectoryEntryBuilder],
+    ) {
+        while Self::color(entries, parents[sid as usize]) == NodeColor::Red {
+            let parent = parents[sid as usize];
+            let grandparent = parents[parent as usize];
+            if parent == entries[grandparent as usize].sid_left {
+                let uncle = entries[grandparent as usize].sid_right;
+                if Self::color(entries, uncle) == NodeColor::Red {
+                    entries[parent as usize].node_color = NodeColor::Black;
+                    entries[uncle as usize].node_color = NodeColor::Black;
+                    entries[grandparent as usize].node_color = NodeColor::Red;
+                    sid = grandparent;
+                } else {
+                    if sid == entries[parent as usize].sid_right {
+                        sid = parent;
+                        Self::rotate_left(root, sid, parents, entries);
+                    }
+                    let rotated_parent = parents[sid as usize];
+                    let rotated_grandparent = parents[rotated_parent as usize];
+                    entries[rotated_parent as usize].node_color = NodeColor::Black;
+                    entries[rotated_grandparent as usize].node_color = NodeColor::Red;
+                    Self::rotate_right(root, rotated_grandparent, parents, entries);
+                }
+            } else {
+                let uncle = entries[grandparent as usize].sid_left;
+                if Self::color(entries, uncle) == NodeColor::Red {
+                    entries[parent as usize].node_color = NodeColor::Black;
+                    entries[uncle as usize].node_color = NodeColor::Black;
+                    entries[grandparent as usize].node_color = NodeColor::Red;
+                    sid = grandparent;
+                } else {
+                    if sid == entries[parent as usize].sid_left {
+                        sid = parent;
+                        Self::rotate_right(root, sid, parents, entries);
+                    }
+                    let rotated_parent = parents[sid as usize];
+                    let rotated_grandparent = parents[rotated_parent as usize];
+                    entries[rotated_parent as usize].node_color = NodeColor::Black;
+                    entries[rotated_grandparent as usize].node_color = NodeColor::Red;
+                    Self::rotate_left(root, rotated_grandparent, parents, entries);
+                }
+            }
+        }
+        entries[*root as usize].node_color = NodeColor::Black;
+    }
+
+    /// Link a parent's children as a conforming red-black sibling tree.
+    fn link_children(
+        parent_sid: u32,
+        child_sids: &[u32],
+        entries: &mut [DirectoryEntryBuilder],
+    ) -> Result<(), OleError> {
         if child_sids.is_empty() {
             entries[parent_sid as usize].sid_child = NOSTREAM;
-            return;
+            return Ok(());
         }
 
-        // Sort SIDs using comparator on names
-        let mut sorted: Vec<u32> = child_sids.to_vec();
-        sorted.sort_by(|&a, &b| {
-            let name1 = &entries[a as usize].name;
-            let name2 = &entries[b as usize].name;
-            let len1 = name1.len();
-            let len2 = name2.len();
-            match len1.cmp(&len2) {
-                std::cmp::Ordering::Equal => {
-                    if name1 == "_VBA_PROJECT" {
-                        return std::cmp::Ordering::Greater;
-                    }
-                    if name2 == "_VBA_PROJECT" {
-                        return std::cmp::Ordering::Less;
-                    }
-                    if name1.starts_with("__") && name2.starts_with("__") {
-                        return name1.to_uppercase().cmp(&name2.to_uppercase());
-                    }
-                    if name1.starts_with("__") {
-                        return std::cmp::Ordering::Greater;
-                    }
-                    if name2.starts_with("__") {
-                        return std::cmp::Ordering::Less;
-                    }
-                    name1.to_uppercase().cmp(&name2.to_uppercase())
-                },
-                other => other,
+        let mut parents = Vec::new();
+        parents
+            .try_reserve_exact(entries.len())
+            .map_err(|source| OleError::allocation("directory tree parents", source))?;
+        parents.resize(entries.len(), NOSTREAM);
+
+        // Prepare every fallible validation allocation before changing any
+        // sibling links.  A bounded allocation failure must leave the
+        // builder's tree unchanged for callers that retry serialization.
+        let mut members = DirectoryBitSet::try_with_capacity(entries.len())?;
+        for &sid in child_sids {
+            let index = usize::try_from(sid).unwrap_or(usize::MAX);
+            if index >= entries.len() || members.contains(index) {
+                return Err(OleError::InvalidData(
+                    "CFB sibling list contains an invalid or duplicate SID".to_string(),
+                ));
             }
-        });
-
-        let midpoint = sorted.len() / 2;
-        entries[parent_sid as usize].sid_child = sorted[midpoint];
-
-        // Initialize first element
-        entries[sorted[0] as usize].sid_left = NOSTREAM;
-        entries[sorted[0] as usize].sid_right = NOSTREAM;
-
-        // Left chain up to midpoint-1
-        for j in 1..midpoint {
-            let sid = sorted[j] as usize;
-            entries[sid].sid_left = sorted[j - 1];
-            entries[sid].sid_right = NOSTREAM;
+            members.insert(index)?;
         }
+        let mut visited = DirectoryBitSet::try_with_capacity(entries.len())?;
+        let stack_capacity = child_sids.len().checked_add(1).ok_or_else(|| {
+            OleError::InvalidData("CFB sibling stack size overflows usize".to_string())
+        })?;
+        let mut stack = Vec::new();
+        stack
+            .try_reserve_exact(stack_capacity)
+            .map_err(|source| OleError::allocation("directory validation stack", source))?;
 
-        // Midpoint element
-        if midpoint > 0 {
-            entries[sorted[midpoint] as usize].sid_left = sorted[midpoint - 1];
-        } else {
-            entries[sorted[midpoint] as usize].sid_left = NOSTREAM;
-        }
+        let mut root = NOSTREAM;
+        for &sid in child_sids {
+            entries[sid as usize].sid_left = NOSTREAM;
+            entries[sid as usize].sid_right = NOSTREAM;
+            entries[sid as usize].node_color = NodeColor::Red;
 
-        if midpoint < sorted.len() - 1 {
-            entries[sorted[midpoint] as usize].sid_right = sorted[midpoint + 1];
-            for j in (midpoint + 1)..(sorted.len() - 1) {
-                let sid = sorted[j] as usize;
-                entries[sid].sid_left = NOSTREAM;
-                entries[sid].sid_right = sorted[j + 1];
+            let mut parent = NOSTREAM;
+            let mut cursor = root;
+            let mut ordering = Ordering::Equal;
+            while cursor != NOSTREAM {
+                parent = cursor;
+                ordering = Self::compare_entries(&entries[sid as usize], &entries[cursor as usize]);
+                cursor = match ordering {
+                    Ordering::Less => entries[cursor as usize].sid_left,
+                    Ordering::Greater => entries[cursor as usize].sid_right,
+                    Ordering::Equal => {
+                        return Err(OleError::InvalidData(format!(
+                            "duplicate CFB sibling name {:?}",
+                            entries[sid as usize].name
+                        )));
+                    },
+                };
             }
-            entries[*sorted.last().unwrap() as usize].sid_left = NOSTREAM;
-            entries[*sorted.last().unwrap() as usize].sid_right = NOSTREAM;
-        } else {
-            entries[sorted[midpoint] as usize].sid_right = NOSTREAM;
+            parents[sid as usize] = parent;
+            if parent == NOSTREAM {
+                root = sid;
+            } else if ordering == Ordering::Less {
+                entries[parent as usize].sid_left = sid;
+            } else {
+                entries[parent as usize].sid_right = sid;
+            }
+            Self::fix_after_insert(&mut root, sid, &mut parents, entries);
         }
+
+        entries[parent_sid as usize].sid_child = root;
+        Self::validate_child_tree(root, entries, &members, &mut visited, &mut stack)
+    }
+
+    fn validate_child_tree(
+        root: u32,
+        entries: &[DirectoryEntryBuilder],
+        members: &DirectoryBitSet,
+        visited: &mut DirectoryBitSet,
+        stack: &mut Vec<(u32, Option<u32>, Option<u32>, usize)>,
+    ) -> Result<(), OleError> {
+        if Self::color(entries, root) != NodeColor::Black {
+            return Err(OleError::InvalidData(
+                "CFB sibling-tree root must be black".to_string(),
+            ));
+        }
+        let mut expected_black_depth = None;
+        stack.clear();
+        stack.push((root, None, None, 0usize));
+        while let Some((sid, lower, upper, black_depth)) = stack.pop() {
+            if sid == NOSTREAM {
+                let leaf_depth = black_depth + 1;
+                if expected_black_depth
+                    .replace(leaf_depth)
+                    .is_some_and(|depth| depth != leaf_depth)
+                {
+                    return Err(OleError::InvalidData(
+                        "CFB sibling tree has inconsistent black height".to_string(),
+                    ));
+                }
+                continue;
+            }
+            let index = sid as usize;
+            if index >= entries.len() || !members.contains(index) || visited.contains(index) {
+                return Err(OleError::InvalidData(
+                    "CFB sibling tree contains an invalid, foreign, or repeated SID".to_string(),
+                ));
+            }
+            visited.insert(index)?;
+            let entry = &entries[index];
+            if lower.is_some_and(|bound: u32| {
+                Self::compare_entries(&entries[bound as usize], entry) != Ordering::Less
+            }) || upper.is_some_and(|bound: u32| {
+                Self::compare_entries(entry, &entries[bound as usize]) != Ordering::Less
+            }) {
+                return Err(OleError::InvalidData(
+                    "CFB sibling tree violates directory-name ordering".to_string(),
+                ));
+            }
+            if entry.node_color == NodeColor::Red
+                && (Self::color(entries, entry.sid_left) == NodeColor::Red
+                    || Self::color(entries, entry.sid_right) == NodeColor::Red)
+            {
+                return Err(OleError::InvalidData(
+                    "CFB sibling tree contains adjacent red nodes".to_string(),
+                ));
+            }
+            let child_black_depth = black_depth + usize::from(entry.node_color == NodeColor::Black);
+            stack.push((entry.sid_right, Some(sid), upper, child_black_depth));
+            stack.push((entry.sid_left, lower, Some(sid), child_black_depth));
+        }
+        if visited.count_ones() != members.count_ones() {
+            return Err(OleError::InvalidData(
+                "CFB sibling tree does not reach every child".to_string(),
+            ));
+        }
+        Ok(())
     }
 
     /// Get the number of directory entries
-    pub fn entry_count(&self) -> usize {
+    pub(crate) fn entry_count(&self) -> usize {
         self.entries.len()
     }
 }
 
+#[allow(
+    clippy::type_complexity,
+    reason = "the paired UTF-16 name and comparison-key SmallVecs are clearer inline than behind a type alias"
+)]
+fn directory_name_data(name: &str) -> Result<(SmallVec<[u16; 32]>, SmallVec<[u16; 32]>), OleError> {
+    let DirectoryNameData { utf16, comparison } =
+        parse_directory_name(name).map_err(|error| OleError::InvalidData(error.to_string()))?;
+    Ok((utf16, comparison))
+}
+
+fn clone_string(value: &str, resource: &'static str) -> Result<String, OleError> {
+    let mut cloned = String::new();
+    cloned
+        .try_reserve(value.len())
+        .map_err(|source| OleError::allocation(resource, source))?;
+    cloned.push_str(value);
+    Ok(cloned)
+}
+
+fn clone_path(path: &[String], resource: &'static str) -> Result<Vec<String>, OleError> {
+    let mut cloned = Vec::new();
+    cloned
+        .try_reserve_exact(path.len())
+        .map_err(|source| OleError::allocation(resource, source))?;
+    for component in path {
+        cloned.push(clone_string(component, resource)?);
+    }
+    Ok(cloned)
+}
+
 #[cfg(test)]
 mod tests {
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        reason = "test assertions panic on failure by design"
+    )]
     use super::*;
 
     #[test]
@@ -433,13 +1001,13 @@ mod tests {
         assert_eq!(root.name, "Root Entry");
         assert_eq!(root.entry_type, STGTY_ROOT);
 
-        let bytes = root.to_bytes();
+        let bytes = root.to_bytes().unwrap();
         assert_eq!(bytes.len(), 128);
     }
 
     #[test]
     fn test_stream_entry() {
-        let stream = DirectoryEntryBuilder::stream("Test".to_string(), 10, 512);
+        let stream = DirectoryEntryBuilder::stream("Test".to_string(), 10, 512).unwrap();
         assert_eq!(stream.entry_type, STGTY_STREAM);
         assert_eq!(stream.start_sector, 10);
         assert_eq!(stream.size, 512);
@@ -448,12 +1016,65 @@ mod tests {
     #[test]
     fn test_directory_builder() {
         let mut dir = DirectoryBuilder::new(0, 0);
-        let sid = dir.add_stream("Stream1".to_string(), 5, 1024);
+        let sid = dir.add_stream("Stream1".to_string(), 5, 1024).unwrap();
 
         assert_eq!(sid, 1);
         assert_eq!(dir.entry_count(), 2); // Root + 1 stream
 
-        let data = dir.generate_directory_stream();
+        let data = dir.generate_directory_stream().unwrap();
         assert_eq!(data.len(), 2 * 128); // 2 entries * 128 bytes each
+    }
+
+    #[test]
+    fn rejects_invalid_and_ambiguous_sibling_names() {
+        assert!(DirectoryEntryBuilder::stream(String::new(), 0, 0).is_err());
+        assert!(DirectoryEntryBuilder::stream("bad/name".to_string(), 0, 0).is_err());
+        assert!(DirectoryEntryBuilder::stream("a".repeat(32), 0, 0).is_err());
+        assert!(DirectoryEntryBuilder::stream("😀".repeat(16), 0, 0).is_err());
+
+        let mut directory = DirectoryBuilder::new(0, 0);
+        directory.add_stream("Report".to_string(), 0, 0).unwrap();
+        assert!(directory.add_stream("report".to_string(), 0, 0).is_err());
+    }
+
+    #[test]
+    fn serializes_maximum_utf16_name_without_truncation() {
+        let name = format!("{}x", "😀".repeat(15));
+        let entry = DirectoryEntryBuilder::stream(name, 0, 0).unwrap();
+        let bytes = entry.to_bytes().unwrap();
+        assert_eq!(u16::from_le_bytes([bytes[64], bytes[65]]), 64);
+        assert_eq!(&bytes[60..64], &[b'x', 0, 0, 0]);
+    }
+
+    #[test]
+    fn builds_valid_red_black_trees_for_adversarial_sibling_counts() {
+        for count in 1..=64 {
+            let mut directory = DirectoryBuilder::new(0, 0);
+            for index in 0..count {
+                directory
+                    .add_stream(format!("stream-{index:03}"), index, 8)
+                    .unwrap();
+            }
+            let bytes = directory.generate_directory_stream().unwrap();
+            assert_eq!(bytes.len(), (count as usize + 1) * DIRENTRY_SIZE);
+        }
+    }
+
+    #[test]
+    fn failed_serialization_does_not_mutate_sibling_tree() {
+        let mut directory = DirectoryBuilder::new(0, 0);
+        let first = directory.add_stream("First".to_string(), 0, 0).unwrap();
+        let second = directory.add_stream("Second".to_string(), 1, 0).unwrap();
+
+        directory.entries[first as usize].name.push('x');
+        assert!(directory.generate_directory_stream().is_err());
+
+        assert_eq!(directory.entries[0].sid_child, NOSTREAM);
+        for sid in [first, second] {
+            let entry = &directory.entries[sid as usize];
+            assert_eq!(entry.sid_left, NOSTREAM);
+            assert_eq!(entry.sid_right, NOSTREAM);
+            assert_eq!(entry.node_color, NodeColor::Black);
+        }
     }
 }

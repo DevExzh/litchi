@@ -1,0 +1,3294 @@
+//! Borrowed slide, layout, and master part views.
+
+use std::borrow::Cow;
+use std::collections::HashSet;
+
+use litchi_ooxml_common::mce::{Capabilities, Limits as MceLimits, process_markup_compatibility};
+use litchi_ooxml_common::xml::{DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE};
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::{OpcPackage, Part, SourceLimits};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::reader::{NsReader, Reader};
+
+use super::{
+    MceCapture, invalid, processed_xml, processed_xml_with_source, raw_xml, related_part_by_type,
+    validate_content_type, validate_source_part_xml,
+};
+use crate::leniency::{MarkupDefect, ToleranceReport};
+use crate::notes::SlideRootProof;
+use crate::shape::Scene;
+use crate::{Error, Result};
+use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+
+// The semantic sink deliberately uses a smaller, stream-specific policy than
+// the general PresentationML part reader. It retains at most one selected
+// slide string and never retains the processed XML after that slide returns.
+const MAX_SEMANTIC_TEXT_RAW_XML_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES: usize = 64 * 1024 * 1024;
+const MAX_SEMANTIC_TEXT_EVENTS: usize = 1_000_000;
+const MAX_SEMANTIC_TEXT_DEPTH: usize = 128;
+const MAX_SEMANTIC_TEXT_RUNS: usize = 100_000;
+const MAX_SEMANTIC_TEXT_OBJECTS: usize = 100_000;
+const MAX_SEMANTIC_TEXT_EVENT_BYTES: usize = 1024 * 1024;
+const MAX_SEMANTIC_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
+const MAX_SEMANTIC_TEXT_BYTES: usize = 16 * 1024 * 1024;
+const MAX_LAYOUT_REFERENCES: usize = 4_096;
+const MIN_NATIVE_ID: u32 = 2_147_483_648;
+
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum PresentationNamespace {
+    Transitional,
+    Strict,
+}
+
+fn presentation_namespace(namespace: &ResolveResult<'_>) -> Option<PresentationNamespace> {
+    match namespace {
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::namespace::PRESENTATIONML_NAMESPACE =>
+        {
+            Some(PresentationNamespace::Transitional)
+        },
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE =>
+        {
+            Some(PresentationNamespace::Strict)
+        },
+        _ => None,
+    }
+}
+
+fn same_presentation_namespace(
+    root: Option<PresentationNamespace>,
+    namespace: &ResolveResult<'_>,
+) -> bool {
+    let Some(root) = root else {
+        return false;
+    };
+    Some(root) == presentation_namespace(namespace)
+}
+
+fn root_name_from_xml(xml: &[u8]) -> Result<String> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader.read_resolved_event()?;
+        match event {
+            Event::Start(element) | Event::Empty(element) => {
+                if !crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    element.local_name().as_ref(),
+                ) {
+                    return Err(invalid("PresentationML part has an invalid root namespace"));
+                }
+                return String::from_utf8(element.local_name().as_ref().to_vec())
+                    .map_err(|_err| invalid("PresentationML root name is not UTF-8"));
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            _ => return Err(invalid("PresentationML part lacks an element root")),
+        }
+    }
+}
+
+fn root_name(part: &dyn Part) -> Result<String> {
+    let xml = processed_xml(part)?;
+    root_name_from_xml(xml.as_ref())
+}
+
+fn c_sld_name_from_xml(xml: &[u8]) -> Result<Option<String>> {
+    crate::namespace::presentation_name(xml)
+}
+
+fn c_sld_name(part: &dyn Part) -> Result<Option<String>> {
+    let xml = processed_xml(part)?;
+    c_sld_name_from_xml(xml.as_ref())
+}
+
+fn c_sld_authored_name_from_xml(xml: &[u8]) -> Result<Option<String>> {
+    let mut reader = NsReader::from_reader(xml);
+    loop {
+        let (namespace, event) = reader.read_resolved_event()?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"cSld",
+                ) =>
+            {
+                return Ok(litchi_ooxml_common::xml::unqualified_attribute_value(
+                    &element,
+                    b"name",
+                    reader.decoder(),
+                )?);
+            },
+            Event::Eof => return Ok(None),
+            _ => {},
+        }
+    }
+}
+
+fn c_sld_authored_name(part: &dyn Part) -> Result<Option<String>> {
+    let xml = processed_xml(part)?;
+    c_sld_authored_name_from_xml(xml.as_ref())
+}
+
+/// Read the ordered `p:sldLayoutIdLst` relationship references owned by a
+/// slide master. The OPC relationship collection may contain stale or
+/// producer-private edges; the XML list is the semantic owner of the layout
+/// inventory.
+fn layout_relationship_ids(part: &dyn Part) -> Result<Vec<String>> {
+    let xml = processed_xml(part)?;
+    let mut reader = NsReader::from_reader(xml.as_ref());
+    let mut depth = 0usize;
+    let mut roots = 0usize;
+    let mut root_namespace = None;
+    let mut lists = 0usize;
+    let mut list_depth: Option<usize> = None;
+    let mut reference_depth: Option<usize> = None;
+    let mut opaque_depth: Option<usize> = None;
+    let mut extension_seen = false;
+    let mut root_extension_seen = false;
+    let mut relationship_ids = Vec::new();
+    let mut seen_relationship_ids = HashSet::new();
+    let mut native_ids = HashSet::new();
+
+    loop {
+        let (namespace, event) = reader.read_resolved_event()?;
+        match event {
+            Event::Start(_) if opaque_depth.is_some() => {
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?;
+            },
+            Event::Empty(_) if opaque_depth.is_some() => {},
+            Event::End(_) if opaque_depth.is_some() => {
+                if opaque_depth == Some(depth) {
+                    opaque_depth = None;
+                }
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| invalid("slide-master XML nesting underflow"))?;
+            },
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) if opaque_depth.is_some() => {},
+            Event::Start(element) => {
+                let is_root = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldMaster",
+                );
+                let is_list = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutIdLst",
+                );
+                let is_reference = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutId",
+                );
+                let is_extension = is_layout_extension(&namespace, element.name());
+                let is_root_extension =
+                    crate::namespace::is_presentationml_name(&namespace, element.name(), b"extLst");
+                if is_extension
+                    && ((reference_depth == Some(depth))
+                        || (reference_depth.is_none() && depth == 1))
+                    && !same_presentation_namespace(root_namespace, &namespace)
+                {
+                    return Err(invalid("slide-master extension list has mixed conformance"));
+                }
+                if reference_depth == Some(depth) && is_extension {
+                    if extension_seen {
+                        return Err(invalid(
+                            "slide-layout reference has duplicate extension lists",
+                        ));
+                    }
+                    extension_seen = true;
+                    opaque_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                    );
+                } else if reference_depth.is_none() && depth == 1 && is_root_extension {
+                    if root_extension_seen {
+                        return Err(invalid("slide-master has duplicate root extension lists"));
+                    }
+                    root_extension_seen = true;
+                    opaque_depth = Some(
+                        depth
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                    );
+                } else {
+                    if reference_depth.is_some() {
+                        return Err(invalid(
+                            "slide-layout reference contains an unexpected child",
+                        ));
+                    }
+                    if depth == 0 {
+                        roots = roots
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML root count overflow"))?;
+                        if !is_root {
+                            return Err(invalid("slide-master XML has an invalid root"));
+                        }
+                        root_namespace =
+                            Some(presentation_namespace(&namespace).ok_or_else(|| {
+                                invalid("slide-master XML has an invalid root namespace")
+                            })?);
+                    }
+                    if is_list {
+                        if depth != 1 || lists != 0 {
+                            return Err(invalid(
+                                "slide-layout ID list must be one direct root child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout ID list has mixed conformance"));
+                        }
+                        lists = lists
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-layout ID list count overflow"))?;
+                        reject_layout_id_list_attributes(&element)?;
+                        list_depth = Some(
+                            depth
+                                .checked_add(1)
+                                .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                        );
+                    } else if is_reference {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "slide-layout reference is not a direct list child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout reference has mixed conformance"));
+                        }
+                        append_layout_relationship_id(
+                            &mut relationship_ids,
+                            &mut seen_relationship_ids,
+                            &mut native_ids,
+                            &element,
+                            &reader,
+                        )?;
+                        reference_depth = Some(
+                            depth
+                                .checked_add(1)
+                                .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?,
+                        );
+                        extension_seen = false;
+                    } else if element.local_name().as_ref() == b"sldLayoutIdLst" {
+                        return Err(invalid("slide-layout ID list has an invalid namespace"));
+                    } else if depth == 1 && element.local_name().as_ref() == b"extLst" {
+                        return Err(invalid(
+                            "slide-master extension list has an invalid namespace",
+                        ));
+                    } else if list_depth == Some(depth) {
+                        return Err(invalid("slide-layout ID list contains an unexpected child"));
+                    }
+                }
+                depth = depth
+                    .checked_add(1)
+                    .ok_or_else(|| invalid("slide-master XML nesting is too deep"))?;
+            },
+            Event::Empty(element) => {
+                let is_root = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldMaster",
+                );
+                let is_list = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutIdLst",
+                );
+                let is_reference = crate::namespace::is_presentationml_name(
+                    &namespace,
+                    element.name(),
+                    b"sldLayoutId",
+                );
+                let is_extension = is_layout_extension(&namespace, element.name());
+                let is_root_extension =
+                    crate::namespace::is_presentationml_name(&namespace, element.name(), b"extLst");
+                if is_extension
+                    && ((reference_depth == Some(depth))
+                        || (reference_depth.is_none() && depth == 1))
+                    && !same_presentation_namespace(root_namespace, &namespace)
+                {
+                    return Err(invalid("slide-master extension list has mixed conformance"));
+                }
+                if reference_depth == Some(depth) && is_extension {
+                    if extension_seen {
+                        return Err(invalid(
+                            "slide-layout reference has duplicate extension lists",
+                        ));
+                    }
+                    extension_seen = true;
+                } else if reference_depth.is_none() && depth == 1 && is_root_extension {
+                    if root_extension_seen {
+                        return Err(invalid("slide-master has duplicate root extension lists"));
+                    }
+                    root_extension_seen = true;
+                } else {
+                    if reference_depth.is_some() {
+                        return Err(invalid(
+                            "slide-layout reference contains an unexpected child",
+                        ));
+                    }
+                    if depth == 0 {
+                        roots = roots
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-master XML root count overflow"))?;
+                        if !is_root {
+                            return Err(invalid("slide-master XML has an invalid root"));
+                        }
+                        root_namespace =
+                            Some(presentation_namespace(&namespace).ok_or_else(|| {
+                                invalid("slide-master XML has an invalid root namespace")
+                            })?);
+                    }
+                    if is_list {
+                        if depth != 1 || lists != 0 {
+                            return Err(invalid(
+                                "slide-layout ID list must be one direct root child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout ID list has mixed conformance"));
+                        }
+                        lists = lists
+                            .checked_add(1)
+                            .ok_or_else(|| invalid("slide-layout ID list count overflow"))?;
+                        reject_layout_id_list_attributes(&element)?;
+                    } else if is_reference {
+                        if list_depth != Some(depth) {
+                            return Err(invalid(
+                                "slide-layout reference is not a direct list child",
+                            ));
+                        }
+                        if !same_presentation_namespace(root_namespace, &namespace) {
+                            return Err(invalid("slide-layout reference has mixed conformance"));
+                        }
+                        append_layout_relationship_id(
+                            &mut relationship_ids,
+                            &mut seen_relationship_ids,
+                            &mut native_ids,
+                            &element,
+                            &reader,
+                        )?;
+                    } else if element.local_name().as_ref() == b"sldLayoutIdLst" {
+                        return Err(invalid("slide-layout ID list has an invalid namespace"));
+                    } else if depth == 1 && element.local_name().as_ref() == b"extLst" {
+                        return Err(invalid(
+                            "slide-master extension list has an invalid namespace",
+                        ));
+                    } else if list_depth == Some(depth) {
+                        return Err(invalid("slide-layout ID list contains an unexpected child"));
+                    }
+                }
+            },
+            Event::End(element) => {
+                if depth == 0 {
+                    return Err(invalid("unexpected closing element in slide-master XML"));
+                }
+                if reference_depth == Some(depth) {
+                    if !same_presentation_namespace(root_namespace, &namespace)
+                        || !crate::namespace::is_presentationml_name(
+                            &namespace,
+                            element.name(),
+                            b"sldLayoutId",
+                        )
+                    {
+                        return Err(invalid(
+                            "slide-layout reference has an invalid closing element",
+                        ));
+                    }
+                    reference_depth = None;
+                    extension_seen = false;
+                }
+                if list_depth == Some(depth)
+                    && same_presentation_namespace(root_namespace, &namespace)
+                    && crate::namespace::is_presentationml_name(
+                        &namespace,
+                        element.name(),
+                        b"sldLayoutIdLst",
+                    )
+                {
+                    list_depth = None;
+                }
+                depth -= 1;
+            },
+            Event::Text(value) if reference_depth == Some(depth) => {
+                if !value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid("slide-layout references contain text content"));
+                }
+            },
+            Event::Text(value) if list_depth == Some(depth) => {
+                if !value
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?
+                    .trim()
+                    .is_empty()
+                {
+                    return Err(invalid("slide-layout ID list contains text content"));
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if reference_depth == Some(depth) => {
+                return Err(invalid(
+                    "slide-layout references contain unsupported content",
+                ));
+            },
+            Event::CData(_) | Event::GeneralRef(_) if list_depth == Some(depth) => {
+                return Err(invalid("slide-layout ID list contains unsupported content"));
+            },
+            Event::DocType(_) => return Err(invalid("DTDs are rejected")),
+            Event::Eof => break,
+            _ => {},
+        }
+    }
+
+    if roots != 1
+        || depth != 0
+        || list_depth.is_some()
+        || reference_depth.is_some()
+        || opaque_depth.is_some()
+    {
+        return Err(invalid("slide-master XML is not a balanced tree"));
+    }
+    Ok(relationship_ids)
+}
+
+fn is_layout_extension(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    crate::namespace::is_presentationml_name(namespace, name, b"extLst")
+}
+
+fn reject_layout_id_list_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let key = attribute.key.as_ref();
+        if key != b"xmlns" && !key.starts_with(b"xmlns:") {
+            return Err(invalid(
+                "slide-layout ID list permits only namespace declarations",
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn append_layout_relationship_id(
+    relationship_ids: &mut Vec<String>,
+    seen_relationship_ids: &mut HashSet<String>,
+    native_ids: &mut HashSet<u32>,
+    element: &quick_xml::events::BytesStart<'_>,
+    reader: &NsReader<&[u8]>,
+) -> Result<()> {
+    if relationship_ids.len() >= MAX_LAYOUT_REFERENCES {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::References),
+            observed: relationship_ids.len().checked_add(1).unwrap_or(usize::MAX),
+            maximum: MAX_LAYOUT_REFERENCES,
+        });
+    }
+    let native_id = parse_layout_native_id(element, reader.decoder())?;
+    if native_id.is_some_and(|id| native_ids.contains(&id)) {
+        return Err(invalid("slide-layout native IDs must be unique"));
+    }
+    let relationship_id = crate::namespace::relationship_attribute_value(
+        element,
+        b"id",
+        reader.decoder(),
+        reader.resolver(),
+    )?
+    .ok_or_else(|| invalid("slide-layout reference lacks r:id"))?;
+    if seen_relationship_ids.contains(&relationship_id) {
+        return Err(invalid("slide-layout relationship IDs must be unique"));
+    }
+    seen_relationship_ids
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "slide-master layout relationship IDs",
+            source,
+        })?;
+    if native_id.is_some() {
+        native_ids
+            .try_reserve(1)
+            .map_err(|source| Error::Allocation {
+                resource: "slide-master layout native IDs",
+                source,
+            })?;
+    }
+    relationship_ids
+        .try_reserve(1)
+        .map_err(|source| Error::Allocation {
+            resource: "slide-master layout references",
+            source,
+        })?;
+    if let Some(native_id) = native_id {
+        native_ids.insert(native_id);
+    }
+    seen_relationship_ids.insert(relationship_id.clone());
+    relationship_ids.push(relationship_id);
+    Ok(())
+}
+
+fn parse_layout_native_id(
+    element: &quick_xml::events::BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Option<u32>> {
+    let Some(value) =
+        litchi_ooxml_common::xml::unqualified_attribute_value(element, b"id", decoder)?
+    else {
+        return Ok(None);
+    };
+    let value = value
+        .parse::<u32>()
+        .ok()
+        .filter(|value| *value >= MIN_NATIVE_ID)
+        .ok_or_else(|| invalid("slide-layout native ID is invalid"))?;
+    Ok(Some(value))
+}
+
+fn root_bool(part: &dyn Part, attribute: &[u8], field: &str, default: bool) -> Result<bool> {
+    let xml = processed_xml(part)?;
+    let mut reader = Reader::from_reader(xml.as_ref());
+    loop {
+        match reader.read_event()? {
+            Event::Start(element) | Event::Empty(element) => {
+                let value = litchi_ooxml_common::xml::unqualified_attribute_value(
+                    &element,
+                    attribute,
+                    reader.decoder(),
+                )?;
+                return value.map_or(Ok(default), |value| match value.as_str() {
+                    "1" | "true" => Ok(true),
+                    "0" | "false" => Ok(false),
+                    _ => Err(invalid(format!("{field} must be 0, 1, true, or false"))),
+                });
+            },
+            Event::Decl(_) | Event::Comment(_) => {},
+            Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+            _ => return Err(invalid("PresentationML part lacks an element root")),
+        }
+    }
+}
+
+fn text_from_part(part: &dyn Part) -> Result<Option<String>> {
+    let value = semantic_text_from_part(part, "\n")?;
+    Ok((!value.is_empty()).then_some(value))
+}
+
+#[derive(Default)]
+struct SemanticTextXmlBudget {
+    events: usize,
+    depth: usize,
+}
+
+impl SemanticTextXmlBudget {
+    fn observe_event(&mut self, event_bytes: usize) -> Result<()> {
+        self.events = self.events.checked_add(1).ok_or_else(|| {
+            Error::Invalid("semantic slide XML event counter overflow".to_string())
+        })?;
+        if self.events > MAX_SEMANTIC_TEXT_EVENTS {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlEvents),
+                observed: self.events,
+                maximum: MAX_SEMANTIC_TEXT_EVENTS,
+            });
+        }
+        if event_bytes > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: event_bytes,
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+            });
+        }
+        Ok(())
+    }
+
+    fn start(&mut self) -> Result<()> {
+        self.depth = self.depth.checked_add(1).ok_or_else(|| {
+            Error::Invalid("semantic slide XML depth counter overflow".to_string())
+        })?;
+        if self.depth > MAX_SEMANTIC_TEXT_DEPTH {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlDepth),
+                observed: self.depth,
+                maximum: MAX_SEMANTIC_TEXT_DEPTH,
+            });
+        }
+        Ok(())
+    }
+
+    fn end(&mut self) -> Result<()> {
+        if self.depth == 0 {
+            return Err(invalid(
+                "semantic slide XML has an unexpected closing element",
+            ));
+        }
+        self.depth -= 1;
+        Ok(())
+    }
+}
+
+fn semantic_event_bytes(event: &Event<'_>) -> usize {
+    match event {
+        Event::Start(element) => element.as_ref().len(),
+        Event::Empty(element) => element.as_ref().len(),
+        Event::End(element) => element.as_ref().len(),
+        Event::Text(text) => text.as_ref().len(),
+        Event::CData(text) => text.as_ref().len(),
+        Event::Comment(comment) => comment.as_ref().len(),
+        Event::DocType(doctype) => doctype.as_ref().len(),
+        Event::PI(pi) => pi.as_ref().len(),
+        Event::Decl(decl) => decl.as_ref().len(),
+        Event::GeneralRef(reference) => reference.as_ref().len(),
+        Event::Eof => 0,
+    }
+}
+
+fn validate_semantic_attributes(element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+    let mut total = 0usize;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let attribute_bytes = attribute
+            .key
+            .as_ref()
+            .len()
+            .checked_add(attribute.value.len())
+            .ok_or_else(|| Error::Invalid("semantic slide XML attribute length overflow".into()))?;
+        total = total
+            .checked_add(attribute_bytes)
+            .ok_or_else(|| Error::Invalid("semantic slide XML attribute length overflow".into()))?;
+        if total > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::XmlAttributeBytes,
+                ),
+                observed: total,
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+            });
+        }
+        let value = attribute
+            .normalized_value(quick_xml::XmlVersion::Implicit1_0)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&value)?;
+    }
+    Ok(())
+}
+
+fn validate_semantic_attribute_names(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+) -> Result<()> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+        let name = attribute.key.as_ref();
+        if name == b"xmlns" || name.starts_with(b"xmlns:") {
+            continue;
+        }
+        if let ResolveResult::Unknown(prefix) = reader.resolver().resolve_attribute(attribute.key).0
+        {
+            return Err(invalid(format!(
+                "unresolved semantic slide attribute namespace prefix '{}'",
+                String::from_utf8_lossy(prefix.as_ref())
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_semantic_element_namespace(namespace: &ResolveResult<'_>) -> Result<()> {
+    if let ResolveResult::Unknown(prefix) = namespace {
+        return Err(invalid(format!(
+            "unresolved semantic slide element namespace prefix '{}'",
+            String::from_utf8_lossy(prefix.as_ref())
+        )));
+    }
+    Ok(())
+}
+
+fn validate_xml_characters(value: &str) -> Result<()> {
+    if value.chars().all(|character| {
+        matches!(
+            character,
+            '\u{9}'
+                | '\u{a}'
+                | '\u{d}'
+                | '\u{20}'..='\u{d7ff}'
+                | '\u{e000}'..='\u{fffd}'
+                | '\u{10000}'..='\u{10ffff}'
+        )
+    }) {
+        Ok(())
+    } else {
+        Err(invalid(
+            "semantic slide XML contains an invalid XML character",
+        ))
+    }
+}
+
+fn validate_xml_comment(comment: &str) -> Result<()> {
+    validate_xml_characters(comment)?;
+    if comment.contains("--") || comment.ends_with('-') {
+        return Err(invalid("semantic slide XML contains an invalid comment"));
+    }
+    Ok(())
+}
+
+fn semantic_mce_limits() -> MceLimits {
+    MceLimits {
+        max_input_bytes: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+        max_output_bytes: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+        max_depth: MAX_SEMANTIC_TEXT_DEPTH,
+        max_namespace_bindings: 4096,
+        max_directive_tokens: 4096,
+        max_choices_per_alternate: 1024,
+        max_attributes_per_element: litchi_ooxml_common::mce::DEFAULT_MAX_ATTRIBUTES_PER_ELEMENT,
+    }
+}
+
+/// A reader configured exactly as both semantic-text passes configure theirs.
+fn semantic_text_reader(xml: &[u8]) -> NsReader<&[u8]> {
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    reader.config_mut().check_end_names = true;
+    reader
+}
+
+/// Where the raw scan is in the slide document. Whether the root is still open
+/// is the element depth, not a phase.
+///
+/// ```text
+/// Start          --XML declaration-----------------------------> Prolog
+/// Start          --comment, processing instruction, whitespace-> Prolog
+/// Start | Prolog --any start or empty-element tag--> Rooted
+/// Prolog | Rooted --comment, processing instruction, whitespace--> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so also a second one;
+/// a top-level element in `Rooted`; text outside the root unless it is
+/// whitespace; CDATA or an entity reference outside the root; a DOCTYPE
+/// anywhere; and the end of input before `Rooted`.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+enum RawRootPhase {
+    /// Nothing has been read.
+    #[default]
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read: inside the root, or after it.
+    Rooted,
+}
+
+/// Raw-byte validation of one slide for semantic text, one event at a time.
+///
+/// [`Self::observe`] applies to each event exactly the checks the raw scan
+/// applies, in the same order, so the stand-alone scan and the single-pass
+/// route refuse the same event with the same error.
+#[derive(Default)]
+struct RawTextScan {
+    budget: SemanticTextXmlBudget,
+    phase: RawRootPhase,
+}
+
+impl RawTextScan {
+    /// Validate one event; returns `true` once the document is complete.
+    ///
+    /// `namespace` is the element namespace `read_resolved_event` returned
+    /// with `event`. For a start, empty or end element that is the value
+    /// `resolve_element(name)` returns against the same bindings, which is
+    /// what the scan validates.
+    fn observe(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        namespace: &ResolveResult<'_>,
+        event: &Event<'_>,
+    ) -> Result<bool> {
+        let declaration_is_first = self.phase == RawRootPhase::Start;
+        if declaration_is_first && !matches!(event, Event::Eof) {
+            self.phase = RawRootPhase::Prolog;
+        }
+        self.budget.observe_event(semantic_event_bytes(event))?;
+        match event {
+            Event::Start(element) => {
+                validate_semantic_attributes(element)?;
+                validate_semantic_attribute_names(reader, element)?;
+                validate_semantic_element_namespace(namespace)?;
+                if self.budget.depth == 0 {
+                    if self.phase == RawRootPhase::Rooted {
+                        return Err(invalid("semantic slide XML has multiple roots"));
+                    }
+                    self.phase = RawRootPhase::Rooted;
+                }
+                self.budget.start()?;
+            },
+            Event::Empty(element) => {
+                validate_semantic_attributes(element)?;
+                validate_semantic_attribute_names(reader, element)?;
+                validate_semantic_element_namespace(namespace)?;
+                if self.budget.depth == 0 {
+                    if self.phase == RawRootPhase::Rooted {
+                        return Err(invalid("semantic slide XML has multiple roots"));
+                    }
+                    self.phase = RawRootPhase::Rooted;
+                }
+            },
+            Event::End(_) => {
+                validate_semantic_element_namespace(namespace)?;
+                self.budget.end()?;
+            },
+            Event::DocType(_) => {
+                return Err(invalid("DTD declarations are not permitted in slide text"));
+            },
+            // A processing instruction is legal XML that carries no slide content;
+            // it is skipped and recorded once by the part's
+            // shape scene.
+            Event::PI(_) => {},
+            Event::Decl(_) => {
+                if !declaration_is_first {
+                    return Err(invalid("XML declarations must be the first document event"));
+                }
+            },
+            Event::Text(text) => {
+                let decoded = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                    });
+                }
+                if self.budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
+                {
+                    return Err(invalid("semantic slide XML has text outside its root"));
+                }
+            },
+            Event::CData(_) if self.budget.depth == 0 => {
+                return Err(invalid("slide XML has CDATA outside its document root"));
+            },
+            Event::CData(text) => {
+                let decoded = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                    });
+                }
+            },
+            Event::Comment(comment) => {
+                let decoded = comment
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_comment(&decoded)?;
+            },
+            Event::GeneralRef(reference) => {
+                if self.budget.depth == 0 {
+                    return Err(invalid("XML entity reference is outside the document root"));
+                }
+                if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::ReferenceBytes,
+                        ),
+                        observed: reference.as_ref().len(),
+                        maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                    });
+                }
+            },
+            Event::Eof => {
+                match self.phase {
+                    RawRootPhase::Start | RawRootPhase::Prolog => {
+                        return Err(invalid("semantic slide XML lacks an element root"));
+                    },
+                    RawRootPhase::Rooted => {},
+                }
+                if self.budget.depth != 0 {
+                    return Err(invalid("semantic slide XML has unbalanced elements"));
+                }
+                return Ok(true);
+            },
+        }
+        Ok(false)
+    }
+}
+
+fn check_semantic_text_raw_len(xml: &[u8]) -> Result<()> {
+    if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: xml.len(),
+            maximum: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+        });
+    }
+    Ok(())
+}
+
+fn scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
+    check_semantic_text_raw_len(xml)?;
+    let mut reader = semantic_text_reader(xml);
+    let mut scan = RawTextScan::default();
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        // `read_resolved_event` is exactly these two steps; splitting them
+        // lets the namespace borrow the reader shared, so the element's
+        // attribute names can be resolved while it is held.
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        if scan.observe(&reader, &namespace, &event)? {
+            return Ok(());
+        }
+    }
+}
+
+fn is_drawingml_element(namespace: &ResolveResult<'_>, name: QName<'_>, local_name: &[u8]) -> bool {
+    if name.local_name().as_ref() != local_name {
+        return false;
+    }
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
+    )
+}
+
+fn is_presentationml_slide(namespace: &ResolveResult<'_>, name: QName<'_>) -> bool {
+    if name.local_name().as_ref() != b"sld" {
+        return false;
+    }
+    matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(value))
+            if *value == crate::namespace::PRESENTATIONML_NAMESPACE
+                || *value == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE
+    )
+}
+
+/// Where the semantic pass is in the slide document. Whether the root is still open
+/// is the element depth, not a phase.
+///
+/// ```text
+/// Start          --XML declaration-----------------------------> Prolog
+/// Start          --comment, processing instruction, whitespace-> Prolog
+/// Start | Prolog --p:sld start or empty-element tag--> Rooted
+/// Prolog | Rooted --comment, processing instruction, whitespace--> unchanged
+/// ```
+///
+/// Refused: an XML declaration anywhere but `Start`, so also a second one;
+/// a top-level element in `Rooted`; text outside the root unless it is
+/// whitespace; CDATA or an entity reference outside the root; a DOCTYPE
+/// anywhere; and the end of input before `Rooted`.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SemanticRootPhase {
+    /// Nothing has been read.
+    Start,
+    /// A declaration, a comment, a processing instruction or whitespace was
+    /// read; no root yet.
+    Prolog,
+    /// The root start tag was read: inside the root, or after it.
+    Rooted,
+}
+
+struct SemanticTextParser<'a> {
+    budget: SemanticTextXmlBudget,
+    output: String,
+    phase: SemanticRootPhase,
+    active_text_depth: Option<usize>,
+    text_has_payload: bool,
+    runs: usize,
+    objects: usize,
+    paragraph_separator: &'a str,
+    /// Depth of the foreign `*:t` element (not DrawingML `a:t`) whose
+    /// subtree is being skipped, if any.
+    foreign_text_depth: Option<usize>,
+    /// The repairs this parse applied: one
+    /// [`MarkupDefect::ForeignTextElement`] per skipped foreign subtree.
+    tolerance: ToleranceReport,
+    /// Whether the raw scan validates each event before this parser reads it.
+    ///
+    /// Only the single-pass route sets it. There the raw scan has already
+    /// accepted the element's attribute values and attribute-name prefixes
+    /// for this very event against these very bindings; both checks are pure
+    /// functions of the two, so repeating them cannot fail and is skipped.
+    /// Every check that is not a repetition of the raw scan still runs.
+    raw_validated: bool,
+}
+
+impl<'a> SemanticTextParser<'a> {
+    fn new(paragraph_separator: &'a str) -> Self {
+        Self {
+            budget: SemanticTextXmlBudget::default(),
+            output: String::new(),
+            phase: SemanticRootPhase::Start,
+            active_text_depth: None,
+            text_has_payload: false,
+            runs: 0,
+            objects: 0,
+            paragraph_separator,
+            foreign_text_depth: None,
+            tolerance: ToleranceReport::default(),
+            raw_validated: false,
+        }
+    }
+
+    /// The parser for the single-pass route, whose raw scan validates every
+    /// event first.
+    fn after_raw_scan(paragraph_separator: &'a str) -> Self {
+        Self {
+            raw_validated: true,
+            ..Self::new(paragraph_separator)
+        }
+    }
+
+    /// The attribute-value check of the semantic pass, which on the
+    /// single-pass route repeats the raw scan's check of the same element.
+    fn validate_attributes(&self, element: &quick_xml::events::BytesStart<'_>) -> Result<()> {
+        if self.raw_validated {
+            debug_assert!(
+                validate_semantic_attributes(element).is_ok(),
+                "the raw scan accepted attributes the semantic pass refuses"
+            );
+            return Ok(());
+        }
+        validate_semantic_attributes(element)
+    }
+
+    /// The attribute-name check of the semantic pass, which on the
+    /// single-pass route repeats the raw scan's check of the same element
+    /// against the same bindings.
+    fn validate_attribute_names(
+        &self,
+        reader: &NsReader<&[u8]>,
+        element: &quick_xml::events::BytesStart<'_>,
+    ) -> Result<()> {
+        if self.raw_validated {
+            debug_assert!(
+                validate_semantic_attribute_names(reader, element).is_ok(),
+                "the raw scan accepted attribute names the semantic pass refuses"
+            );
+            return Ok(());
+        }
+        validate_semantic_attribute_names(reader, element)
+    }
+}
+
+impl<'a> SemanticTextParser<'a> {
+    fn increment(
+        value: &mut usize,
+        limit: usize,
+        kind: crate::error::CodecLimitKind,
+    ) -> Result<()> {
+        *value = value.checked_add(1).ok_or(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(kind),
+            observed: usize::MAX,
+            maximum: limit,
+        })?;
+        if *value > limit {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(kind),
+                observed: *value,
+                maximum: limit,
+            });
+        }
+        Ok(())
+    }
+
+    fn append_output(&mut self, value: &str) -> Result<()> {
+        let observed = self.output.len().checked_add(value.len()).ok_or_else(|| {
+            Error::Invalid("semantic slide decoded text length overflow".to_string())
+        })?;
+        if observed > MAX_SEMANTIC_TEXT_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed,
+                maximum: MAX_SEMANTIC_TEXT_BYTES,
+            });
+        }
+        self.output
+            .try_reserve(value.len())
+            .map_err(|source| Error::Allocation {
+                resource: "semantic slide decoded text",
+                source,
+            })?;
+        self.output.push_str(value);
+        Ok(())
+    }
+
+    fn append_text_fragment(&mut self, value: &str) -> Result<()> {
+        if value.is_empty() {
+            return Ok(());
+        }
+        if !self.text_has_payload {
+            if !self.output.is_empty() {
+                self.append_output(self.paragraph_separator)?;
+            }
+            self.text_has_payload = true;
+        }
+        self.append_output(value)
+    }
+
+    fn finish_text(&mut self) -> Result<()> {
+        if !self.text_has_payload && !self.output.is_empty() {
+            self.append_output(self.paragraph_separator)?;
+        }
+        self.active_text_depth = None;
+        self.text_has_payload = false;
+        Ok(())
+    }
+
+    fn start_element(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &quick_xml::events::BytesStart<'_>,
+    ) -> Result<()> {
+        self.validate_attributes(element)?;
+        if self.foreign_text_depth.is_some() {
+            return Ok(());
+        }
+        if element.name().local_name().as_ref() == b"t" {
+            if !is_drawingml_element(namespace, element.name(), b"t") {
+                self.skip_foreign_text();
+                self.foreign_text_depth = Some(self.budget.depth);
+                return Ok(());
+            }
+            if self.active_text_depth.is_some() {
+                return Err(invalid("nested DrawingML text elements are not permitted"));
+            }
+            Self::increment(
+                &mut self.objects,
+                MAX_SEMANTIC_TEXT_OBJECTS,
+                crate::error::CodecLimitKind::TextObjects,
+            )?;
+            self.active_text_depth = Some(self.budget.depth);
+            self.text_has_payload = false;
+        } else if is_drawingml_element(namespace, element.name(), b"r") {
+            Self::increment(
+                &mut self.runs,
+                MAX_SEMANTIC_TEXT_RUNS,
+                crate::error::CodecLimitKind::TextRuns,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn empty_element(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &quick_xml::events::BytesStart<'_>,
+    ) -> Result<()> {
+        self.validate_attributes(element)?;
+        if self.foreign_text_depth.is_some() {
+            return Ok(());
+        }
+        if element.name().local_name().as_ref() == b"t" {
+            if !is_drawingml_element(namespace, element.name(), b"t") {
+                self.skip_foreign_text();
+                return Ok(());
+            }
+            if self.active_text_depth.is_some() {
+                return Err(invalid("nested DrawingML text elements are not permitted"));
+            }
+            Self::increment(
+                &mut self.objects,
+                MAX_SEMANTIC_TEXT_OBJECTS,
+                crate::error::CodecLimitKind::TextObjects,
+            )?;
+            if !self.output.is_empty() {
+                self.append_output(self.paragraph_separator)?;
+            }
+        } else if is_drawingml_element(namespace, element.name(), b"r") {
+            Self::increment(
+                &mut self.runs,
+                MAX_SEMANTIC_TEXT_RUNS,
+                crate::error::CodecLimitKind::TextRuns,
+            )?;
+        }
+        Ok(())
+    }
+
+    fn end_element(
+        &mut self,
+        namespace: &ResolveResult<'_>,
+        element: &quick_xml::events::BytesEnd<'_>,
+    ) -> Result<()> {
+        if let Some(depth) = self.foreign_text_depth {
+            if depth == self.budget.depth {
+                self.foreign_text_depth = None;
+            }
+            return Ok(());
+        }
+        if element.name().local_name().as_ref() == b"t" {
+            if !is_drawingml_element(namespace, element.name(), b"t") {
+                return Err(invalid(
+                    "foreign text element is not a DrawingML a:t element",
+                ));
+            }
+            if self.active_text_depth != Some(self.budget.depth) {
+                return Err(invalid("unbalanced DrawingML text element"));
+            }
+            self.finish_text()?
+        }
+        Ok(())
+    }
+
+    /// Skip a foreign `*:t` element (an extension payload's `x:t`, a
+    /// PresentationML `p:t`) and its subtree, recording the skip: text
+    /// extraction reads only DrawingML `a:t`.
+    fn skip_foreign_text(&mut self) {
+        self.tolerance.record(MarkupDefect::ForeignTextElement, 0);
+    }
+
+    /// Whether character data belongs to the DrawingML text being read.
+    fn reading_text(&self) -> bool {
+        self.active_text_depth.is_some() && self.foreign_text_depth.is_none()
+    }
+
+    fn text_event(&mut self, text: &quick_xml::events::BytesText<'_>) -> Result<()> {
+        let decoded = text
+            .decode()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let decoded =
+            quick_xml::escape::unescape(&decoded).map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&decoded)?;
+        if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+            });
+        }
+        self.append_text_fragment(&decoded)
+    }
+
+    fn cdata_event(&mut self, text: &quick_xml::events::BytesCData<'_>) -> Result<()> {
+        let decoded = text
+            .decode()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&decoded)?;
+        if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+            });
+        }
+        self.append_text_fragment(&decoded)
+    }
+
+    fn reference_event(&mut self, reference: &quick_xml::events::BytesRef<'_>) -> Result<()> {
+        if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ReferenceBytes,
+                ),
+                observed: reference.as_ref().len(),
+                maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+            });
+        }
+        let decoded = litchi_ooxml_common::xml::decode_xml_reference(reference)
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        validate_xml_characters(&decoded)?;
+        if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(
+                    crate::opened::CodecLimitKind::ReferenceBytes,
+                ),
+                observed: decoded.len(),
+                maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+            });
+        }
+        self.append_text_fragment(&decoded)
+    }
+
+    /// Consume one event read from `reader`, with the element-name check the
+    /// semantic pass applies before the event itself.
+    ///
+    /// `namespace` is the element namespace `read_resolved_event` returned,
+    /// the value `resolve_element(name)` returns against the same bindings.
+    fn consume_event(
+        &mut self,
+        reader: &NsReader<&[u8]>,
+        namespace: ResolveResult<'_>,
+        event: Event<'_>,
+    ) -> Result<bool> {
+        match event {
+            Event::Start(element) => {
+                self.validate_attribute_names(reader, &element)?;
+                self.consume(namespace, Event::Start(element))
+            },
+            Event::Empty(element) => {
+                self.validate_attribute_names(reader, &element)?;
+                self.consume(namespace, Event::Empty(element))
+            },
+            event => self.consume(namespace, event),
+        }
+    }
+
+    fn consume(&mut self, namespace: ResolveResult<'_>, event: Event<'_>) -> Result<bool> {
+        self.budget.observe_event(semantic_event_bytes(&event))?;
+        let declaration_is_first = self.phase == SemanticRootPhase::Start;
+        if declaration_is_first && !matches!(&event, Event::Eof) {
+            self.phase = SemanticRootPhase::Prolog;
+        }
+        match event {
+            Event::Start(element) => {
+                validate_semantic_element_namespace(&namespace)?;
+                if self.budget.depth == 0 {
+                    if self.phase == SemanticRootPhase::Rooted
+                        || !is_presentationml_slide(&namespace, element.name())
+                    {
+                        return Err(invalid("semantic slide XML has an invalid root"));
+                    }
+                    self.phase = SemanticRootPhase::Rooted;
+                }
+                self.budget.start()?;
+                self.start_element(&namespace, &element)?;
+            },
+            Event::Empty(element) => {
+                validate_semantic_element_namespace(&namespace)?;
+                if self.budget.depth == 0 {
+                    if self.phase == SemanticRootPhase::Rooted
+                        || !is_presentationml_slide(&namespace, element.name())
+                    {
+                        return Err(invalid("semantic slide XML has an invalid root"));
+                    }
+                    self.phase = SemanticRootPhase::Rooted;
+                }
+                self.empty_element(&namespace, &element)?;
+            },
+            Event::End(element) => {
+                validate_semantic_element_namespace(&namespace)?;
+                self.end_element(&namespace, &element)?;
+                self.budget.end()?;
+            },
+            Event::Text(text) if self.reading_text() => {
+                self.text_event(&text)?;
+            },
+            Event::CData(text) if self.reading_text() => {
+                self.cdata_event(&text)?;
+            },
+            Event::GeneralRef(reference) if self.reading_text() => {
+                self.reference_event(&reference)?;
+            },
+            Event::Decl(_) => {
+                if !declaration_is_first {
+                    return Err(invalid("XML declarations must be the first document event"));
+                }
+            },
+            Event::Text(text) if self.budget.depth == 0 => {
+                let decoded = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                    });
+                }
+                if !decoded.as_bytes().iter().all(u8::is_ascii_whitespace) {
+                    return Err(invalid("semantic slide XML has text outside its root"));
+                }
+            },
+            Event::Text(text) => {
+                let decoded = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                    });
+                }
+            },
+            // Character data outside DrawingML text is ordinary XML that
+            // carries no slide text: it is validated and
+            // ignored, like a text node there. Inside the root only; the
+            // root-level forms are refused above and by the raw scan.
+            Event::CData(_) if self.budget.depth == 0 => {
+                return Err(invalid("slide XML has CDATA outside its document root"));
+            },
+            Event::GeneralRef(_) if self.budget.depth == 0 => {
+                return Err(invalid("XML entity reference is outside the document root"));
+            },
+            Event::CData(text) => {
+                let decoded = text
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+                if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::TextBytes,
+                        ),
+                        observed: decoded.len(),
+                        maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                    });
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+                    return Err(Error::Limit {
+                        kind: crate::opened::LimitKind::Codec(
+                            crate::opened::CodecLimitKind::ReferenceBytes,
+                        ),
+                        observed: reference.as_ref().len(),
+                        maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                    });
+                }
+                let decoded = litchi_ooxml_common::xml::decode_xml_reference(&reference)
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_characters(&decoded)?;
+            },
+            Event::DocType(_) => {
+                return Err(invalid("DTD declarations are not permitted in slide text"));
+            },
+            // A processing instruction is legal XML that carries no slide content;
+            // it is skipped and recorded once by the part's
+            // shape scene.
+            Event::PI(_) => {},
+            Event::Comment(comment) => {
+                let decoded = comment
+                    .decode()
+                    .map_err(|error| Error::Xml(error.to_string()))?;
+                validate_xml_comment(&decoded)?;
+            },
+            Event::Eof => {
+                return match self.phase {
+                    SemanticRootPhase::Rooted
+                        if self.budget.depth == 0 && self.active_text_depth.is_none() =>
+                    {
+                        Ok(true)
+                    },
+                    SemanticRootPhase::Start
+                    | SemanticRootPhase::Prolog
+                    | SemanticRootPhase::Rooted => {
+                        Err(invalid("semantic slide XML has unbalanced elements"))
+                    },
+                };
+            },
+        }
+        Ok(false)
+    }
+}
+
+fn semantic_text_from_part(part: &dyn Part, paragraph_separator: &str) -> Result<String> {
+    semantic_text_from_part_with_tolerance(
+        part,
+        paragraph_separator,
+        &mut ToleranceReport::default(),
+    )
+}
+
+/// [`semantic_text_from_part`], appending the repairs the read applied to
+/// `tolerance`, stamped with the part name.
+fn semantic_text_from_part_with_tolerance(
+    part: &dyn Part,
+    paragraph_separator: &str,
+    tolerance: &mut ToleranceReport,
+) -> Result<String> {
+    let (text, mut repairs) = semantic_text_and_repairs(part.blob(), paragraph_separator)?;
+    if !repairs.is_clean() {
+        repairs.locate_in_part(part.partname().as_str());
+        tolerance.append(&repairs);
+    }
+    Ok(text)
+}
+
+fn semantic_text_and_repairs(
+    raw: &[u8],
+    paragraph_separator: &str,
+) -> Result<(String, ToleranceReport)> {
+    check_semantic_text_raw_len(raw)?;
+    // Markup-compatibility processing is a pure function of the raw bytes,
+    // so running it before the raw scan changes no value; only the order in
+    // which failures are reported could move, and both routes below restore
+    // the scan-first order.
+    let processed =
+        process_markup_compatibility(raw, &Capabilities::ooxml_baseline(), &semantic_mce_limits());
+    // The single pass drops the processed-size check below. A borrowed MCE
+    // output is the raw slice, already within the raw ceiling, so that check
+    // cannot fire while the processed ceiling is at least the raw one (both
+    // are 64 MiB). Changing either limit must keep this ordering or restore
+    // the check on the single-pass route.
+    const _: () = assert!(
+        MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES >= MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+        "the single-pass semantic text route relies on the processed ceiling covering the raw one"
+    );
+    if let Ok(output) = &processed
+        && let Cow::Borrowed(unchanged) = &output.xml
+        && std::ptr::eq(*unchanged, raw)
+    {
+        // A marker-free slide: the processed bytes are the raw bytes, which
+        // are within both ceilings, so the two passes would read one event
+        // stream. Read it once.
+        return semantic_text_single_pass(raw, paragraph_separator);
+    }
+    scan_raw_semantic_text_xml(raw)?;
+    let processed = processed?;
+    if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
+        return Err(Error::Limit {
+            kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+            observed: processed.xml.len(),
+            maximum: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+        });
+    }
+    parse_semantic_text(processed.xml.as_ref(), paragraph_separator)
+}
+
+/// The semantic pass over already-scanned, MCE-processed slide XML.
+fn parse_semantic_text(xml: &[u8], paragraph_separator: &str) -> Result<(String, ToleranceReport)> {
+    let mut reader = semantic_text_reader(xml);
+    let mut parser = SemanticTextParser::new(paragraph_separator);
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        // `read_resolved_event` is exactly these two steps; splitting them
+        // lets the namespace borrow the reader shared, so the element's
+        // attribute names can be resolved while it is held.
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        if parser.consume_event(&reader, namespace, event)? {
+            return Ok((parser.output, parser.tolerance));
+        }
+    }
+}
+
+/// Both passes over one event stream, for a slide whose processed bytes are
+/// its raw bytes.
+///
+/// The raw scan refuses before the semantic pass ever starts, so a raw
+/// failure at any event outranks a semantic failure at any event, earlier or
+/// later. Each event is therefore validated by the raw scan first, and a raw
+/// failure is returned at once; a semantic failure is only recorded, the
+/// semantic pass stops, and the raw scan continues to the end, where the
+/// recorded failure is returned only if the raw scan passed. The semantic
+/// pass consumes exactly the prefix of the stream it would have consumed
+/// alone, so its value and its first failure are unchanged.
+fn semantic_text_single_pass(
+    xml: &[u8],
+    paragraph_separator: &str,
+) -> Result<(String, ToleranceReport)> {
+    let mut reader = semantic_text_reader(xml);
+    let mut scan = RawTextScan::default();
+    let mut parser = SemanticTextParser::after_raw_scan(paragraph_separator);
+    let mut deferred = None;
+    loop {
+        let event = reader
+            .read_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        // `read_resolved_event` is exactly these two steps; splitting them
+        // lets the namespace borrow the reader shared, so the element's
+        // attribute names can be resolved while it is held.
+        let (namespace, event) = reader.resolver().resolve_event(event);
+        let complete = scan.observe(&reader, &namespace, &event)?;
+        if deferred.is_none() {
+            match parser.consume_event(&reader, namespace, event) {
+                Ok(finished) => debug_assert_eq!(
+                    finished, complete,
+                    "the semantic pass finished on a different event from the raw scan"
+                ),
+                Err(error) => deferred = Some(error),
+            }
+        }
+        if complete {
+            return match deferred {
+                Some(error) => Err(error),
+                None => Ok((parser.output, parser.tolerance)),
+            };
+        }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    /// Proved slide-root classifications reused on this thread, for tests
+    /// that must show a capture skipped the scan rather than only that its
+    /// result is right.
+    static PROVED_ROOT_HITS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+    /// Complete notes-root scans run on this thread, including the debug
+    /// re-derivation of every reused classification.
+    static ROOT_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// Return and reset this thread's count of reused slide-root classifications.
+#[cfg(test)]
+pub(crate) fn take_proved_root_hits() -> usize {
+    PROVED_ROOT_HITS.with(|hits| hits.replace(0))
+}
+
+/// Return and reset this thread's count of complete notes-root scans.
+#[cfg(test)]
+pub(crate) fn take_root_scans() -> usize {
+    ROOT_SCANS.with(|scans| scans.replace(0))
+}
+
+fn text_and_name_from_part(part: &dyn Part) -> Result<(String, String)> {
+    // Keep the established individual projections as the semantic source of
+    // truth. Text uses the same bounded namespace-aware parser as the sink,
+    // while `name` preserves its early-return namespace behavior. Source-
+    // backed callers still materialize the selected Part payload only once;
+    // only the processed XML projections are repeated.
+    let text = text_from_part(part)?.unwrap_or_default();
+    let name = c_sld_name(part)?.unwrap_or_else(|| part.partname().to_string());
+    Ok((text, name))
+}
+
+/// Borrowed view of a `PresentationML` slide part.
+#[derive(Clone, Copy)]
+pub struct SlidePart<'a> {
+    part: &'a dyn Part,
+}
+
+impl<'a> SlidePart<'a> {
+    pub(crate) const fn semantic_text_raw_xml_limit() -> usize {
+        MAX_SEMANTIC_TEXT_RAW_XML_BYTES
+    }
+
+    pub(crate) fn semantic_text_from_part(
+        part: &'a dyn Part,
+        paragraph_separator: &str,
+    ) -> Result<String> {
+        semantic_text_from_part(part, paragraph_separator)
+    }
+
+    /// Validate and wrap a slide part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_part(part: &'a dyn Part) -> Result<Self> {
+        validate_content_type(part, ct::PML_SLIDE)?;
+        if root_name(part)? != "sld" {
+            return Err(invalid("slide part does not have a p:sld root"));
+        }
+        Ok(Self { part })
+    }
+
+    /// Validate a slide and project its producer name from one temporary MCE
+    /// result. The optional notes proof is classified while that result is
+    /// alive, then the processed bytes are dropped before a part-name
+    /// fallback is allocated.
+    pub(crate) fn from_part_with_name(
+        part: &'a dyn Part,
+        collect_notes_proof: bool,
+    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
+        validate_content_type(part, ct::PML_SLIDE)?;
+        let xml = processed_xml_with_source(part)?;
+        Self::finish_from_processed(part, collect_notes_proof, xml, None, false)
+    }
+
+    /// Capture variant that may reuse a default-profile transformed slide
+    /// projection already retained by the opened snapshot, and a notes-root
+    /// classification an earlier capture proved for the same payload
+    /// allocation. Source, name, and MCE checks still run for this call; an
+    /// exact notes-root proof may answer the root classification without
+    /// repeating its complete bounded scan.
+    pub(crate) fn from_part_with_name_with_capture<'parent>(
+        part: &'a dyn Part,
+        collect_notes_proof: bool,
+        capture: &mut MceCapture<'a, 'parent>,
+        proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_limits: SourceLimits,
+    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
+        validate_content_type(part, ct::PML_SLIDE)?;
+        let source = raw_xml(part)?;
+        // A memo hit was admitted from this package's source profile during
+        // the preceding capture. Reusing it avoids a second physical XML
+        // scan; misses and the first capture must still honor the selected
+        // source event, depth, attribute, and part-byte limits before MCE.
+        let memo_hit = proved_roots.and_then(|memo| memo.lookup(source)).is_some();
+        if !memo_hit {
+            validate_source_part_xml(source, source_limits)?;
+        }
+        let source_checked = true;
+        let processed = capture.process(source)?;
+        let xml = super::ProcessedXml { source, processed };
+        Self::finish_from_processed(part, collect_notes_proof, xml, proved_roots, source_checked)
+    }
+
+    fn finish_from_processed(
+        part: &'a dyn Part,
+        collect_notes_proof: bool,
+        xml: super::ProcessedXml<'a>,
+        proved_roots: Option<&crate::notes::SlideRootMemo>,
+        source_checked: bool,
+    ) -> Result<(Self, Result<String>, Option<SlideRootProof<'a>>)> {
+        if root_name_from_xml(xml.processed.as_ref())? != "sld" {
+            return Err(invalid("slide part does not have a p:sld root"));
+        }
+        let name = c_sld_name_from_xml(xml.processed.as_ref());
+        let notes_proof = (collect_notes_proof && name.is_ok())
+            .then(|| -> Result<_> {
+                let scan = || {
+                    #[cfg(test)]
+                    ROOT_SCANS.with(|scans| scans.set(scans.get() + 1));
+                    crate::notes::root_conformance_from_processed(
+                        xml.processed.as_ref(),
+                        xml.source.len(),
+                        crate::notes::MAX_SLIDE_XML,
+                        "sld",
+                    )
+                };
+                // The memo is keyed on the exact raw observation MCE just read,
+                // so a hit names these very bytes; a miss is the ordinary scan.
+                let conformance = match proved_roots.and_then(|memo| memo.lookup(xml.source)) {
+                    Some(proved) => {
+                        #[cfg(debug_assertions)]
+                        {
+                            let checked = scan().expect(
+                                "a proved slide-root classification must remain resource-valid",
+                            );
+                            debug_assert_eq!(
+                                checked,
+                                Some(proved),
+                                "a proved slide-root classification answered for different bytes"
+                            );
+                        }
+                        #[cfg(test)]
+                        PROVED_ROOT_HITS.with(|hits| hits.set(hits.get() + 1));
+                        Some(proved)
+                    },
+                    None => scan()?,
+                };
+                Ok(SlideRootProof::with_source_checked(
+                    xml.source,
+                    conformance,
+                    source_checked,
+                ))
+            })
+            .transpose()?;
+        drop(xml);
+        let name = name.map(|name| name.unwrap_or_else(|| part.partname().to_string()));
+        Ok((Self { part }, name, notes_proof))
+    }
+
+    /// The underlying OPC part.
+    #[inline]
+    #[must_use]
+    pub fn part(&self) -> &'a dyn Part {
+        self.part
+    }
+
+    /// Producer-visible slide name, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn name(&self) -> Result<String> {
+        Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
+    }
+
+    /// Return the authored `p:cSld@name`, without a physical part-name
+    /// fallback.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        c_sld_authored_name(self.part)
+    }
+
+    /// Whether the slide is marked hidden by its root `show` attribute.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn is_hidden(&self) -> Result<bool> {
+        Ok(!root_bool(self.part, b"show", "slide show", true)?)
+    }
+
+    /// Flatten `DrawingML` text runs in source order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn text(&self) -> Result<String> {
+        Ok(text_from_part(self.part)?.unwrap_or_default())
+    }
+
+    /// [`Self::text`], appending the repairs the extraction applied to
+    /// `tolerance`, stamped with this part's name: each foreign `*:t`
+    /// element whose subtree was skipped is a
+    /// [`crate::MarkupDefect::ForeignTextElement`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors [`Self::text`] returns.
+    pub fn text_with_tolerance(&self, tolerance: &mut ToleranceReport) -> Result<String> {
+        semantic_text_from_part_with_tolerance(self.part, "\n", tolerance)
+    }
+
+    /// Read the producer-visible name and flattened text while preserving the
+    /// exact semantics of [`Self::name`] and [`Self::text`].
+    ///
+    /// This combined projection is useful to source-backed callers that need
+    /// both values. Source-backed callers materialize the selected Part only
+    /// once; the two established processed-XML projections retain their
+    /// independent reader behavior.
+    pub fn text_and_name(&self) -> Result<(String, String)> {
+        text_and_name_from_part(self.part)
+    }
+
+    /// Build the bounded borrowed shape scene for this slide.
+    ///
+    /// Per-shape repairs (a malformed transform degrades that shape's
+    /// geometry only) are listed, with this part's name, in
+    /// [`Scene::tolerance_report`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn shapes(&self) -> Result<Scene<'a>> {
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
+    }
+
+    /// Resolve ordinary `DrawingML` chart parts related to this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn charts(&self, package: &'a OpcPackage) -> Result<Vec<crate::chart::Part<'a>>> {
+        crate::chart::related(package, self.part)
+    }
+
+    /// Resolve Microsoft `ChartEx` parts related to this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn chart_extensions(
+        &self,
+        package: &'a OpcPackage,
+    ) -> Result<Vec<crate::chart::extension::Part<'a>>> {
+        crate::chart::extension::related(package, self.part)
+    }
+
+    /// Resolve the optional legacy comments list attached to this slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn comments(
+        &self,
+        package: &'a OpcPackage,
+    ) -> Result<Option<crate::comments::ListPart<'a>>> {
+        let part = related_part_by_type(
+            package,
+            self.part,
+            crate::comments::COMMENTS_REL,
+            "comments",
+            ct::PML_COMMENTS,
+        )?;
+        part.map(crate::comments::ListPart::from_part).transpose()
+    }
+
+    /// Resolve the slide's optional layout relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn layout(&self, package: &'a OpcPackage) -> Result<Option<SlideLayoutPart<'a>>> {
+        related_part_by_type(
+            package,
+            self.part,
+            rt::SLIDE_LAYOUT,
+            "slideLayout",
+            ct::PML_SLIDE_LAYOUT,
+        )?
+        .map(SlideLayoutPart::from_part)
+        .transpose()
+    }
+}
+
+/// Borrowed view of a `PresentationML` slide-layout part.
+#[derive(Clone, Copy)]
+pub struct SlideLayoutPart<'a> {
+    part: &'a dyn Part,
+}
+
+impl<'a> SlideLayoutPart<'a> {
+    /// Validate and wrap a slide-layout part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_part(part: &'a dyn Part) -> Result<Self> {
+        validate_content_type(part, ct::PML_SLIDE_LAYOUT)?;
+        if root_name(part)? != "sldLayout" {
+            return Err(invalid(
+                "slide-layout part does not have a p:sldLayout root",
+            ));
+        }
+        Ok(Self { part })
+    }
+
+    /// The underlying OPC part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    #[inline]
+    #[must_use]
+    pub fn part(&self) -> &'a dyn Part {
+        self.part
+    }
+
+    /// Producer-visible layout name, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn name(&self) -> Result<String> {
+        Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
+    }
+
+    /// The authored display name, without a physical package-name fallback.
+    ///
+    /// # Errors
+    /// Returns an error when the part XML is malformed.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        c_sld_name(self.part)
+    }
+
+    /// Layout kind token from `p:sldLayout@type`, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn kind(&self) -> Result<Option<String>> {
+        let xml = processed_xml(self.part)?;
+        let mut reader = Reader::from_reader(xml.as_ref());
+        loop {
+            match reader.read_event()? {
+                Event::Start(element) | Event::Empty(element) => {
+                    return Ok(litchi_ooxml_common::xml::unqualified_attribute_value(
+                        &element,
+                        b"type",
+                        reader.decoder(),
+                    )?);
+                },
+                Event::Decl(_) | Event::Comment(_) => {},
+                Event::Text(text) if text.as_ref().iter().all(u8::is_ascii_whitespace) => {},
+                _ => return Err(invalid("slide-layout part lacks an element root")),
+            }
+        }
+    }
+
+    /// Build the bounded borrowed shape scene for this layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn shapes(&self) -> Result<Scene<'a>> {
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
+    }
+
+    /// Read the optional theme override attached to this layout.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn theme_override(
+        &self,
+        package: &'a OpcPackage,
+    ) -> Result<Option<crate::shape::theme::Override>> {
+        crate::shape::theme::package::load_override(package, self.part.partname().as_str())
+    }
+
+    /// Resolve the required slide-master relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn master(&self, package: &'a OpcPackage) -> Result<SlideMasterPart<'a>> {
+        let part = related_part_by_type(
+            package,
+            self.part,
+            rt::SLIDE_MASTER,
+            "slideMaster",
+            ct::PML_SLIDE_MASTER,
+        )?
+        .ok_or_else(|| invalid("slide layout lacks its slide-master relationship"))?;
+        SlideMasterPart::from_part(part)
+    }
+}
+
+/// Borrowed view of a `PresentationML` slide-master part.
+#[derive(Clone, Copy)]
+pub struct SlideMasterPart<'a> {
+    part: &'a dyn Part,
+}
+
+impl<'a> SlideMasterPart<'a> {
+    /// Validate and wrap a slide-master part.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the input cannot be read or is malformed.
+    pub fn from_part(part: &'a dyn Part) -> Result<Self> {
+        validate_content_type(part, ct::PML_SLIDE_MASTER)?;
+        if root_name(part)? != "sldMaster" {
+            return Err(invalid(
+                "slide-master part does not have a p:sldMaster root",
+            ));
+        }
+        Ok(Self { part })
+    }
+
+    /// The underlying OPC part.
+    #[inline]
+    #[must_use]
+    pub fn part(&self) -> &'a dyn Part {
+        self.part
+    }
+
+    /// Producer-visible master name, if present.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn name(&self) -> Result<String> {
+        Ok(c_sld_name(self.part)?.unwrap_or_else(|| self.part.partname().to_string()))
+    }
+
+    /// The authored display name, without a physical package-name fallback.
+    ///
+    /// # Errors
+    /// Returns an error when the part XML is malformed.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        c_sld_name(self.part)
+    }
+
+    /// Whether the master is marked preserved.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn is_preserved(&self) -> Result<bool> {
+        root_bool(self.part, b"preserve", "slide-master preserve", false)
+    }
+
+    /// Build the bounded borrowed shape scene for this master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn shapes(&self) -> Result<Scene<'a>> {
+        self.shapes_with_limits(crate::shape::Limits::DEFAULT)
+    }
+
+    /// Build the borrowed scene under an explicit semantic shape policy.
+    pub(crate) fn shapes_with_limits(&self, limits: crate::shape::Limits) -> Result<Scene<'a>> {
+        Ok(Scene::read(self.part.blob(), limits)?.locate_in_part(self.part.partname().as_str()))
+    }
+
+    /// Read the theme reached from this slide master.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn theme(
+        &self,
+        package: &'a OpcPackage,
+    ) -> Result<Option<crate::shape::theme::ThemeSummary>> {
+        let part = related_part_by_type(package, self.part, rt::THEME, "theme", ct::OFC_THEME)?;
+        part.map(|part| crate::shape::theme::part::Part::from_part(part)?.read())
+            .transpose()
+    }
+
+    /// Resolve the slide layouts listed by this master in XML order.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the operation fails.
+    pub fn layouts(&self, package: &'a OpcPackage) -> Result<Vec<SlideLayoutPart<'a>>> {
+        let relationship_ids = self.layout_references()?;
+        let mut layouts = Vec::with_capacity(relationship_ids.len());
+        for relationship_id in relationship_ids {
+            let relationship = self.part.rels().get(&relationship_id).ok_or_else(|| {
+                Error::Relationship(format!(
+                    "slide master references missing slide-layout relationship '{relationship_id}'"
+                ))
+            })?;
+            if relationship.is_external() {
+                return Err(Error::Relationship(
+                    "slide-layout relationship must be internal".into(),
+                ));
+            }
+            if !super::is_relationship_type(relationship.reltype(), rt::SLIDE_LAYOUT, "slideLayout")
+            {
+                return Err(Error::Relationship(format!(
+                    "relationship '{relationship_id}' is not a slide-layout relationship"
+                )));
+            }
+            let target = relationship.target_partname()?;
+            let part = package.get_part(&target)?;
+            validate_content_type(part, ct::PML_SLIDE_LAYOUT)?;
+            layouts.push(SlideLayoutPart::from_part(part)?);
+        }
+        Ok(layouts)
+    }
+
+    pub(crate) fn layout_references(&self) -> Result<Vec<String>> {
+        layout_relationship_ids(self.part)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{SlideLayoutPart, SlideMasterPart, SlidePart, semantic_text_from_part};
+    use crate::Error;
+    use litchi_opc::PackURI;
+    use litchi_opc::constants::content_type as ct;
+    use litchi_opc::part::BlobPart;
+    use std::fmt::Write as _;
+
+    // The two semantic-text passes as they stood before the single-pass route,
+    // verbatim: a complete raw scan, then markup-compatibility processing, then
+    // the semantic pass over the processed bytes. The single-pass route must
+    // return exactly their value and exactly their first refusal.
+    use super::{
+        Capabilities, Event, MAX_SEMANTIC_TEXT_EVENT_BYTES, MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+        MAX_SEMANTIC_TEXT_RAW_XML_BYTES, MAX_SEMANTIC_TEXT_REFERENCE_BYTES, NsReader, Part, Result,
+        SemanticTextParser, SemanticTextXmlBudget, invalid, process_markup_compatibility,
+        semantic_event_bytes, semantic_mce_limits, validate_semantic_attribute_names,
+        validate_semantic_attributes, validate_semantic_element_namespace, validate_xml_characters,
+        validate_xml_comment,
+    };
+
+    fn oracle_scan_raw_semantic_text_xml(xml: &[u8]) -> Result<()> {
+        if xml.len() > MAX_SEMANTIC_TEXT_RAW_XML_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: xml.len(),
+                maximum: MAX_SEMANTIC_TEXT_RAW_XML_BYTES,
+            });
+        }
+
+        let mut reader = NsReader::from_reader(xml);
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
+        let mut budget = SemanticTextXmlBudget::default();
+        let mut root_seen = false;
+        let mut declaration_seen = false;
+        let mut document_event_seen = false;
+
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let declaration_is_first = !document_event_seen;
+            if !matches!(&event, Event::Eof) {
+                document_event_seen = true;
+            }
+            budget.observe_event(semantic_event_bytes(&event))?;
+            match event {
+                Event::Start(element) => {
+                    let _ = namespace;
+                    validate_semantic_attributes(&element)?;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    validate_semantic_element_namespace(&namespace)?;
+                    if budget.depth == 0 {
+                        if root_seen {
+                            return Err(invalid("semantic slide XML has multiple roots"));
+                        }
+                        root_seen = true;
+                    }
+                    budget.start()?;
+                },
+                Event::Empty(element) => {
+                    let _ = namespace;
+                    validate_semantic_attributes(&element)?;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    validate_semantic_element_namespace(&namespace)?;
+                    if budget.depth == 0 {
+                        if root_seen {
+                            return Err(invalid("semantic slide XML has multiple roots"));
+                        }
+                        root_seen = true;
+                    }
+                },
+                Event::End(_) => {
+                    validate_semantic_element_namespace(&namespace)?;
+                    budget.end()?;
+                },
+                Event::DocType(_) => {
+                    return Err(invalid("DTD declarations are not permitted in slide text"));
+                },
+                // A processing instruction is legal XML that carries no slide content;
+                // it is skipped and recorded once by the part's
+                // shape scene.
+                Event::PI(_) => {},
+                Event::Decl(_) => {
+                    if declaration_seen || !declaration_is_first || root_seen {
+                        return Err(invalid("XML declarations must be the first document event"));
+                    }
+                    declaration_seen = true;
+                },
+                Event::Text(text) => {
+                    let decoded = text
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_xml_characters(&decoded)?;
+                    if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::TextBytes,
+                            ),
+                            observed: decoded.len(),
+                            maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        });
+                    }
+                    if budget.depth == 0 && !decoded.as_bytes().iter().all(u8::is_ascii_whitespace)
+                    {
+                        return Err(invalid("semantic slide XML has text outside its root"));
+                    }
+                },
+                Event::CData(_) if budget.depth == 0 => {
+                    return Err(invalid("slide XML has CDATA outside its document root"));
+                },
+                Event::CData(text) => {
+                    let decoded = text
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_xml_characters(&decoded)?;
+                    if decoded.len() > MAX_SEMANTIC_TEXT_EVENT_BYTES {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::TextBytes,
+                            ),
+                            observed: decoded.len(),
+                            maximum: MAX_SEMANTIC_TEXT_EVENT_BYTES,
+                        });
+                    }
+                },
+                Event::Comment(comment) => {
+                    let decoded = comment
+                        .decode()
+                        .map_err(|error| Error::Xml(error.to_string()))?;
+                    validate_xml_comment(&decoded)?;
+                },
+                Event::GeneralRef(reference) => {
+                    if budget.depth == 0 {
+                        return Err(invalid("XML entity reference is outside the document root"));
+                    }
+                    if reference.as_ref().len() > MAX_SEMANTIC_TEXT_REFERENCE_BYTES {
+                        return Err(Error::Limit {
+                            kind: crate::opened::LimitKind::Codec(
+                                crate::opened::CodecLimitKind::ReferenceBytes,
+                            ),
+                            observed: reference.as_ref().len(),
+                            maximum: MAX_SEMANTIC_TEXT_REFERENCE_BYTES,
+                        });
+                    }
+                },
+                Event::Eof => {
+                    if !root_seen {
+                        return Err(invalid("semantic slide XML lacks an element root"));
+                    }
+                    if budget.depth != 0 {
+                        return Err(invalid("semantic slide XML has unbalanced elements"));
+                    }
+                    return Ok(());
+                },
+            }
+        }
+    }
+
+    fn oracle_semantic_text_from_part(
+        part: &dyn Part,
+        paragraph_separator: &str,
+    ) -> Result<String> {
+        let raw = part.blob();
+        oracle_scan_raw_semantic_text_xml(raw)?;
+        let processed = process_markup_compatibility(
+            raw,
+            &Capabilities::ooxml_baseline(),
+            &semantic_mce_limits(),
+        )?;
+        if processed.xml.len() > MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES {
+            return Err(Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::XmlBytes),
+                observed: processed.xml.len(),
+                maximum: MAX_SEMANTIC_TEXT_PROCESSED_XML_BYTES,
+            });
+        }
+
+        let mut reader = NsReader::from_reader(processed.xml.as_ref());
+        reader.config_mut().trim_text(false);
+        reader.config_mut().check_end_names = true;
+        let mut parser = SemanticTextParser::new(paragraph_separator);
+        loop {
+            let (namespace, event) = reader
+                .read_resolved_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let finished = match event {
+                Event::Start(element) => {
+                    let _ = namespace;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    parser.consume(namespace, Event::Start(element))?
+                },
+                Event::Empty(element) => {
+                    let _ = namespace;
+                    validate_semantic_attribute_names(&reader, &element)?;
+                    let namespace = reader.resolver().resolve_element(element.name()).0;
+                    parser.consume(namespace, Event::Empty(element))?
+                },
+                event => parser.consume(namespace, event)?,
+            };
+            if finished {
+                return Ok(parser.output);
+            }
+        }
+    }
+
+    fn slide_part(xml: &[u8]) -> BlobPart {
+        BlobPart::new(
+            PackURI::new("/ppt/slides/slide1.xml").unwrap(),
+            ct::PML_SLIDE.to_owned(),
+            xml.to_vec(),
+        )
+    }
+
+    fn slide_master_part(
+        body: &str,
+        presentation_namespace: &str,
+        relationship_namespace: &str,
+    ) -> BlobPart {
+        let xml = format!(
+            r#"<p:sldMaster xmlns:p="{presentation_namespace}" xmlns:r="{relationship_namespace}" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:s="http://purl.oclc.org/ooxml/presentationml/main" xmlns:t="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:x="urn:foreign"><p:cSld><p:spTree/></p:cSld>{body}</p:sldMaster>"#
+        );
+        BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            xml.into_bytes(),
+        )
+    }
+
+    #[test]
+    fn combined_text_and_name_matches_separate_reads_through_mce_and_unusual_text() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:x="urn:producer-future" mc:Ignorable="x">
+            <!-- producer formatting and an ignored extension are intentional -->
+            <p:cSld name="  Producer &amp; Name  " x:future="retained"><p:spTree>
+                <a:t> leading &amp; </a:t><x:future><a:t>ignored</a:t></x:future>
+                <a:t><![CDATA[tail]]></a:t><a:t>two</a:t>
+            </p:spTree></p:cSld>
+        </p:sld>"#;
+        let part = slide_part(xml);
+        let slide = SlidePart::from_part(&part).unwrap();
+        let separate = (slide.text().unwrap(), slide.name().unwrap());
+        assert_eq!(slide.text_and_name().unwrap(), separate);
+        assert_eq!(
+            slide.authored_name().unwrap().as_deref(),
+            Some("  Producer & Name  ")
+        );
+        assert_eq!(separate.0, " leading & \ntail\ntwo");
+        assert_eq!(separate.1, "  Producer & Name  ");
+    }
+
+    #[test]
+    fn late_reserved_prefix_rebinding_is_rejected_by_text_and_text_and_name() {
+        let xml = br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld name="early"><p:spTree><a:t>text</a:t></p:spTree></p:cSld><p:extLst xmlns:xml="urn:invalid"/></p:sld>"#;
+        let part = slide_part(xml);
+        let slide = SlidePart::from_part(&part).unwrap();
+        assert_eq!(slide.name().unwrap(), "early");
+
+        let text_error = slide.text().unwrap_err();
+        assert!(matches!(text_error, Error::Xml(_) | Error::Invalid(_)));
+
+        let combined_error = slide.text_and_name().unwrap_err();
+        assert!(matches!(combined_error, Error::Xml(_) | Error::Invalid(_)));
+    }
+
+    #[test]
+    fn combined_text_and_name_preserves_missing_and_empty_name_semantics() {
+        let fixtures = [
+            (
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree/></p:cSld></p:sld>"#.as_slice(),
+                "",
+                None,
+            ),
+            (
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld name=""><p:spTree/></p:cSld></p:sld>"#.as_slice(),
+                "",
+                Some(""),
+            ),
+            (
+                br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:spTree/></p:sld>"#.as_slice(),
+                "/ppt/slides/slide1.xml",
+                None,
+            ),
+        ];
+        for (xml, expected_name, expected_authored_name) in fixtures {
+            let part = slide_part(xml);
+            let slide = SlidePart::from_part(&part).unwrap();
+            let separate = (slide.text().unwrap(), slide.name().unwrap());
+            assert_eq!(slide.text_and_name().unwrap(), separate);
+            assert_eq!(separate, (String::new(), expected_name.to_owned()));
+            assert_eq!(
+                slide.authored_name().unwrap().as_deref(),
+                expected_authored_name
+            );
+        }
+    }
+
+    #[test]
+    fn combined_text_and_name_rejects_the_same_malformed_xml_as_separate_reads() {
+        let part = slide_part(
+            br#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"><p:cSld><p:spTree><p:broken></p:cSld></p:sld>"#,
+        );
+        let slide = SlidePart::from_part(&part).unwrap();
+        let name = slide.name();
+        assert_eq!(name.unwrap(), "");
+        let text_error = slide.text().unwrap_err().to_string();
+        let combined_error = slide.text_and_name().unwrap_err().to_string();
+        assert_eq!(combined_error, text_error);
+    }
+
+    #[test]
+    fn semantic_text_enforces_the_cumulative_decoded_text_ceiling() {
+        let chunk = "x".repeat(1024 * 1024);
+        let mut xml = String::with_capacity(17 * (chunk.len() + 11) + 256);
+        xml.push_str(
+            r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main" xmlns:a="http://schemas.openxmlformats.org/drawingml/2006/main"><p:cSld><p:spTree>"#,
+        );
+        for _ in 0..17 {
+            xml.push_str("<a:t>");
+            xml.push_str(&chunk);
+            xml.push_str("</a:t>");
+        }
+        xml.push_str(r#"</p:spTree></p:cSld></p:sld>"#);
+
+        let part = slide_part(xml.as_bytes());
+        let error = semantic_text_from_part(&part, "\n").unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::opened::LimitKind::Codec(crate::opened::CodecLimitKind::TextBytes),
+                ..
+            }
+        ));
+    }
+
+    const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+    const DML: &str = "http://schemas.openxmlformats.org/drawingml/2006/main";
+    const MCE: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
+
+    fn slide(body: &str) -> Vec<u8> {
+        format!(r#"<p:sld xmlns:p="{PML}" xmlns:a="{DML}"><p:cSld><p:spTree>{body}</p:spTree></p:cSld></p:sld>"#)
+            .into_bytes()
+    }
+
+    type TextOutcome = std::result::Result<String, String>;
+
+    fn text_outcome(result: Result<String>) -> TextOutcome {
+        result.map_err(|error| format!("{error:?}"))
+    }
+
+    /// Compare the routed semantic text with the three-pass oracle for one
+    /// input and both separators. Returns (compared, accepted).
+    fn assert_text_routes_agree(label: &str, xml: &[u8]) -> (usize, usize) {
+        let part = slide_part(xml);
+        let mut accepted = 0;
+        for separator in ["\n", " | "] {
+            let expected = text_outcome(oracle_semantic_text_from_part(&part, separator));
+            let actual = text_outcome(semantic_text_from_part(&part, separator));
+            assert_eq!(actual, expected, "{label}: separator {separator:?}");
+            accepted += usize::from(expected.is_ok());
+        }
+        (2, accepted)
+    }
+
+    fn text_seeds() -> Vec<Vec<u8>> {
+        let run = |text: &str| {
+            format!("<p:sp><p:txBody><a:p><a:r><a:t>{text}</a:t></a:r></a:p></p:txBody></p:sp>")
+        };
+        let deep = format!("{}{}", "<a:g>".repeat(130), "</a:g>".repeat(130));
+        let mut seeds: Vec<Vec<u8>> = vec![
+            slide(&format!("{}{}", run("one &amp; two"), run("three"))),
+            slide(&run("<![CDATA[raw <text>]]>")),
+            slide(&run("x&#65;y&#x42;z")),
+            slide(&format!("{}<a:br/><a:t/>{}", run("a"), run("b"))),
+            slide(&run("<a:t>nested</a:t>")),
+            slide(&format!("{}<!-- bad -- comment -->", run("<a:t>nested</a:t>"))),
+            slide(&format!("<!-- bad -- comment -->{}", run("<a:t>nested</a:t>"))),
+            slide(&format!("{}<p:x a=\"&#1;\"/>", run("<a:t>nested</a:t>"))),
+            slide(&format!("<q:t>foreign</q:t>{}", run("x"))),
+            slide(&format!("<p:t>foreign</p:t>{}", run("x"))),
+            slide("<![CDATA[outside text]]>"),
+            slide("&amp;"),
+            slide(&run("&unknown;")),
+            slide(&format!("{}<p:x q:a=\"1\"/>", run("x"))),
+            slide(&format!("{}<p:x a=\"1\" a=\"2\"/>", run("x"))),
+            slide(&deep),
+            slide(&format!("<p:x>\u{1}</p:x>{}", run("y"))),
+            format!(r#"<p:notSld xmlns:p="{PML}" xmlns:a="{DML}">{}</p:notSld>"#, run("x")).into_bytes(),
+            format!(r#"<?xml version="1.0"?><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"/><?xml version="1.0"?>"#).into_bytes(),
+            format!(r#"<!DOCTYPE d><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"><?pi x?></p:sld>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"/>text"#).into_bytes(),
+            format!(r#"<![CDATA[x]]><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"&amp;<p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"/><p:sld xmlns:p="{PML}"/>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}"><p:a></p:b></p:sld>"#).into_bytes(),
+            format!(r#"<p:sld xmlns:p="{PML}">"#).into_bytes(),
+            format!("\u{feff}<p:sld xmlns:p=\"{PML}\"/>").into_bytes(),
+            format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:a="{DML}" xmlns:mc="{MCE}" xmlns:x="urn:future" mc:Ignorable="x"><p:cSld><p:spTree>{}<x:ext><a:t>ignored</a:t></x:ext><mc:AlternateContent><mc:Choice Requires="x"><a:t>choice</a:t></mc:Choice><mc:Fallback><a:t>fallback</a:t></mc:Fallback></mc:AlternateContent></p:spTree></p:cSld></p:sld>"#,
+                run("marked")
+            )
+            .into_bytes(),
+            format!(
+                r#"<p:sld xmlns:p="{PML}" xmlns:a="{DML}" xmlns:mc="{MCE}"><!-- bad -- --><mc:AlternateContent/></p:sld>"#
+            )
+            .into_bytes(),
+            Vec::new(),
+        ];
+        let mut invalid_utf8 = slide(&run("ok"));
+        invalid_utf8.splice(10..10, b"\xff\xfe".iter().copied());
+        seeds.push(invalid_utf8);
+        seeds
+    }
+
+    fn text_mutations(seed: &[u8], budget: usize) -> Vec<Vec<u8>> {
+        const BYTES: &[u8] = b"<>&\"'/!?=:;\x00\x01\xff x";
+        const SNIPPETS: &[&[u8]] = &[
+            b"<![CDATA[c]]>",
+            b"<?pi x?>",
+            b"<!DOCTYPE d>",
+            b"<!-- c -->",
+            b"<!-- c -- d -->",
+            b"<q:x/>",
+            b"<a:t>t</a:t>",
+            b"<a:t/>",
+            b"&amp;",
+            b"&bad;",
+            b"&#1;",
+            b"</a:t>",
+            b" a=\"&#1;\"",
+        ];
+        let mut output = Vec::new();
+        if seed.is_empty() {
+            return output;
+        }
+        let step = (seed.len() / budget.max(1)).max(1);
+        let mut state = 0x2545_f491_4f6c_dd1d_u64 ^ seed.len() as u64;
+        let mut next = || {
+            state ^= state << 13;
+            state ^= state >> 7;
+            state ^= state << 17;
+            usize::try_from(state >> 8).unwrap_or(0)
+        };
+        for position in (0..seed.len()).step_by(step) {
+            output.push(seed[..position].to_vec());
+            let mut replaced = seed.to_vec();
+            replaced[position] = BYTES[next() % BYTES.len()];
+            output.push(replaced);
+            let mut inserted = seed[..position].to_vec();
+            inserted.extend_from_slice(SNIPPETS[next() % SNIPPETS.len()]);
+            inserted.extend_from_slice(&seed[position..]);
+            output.push(inserted);
+        }
+        output
+    }
+
+    #[test]
+    fn single_pass_semantic_text_matches_the_three_pass_oracle_on_handcrafted_xml() {
+        let mut compared = 0;
+        let mut accepted = 0;
+        for (index, seed) in text_seeds().iter().enumerate() {
+            let (count, ok) = assert_text_routes_agree(&format!("seed {index}"), seed);
+            compared += count;
+            accepted += ok;
+            for (variant, mutated) in text_mutations(seed, 60).iter().enumerate() {
+                let (count, ok) =
+                    assert_text_routes_agree(&format!("seed {index} variant {variant}"), mutated);
+                compared += count;
+                accepted += ok;
+            }
+        }
+        println!("slide-text-oracle handcrafted compared={compared} accepted={accepted}");
+        assert!(accepted > 0 && accepted < compared);
+    }
+
+    #[test]
+    fn single_pass_semantic_text_matches_the_three_pass_oracle_on_the_pptx_corpus() {
+        fn collect(directory: &std::path::Path, found: &mut Vec<std::path::PathBuf>) {
+            let Ok(entries) = std::fs::read_dir(directory) else {
+                return;
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if path.is_dir() {
+                    collect(&path, found);
+                } else if path
+                    .extension()
+                    .is_some_and(|extension| extension == "pptx")
+                {
+                    found.push(path);
+                }
+            }
+        }
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data");
+        let mut fixtures = Vec::new();
+        collect(&root, &mut fixtures);
+        fixtures.sort();
+        let mut parts = 0;
+        let mut compared = 0;
+        let mut accepted = 0;
+        for fixture in fixtures {
+            let Ok(bytes) = std::fs::read(&fixture) else {
+                continue;
+            };
+            let Ok(package) =
+                litchi_opc::OpcPackage::from_vec(bytes, litchi_opc::SourceLimits::default())
+            else {
+                continue;
+            };
+            // Package parts iterate in hash order; visit them by name so the
+            // oracle compares, and mutates, the same parts on every run.
+            let mut named: Vec<_> = package.try_iter_parts().flatten().collect();
+            named.sort_by(|left, right| left.partname().as_str().cmp(right.partname().as_str()));
+            for part in named {
+                if !part.content_type().ends_with("+xml") {
+                    continue;
+                }
+                let label = format!("{} {}", fixture.display(), part.partname());
+                let (count, ok) = assert_text_routes_agree(&label, part.blob());
+                compared += count;
+                accepted += ok;
+                if part.content_type() == ct::PML_SLIDE && parts % 4 == 0 {
+                    for (variant, mutated) in text_mutations(part.blob(), 16).iter().enumerate() {
+                        let (count, ok) = assert_text_routes_agree(
+                            &format!("{label} variant {variant}"),
+                            mutated,
+                        );
+                        compared += count;
+                        accepted += ok;
+                    }
+                }
+                parts += 1;
+            }
+        }
+        println!("slide-text-oracle corpus parts={parts} compared={compared} accepted={accepted}");
+        assert!(parts >= 300 && accepted > 0 && accepted < compared);
+    }
+
+    /// The precedence the single pass must keep, stated independently of the
+    /// oracle: any raw-scan refusal outranks any semantic refusal, wherever
+    /// either occurs, and a semantic refusal alone is the first one in order.
+    #[test]
+    fn single_pass_keeps_raw_refusals_ahead_of_earlier_semantic_refusals() {
+        let run =
+            "<p:sp><p:txBody><a:p><a:r><a:t>x<a:t>nested</a:t></a:t></a:r></a:p></p:txBody></p:sp>";
+        let foreign = "<q:t>foreign</q:t>";
+        let bad_comment = "<!-- bad -- comment -->";
+        let cases: [(String, &str); 5] = [
+            (format!("{run}{bad_comment}"), "invalid comment"),
+            (format!("{bad_comment}{run}"), "invalid comment"),
+            (
+                run.to_owned(),
+                "nested DrawingML text elements are not permitted",
+            ),
+            (
+                format!("{run}<p:t>second semantic refusal</p:t>"),
+                "nested DrawingML text elements are not permitted",
+            ),
+            (
+                format!("{run}{foreign}"),
+                "unresolved semantic slide element namespace prefix 'q'",
+            ),
+        ];
+        for (body, expected) in cases {
+            let xml = slide(&body);
+            let part = slide_part(&xml);
+            let error = semantic_text_from_part(&part, "\n")
+                .expect_err("each case must refuse")
+                .to_string();
+            assert!(
+                error.contains(expected),
+                "{body}: expected {expected:?}, got {error:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_accept_transitional_and_strict_direct_children() {
+        for (presentation_namespace, relationship_namespace) in [
+            (
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            ),
+            (
+                "http://purl.oclc.org/ooxml/presentationml/main",
+                "http://purl.oclc.org/ooxml/officeDocument/relationships",
+            ),
+        ] {
+            let part = slide_master_part(
+                r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst>"#,
+                presentation_namespace,
+                relationship_namespace,
+            );
+            let master = SlideMasterPart::from_part(&part).unwrap();
+            assert_eq!(master.layout_references().unwrap(), vec!["rIdLayout"]);
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_reject_mixed_root_and_core_namespaces() {
+        for (presentation_namespace, body) in [
+            (
+                "http://purl.oclc.org/ooxml/presentationml/main",
+                r#"<t:sldLayoutIdLst><t:sldLayoutId r:id="rIdLayout"/></t:sldLayoutIdLst>"#,
+            ),
+            (
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                r#"<s:sldLayoutIdLst><s:sldLayoutId r:id="rIdLayout"/></s:sldLayoutIdLst>"#,
+            ),
+        ] {
+            let part = slide_master_part(
+                body,
+                presentation_namespace,
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            );
+            assert!(
+                SlideMasterPart::from_part(&part)
+                    .unwrap()
+                    .layout_references()
+                    .is_err(),
+                "core layout references must use the root conformance"
+            );
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_reject_undeclared_p_prefix() {
+        let part = BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            br#"<p:sldMaster><p:cSld><p:spTree/></p:cSld><p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst></p:sldMaster>"#.to_vec(),
+        );
+        assert!(
+            SlideMasterPart::from_part(&part)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn slide_master_layout_references_reject_namespace_spoof_nested_and_duplicate_entries() {
+        let cases = [
+            r#"<p:sldLayoutIdLst><x:sldLayoutId r:id="rIdForeign"/></p:sldLayoutIdLst>"#,
+            r#"<p:sldLayoutIdLst><p:wrapper><p:sldLayoutId r:id="rIdNested"/></p:wrapper></p:sldLayoutIdLst>"#,
+            r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="secret-id"/><p:sldLayoutId r:id="secret-id"/></p:sldLayoutIdLst>"#,
+        ];
+        for body in cases {
+            let part = slide_master_part(
+                body,
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            );
+            let master = SlideMasterPart::from_part(&part).unwrap();
+            let error = master
+                .layout_references()
+                .expect_err("invalid layout list must be refused")
+                .to_string();
+            assert!(!error.contains("secret-id"));
+        }
+    }
+
+    #[test]
+    fn slide_master_layout_references_bound_collection_before_the_4097th_entry() {
+        let mut body = String::new();
+        for index in 0..=4_096 {
+            write!(&mut body, r#"<p:sldLayoutId r:id="rId{index}"/>"#).unwrap();
+        }
+        let body = format!(r#"<p:sldLayoutIdLst>{body}</p:sldLayoutIdLst>"#);
+        let part = slide_master_part(
+            &body,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        let master = SlideMasterPart::from_part(&part).unwrap();
+        assert!(matches!(
+            master.layout_references(),
+            Err(Error::Limit { .. })
+        ));
+    }
+
+    #[test]
+    fn slide_master_layout_references_allow_one_opaque_extension_list_per_entry() {
+        let part = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rIdLayout"><p:extLst><p:future><p:sldLayoutId r:id="ignored"/><p:sldLayoutIdLst/></p:future></p:extLst></p:sldLayoutId></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        let master = SlideMasterPart::from_part(&part).unwrap();
+        assert_eq!(master.layout_references().unwrap(), vec!["rIdLayout"]);
+
+        let drawingml_extension = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"><a:extLst><a:future><p:sldLayoutId r:id="ignored"/></a:future></a:extLst></p:sldLayoutId></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert!(
+            SlideMasterPart::from_part(&drawingml_extension)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+
+        let duplicate = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"><p:extLst/><p:extLst/></p:sldLayoutId></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert!(
+            SlideMasterPart::from_part(&duplicate)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn slide_master_layout_references_ignore_opaque_root_extension_payloads() {
+        let part = slide_master_part(
+            r#"<p:extLst><p:future><p:sldLayoutId r:id="ignored"/><p:sldLayoutIdLst><p:sldLayoutId r:id="also-ignored"/></p:sldLayoutIdLst></p:future></p:extLst><p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert_eq!(
+            SlideMasterPart::from_part(&part)
+                .unwrap()
+                .layout_references()
+                .unwrap(),
+            vec!["rIdLayout"]
+        );
+
+        let duplicate = slide_master_part(
+            r#"<p:extLst/><p:extLst/><p:sldLayoutIdLst><p:sldLayoutId r:id="rIdLayout"/></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert!(
+            SlideMasterPart::from_part(&duplicate)
+                .unwrap()
+                .layout_references()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn slide_master_layout_references_validate_optional_native_ids() {
+        let valid = slide_master_part(
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rIdOne"/><p:sldLayoutId id="2147483650" r:id="rIdTwo"/></p:sldLayoutIdLst>"#,
+            "http://schemas.openxmlformats.org/presentationml/2006/main",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+        );
+        assert_eq!(
+            SlideMasterPart::from_part(&valid)
+                .unwrap()
+                .layout_references()
+                .unwrap(),
+            vec!["rIdOne", "rIdTwo"]
+        );
+
+        for body in [
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483649" r:id="rIdOne"/><p:sldLayoutId id="2147483649" r:id="rIdTwo"/></p:sldLayoutIdLst>"#,
+            r#"<p:sldLayoutIdLst><p:sldLayoutId id="2147483647" r:id="rIdOne"/></p:sldLayoutIdLst>"#,
+        ] {
+            let part = slide_master_part(
+                body,
+                "http://schemas.openxmlformats.org/presentationml/2006/main",
+                "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+            );
+            assert!(
+                SlideMasterPart::from_part(&part)
+                    .unwrap()
+                    .layout_references()
+                    .is_err()
+            );
+        }
+    }
+
+    #[test]
+    fn root_booleans_accept_strict_lexical_values_and_redact_invalid_tokens() {
+        const PML: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
+        for (value, expected) in [("1", true), ("true", true), ("0", false), ("false", false)] {
+            let xml = format!(
+                r#"<p:sldMaster xmlns:p="{PML}" preserve="{value}"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+            );
+            let part = BlobPart::new(
+                PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+                ct::PML_SLIDE_MASTER.to_owned(),
+                xml.into_bytes(),
+            );
+            assert_eq!(
+                SlideMasterPart::from_part(&part)
+                    .unwrap()
+                    .is_preserved()
+                    .unwrap(),
+                expected
+            );
+        }
+
+        let master_xml = format!(
+            r#"<?xml version="1.0"?>
+
+            <p:sldMaster xmlns:p="{PML}" preserve="true"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+        );
+        let master_part = BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            master_xml.into_bytes(),
+        );
+        assert!(
+            SlideMasterPart::from_part(&master_part)
+                .unwrap()
+                .is_preserved()
+                .unwrap()
+        );
+
+        let slide_xml = format!(
+            r#"<?xml version="1.0"?>
+
+            <p:sld xmlns:p="{PML}" show="true"><p:cSld><p:spTree/></p:cSld></p:sld>"#
+        );
+        let slide = slide_part(slide_xml.as_bytes());
+        assert!(!SlidePart::from_part(&slide).unwrap().is_hidden().unwrap());
+
+        let layout_xml = format!(
+            r#"<?xml version="1.0"?>
+
+            <p:sldLayout xmlns:p="{PML}" type="title"><p:cSld><p:spTree/></p:cSld></p:sldLayout>"#
+        );
+        let layout = BlobPart::new(
+            PackURI::new("/ppt/slideLayouts/slideLayout1.xml").unwrap(),
+            ct::PML_SLIDE_LAYOUT.to_owned(),
+            layout_xml.into_bytes(),
+        );
+        assert_eq!(
+            SlideLayoutPart::from_part(&layout)
+                .unwrap()
+                .kind()
+                .unwrap()
+                .as_deref(),
+            Some("title")
+        );
+
+        let private_invalid = "private-invalid-boolean-token-7f2d9c";
+        let invalid_master = format!(
+            r#"<p:sldMaster xmlns:p="{PML}" preserve="{private_invalid}"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+        );
+        let master_part = BlobPart::new(
+            PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+            ct::PML_SLIDE_MASTER.to_owned(),
+            invalid_master.into_bytes(),
+        );
+        let error = SlideMasterPart::from_part(&master_part)
+            .unwrap()
+            .is_preserved()
+            .expect_err("non-schema boolean must be refused")
+            .to_string();
+        assert!(!error.contains(private_invalid));
+
+        for value in ["on", "off"] {
+            let invalid_master = format!(
+                r#"<p:sldMaster xmlns:p="{PML}" preserve="{value}"><p:cSld><p:spTree/></p:cSld></p:sldMaster>"#
+            );
+            let master_part = BlobPart::new(
+                PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap(),
+                ct::PML_SLIDE_MASTER.to_owned(),
+                invalid_master.into_bytes(),
+            );
+            assert!(
+                SlideMasterPart::from_part(&master_part)
+                    .unwrap()
+                    .is_preserved()
+                    .is_err(),
+                "{value} must be refused for slide-master preserve"
+            );
+
+            let invalid_slide_xml = format!(
+                r#"<p:sld xmlns:p="{PML}" show="{value}"><p:cSld><p:spTree/></p:cSld></p:sld>"#
+            );
+            let invalid_slide = slide_part(invalid_slide_xml.as_bytes());
+            assert!(
+                SlidePart::from_part(&invalid_slide)
+                    .unwrap()
+                    .is_hidden()
+                    .is_err(),
+                "{value} must be refused for slide show"
+            );
+        }
+    }
+}
+
+#[cfg(test)]
+mod envelope_tests {
+    //! What each semantic-text pass accepts before, around and after `p:sld`, and the exact error reported otherwise. Each expected
+    //! line is the row label followed by the result.
+
+    const DECLARATION: &str = r#"<?xml version="1.0" encoding="UTF-8"?>"#;
+
+    /// One reader's root element in the forms the rows are built from.
+    struct Root<'a> {
+        /// The start tag.
+        open: &'a str,
+        /// Content that makes the element valid for its reader.
+        body: &'a str,
+        /// The end tag.
+        close: &'a str,
+        /// The element as one empty-element tag.
+        empty: &'a str,
+    }
+
+    fn rows(root: &Root<'_>) -> Vec<(&'static str, String)> {
+        let Root {
+            open,
+            body,
+            close,
+            empty,
+        } = *root;
+        let document = format!("{open}{body}{close}");
+        let d = document.as_str();
+        vec![
+            ("empty input", String::new()),
+            ("whitespace only", " \n".to_owned()),
+            ("declaration only", DECLARATION.to_owned()),
+            ("empty-element root", empty.to_owned()),
+            ("start and end root", format!("{open}{close}")),
+            ("root then whitespace", format!("{d}\n ")),
+            ("root then comment", format!("{d}<!--c-->")),
+            ("root then PI", format!("{d}<?pi x?>")),
+            ("root then text", format!("{d}text")),
+            ("root then second root", format!("{d}{d}")),
+            ("root then foreign start", format!("{d}<foreign></foreign>")),
+            ("root then foreign empty", format!("{d}<foreign/>")),
+            ("declaration after root", format!("{d}{DECLARATION}")),
+            ("two declarations", format!("{DECLARATION}{DECLARATION}{d}")),
+            (
+                "comment before declaration",
+                format!("<!--c-->{DECLARATION}{d}"),
+            ),
+            ("text before root", format!("text{d}")),
+            ("unterminated root", format!("{open}{body}")),
+            ("stray end tag", format!("{d}</foreign>")),
+            ("DOCTYPE", format!("<!DOCTYPE x>{d}")),
+            ("top-level CDATA", format!("<![CDATA[x]]>{d}")),
+            ("declaration then root", format!("{DECLARATION}{d}")),
+            (
+                "whitespace before declaration",
+                format!(" {DECLARATION}{d}"),
+            ),
+            ("PI before declaration", format!("<?pi x?>{DECLARATION}{d}")),
+            ("comment then root", format!("<!--c-->{d}")),
+            ("PI then root", format!("<?pi x?>{d}")),
+            ("root then text then second root", format!("{d}text{d}")),
+            ("empty-element root then root", format!("{empty}{d}")),
+            (
+                "declaration after empty-element root",
+                format!("{empty}{DECLARATION}"),
+            ),
+        ]
+    }
+
+    fn assert_matrix(root: &Root<'_>, expected: &[&str], read: impl Fn(&[u8]) -> String) {
+        let actual = rows(root)
+            .into_iter()
+            .map(|(label, xml)| format!("{label}: {}", read(xml.as_bytes())))
+            .collect::<Vec<_>>();
+        assert_eq!(actual, expected, "actual rows:\n{actual:#?}");
+    }
+
+    fn outcome<T, E: std::fmt::Debug>(
+        result: Result<T, E>,
+        summary: impl Fn(T) -> String,
+    ) -> String {
+        match result {
+            Ok(value) => format!("Ok({})", summary(value)),
+            Err(error) => format!("{error:?}"),
+        }
+    }
+
+    /// The raw validation pass on its own.
+    #[test]
+    fn raw_text_scan_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"semantic slide XML lacks an element root\")",
+                "whitespace only: Invalid(\"semantic slide XML lacks an element root\")",
+                "declaration only: Invalid(\"semantic slide XML lacks an element root\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"semantic slide XML has text outside its root\")",
+                "root then second root: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign start: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign empty: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after root: Invalid(\"XML declarations must be the first document event\")",
+                "two declarations: Invalid(\"XML declarations must be the first document event\")",
+                "comment before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "text before root: Invalid(\"semantic slide XML has text outside its root\")",
+                "unterminated root: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD declarations are not permitted in slide text\")",
+                "top-level CDATA: Invalid(\"slide XML has CDATA outside its document root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "PI before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"semantic slide XML has text outside its root\")",
+                "empty-element root then root: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after empty-element root: Invalid(\"XML declarations must be the first document event\")",
+            ],
+            |xml| outcome(super::scan_raw_semantic_text_xml(xml), |_| String::new()),
+        );
+    }
+
+    /// The semantic pass on its own.
+    #[test]
+    fn semantic_text_pass_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "whitespace only: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "declaration only: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"semantic slide XML has text outside its root\")",
+                "root then second root: Invalid(\"semantic slide XML has an invalid root\")",
+                "root then foreign start: Invalid(\"semantic slide XML has an invalid root\")",
+                "root then foreign empty: Invalid(\"semantic slide XML has an invalid root\")",
+                "declaration after root: Invalid(\"XML declarations must be the first document event\")",
+                "two declarations: Invalid(\"XML declarations must be the first document event\")",
+                "comment before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "text before root: Invalid(\"semantic slide XML has text outside its root\")",
+                "unterminated root: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD declarations are not permitted in slide text\")",
+                "top-level CDATA: Invalid(\"slide XML has CDATA outside its document root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "PI before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"semantic slide XML has text outside its root\")",
+                "empty-element root then root: Invalid(\"semantic slide XML has an invalid root\")",
+                "declaration after empty-element root: Invalid(\"XML declarations must be the first document event\")",
+            ],
+            |xml| outcome(super::parse_semantic_text(xml, "\n"), |(text, _)| text),
+        );
+    }
+
+    /// Both passes as a slide part runs them.
+    #[test]
+    fn semantic_text_envelope() {
+        let root = Root {
+            open: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">"#,
+            body: r"<p:cSld><p:spTree/></p:cSld>",
+            close: r"</p:sld>",
+            empty: r#"<p:sld xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"/>"#,
+        };
+        assert_matrix(
+            &root,
+            &[
+                "empty input: Invalid(\"semantic slide XML lacks an element root\")",
+                "whitespace only: Invalid(\"semantic slide XML lacks an element root\")",
+                "declaration only: Invalid(\"semantic slide XML lacks an element root\")",
+                "empty-element root: Ok()",
+                "start and end root: Ok()",
+                "root then whitespace: Ok()",
+                "root then comment: Ok()",
+                "root then PI: Ok()",
+                "root then text: Invalid(\"semantic slide XML has text outside its root\")",
+                "root then second root: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign start: Invalid(\"semantic slide XML has multiple roots\")",
+                "root then foreign empty: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after root: Invalid(\"XML declarations must be the first document event\")",
+                "two declarations: Invalid(\"XML declarations must be the first document event\")",
+                "comment before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "text before root: Invalid(\"semantic slide XML has text outside its root\")",
+                "unterminated root: Invalid(\"semantic slide XML has unbalanced elements\")",
+                "stray end tag: Xml(\"ill-formed document: close tag `</foreign>` does not match any open tag\")",
+                "DOCTYPE: Invalid(\"DTD declarations are not permitted in slide text\")",
+                "top-level CDATA: Invalid(\"slide XML has CDATA outside its document root\")",
+                "declaration then root: Ok()",
+                "whitespace before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "PI before declaration: Invalid(\"XML declarations must be the first document event\")",
+                "comment then root: Ok()",
+                "PI then root: Ok()",
+                "root then text then second root: Invalid(\"semantic slide XML has text outside its root\")",
+                "empty-element root then root: Invalid(\"semantic slide XML has multiple roots\")",
+                "declaration after empty-element root: Invalid(\"XML declarations must be the first document event\")",
+            ],
+            |xml| {
+                outcome(super::semantic_text_and_repairs(xml, "\n"), |(text, _)| {
+                    text
+                })
+            },
+        );
+    }
+}

@@ -1,0 +1,384 @@
+use super::model::{MAX_DEPTH, MAX_PART_BYTES, NS, USERS_REL};
+use super::*;
+use litchi_opc::{BlobPart, OpcPackage, PackURI};
+
+const LO: &[u8] = include_bytes!(
+    "../../../../test-data/libreoffice-core/sc/qa/unit/data/xlsx/track-changes/simple-cell-changes.xlsx"
+);
+const POI: &[u8] = include_bytes!(
+    "../../../../test-data/poi/test-data/spreadsheet/workbookProtection_workbook_revision_protected.xlsx"
+);
+fn guid(n: u8) -> String {
+    format!("{{00000000-0000-0000-0000-{n:012X}}}")
+}
+fn log() -> RevisionLog {
+    RevisionLog {
+        records: vec![RevisionRecord {
+            kind: RevisionRecordKind::CellChange,
+            revision_id: Some(1),
+            sheet_id: Some(1),
+            attributes: vec![],
+            children: vec![RevisionXmlElement {
+                name: "nc".into(),
+                attributes: vec![RevisionAttribute {
+                    namespace: RevisionAttributeNamespace::Unqualified,
+                    name: "r".into(),
+                    value: "A1".into(),
+                }],
+                children: vec![RevisionXmlElement {
+                    name: "v".into(),
+                    attributes: vec![],
+                    children: vec![],
+                    text: "=1+1".into(),
+                }],
+                text: String::new(),
+            }],
+            text: String::new(),
+        }],
+    }
+}
+fn value() -> Revisions {
+    let h = RevisionHeader {
+        guid: guid(2),
+        date_time: "2026-07-17T12:00:00Z".into(),
+        max_sheet_id: 2,
+        user_name: "Reviewer".into(),
+        relationship_id: "rId1".into(),
+        min_revision_id: Some(1),
+        max_revision_id: Some(1),
+        sheet_ids: vec![1],
+        trailing_elements: vec![],
+    };
+    Revisions {
+        users_relationship_id: "rId2".into(),
+        users_part_name: "/xl/revisions/userNames.xml".into(),
+        headers_relationship_id: "rId3".into(),
+        headers_part_name: "/xl/revisions/revisionHeaders.xml".into(),
+        users: RevisionUsers::default(),
+        headers: RevisionHeaders {
+            properties: RevisionHeaderProperties {
+                guid: h.guid.clone(),
+                disk_revisions: Some(true),
+                ..Default::default()
+            },
+            headers: vec![h],
+        },
+        logs: vec![RevisionLogPart {
+            relationship_id: "rId1".into(),
+            part_name: "/xl/revisions/revisionLog1.xml".into(),
+            log: log(),
+        }],
+    }
+}
+fn package() -> OpcPackage {
+    let mut p = OpcPackage::new();
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").unwrap();
+    p.add_part(Box::new(BlobPart::new(
+        worksheet.clone(),
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml".into(),
+        br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#.to_vec(),
+    )));
+    crate::record::adopt_worksheet(&mut p, &worksheet, false);
+    p
+}
+#[test]
+fn loads_libreoffice_and_poi_reference_packages() {
+    let a = load_workbook_revisions(
+        &OpcPackage::from_bytes(LO, litchi_opc::SourceLimits::default()).unwrap(),
+        &litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(a.logs.len(), 5);
+    assert!(
+        a.logs
+            .iter()
+            .flat_map(|l| &l.log.records)
+            .any(|r| r.kind == RevisionRecordKind::RowColumn)
+    );
+    assert!(
+        a.logs
+            .iter()
+            .flat_map(|l| &l.log.records)
+            .any(|r| r.kind == RevisionRecordKind::CustomView)
+    );
+    let b = load_workbook_revisions(
+        &OpcPackage::from_bytes(POI, litchi_opc::SourceLimits::default()).unwrap(),
+        &litchi_opc::SourceLimits::default(),
+    )
+    .unwrap()
+    .unwrap();
+    assert_eq!(b.logs.len(), 3);
+    assert_eq!(b.logs.iter().map(|l| l.log.records.len()).sum::<usize>(), 2);
+}
+#[test]
+fn strict_writers_are_deterministic_and_round_trip() {
+    let v = value();
+    let limits = litchi_opc::SourceLimits::default();
+    let u = write_revision_users(&v.users, RevisionConformance::Strict, &limits).unwrap();
+    let h = write_revision_headers(&v.headers, RevisionConformance::Strict, &limits).unwrap();
+    let l = write_revision_log(&v.logs[0].log, RevisionConformance::Strict, &limits).unwrap();
+    assert_eq!(
+        u,
+        write_revision_users(&v.users, RevisionConformance::Strict, &limits).unwrap()
+    );
+    assert_eq!(parse_revision_users(&u, &limits).unwrap(), v.users);
+    assert_eq!(parse_revision_headers(&h, &limits).unwrap(), v.headers);
+    assert_eq!(parse_revision_log(&l, &limits).unwrap(), v.logs[0].log);
+}
+#[test]
+fn mce_fallback() {
+    let x = format!(
+        r#"<revisions xmlns="{NS}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" xmlns:z="urn:z" mc:Ignorable="z"><mc:AlternateContent><mc:Choice Requires="z"><z:x/></mc:Choice><mc:Fallback><rcv guid="{}" action="add"/></mc:Fallback></mc:AlternateContent></revisions>"#,
+        guid(3)
+    );
+    assert_eq!(
+        parse_revision_log(x.as_bytes(), &litchi_opc::SourceLimits::default())
+            .unwrap()
+            .records[0]
+            .kind,
+        RevisionRecordKind::CustomView
+    );
+}
+#[test]
+fn package_writer_round_trip() {
+    let mut p = package();
+    let v = value();
+    store_workbook_revisions(&mut p, &v, RevisionConformance::Strict).unwrap();
+    assert_eq!(
+        load_workbook_revisions(&p, &litchi_opc::SourceLimits::default())
+            .unwrap()
+            .unwrap(),
+        v
+    );
+}
+
+fn revision_user(id: i32, name: &str) -> RevisionUser {
+    RevisionUser {
+        guid: guid(9),
+        name: name.into(),
+        id,
+        date_time: "2026-07-17T12:00:00Z".into(),
+        extension_elements: vec![],
+    }
+}
+
+fn owner_bytes(package: &OpcPackage) -> Vec<(String, Vec<u8>)> {
+    let value = load_workbook_revisions(package, &package.read_limits())
+        .unwrap()
+        .unwrap();
+    let workbook = package.main_document_part().unwrap();
+    let mut parts = vec![(
+        format!("{}::rels", workbook.partname()),
+        workbook.rels().to_xml().into_bytes(),
+    )];
+    let mut names = vec![value.users_part_name, value.headers_part_name];
+    names.extend(value.logs.into_iter().map(|log| log.part_name));
+    for name in names {
+        let uri = PackURI::new(&name).unwrap();
+        let part = package.get_part(&uri).unwrap();
+        parts.push((name.clone(), part.blob().to_vec()));
+        parts.push((format!("{name}::rels"), part.rels().to_xml().into_bytes()));
+    }
+    parts.sort_by(|left, right| left.0.cmp(&right.0));
+    parts
+}
+
+#[test]
+fn transaction_noop_preserves_package_bytes() {
+    let mut package = package();
+    store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
+    let before = owner_bytes(&package);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let staged = transaction.revisions().unwrap().cloned();
+    assert!(!transaction.replace(staged).unwrap());
+    let commit = transaction.commit().unwrap();
+    assert!(!commit.changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(owner_bytes(&package), before);
+}
+
+#[test]
+fn transaction_edits_one_typed_user() {
+    let mut package = package();
+    store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
+    let before = owner_bytes(&package);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    assert!(transaction.set_user(revision_user(7, "Alice")).unwrap());
+    let commit = transaction.commit().unwrap();
+    assert!(commit.changed());
+    assert_eq!(
+        load_workbook_revisions(&package, &package.read_limits())
+            .unwrap()
+            .unwrap()
+            .users
+            .users[0]
+            .name,
+        "Alice"
+    );
+    assert_ne!(
+        commit
+            .snapshot()
+            .source_xml("/xl/revisions/userNames.xml")
+            .unwrap(),
+        write_revision_users(
+            &RevisionUsers::default(),
+            RevisionConformance::Strict,
+            &package.read_limits(),
+        )
+        .unwrap()
+    );
+    let after = owner_bytes(&package);
+    assert_ne!(after, before);
+    assert_eq!(
+        after
+            .iter()
+            .find(|(name, _)| name.ends_with("revisionHeaders.xml"))
+            .map(|(_, bytes)| bytes),
+        before
+            .iter()
+            .find(|(name, _)| name.ends_with("revisionHeaders.xml"))
+            .map(|(_, bytes)| bytes)
+    );
+}
+
+#[test]
+fn invalid_edit_is_staged_and_failure_atomic() {
+    let mut package = package();
+    store_workbook_revisions(&mut package, &value(), RevisionConformance::Strict).unwrap();
+    let before = owner_bytes(&package);
+    let mut transaction = Transaction::new(&mut package).unwrap();
+    let mut invalid_user = revision_user(7, "Alice");
+    invalid_user.guid = "not-a-guid".into();
+    assert!(transaction.set_user(invalid_user).is_err());
+    assert!(
+        transaction
+            .revisions()
+            .unwrap()
+            .unwrap()
+            .users
+            .users
+            .is_empty()
+    );
+    drop(transaction);
+    assert_eq!(owner_bytes(&package), before);
+}
+
+#[test]
+fn stale_patch_and_shared_relationship_are_rejected_atomically() {
+    let mut source_package = package();
+    store_workbook_revisions(&mut source_package, &value(), RevisionConformance::Strict).unwrap();
+    let mut transaction = Transaction::new(&mut source_package).unwrap();
+    transaction.set_user(revision_user(7, "Alice")).unwrap();
+    let patch = transaction.commit().unwrap().patch().clone();
+    let after_commit = owner_bytes(&source_package);
+    assert!(patch.apply(&mut source_package).is_err());
+    assert_eq!(owner_bytes(&source_package), after_commit);
+
+    let mut unsafe_package = package();
+    store_workbook_revisions(&mut unsafe_package, &value(), RevisionConformance::Strict).unwrap();
+    let users_target = PackURI::new("/xl/revisions/userNames.xml").unwrap();
+    let unsafe_before = owner_bytes(&unsafe_package);
+    unsafe_package
+        .get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            "urn:litchi:unexpected-revision-owner".into(),
+            users_target.relative_ref("/xl/"),
+            "rIdUnsafe".into(),
+            false,
+        );
+    let unsafe_before_edit = owner_bytes(&unsafe_package);
+    let mut transaction = Transaction::new(&mut unsafe_package).unwrap();
+    transaction.set_user(revision_user(7, "Alice")).unwrap();
+    assert!(transaction.commit().is_err());
+    assert_eq!(owner_bytes(&unsafe_package), unsafe_before_edit);
+    assert_ne!(unsafe_before, unsafe_before_edit);
+}
+#[test]
+fn malformed_and_caps() {
+    for x in [
+        format!(r#"<users xmlns="{NS}" count="2"/>"#),
+        format!(r#"<headers xmlns="{NS}" guid="bad"/>"#),
+        format!(r#"<revisions xmlns="{NS}"><bad/></revisions>"#),
+        format!(r#"<!DOCTYPE x><revisions xmlns="{NS}"/>"#),
+    ] {
+        assert!(if x.contains("<users") {
+            parse_revision_users(x.as_bytes(), &litchi_opc::SourceLimits::default()).is_err()
+        } else if x.contains("<headers") {
+            parse_revision_headers(x.as_bytes(), &litchi_opc::SourceLimits::default()).is_err()
+        } else {
+            parse_revision_log(x.as_bytes(), &litchi_opc::SourceLimits::default()).is_err()
+        });
+    }
+    assert!(
+        parse_revision_log(
+            &vec![b' '; MAX_PART_BYTES + 1],
+            &litchi_opc::SourceLimits::default(),
+        )
+        .is_err()
+    );
+    let deep = format!(
+        r#"<revisions xmlns="{NS}"><rcc>{}{}</rcc></revisions>"#,
+        "<x>".repeat(MAX_DEPTH),
+        "</x>".repeat(MAX_DEPTH)
+    );
+    assert!(parse_revision_log(deep.as_bytes(), &litchi_opc::SourceLimits::default()).is_err());
+}
+
+#[test]
+fn source_limits_bound_codec_input_and_output() {
+    let limits = litchi_opc::SourceLimits::builder()
+        .max_part_bytes(16)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = parse_revision_log(
+        br#"<revisions xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"/>"#,
+        &limits,
+    )
+    .expect_err("the caller's source part budget must be enforced");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Revisions(LimitKind::PartBytes),
+            maximum: 16,
+            ..
+        }
+    ));
+    let error = write_revision_users(
+        &RevisionUsers::default(),
+        RevisionConformance::Strict,
+        &limits,
+    )
+    .expect_err("the caller's source part budget must bound generated XML");
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: crate::LimitKind::Revisions(LimitKind::PartBytes),
+            maximum: 16,
+            ..
+        }
+    ));
+}
+
+#[test]
+fn graph_and_reference_errors() {
+    let mut v = value();
+    v.logs[0].log.records[0].sheet_id = Some(9);
+    assert!(
+        store_workbook_revisions(&mut package(), &v, RevisionConformance::Transitional).is_err()
+    );
+    let mut p = package();
+    p.get_part_mut(&PackURI::new("/xl/workbook.xml").unwrap())
+        .unwrap()
+        .rels_mut()
+        .add_relationship(
+            USERS_REL.into(),
+            "https://invalid.example/users".into(),
+            "rId2".into(),
+            true,
+        );
+    assert!(load_workbook_revisions(&p, &p.read_limits()).is_err());
+}

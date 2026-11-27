@@ -1,8 +1,8 @@
-//! Demonstrate the LZFu compressed-RTF helpers: `is_compressed_rtf`, `compress`, `decompress`.
+//! Demonstrate the `LZFu` compressed-RTF helpers: `is_compressed_rtf`, `compress`, `decompress`.
 //!
 //! The `compress`/`decompress` pair implements the algorithm used by Outlook for
 //! the `PR_RTF_COMPRESSED` MAPI property. This example round-trips a small RTF
-//! fragment through both compressed (LZFu) and uncompressed framings.
+//! fragment through both compressed (`LZFu`) and uncompressed framings.
 //!
 //! Run from the workspace root:
 //!
@@ -10,7 +10,9 @@
 //! cargo run -p litchi-rtf --example compressed_rtf
 //! ```
 
-use litchi_rtf::{compress, decompress, is_compressed_rtf};
+use litchi_rtf::transport::{
+    CompressionLimits, DecompressionLimits, compress, decompress, is_compressed_rtf,
+};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let original: &[u8] = b"{\\rtf1\\ansi{\\fonttbl\\f0\\fswiss Helvetica;}\\f0\\pard \
@@ -24,7 +26,7 @@ This text is repeated.\\par}";
     );
 
     // ----- LZFu compressed framing -----
-    let compressed = compress(original, true)?;
+    let compressed = compress(original, true, CompressionLimits::default())?;
     println!("\nLZFu framing");
     println!("{}", "-".repeat(60));
     println!("Compressed payload size: {} bytes", compressed.len());
@@ -33,7 +35,7 @@ This text is repeated.\\par}";
         is_compressed_rtf(&compressed)
     );
 
-    let round_trip = decompress(&compressed)?;
+    let round_trip = decompress(&compressed, DecompressionLimits::default())?;
     assert_eq!(
         round_trip, original,
         "LZFu round-trip should restore the exact bytes"
@@ -46,7 +48,7 @@ This text is repeated.\\par}";
     // ----- Uncompressed framing -----
     // The `compress = false` mode still wraps the data in the 16-byte
     // compressed-RTF header, but skips LZFu encoding.
-    let stored = compress(original, false)?;
+    let stored = compress(original, false, CompressionLimits::default())?;
     println!("\nUncompressed framing");
     println!("{}", "-".repeat(60));
     println!("Stored payload size: {} bytes", stored.len());
@@ -55,7 +57,7 @@ This text is repeated.\\par}";
         is_compressed_rtf(&stored)
     );
 
-    let stored_round_trip = decompress(&stored)?;
+    let stored_round_trip = decompress(&stored, DecompressionLimits::default())?;
     assert_eq!(
         stored_round_trip, original,
         "Uncompressed round-trip should restore the exact bytes"

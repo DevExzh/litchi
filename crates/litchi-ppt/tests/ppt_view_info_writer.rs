@@ -1,0 +1,150 @@
+use std::io::Cursor;
+
+use litchi_ppt::writer::{
+    Builder, Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind,
+    ViewOrigin, ZoomViewInfo,
+};
+use litchi_ppt::{Record, raw::Reader};
+
+fn slide_view() -> SlideViewInfo {
+    let scale = Ratio::new(3, 4).unwrap();
+    SlideViewInfo::new(
+        ViewKind::Slide,
+        SlideViewPreferences::new(true, false),
+        Some(ZoomViewInfo::new(scale, scale, ViewOrigin::new(-100, 200), true, false).unwrap()),
+        vec![
+            Guide::new(GuideOrientation::Horizontal, 2160).unwrap(),
+            Guide::new(GuideOrientation::Vertical, 2880).unwrap(),
+        ],
+    )
+    .unwrap()
+}
+
+fn notes_view() -> SlideViewInfo {
+    SlideViewInfo::new(
+        ViewKind::Notes,
+        SlideViewPreferences::new(false, true),
+        None,
+        vec![Guide::new(GuideOrientation::Horizontal, 720).unwrap()],
+    )
+    .unwrap()
+}
+
+fn write(writer: &mut Builder) -> Vec<u8> {
+    let mut output = Cursor::new(Vec::new());
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
+    output.into_inner()
+}
+
+fn view_records(bytes: &[u8]) -> Vec<Record> {
+    let mut ole =
+        litchi_cfb::OleFile::open(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())
+            .unwrap();
+    let stream = ole.open_stream(&["PowerPoint Document"]).unwrap();
+    let (document, _) = Record::parse(&stream, 0, &litchi_ppt::SourceLimits::default()).unwrap();
+    let doc_info = document
+        .children
+        .iter()
+        .find(|record| record.record_type_raw == 2000)
+        .unwrap();
+    doc_info
+        .children
+        .iter()
+        .filter(|record| record.record_type_raw == 1018)
+        .cloned()
+        .collect()
+}
+
+#[test]
+fn emits_exact_slide_and_notes_view_record_structure() {
+    let mut writer = Builder::new();
+    writer.add_slide().unwrap();
+    writer.set_slide_view_info(slide_view()).unwrap();
+    writer.set_notes_view_info(notes_view()).unwrap();
+
+    let bytes = write(&mut writer);
+    let views = view_records(&bytes);
+    assert_eq!(views.len(), 2);
+    assert_eq!((views[0].version, views[0].instance), (0xF, 0));
+    assert_eq!((views[1].version, views[1].instance), (0xF, 1));
+    assert_eq!(
+        views[0]
+            .children
+            .iter()
+            .map(|record| (record.record_type_raw, record.instance, record.data.len()))
+            .collect::<Vec<_>>(),
+        vec![(1022, 0, 3), (1021, 0, 52), (1019, 7, 8), (1019, 7, 8)]
+    );
+    assert_eq!(
+        views[1]
+            .children
+            .iter()
+            .map(|record| (record.record_type_raw, record.instance, record.data.len()))
+            .collect::<Vec<_>>(),
+        vec![(1022, 0, 3), (1019, 7, 8)]
+    );
+}
+
+#[test]
+fn simultaneous_slide_and_notes_views_round_trip_through_writer_and_reader() {
+    let mut writer = Builder::new();
+    writer.add_slide().unwrap();
+    writer.set_slide_view_info(slide_view()).unwrap();
+    writer.set_notes_view_info(notes_view()).unwrap();
+
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let presentation = package.presentation().unwrap();
+    let information = presentation.slide_view_information().unwrap();
+    let slide = information.slide().unwrap();
+    let notes = information.notes().unwrap();
+    assert!(slide.preferences().snap_to_grid());
+    assert!(!slide.preferences().snap_to_shape());
+    assert_eq!(slide.zoom().unwrap().x_scale().numerator(), 3);
+    assert_eq!(slide.guides().len(), 2);
+    assert!(!notes.preferences().snap_to_grid());
+    assert!(notes.preferences().snap_to_shape());
+    assert!(notes.zoom().is_none());
+    assert_eq!(notes.guides()[0].position(), 720);
+}
+
+#[test]
+fn setters_reject_wrong_kinds_atomically_and_models_enforce_limits() {
+    let mut writer = Builder::new();
+    writer.add_slide().unwrap();
+    writer.set_slide_view_info(slide_view()).unwrap();
+    assert!(writer.set_slide_view_info(notes_view()).is_err());
+    assert_eq!(writer.slide_view_info().unwrap().kind(), ViewKind::Slide);
+    assert!(writer.set_notes_view_info(slide_view()).is_err());
+    assert!(writer.notes_view_info().is_none());
+
+    assert!(Guide::new(GuideOrientation::Vertical, 32_256).is_err());
+    let too_many = vec![Guide::new(GuideOrientation::Horizontal, 0).unwrap(); 9];
+    assert!(
+        SlideViewInfo::new(
+            ViewKind::Slide,
+            SlideViewPreferences::new(false, false),
+            None,
+            too_many,
+        )
+        .is_err()
+    );
+    assert!(
+        ZoomViewInfo::new(
+            Ratio::new(1, 2).unwrap(),
+            Ratio::new(3, 4).unwrap(),
+            ViewOrigin::new(0, 0),
+            false,
+            false,
+        )
+        .is_err()
+    );
+
+    writer.clear_slide_view_info();
+    writer.clear_notes_view_info();
+    assert!(writer.slide_view_info().is_none());
+    assert!(writer.notes_view_info().is_none());
+    let views = view_records(&write(&mut writer));
+    assert_eq!(views.len(), 1);
+    assert_eq!(views[0].instance, 0);
+    assert_eq!(views[0].children.len(), 1);
+}

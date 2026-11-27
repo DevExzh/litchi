@@ -1,0 +1,46 @@
+[package]
+name = "litchi-crypto"
+description = "Runtime-neutral MS-OFFCRYPTO primitives for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+ooxml = [
+    "dep:aes",
+    "dep:base64",
+    "dep:cbc",
+    "dep:hmac",
+    "dep:rand",
+    "dep:sha2",
+    "dep:thiserror",
+]
+
+[dependencies]
+aes = { workspace = true, optional = true, features = ["zeroize"] }
+base64 = { workspace = true, optional = true }
+bitflags = { workspace = true }
+cbc = { workspace = true, optional = true, features = ["zeroize"] }
+hmac = { workspace = true, optional = true, features = ["zeroize"] }
+litchi-cfb = { workspace = true }
+litchi-core = { workspace = true }
+litchi-ole-common = { workspace = true }
+md-5 = { workspace = true }
+quick-xml = { workspace = true }
+rand = { workspace = true, optional = true }
+rc4 = { workspace = true }
+sha1 = { workspace = true }
+sha2 = { workspace = true, optional = true, features = ["zeroize"] }
+subtle = { workspace = true }
+thiserror = { workspace = true, optional = true }
+zeroize = { workspace = true }
+
+[dev-dependencies]
+zip = { version = "9.8.2", default-features = false, features = ["deflate"] }
+
+[lints]
+workspace = true

@@ -1,0 +1,7 @@
+Source archive: test-data/libreoffice-core/oox/qa/unit/data/tdf131082.pptx
+Source archive SHA-256: a7287e4303cce471c20f10d7a6f90c0717ff99d1165450033c314b821ac34fa1
+Source member: ppt/theme/theme1.xml
+Source member SHA-256: 320d1eb5e8a588c54a7a212ed2b26b551e2942fa21dd3c75bfcea55e084bb95d
+Extracted fragment SHA-256: fc3629eb8c47a9665d56152c54d52112621b889581f6ceb1299ac5ed8cfc264f
+Extraction: exact lexical thm15:themeFamily empty-element fragment from the source member.
+Specification: [MS-ODRAWXML] sections 2.4 and 5.17.

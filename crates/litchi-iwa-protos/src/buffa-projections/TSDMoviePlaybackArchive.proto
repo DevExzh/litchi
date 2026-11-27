@@ -1,0 +1,18 @@
+// Private scalar projection of TSD.MovieArchive playback settings.
+//
+// The complete MovieArchive, including its drawable graph and media data
+// references, remains caller-owned. This sidecar only forces the selected
+// playback scalars through Buffa's borrowed lazy decoder.
+syntax = "proto2";
+
+package LitchiIwaProjection;
+
+message MoviePlaybackArchive {
+  required bytes super = 1;
+  optional float start_time = 3;
+  optional float end_time = 4;
+  optional float poster_time = 5;
+  optional uint32 loop_option_as_integer = 6;
+  optional float volume = 7;
+  optional int32 loop_option = 24;
+}

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<p:extLst xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main"
+    xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main">
+  <p:ext uri="{3A86A75C-4F4B-4683-9AE1-C65F6400EC91}">
+    <p14:laserTraceLst>
+      <p14:tracePtLst>
+        <p14:tracePt t="48796" x="6062662" y="3259137"/>
+        <p14:tracePt t="49796" x="6438900" y="3179762"/>
+        <p14:tracePt t="50296" x="0" y="0"/>
+      </p14:tracePtLst>
+      <p14:tracePtLst>
+        <p14:tracePt t="52000" x="1196975" y="2982912"/>
+        <p14:tracePt t="55000" x="0" y="0"/>
+      </p14:tracePtLst>
+    </p14:laserTraceLst>
+  </p:ext>
+</p:extLst>

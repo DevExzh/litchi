@@ -1,0 +1,16 @@
+<p:sldMaster xmlns:p="http://schemas.openxmlformats.org/presentationml/2006/main">
+  <p:cSld>
+    <p:spTree>
+      <p:sp>
+        <p:nvSpPr>
+          <p:cNvPr id="4" name="Master animation target"/>
+        </p:nvSpPr>
+      </p:sp>
+    </p:spTree>
+  </p:cSld>
+  <p:timing>
+    <p:tnLst>
+      <p:par><p:cTn><p:stCondLst><p:cond delay="indefinite"/></p:stCondLst><p:childTnLst><p:par><p:cTn><p:stCondLst><p:cond delay="0"/></p:stCondLst><p:childTnLst><p:par><p:cTn presetID="10" presetClass="entr" presetSubtype="0" nodeType="clickEffect" dur="750"><p:childTnLst><p:set><p:cBhvr><p:tgtEl><p:spTgt spid="4"/></p:tgtEl></p:cBhvr></p:set></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par></p:childTnLst></p:cTn></p:par>
+    </p:tnLst>
+  </p:timing>
+</p:sldMaster>

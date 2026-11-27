@@ -1,0 +1,62 @@
+[package]
+name = "litchi-xlsx"
+description = "Typed, lossless Excel Open XML documents for Litchi."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+encryption = ["dep:litchi-crypto", "litchi-crypto/ooxml", "litchi-ooxml-common/encryption"]
+vba-inspection = ["dep:litchi-vba", "litchi-ooxml-common/vba-inspection"]
+# Converts worksheet-drawing equations (OMML) to LaTeX through
+# `litchi-equation`, and writes them (`drawing::edit::Edit::add_equation`,
+# `set_equation`, `remove_equation`). Writing measures each equation to size
+# its text box and redraws the picture fallback other producers keep, so
+# this feature also turns on the renderer (`litchi-equation/render`, which
+# embeds about 1.9 MB of fonts). It also reads, adds, replaces and removes
+# OLE equation objects (MathType and Equation Editor 3.0,
+# `equation_objects`): their compound files (`litchi-equation/ole`) and the
+# PNG previews drawn for them.
+equation = [
+  "dep:litchi-equation",
+  "litchi-drawingml/equation",
+  "litchi-equation/ole",
+  "litchi-equation/render",
+]
+
+[dependencies]
+base64 = { workspace = true }
+bitflags = { workspace = true }
+caseless = { workspace = true }
+chrono = { workspace = true }
+itoa = { workspace = true }
+litchi-core = { workspace = true }
+litchi-crypto = { workspace = true, optional = true }
+litchi-drawingml = { workspace = true }
+litchi-equation = { workspace = true, optional = true }
+litchi-ooxml-common = { workspace = true }
+litchi-opc = { workspace = true }
+litchi-sheet = { workspace = true }
+litchi-spreadsheet-drawing = { workspace = true }
+litchi-vba = { workspace = true, optional = true }
+litchi-xldm = { workspace = true }
+memchr = { workspace = true }
+once_cell = { workspace = true }
+quick-xml = { workspace = true }
+ryu = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+smallvec = { workspace = true }
+thiserror = { workspace = true }
+unicode-normalization = { workspace = true }
+
+[dev-dependencies]
+soapberry-zip = { workspace = true }
+tempfile = { workspace = true }
+
+[lints]
+workspace = true

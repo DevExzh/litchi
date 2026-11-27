@@ -1,0 +1,182 @@
+//! Offline release gates over pinned normative Markdown corpora.
+//!
+//! Exact versions, hashes, generation commands, attribution, and licenses live
+//! in `tests/data/PROVENANCE.md` and alongside the vendored corpora.
+
+use std::ops::Range;
+
+use litchi_markdown::reader::{Dialect, Error, OpenOptions, ReadLimits, Snapshot};
+use serde::Deserialize;
+
+const COMMONMARK_JSON: &str = include_str!("corpus/commonmark-0.31.2/spec.json");
+const GFM_JSON: &str = include_str!("corpus/gfm-0.29.0.gfm.13/spec.json");
+const COMMONMARK_EXAMPLE_COUNT: usize = 652;
+const GFM_EXAMPLE_COUNT: usize = 670;
+const GFM_EXTENSION_EXAMPLE_COUNT: usize = 22;
+
+#[derive(Debug, Deserialize)]
+struct Example {
+    markdown: String,
+    html: String,
+    #[serde(rename = "example")]
+    number: usize,
+    section: String,
+    #[serde(default)]
+    extensions: Vec<String>,
+}
+
+#[test]
+fn commonmark_0_31_2_complete_normative_release_gate() -> Result<(), Box<dyn std::error::Error>> {
+    let examples: Vec<Example> = serde_json::from_str(COMMONMARK_JSON)?;
+    assert_eq!(examples.len(), COMMONMARK_EXAMPLE_COUNT);
+    for example in &examples {
+        assert_rendering(example, Dialect::CommonMark)?;
+        assert_exact_model_and_reversible_edit(example, Dialect::CommonMark)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn official_gfm_corpus_release_gate() -> Result<(), Box<dyn std::error::Error>> {
+    let examples: Vec<Example> = serde_json::from_str(GFM_JSON)?;
+    assert_eq!(examples.len(), GFM_EXAMPLE_COUNT);
+    assert_eq!(
+        examples
+            .iter()
+            .filter(|example| !example.extensions.is_empty())
+            .count(),
+        GFM_EXTENSION_EXAMPLE_COUNT
+    );
+    for example in &examples {
+        assert_rendering(example, Dialect::GitHubFlavored)?;
+        assert_exact_model_and_reversible_edit(example, Dialect::GitHubFlavored)?;
+    }
+    Ok(())
+}
+
+#[test]
+fn real_document_fixtures_roundtrip_through_durable_patches() -> Result<(), Error> {
+    for (source, dialect) in [
+        (
+            include_str!("data/roundtrip-commonmark.md"),
+            Dialect::CommonMark,
+        ),
+        (
+            include_str!("data/roundtrip-gfm.md"),
+            Dialect::GitHubFlavored,
+        ),
+    ] {
+        let snapshot = read_with_policy(source, dialect, ReadLimits::DEFAULT)?;
+        let mut edit = snapshot.edit();
+        edit.append_block("Roundtrip sentinel")?;
+        let commit = edit.commit()?;
+        let json = commit
+            .patch()
+            .to_json(litchi_markdown::reader::PatchEnvelopeLimits::DEFAULT)?;
+        let durable = litchi_markdown::reader::Patch::from_json(
+            &json,
+            litchi_markdown::reader::PatchEnvelopeLimits::DEFAULT,
+        )?;
+        let applied = snapshot.apply(&durable)?;
+        let restored = applied.package().apply(&durable.inverse())?;
+        assert_eq!(restored.package().source().as_bytes(), source.as_bytes());
+    }
+    Ok(())
+}
+
+fn assert_rendering(example: &Example, dialect: Dialect) -> Result<(), Error> {
+    let actual = read_with_policy(&example.markdown, dialect, ReadLimits::DEFAULT)?.to_html()?;
+    assert_eq!(
+        normalized_html(&actual),
+        normalized_html(&example.html),
+        "normative example {} ({})",
+        example.number,
+        example.section
+    );
+    Ok(())
+}
+
+fn assert_exact_model_and_reversible_edit(
+    example: &Example,
+    dialect: Dialect,
+) -> Result<(), Error> {
+    let snapshot = read_with_policy(&example.markdown, dialect, ReadLimits::DEFAULT)?;
+    assert_eq!(snapshot.source().as_bytes(), example.markdown.as_bytes());
+    assert_eq!(
+        snapshot,
+        read_with_policy(&example.markdown, dialect, ReadLimits::DEFAULT)?
+    );
+    assert_ranges(&snapshot, example);
+
+    let mut edit = snapshot.edit();
+    edit.append_block("release-gate-sentinel")?;
+    let committed = edit.commit()?;
+    let restored = committed.package().apply(&committed.patch().inverse())?;
+    assert_eq!(restored.package().source(), snapshot.source());
+    Ok(())
+}
+
+fn assert_ranges(snapshot: &Snapshot, example: &Example) {
+    let source = snapshot.source();
+    let mut prior_end = 0usize;
+    for block in snapshot.blocks() {
+        let block_range = block.range();
+        assert_valid_range(source, &block_range);
+        assert!(
+            prior_end <= block_range.start,
+            "overlapping top-level block in example {} ({}): prior end {prior_end}, current {block_range:?} {:?}",
+            example.number,
+            example.section,
+            block.kind()
+        );
+        assert_eq!(&source[block_range.clone()], block.source());
+        prior_end = block_range.end;
+        for nested in block.descendants() {
+            let range = nested.range();
+            assert_valid_range(source, &range);
+            assert!(block_range.start <= range.start && range.end <= block_range.end);
+            assert_eq!(&source[range], nested.source());
+        }
+        for inline in block.inlines() {
+            let range = inline.range();
+            assert_valid_range(source, &range);
+            assert!(block_range.start <= range.start && range.end <= block_range.end);
+            assert_eq!(&source[range], inline.source());
+        }
+    }
+    for reference in snapshot.references() {
+        let range = reference.range();
+        assert_valid_range(source, &range);
+        assert_eq!(&source[range], reference.source());
+    }
+}
+
+fn assert_valid_range(source: &str, range: &Range<usize>) {
+    assert!(range.start <= range.end && range.end <= source.len());
+    assert!(source.is_char_boundary(range.start));
+    assert!(source.is_char_boundary(range.end));
+}
+
+fn normalized_html(source: &str) -> String {
+    source
+        // Both spellings represent the same text node. The upstream
+        // CommonMark/GFM harnesses normalize character references before
+        // comparing renderer output.
+        .replace("&quot;", "\"")
+        .replace("align=\"left\"", "style=\"text-align: left\"")
+        .replace("align=\"center\"", "style=\"text-align: center\"")
+        .replace("align=\"right\"", "style=\"text-align: right\"")
+        .replace("<br>", "<br />")
+        .replace("<br/>", "<br />")
+        .replace("<hr>", "<hr />")
+        .replace("<hr/>", "<hr />")
+        .replace(">\n<", "><")
+        .replace("<tbody></tbody>", "")
+}
+
+fn read_with_policy(source: &str, dialect: Dialect, limits: ReadLimits) -> Result<Snapshot, Error> {
+    Snapshot::read_with_options(
+        source,
+        OpenOptions::default().dialect(dialect).read_limits(limits),
+    )
+}

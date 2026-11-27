@@ -1,0 +1,24 @@
+[package]
+name = "litchi-ole-common"
+description = "Shared validated structures for legacy binary Office formats."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[features]
+default = []
+# Runtime-neutral callbacks for deterministic CFB parse attribution.
+performance-diagnostics = []
+
+[dependencies]
+chrono = { workspace = true }
+litchi-cfb = { workspace = true }
+litchi-codepage = { workspace = true }
+litchi-core = { workspace = true }
+quick-xml = { workspace = true }
+
+[lints]
+workspace = true

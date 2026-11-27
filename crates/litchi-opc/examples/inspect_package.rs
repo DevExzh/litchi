@@ -11,27 +11,33 @@
 //! ```
 
 use litchi_opc::OpcPackage;
+use litchi_opc::SourceLimits;
+use std::io::Write as _;
 use std::path::PathBuf;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let path: PathBuf = std::env::args()
-        .nth(1)
-        .map(PathBuf::from)
-        .unwrap_or_else(|| PathBuf::from("test-data/ooxml/docx/documentProperties.docx"));
+    let mut out = std::io::stdout();
 
-    println!("Opening OPC package: {}", path.display());
-    let pkg = OpcPackage::open(&path)?;
+    let path: PathBuf = std::env::args().nth(1).map_or_else(
+        || PathBuf::from("test-data/ooxml/docx/documentProperties.docx"),
+        PathBuf::from,
+    );
 
-    println!("\nPackage contains {} parts:", pkg.part_count());
-    println!("{:-<100}", "");
-    println!(
+    writeln!(out, "Opening OPC package: {}", path.display())?;
+    let pkg = OpcPackage::open(&path, SourceLimits::default())?;
+
+    writeln!(out, "\nPackage contains {} parts:", pkg.part_count())?;
+    writeln!(out, "{:-<100}", "")?;
+    writeln!(
+        out,
         "{:<60} {:<30} {:>10}",
         "Partname", "Content-Type (truncated)", "Size"
-    );
-    println!("{:-<100}", "");
+    )?;
+    writeln!(out, "{:-<100}", "")?;
 
     // Collect into a Vec so we can sort for stable, human-friendly output.
-    let mut parts: Vec<_> = pkg.iter_parts().collect();
+    // The size column reads payloads, so this uses the fallible iterator.
+    let mut parts: Vec<_> = pkg.try_iter_parts().collect::<Result<Vec<_>, _>>()?;
     parts.sort_by(|a, b| a.partname().as_str().cmp(b.partname().as_str()));
 
     for part in parts {
@@ -41,16 +47,17 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             ct.to_string()
         };
-        println!(
+        writeln!(
+            out,
             "{:<60} {:<30} {:>10}",
             part.partname().as_str(),
             ct_short,
             part.blob().len()
-        );
+        )?;
     }
 
-    println!("\nPackage-level relationships ({}):", pkg.rels().len());
-    println!("{:-<100}", "");
+    writeln!(out, "\nPackage-level relationships ({}):", pkg.rels().len())?;
+    writeln!(out, "{:-<100}", "")?;
     let mut rels: Vec<_> = pkg.rels().iter().collect();
     rels.sort_by(|a, b| a.r_id().cmp(b.r_id()));
     for rel in rels {
@@ -59,13 +66,14 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         } else {
             "Internal"
         };
-        println!(
+        writeln!(
+            out,
             "  {} -> {} [{}]\n     type: {}",
             rel.r_id(),
             rel.target_ref(),
             mode,
             rel.reltype(),
-        );
+        )?;
     }
 
     Ok(())

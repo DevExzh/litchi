@@ -10,8 +10,6 @@ use zerocopy::{FromBytes, IntoBytes};
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetWorldTransform {
-    pub record_type: u32,
-    pub record_size: u32,
     pub xform: XForm,
 }
 
@@ -31,8 +29,6 @@ pub enum ModifyWorldTransformMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrModifyWorldTransform {
-    pub record_type: u32,
-    pub record_size: u32,
     pub xform: XForm,
     pub mode: u32,
 }
@@ -81,8 +77,6 @@ impl MapMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetMapMode {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -90,8 +84,6 @@ pub struct EmrSetMapMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetExtEx {
-    pub record_type: u32,
-    pub record_size: u32,
     pub extent: SizeL,
 }
 
@@ -99,8 +91,6 @@ pub struct EmrSetExtEx {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetOrgEx {
-    pub record_type: u32,
-    pub record_size: u32,
     pub origin: PointL,
 }
 
@@ -108,8 +98,6 @@ pub struct EmrSetOrgEx {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrScaleExtEx {
-    pub record_type: u32,
-    pub record_size: u32,
     pub x_num: i32,
     pub x_denom: i32,
     pub y_num: i32,
@@ -120,8 +108,6 @@ pub struct EmrScaleExtEx {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrOffsetClipRgn {
-    pub record_type: u32,
-    pub record_size: u32,
     pub offset: PointL,
 }
 
@@ -131,8 +117,6 @@ pub struct EmrOffsetClipRgn {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetColorRef {
-    pub record_type: u32,
-    pub record_size: u32,
     pub color: ColorRef,
 }
 
@@ -150,8 +134,6 @@ pub enum BackgroundMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetBkMode {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -159,8 +141,6 @@ pub struct EmrSetBkMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetPolyFillMode {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -192,8 +172,6 @@ pub enum Rop2 {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetRop2 {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -215,8 +193,6 @@ pub enum StretchBltMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetStretchBltMode {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -240,8 +216,6 @@ pub mod text_align {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetTextAlign {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -249,8 +223,6 @@ pub struct EmrSetTextAlign {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetMiterLimit {
-    pub record_type: u32,
-    pub record_size: u32,
     pub limit: u32,
 }
 
@@ -258,8 +230,6 @@ pub struct EmrSetMiterLimit {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetArcDirection {
-    pub record_type: u32,
-    pub record_size: u32,
     pub direction: u32,
 }
 
@@ -269,16 +239,13 @@ pub struct EmrSetArcDirection {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSaveDc {
-    pub record_type: u32,
-    pub record_size: u32,
+    _private: [u8; 0],
 }
 
 /// EMR_RESTOREDC
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrRestoreDc {
-    pub record_type: u32,
-    pub record_size: u32,
     pub saved_dc: i32, // Negative = relative, positive = absolute
 }
 
@@ -286,8 +253,7 @@ pub struct EmrRestoreDc {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSimple {
-    pub record_type: u32,
-    pub record_size: u32,
+    _private: [u8; 0],
 }
 
 // Color adjustment
@@ -314,8 +280,6 @@ pub struct ColorAdjustment {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetColorAdjustment {
-    pub record_type: u32,
-    pub record_size: u32,
     pub color_adjustment: ColorAdjustment,
 }
 
@@ -335,8 +299,6 @@ pub enum IcmMode {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetIcmMode {
-    pub record_type: u32,
-    pub record_size: u32,
     pub mode: u32,
 }
 
@@ -354,7 +316,5 @@ pub mod layout {
 #[derive(Debug, Clone, Copy, IntoBytes, FromBytes)]
 #[repr(C)]
 pub struct EmrSetLayout {
-    pub record_type: u32,
-    pub record_size: u32,
     pub layout_mode: u32,
 }

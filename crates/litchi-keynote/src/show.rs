@@ -1,0 +1,703 @@
+//! Keynote show settings and immutable presentation snapshots.
+//!
+//! [`Size`], [`Mode`], and [`Settings`] are valid-by-construction semantic
+//! values. Their constructors and setters use [`crate::Error`] and
+//! [`crate::Result`] for invalid dimensions, delays, or noncanonical modes.
+//! In contrast, [`Edit`], [`Patch`], [`Commit`], and the corresponding
+//! [`crate::Package`] methods use this module's [`Error`] for package
+//! projection, transaction, and publication failures. The two error domains
+//! intentionally remain distinct.
+
+use std::collections::TryReserveError;
+use std::result::Result;
+
+use crate::{Seconds, Slide, SlideSelector, SlideSelectorError, SlideSelectorResult};
+
+pub use crate::package::show_settings::{
+    Commit, Diagnostics, Edit, Error, LimitKind, Patch, Refusal,
+};
+
+const NORMAL_MODE: i32 = 0;
+const SELF_PLAYING_MODE: i32 = 1;
+const LINKS_ONLY_MODE: i32 = 2;
+
+/// A finite, strictly positive presentation size in points.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Size {
+    width: f32,
+    height: f32,
+}
+
+impl Size {
+    /// Construct a validated presentation size.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::InvalidDimensions`] when either dimension is not
+    /// finite and strictly positive.
+    pub const fn new(width: f32, height: f32) -> crate::Result<Self> {
+        if width.is_finite() && width > 0.0 && height.is_finite() && height > 0.0 {
+            Ok(Self { width, height })
+        } else {
+            Err(crate::Error::InvalidDimensions)
+        }
+    }
+
+    /// Return the width in points.
+    #[must_use]
+    pub const fn width(self) -> f32 {
+        self.width
+    }
+
+    /// Return the height in points.
+    #[must_use]
+    pub const fn height(self) -> f32 {
+        self.height
+    }
+}
+
+impl Default for Size {
+    fn default() -> Self {
+        Self {
+            width: 1_024.0,
+            height: 768.0,
+        }
+    }
+}
+
+/// How a presentation advances through its slides.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Mode {
+    /// Advance through presenter input and configured transitions.
+    Normal,
+    /// Advance automatically using playback delays.
+    SelfPlaying,
+    /// Navigate only through hyperlinks.
+    LinksOnly,
+    /// A mode introduced by a newer Keynote release.
+    Unknown(i32),
+}
+
+impl Mode {
+    /// Decode a native mode value without discarding unknown values.
+    #[must_use]
+    pub const fn from_raw(raw: i32) -> Self {
+        match raw {
+            NORMAL_MODE => Self::Normal,
+            SELF_PLAYING_MODE => Self::SelfPlaying,
+            LINKS_ONLY_MODE => Self::LinksOnly,
+            other => Self::Unknown(other),
+        }
+    }
+
+    /// Construct an unknown mode while rejecting values assigned to a named
+    /// native variant.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::NonCanonicalMode`] when `raw` is already assigned to a
+    /// named mode.
+    pub const fn unknown(raw: i32) -> crate::Result<Self> {
+        match raw {
+            NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE => {
+                Err(crate::Error::NonCanonicalMode)
+            },
+            other => Ok(Self::Unknown(other)),
+        }
+    }
+
+    /// Return the native mode value.
+    #[must_use]
+    pub const fn as_raw(self) -> i32 {
+        match self {
+            Self::Normal => NORMAL_MODE,
+            Self::SelfPlaying => SELF_PLAYING_MODE,
+            Self::LinksOnly => LINKS_ONLY_MODE,
+            Self::Unknown(value) => value,
+        }
+    }
+
+    /// Return whether this value uses a named variant for known input.
+    #[must_use]
+    pub const fn is_canonical(self) -> bool {
+        !matches!(
+            self,
+            Self::Unknown(NORMAL_MODE | SELF_PLAYING_MODE | LINKS_ONLY_MODE)
+        )
+    }
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+struct Flags {
+    present: u8,
+    values: u8,
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Flag {
+    SlideNumbersVisible,
+    LoopPresentation,
+    IdleTimerActive,
+    AutomaticallyPlaysUponOpen,
+}
+
+impl Flag {
+    const fn bit(self) -> u8 {
+        match self {
+            Self::SlideNumbersVisible => 1,
+            Self::LoopPresentation => 2,
+            Self::IdleTimerActive => 4,
+            Self::AutomaticallyPlaysUponOpen => 8,
+        }
+    }
+}
+
+impl Flags {
+    fn get(self, flag: Flag) -> Option<bool> {
+        let bit = flag.bit();
+        (self.present & bit != 0).then_some(self.values & bit != 0)
+    }
+
+    fn set(&mut self, flag: Flag, value: Option<bool>) {
+        let bit = flag.bit();
+        if let Some(set_value) = value {
+            self.present |= bit;
+            if set_value {
+                self.values |= bit;
+            } else {
+                self.values &= !bit;
+            }
+        } else {
+            self.present &= !bit;
+            self.values &= !bit;
+        }
+    }
+}
+
+/// Validated show-level playback settings.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Settings {
+    size: Size,
+    flags: Flags,
+    mode: Option<Mode>,
+    autoplay_transition_delay: Option<Seconds>,
+    autoplay_build_delay: Option<Seconds>,
+    idle_timer_delay: Option<Seconds>,
+}
+
+impl Settings {
+    /// Create settings with all optional producer fields absent.
+    #[must_use]
+    pub const fn new(size: Size) -> Self {
+        Self {
+            size,
+            flags: Flags {
+                present: 0,
+                values: 0,
+            },
+            mode: None,
+            autoplay_transition_delay: None,
+            autoplay_build_delay: None,
+            idle_timer_delay: None,
+        }
+    }
+
+    /// Return the presentation size.
+    #[must_use]
+    pub const fn size(self) -> Size {
+        self.size
+    }
+
+    /// Replace the presentation size.
+    pub fn set_size(&mut self, size: Size) {
+        self.size = size;
+    }
+
+    /// Return the optional slide-number visibility flag.
+    #[must_use]
+    pub fn slide_numbers_visible(self) -> Option<bool> {
+        self.flags.get(Flag::SlideNumbersVisible)
+    }
+
+    /// Set or clear slide-number visibility.
+    pub fn set_slide_numbers_visible(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::SlideNumbersVisible, value);
+    }
+
+    /// Return the optional looping flag.
+    #[must_use]
+    pub fn loop_presentation(self) -> Option<bool> {
+        self.flags.get(Flag::LoopPresentation)
+    }
+
+    /// Set or clear looping.
+    pub fn set_loop_presentation(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::LoopPresentation, value);
+    }
+
+    /// Return the optional playback mode.
+    #[must_use]
+    pub const fn mode(self) -> Option<Mode> {
+        self.mode
+    }
+
+    /// Set or clear playback mode, rejecting non-canonical known values.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`crate::Error::NonCanonicalMode`] when a known native value is passed
+    /// through [`Mode::Unknown`].
+    pub fn set_mode(&mut self, mode: Option<Mode>) -> crate::Result<()> {
+        if mode.is_some_and(|value| !value.is_canonical()) {
+            return Err(crate::Error::NonCanonicalMode);
+        }
+        self.mode = mode;
+        Ok(())
+    }
+
+    /// Return the automatic transition delay.
+    #[must_use]
+    pub const fn autoplay_transition_delay(self) -> Option<Seconds> {
+        self.autoplay_transition_delay
+    }
+
+    /// Set or clear the automatic transition delay.
+    pub fn set_autoplay_transition_delay(&mut self, value: Option<Seconds>) {
+        self.autoplay_transition_delay = value;
+    }
+
+    /// Return the automatic build delay.
+    #[must_use]
+    pub const fn autoplay_build_delay(self) -> Option<Seconds> {
+        self.autoplay_build_delay
+    }
+
+    /// Set or clear the automatic build delay.
+    pub fn set_autoplay_build_delay(&mut self, value: Option<Seconds>) {
+        self.autoplay_build_delay = value;
+    }
+
+    /// Return whether Keynote activates its idle timer.
+    #[must_use]
+    pub fn idle_timer_active(self) -> Option<bool> {
+        self.flags.get(Flag::IdleTimerActive)
+    }
+
+    /// Set or clear idle-timer activation.
+    pub fn set_idle_timer_active(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::IdleTimerActive, value);
+    }
+
+    /// Return the idle-timer delay.
+    #[must_use]
+    pub const fn idle_timer_delay(self) -> Option<Seconds> {
+        self.idle_timer_delay
+    }
+
+    /// Set or clear the idle-timer delay.
+    pub fn set_idle_timer_delay(&mut self, value: Option<Seconds>) {
+        self.idle_timer_delay = value;
+    }
+
+    /// Return whether the presentation plays when opened.
+    #[must_use]
+    pub fn automatically_plays_upon_open(self) -> Option<bool> {
+        self.flags.get(Flag::AutomaticallyPlaysUponOpen)
+    }
+
+    /// Set or clear automatic playback on open.
+    pub fn set_automatically_plays_upon_open(&mut self, value: Option<bool>) {
+        self.flags.set(Flag::AutomaticallyPlaysUponOpen, value);
+    }
+
+    /// Validate all semantic invariants.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed semantic error when the size or mode is invalid.
+    pub fn validate(self) -> crate::Result<()> {
+        Size::new(self.size.width, self.size.height)?;
+        if self.mode.is_some_and(|value| !value.is_canonical()) {
+            return Err(crate::Error::NonCanonicalMode);
+        }
+        Ok(())
+    }
+}
+
+impl Default for Settings {
+    fn default() -> Self {
+        Self::new(Size::default())
+    }
+}
+
+/// An immutable presentation snapshot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct Show {
+    title: Option<Box<str>>,
+    slides: Box<[Slide]>,
+    settings: Settings,
+}
+
+impl Show {
+    /// Start a detached show builder.
+    #[must_use]
+    pub fn builder() -> Builder {
+        Builder::new()
+    }
+
+    /// Return the optional presentation title.
+    #[must_use]
+    pub fn title(&self) -> Option<&str> {
+        self.title.as_deref()
+    }
+
+    /// Borrow slides in presentation order.
+    #[must_use]
+    pub fn slides(&self) -> &[Slide] {
+        &self.slides
+    }
+
+    /// Return the number of slides.
+    #[must_use]
+    pub const fn slide_count(&self) -> usize {
+        self.slides.len()
+    }
+
+    /// Resolve a slide selector against this immutable snapshot.
+    ///
+    /// Name matching is exact and case sensitive; title content is never used
+    /// as an identity fallback. Position resolution is bounds checked and
+    /// selectors never expose native object IDs.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`SlideSelectorError::DuplicateSlideName`] if multiple slides
+    /// carry the requested exact navigator name.
+    pub fn select_slide<'a>(
+        &self,
+        selector: impl Into<SlideSelector<'a>>,
+    ) -> SlideSelectorResult<Option<&Slide>> {
+        match selector.into() {
+            SlideSelector::Name(name) => {
+                if name.is_empty() {
+                    return Err(SlideSelectorError::EmptySlideName);
+                }
+                let mut matches = self
+                    .slides
+                    .iter()
+                    .filter(|slide| slide.name() == Some(name));
+                let Some(slide) = matches.next() else {
+                    return Ok(None);
+                };
+                if matches.next().is_some() {
+                    return Err(SlideSelectorError::DuplicateSlideName { name: name.into() });
+                }
+                Ok(Some(slide))
+            },
+            SlideSelector::Position(position) => Ok(self.slides.get(position.get())),
+        }
+    }
+
+    /// Borrow validated show settings.
+    #[must_use]
+    pub const fn settings(&self) -> &Settings {
+        &self.settings
+    }
+
+    /// Return all show and slide text in presentation order.
+    #[must_use]
+    pub fn all_text(&self) -> Vec<String> {
+        let mut text = Vec::new();
+        if let Some(title) = &self.title {
+            text.push(title.to_string());
+        }
+        for slide in &self.slides {
+            text.extend(slide.all_text());
+        }
+        text
+    }
+
+    /// Fallibly copy all show and slide text in presentation order.
+    ///
+    /// [`Self::all_text`] is retained as the historical infallible helper.
+    /// Callers at a resource-bounded boundary can use this variant to make
+    /// both the result-vector and each owned text value reserve explicitly;
+    /// no partially populated result is returned after an allocation error.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`TryReserveError`] when either the result vector or an owned
+    /// text value cannot reserve its required storage.
+    pub fn try_all_text(&self) -> Result<Vec<String>, TryReserveError> {
+        let mut text = Vec::new();
+        if let Some(title) = &self.title {
+            try_push_text(&mut text, title)?;
+        }
+        for slide in &self.slides {
+            if let Some(title) = slide.title() {
+                try_push_text(&mut text, title)?;
+            }
+            for value in slide.text_content() {
+                try_push_text(&mut text, value)?;
+            }
+            for storage in slide
+                .text_storages()
+                .iter()
+                .filter(|storage| !storage.is_empty())
+            {
+                try_push_text(&mut text, storage.text())?;
+            }
+            if let Some(notes) = slide.notes() {
+                try_push_text(&mut text, notes)?;
+            }
+        }
+        Ok(text)
+    }
+
+    /// Return whether the show contains no slides.
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.slides.is_empty()
+    }
+}
+
+fn try_push_text(output: &mut Vec<String>, source: &str) -> Result<(), TryReserveError> {
+    output.try_reserve(1)?;
+    let mut owned = String::new();
+    owned.try_reserve_exact(source.len())?;
+    owned.push_str(source);
+    output.push(owned);
+    Ok(())
+}
+
+/// A detached, mutable show builder.
+#[derive(Debug, Default)]
+pub struct Builder {
+    title: Option<Box<str>>,
+    slides: Vec<Slide>,
+    settings: Settings,
+}
+
+impl Builder {
+    /// Create an empty show builder with standard settings.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            title: None,
+            slides: Vec::new(),
+            settings: Settings::default(),
+        }
+    }
+
+    /// Set or clear the presentation title.
+    pub fn set_title(&mut self, title: Option<String>) {
+        self.title = title.map(String::into_boxed_str);
+    }
+
+    pub(crate) fn try_reserve_slides(&mut self, additional: usize) -> Result<(), TryReserveError> {
+        self.slides.try_reserve_exact(additional)
+    }
+
+    /// Append one slide in source order.
+    pub fn push_slide(&mut self, slide: Slide) {
+        self.slides.push(slide);
+    }
+
+    /// Replace the validated settings.
+    pub fn set_settings(&mut self, settings: Settings) {
+        self.settings = settings;
+    }
+
+    /// Finish the builder as an immutable show snapshot.
+    #[must_use]
+    pub fn build(self) -> Show {
+        Show {
+            title: self.title,
+            slides: self.slides.into_boxed_slice(),
+            settings: self.settings,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::Slide;
+
+    #[test]
+    fn size_and_modes_are_checked_and_lossless() -> crate::Result<()> {
+        for (width, height) in [
+            (0.0, 1.0),
+            (-1.0, 1.0),
+            (f32::NAN, 1.0),
+            (f32::INFINITY, 1.0),
+            (1.0, 0.0),
+            (1.0, -1.0),
+            (1.0, f32::NAN),
+            (1.0, f32::INFINITY),
+            (1.0, f32::NEG_INFINITY),
+        ] {
+            assert_eq!(
+                Size::new(width, height),
+                Err(crate::Error::InvalidDimensions)
+            );
+        }
+        for raw in [0, 1, 2, 19, -1] {
+            assert_eq!(Mode::from_raw(raw).as_raw(), raw);
+        }
+        let mut settings = Settings::default();
+        settings.set_mode(Some(Mode::SelfPlaying))?;
+        assert_eq!(settings.mode(), Some(Mode::SelfPlaying));
+        assert_eq!(
+            settings.set_mode(Some(Mode::Unknown(1))),
+            Err(crate::Error::NonCanonicalMode)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn show_is_an_immutable_ordered_snapshot() {
+        let mut builder = Show::builder();
+        builder.set_title(Some("Deck".to_owned()));
+        builder.push_slide(Slide::builder(0).build());
+        let show = builder.build();
+        assert_eq!(show.title(), Some("Deck"));
+        assert_eq!(show.slide_count(), 1);
+        assert_eq!(show.try_all_text().unwrap(), show.all_text());
+        assert_eq!(show.slides().first().map(Slide::index), Some(0));
+        assert_eq!(
+            show.select_slide(SlideSelector::index(0))
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(0))
+        );
+        assert!(show.slides().get(1).is_none());
+        assert_eq!(show.select_slide(SlideSelector::index(1)), Ok(None));
+    }
+
+    #[test]
+    fn fallible_all_text_matches_legacy_order_and_empty_storage_filter() {
+        let mut slide = Slide::builder(0);
+        slide.set_title(Some("Title".to_owned()));
+        slide.push_text("Body".to_owned());
+        slide.push_text_storage(litchi_iwa_text::storage::Storage::new());
+        slide.push_text_storage(litchi_iwa_text::storage::Storage::from_text(
+            "Rich".to_owned(),
+        ));
+        slide.set_notes(Some("Notes".to_owned()));
+
+        let mut builder = Show::builder();
+        builder.set_title(Some("Deck".to_owned()));
+        builder.push_slide(slide.build());
+        let show = builder.build();
+
+        assert_eq!(show.try_all_text().unwrap(), show.all_text());
+        assert_eq!(
+            show.try_all_text().unwrap(),
+            ["Deck", "Title", "Body", "Rich", "Notes"]
+        );
+    }
+
+    #[test]
+    fn builder_reservations_preserve_slide_order() -> Result<(), TryReserveError> {
+        let mut builder = Show::builder();
+        builder.try_reserve_slides(0)?;
+        builder.try_reserve_slides(2)?;
+        builder.push_slide(Slide::builder(3).build());
+        builder.push_slide(Slide::builder(5).build());
+
+        let show = builder.build();
+        assert_eq!(
+            show.slides().iter().map(Slide::index).collect::<Vec<_>>(),
+            vec![3, 5]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn content_titles_are_not_used_as_slide_identity() {
+        let mut first = Slide::builder(0);
+        first.set_name(Some("Agenda".to_owned()));
+        first.set_title(Some("Repeated title".to_owned()));
+        let mut second = Slide::builder(1);
+        second.set_title(Some("Repeated title".to_owned()));
+
+        let mut builder = Show::builder();
+        builder.push_slide(first.build());
+        builder.push_slide(second.build());
+        let show = builder.build();
+
+        let named = show.select_slide(SlideSelector::name("Agenda"));
+        assert_eq!(named.map(|slide| slide.map(Slide::index)), Ok(Some(0)));
+        assert_eq!(show.select_slide("Repeated title"), Ok(None));
+    }
+
+    #[test]
+    fn duplicate_names_are_reported_instead_of_picking_one() {
+        let mut first = Slide::builder(0);
+        first.set_name(Some("Agenda".to_owned()));
+        let mut second = Slide::builder(1);
+        second.set_name(Some("Agenda".to_owned()));
+        let mut builder = Show::builder();
+        builder.push_slide(first.build());
+        builder.push_slide(second.build());
+        let show = builder.build();
+
+        assert_eq!(
+            show.select_slide("Agenda"),
+            Err(SlideSelectorError::DuplicateSlideName {
+                name: "Agenda".into()
+            })
+        );
+    }
+
+    #[test]
+    fn duplicate_name_resolution_is_exact_and_position_selectors_remain_independent() {
+        let mut first = Slide::builder(0);
+        first.set_name(Some("Agenda".to_owned()));
+        let mut second = Slide::builder(1);
+        second.set_name(Some("Agenda".to_owned()));
+        let mut third = Slide::builder(2);
+        third.set_name(Some("Appendix".to_owned()));
+        let mut builder = Show::builder();
+        builder.push_slide(first.build());
+        builder.push_slide(second.build());
+        builder.push_slide(third.build());
+        let show = builder.build();
+
+        assert_eq!(show.select_slide("agenda"), Ok(None));
+        assert_eq!(
+            show.select_slide("Appendix")
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(2))
+        );
+        assert_eq!(
+            show.select_slide(SlideSelector::index(0))
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(0))
+        );
+        assert_eq!(
+            show.select_slide(SlideSelector::index(1))
+                .map(|slide| slide.map(Slide::index)),
+            Ok(Some(1))
+        );
+        assert_eq!(
+            show.select_slide("Agenda"),
+            Err(SlideSelectorError::DuplicateSlideName {
+                name: "Agenda".into()
+            })
+        );
+    }
+
+    #[test]
+    fn slides_prefer_names_and_retain_unambiguous_position_selectors() {
+        let unnamed = Slide::builder(7).build();
+        let mut named_builder = Slide::builder(8);
+        named_builder.set_name(Some("Agenda".to_owned()));
+        let named = named_builder.build();
+
+        assert_eq!(unnamed.selector(), SlideSelector::index(7));
+        assert_eq!(named.selector(), SlideSelector::name("Agenda"));
+        assert_eq!(named.position_selector(), SlideSelector::index(8));
+    }
+}

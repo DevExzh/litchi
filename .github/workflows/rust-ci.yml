@@ -5,59 +5,142 @@ on:
     paths:
       - '**/*.rs'
       - '**/Cargo.toml'
+      - 'crates/**'
       - 'Cargo.lock'
       - '.cargo/config.toml'
+      - '.cargo/**'
+      - 'tools/**'
+      - '.github/**'
+      - 'deny.toml'
       - 'clippy.toml'
       - '.pre-commit-config.yaml'
       - 'rustfmt.toml'
+      - 'rust-toolchain.toml'
       - '.github/workflows/rust-ci.yml'
+      - 'README.md'
+      - 'crates/**/README.md'
+      - 'crates/**/docs/**'
+      - 'docs/FEATURE_MATRIX.md'
+      - 'docs/OFFICE_API_GUIDE.md'
+      - 'docs/API_GLOSSARY.md'
+      - 'docs/adr/**'
+      - 'test-data/libreoffice-core/**'
+      - 'test-data/odf/**'
+      - 'test-data/office-interop/**'
+      - 'test-data/ole/**'
+      - 'test-data/ooxml/**'
+      - 'test-data/poi/**'
+      - 'test-data/**'
+      - 'tools/check_crate_boundaries.py'
+      - 'tools/check_numbers_public_dependencies.py'
+      - 'tools/check_example_targets.py'
+      - 'tools/crate_boundaries.json'
+      - 'tools/test_check_crate_boundaries.py'
+      - 'tools/test_check_numbers_public_dependencies.py'
+      - 'tools/test_check_example_targets.py'
+      - 'tools/non_iwork_gate.py'
+      - 'tools/test_non_iwork_gate.py'
+      - 'tools/native_odf_resave.py'
+      - 'tools/test_native_odf_resave.py'
+      - 'tools/test_no_3rdparty_references.py'
     branches:
       - main
   pull_request:
     paths:
       - '**/*.rs'
       - '**/Cargo.toml'
+      - 'crates/**'
       - 'Cargo.lock'
       - '.cargo/config.toml'
+      - '.cargo/**'
+      - 'tools/**'
+      - '.github/**'
+      - 'deny.toml'
       - 'clippy.toml'
       - '.pre-commit-config.yaml'
       - 'rustfmt.toml'
+      - 'rust-toolchain.toml'
       - '.github/workflows/rust-ci.yml'
+      - 'README.md'
+      - 'crates/**/README.md'
+      - 'crates/**/docs/**'
+      - 'docs/FEATURE_MATRIX.md'
+      - 'docs/OFFICE_API_GUIDE.md'
+      - 'docs/API_GLOSSARY.md'
+      - 'docs/adr/**'
+      - 'test-data/libreoffice-core/**'
+      - 'test-data/odf/**'
+      - 'test-data/office-interop/**'
+      - 'test-data/ole/**'
+      - 'test-data/ooxml/**'
+      - 'test-data/poi/**'
+      - 'test-data/**'
+      - 'tools/check_crate_boundaries.py'
+      - 'tools/check_numbers_public_dependencies.py'
+      - 'tools/check_example_targets.py'
+      - 'tools/crate_boundaries.json'
+      - 'tools/test_check_crate_boundaries.py'
+      - 'tools/test_check_numbers_public_dependencies.py'
+      - 'tools/test_check_example_targets.py'
+      - 'tools/non_iwork_gate.py'
+      - 'tools/test_non_iwork_gate.py'
+      - 'tools/native_odf_resave.py'
+      - 'tools/test_native_odf_resave.py'
+      - 'tools/test_no_3rdparty_references.py'
     branches:
       - main
 
 permissions:
   contents: read
 
+# A new push to a pull request supersedes its running checks. Every push to
+# main gets a group of its own, so no main run is cancelled or replaced while
+# it waits, and every main commit gets a full result.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+  CARGO_PROFILE_DEV_DEBUG: 0
+  CARGO_PROFILE_TEST_DEBUG: 0
   RUST_BACKTRACE: 1
 
 jobs:
-  check-and-clippy:
-    name: cargo check + clippy
+  workflow-lint:
+    name: GitHub Actions workflow validation
     runs-on: ubuntu-latest
+    timeout-minutes: 5
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
-          version: 1.0
+      - name: Validate workflow definitions
+        run: go run github.com/rhysd/actionlint/cmd/actionlint@v1.7.12 -shellcheck= -pyflakes=
+
+  architecture:
+    name: repository policy checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install the Protocol Buffers compiler
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
         with:
-          components: clippy, rustfmt
-
-      - name: Rust cache
-        uses: Swatinem/rust-cache@v2
+          components: rustfmt
 
       - name: Install cargo-sort
-        uses: taiki-e/install-action@v2
+        uses: taiki-e/install-action@v2.90.11
         with:
           tool: cargo-sort
 
@@ -65,37 +148,607 @@ jobs:
         run: cargo fmt --all -- --check
 
       - name: Check Cargo.toml sorting
-        run: cargo sort --check
+        run: cargo sort --workspace --check
 
-      - name: Check if code is compilable
-        run: cargo check --workspace --all-features
+      - name: Test API glossary, debt inventory, and disposition gates
+        run: python3 -m unittest tools.test_check_api_glossary tools.test_api_debt_inventory tools.test_validate_api_disposition
+      - name: Check capability delta inputs and generator
+        run: python3 -m unittest tools.test_officecli_capability_delta
+      - name: Check the capability delta dispositions
+        run: python3 tools/officecli_capability_delta.py --check
+      - name: Check the OfficeCLI corpus classifier and its dispositions
+        run: |
+          python3 -m unittest tools.test_officecli_corpus
+          python3 tools/officecli_corpus.py --check
 
-      - name: Enforce Rust lint policy
-        run: cargo lint
+      - name: Test dependency-direction gate
+        run: python3 -m unittest tools/test_check_crate_boundaries.py
 
-  test:
-    name: cargo test
+      - name: Check dependency direction
+        run: python3 tools/check_crate_boundaries.py
+
+      - name: Check workspace example target names
+        run: python3 tools/check_example_targets.py
+
+      - name: Test workspace example target check
+        run: python3 -m unittest tools/test_check_example_targets.py
+
+      - name: Test Cargo batch planning and disk accounting
+        run: python3 -m unittest tools.test_chunked_cargo_tests
+
+      - name: Test Numbers public-dependency gate
+        run: python3 -m unittest tools/test_check_numbers_public_dependencies.py
+
+      - name: Check Numbers public dependencies
+        run: python3 tools/check_numbers_public_dependencies.py
+
+      - name: Check native resave fixtures and filters
+        run: python3 -m unittest tools.test_native_odf_resave
+
+      - name: Check that code never references the untracked upstream checkout
+        run: python3 -m unittest tools.test_no_3rdparty_references
+
+      - name: Verify native Microsoft Office fixture integrity and inventory
+        run: python3 -m unittest tools.test_native_office_corpus
+
+  # The release gate runs one package root at a time per job, each with its
+  # own runner and target directory; no gate job depends on another. Every
+  # gate invocation passes --jobs 4 and test modes pass --test-threads 4, the
+  # runner's vCPU count. The non-iWork jobs install no protoc, so any build
+  # that reaches the iWork protobuf crate fails there.
+  non-iwork-gate-static:
+    name: non-iWork release gate (topology, check, clippy, doc)
     runs-on: ubuntu-latest
-    needs: check-and-clippy
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: target/non-iwork-gate
+      CARGO_BUILD_JOBS: 4
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Install system dependencies
-        uses: awalsh128/cache-apt-pkgs-action@v1
-        with:
-          packages: protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
-          version: 1.0
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install non-iWork system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfreetype6-dev libfontconfig1-dev
 
       - name: Set up Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+
+      - name: Test release-gate planner
+        run: python3 -m unittest tools.test_non_iwork_gate
+
+      - name: Print and verify non-iWork topology
+        run: |
+          python3 tools/non_iwork_gate.py print
+          python3 tools/non_iwork_gate.py verify
+
+      - name: Check non-iWork workspace and safe facade
+        run: python3 tools/non_iwork_gate.py --jobs 4 --record-file target/non-iwork-gate-reports/check.json check
+
+      - name: Lint non-iWork workspace and safe facade
+        run: python3 tools/non_iwork_gate.py --jobs 4 --record-file target/non-iwork-gate-reports/clippy.json clippy
+
+      - name: Build non-iWork documentation
+        run: python3 tools/non_iwork_gate.py --jobs 4 --record-file target/non-iwork-gate-reports/doc.json doc
+
+      - name: Upload non-iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-iwork-gate-reports-static
+          path: target/non-iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  non-iwork-gate-deprecated:
+    name: non-iWork release gate (deprecated API use)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: target/non-iwork-gate
+      CARGO_BUILD_JOBS: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install non-iWork system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Reject deprecated non-iWork API use
+        run: python3 tools/non_iwork_gate.py --jobs 4 --record-file target/non-iwork-gate-reports/deprecated.json deprecated
+
+      - name: Upload non-iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-iwork-gate-reports-deprecated
+          path: target/non-iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  non-iwork-gate-tests:
+    name: non-iWork release gate tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [sheet, word, slide, facade]
+    env:
+      CARGO_TARGET_DIR: target/non-iwork-gate
+      CARGO_BUILD_JOBS: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install non-iWork system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      # The facade's default feature set is empty, so its suite is not
+      # reachable from any per-package selection. These focused runs come
+      # first in the facade shard so stale expectations fail before its
+      # facade-root sweeps.
+      - name: Test the facade with the Office format leaves
+        if: matrix.shard == 'facade'
+        run: python3 tools/non_iwork_gate.py --jobs 4 --test-threads 4 --record-file target/non-iwork-gate-reports/facade-format-tests.json facade-format-tests
+
+      - name: Test native PowerPoint without optional encryption support
+        if: matrix.shard == 'facade'
+        run: cargo test -p litchi-ppt --no-default-features --test microsoft_office_native
+
+      - name: Test the facade's DOCX/ODT polyglot feature closure
+        if: matrix.shard == 'facade'
+        run: python3 tools/non_iwork_gate.py --jobs 4 --test-threads 4 --record-file target/non-iwork-gate-reports/facade-polyglot-tests.json facade-polyglot-tests
+
+      - name: Run non-iWork library and integration tests
+        run: python3 tools/non_iwork_gate.py --jobs 4 --test-threads 4 --shard ${{ matrix.shard }} --record-file target/non-iwork-gate-reports/lib-tests-${{ matrix.shard }}.json lib-tests
+
+      - name: Run non-iWork documentation tests
+        run: python3 tools/non_iwork_gate.py --jobs 4 --test-threads 4 --shard ${{ matrix.shard }} --record-file target/non-iwork-gate-reports/doc-tests-${{ matrix.shard }}.json doc-tests
+
+      - name: Upload non-iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: non-iwork-gate-reports-tests-${{ matrix.shard }}
+          path: target/non-iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The iWork lane gives the iWork packages, litchi-ops, litchi-cli and the
+  # facade's iWork closures the same per-package guarantees. Its builds run
+  # the iWork protobuf build script, so these jobs install protoc.
+  iwork-gate-static:
+    name: iWork release gate (topology, check, clippy, doc)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: target/iwork-gate
+      CARGO_BUILD_JOBS: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install iWork system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
+
+      - name: Print and verify iWork-lane topology
+        run: |
+          python3 tools/non_iwork_gate.py --lane iwork print
+          python3 tools/non_iwork_gate.py --lane iwork verify
+
+      - name: Check iWork-lane packages and facade closures
+        run: python3 tools/non_iwork_gate.py --lane iwork --jobs 4 --record-file target/iwork-gate-reports/check.json check
+
+      - name: Lint iWork-lane packages and facade closures
+        run: python3 tools/non_iwork_gate.py --lane iwork --jobs 4 --record-file target/iwork-gate-reports/clippy.json clippy
+
+      - name: Build iWork-lane documentation
+        run: python3 tools/non_iwork_gate.py --lane iwork --jobs 4 --record-file target/iwork-gate-reports/doc.json doc
+
+      - name: Upload iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwork-gate-reports-static
+          path: target/iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  # The deprecated check rebuilds every unit under other RUSTFLAGS, so it runs
+  # beside the static checks instead of after them.
+  iwork-gate-deprecated:
+    name: iWork release gate (deprecated API use)
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    env:
+      CARGO_TARGET_DIR: target/iwork-gate
+      CARGO_BUILD_JOBS: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install iWork system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Reject deprecated iWork-lane API use
+        run: python3 tools/non_iwork_gate.py --lane iwork --jobs 4 --record-file target/iwork-gate-reports/deprecated.json deprecated
+
+      - name: Upload iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwork-gate-reports-deprecated
+          path: target/iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  iwork-gate-tests:
+    name: iWork release gate tests (${{ matrix.shard }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [iwork-leaves, unified]
+    env:
+      CARGO_TARGET_DIR: target/iwork-gate
+      CARGO_BUILD_JOBS: 4
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install iWork system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Run iWork-lane library and integration tests
+        run: python3 tools/non_iwork_gate.py --lane iwork --jobs 4 --test-threads 4 --shard ${{ matrix.shard }} --record-file target/iwork-gate-reports/lib-tests-${{ matrix.shard }}.json lib-tests
+
+      - name: Run iWork-lane documentation tests
+        run: python3 tools/non_iwork_gate.py --lane iwork --jobs 4 --test-threads 4 --shard ${{ matrix.shard }} --record-file target/iwork-gate-reports/doc-tests-${{ matrix.shard }}.json doc-tests
+
+      - name: Upload iWork gate reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: iwork-gate-reports-tests-${{ matrix.shard }}
+          path: target/iwork-gate-reports/*.json
+          if-no-files-found: warn
+          retention-days: 14
+
+  portable-foundations:
+    name: foundation tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        if: runner.os == 'Linux'
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      # Pull-request runs restore the caches main wrote but never save their
+      # own, so they do not evict main's entries from the repository limit.
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Test portable foundations
+        run: >-
+          ${{ runner.os == 'Windows' && 'python' || 'python3' }} tools/gate/chunked_cargo_tests.py
+          -p litchi-codepage
+          -p litchi-core
+          -p litchi-crypto
+          -p litchi-doc
+          -p litchi-docx
+          -p litchi-drawingml
+          -p litchi-fonts
+          -p litchi-odraw
+          -p litchi-ograph
+          -p litchi-ole-common
+          -p litchi-opc
+          -p litchi-ooxml-common
+          -p litchi-ppt
+          -p litchi-pptx
+          -p litchi-sheet
+          -p litchi-sheet-text
+          -p litchi-sign
+          -p litchi-slide
+          -p litchi-vba
+          -p litchi-word
+          -p litchi-xls
+          -p litchi-xlsb
+          -p litchi-xlsx
+
+  workspace-check:
+    name: cargo check + clippy + doc
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      # One RUSTFLAGS value for the whole job, so clippy and rustdoc reuse the
+      # dependencies the deprecated check builds instead of rebuilding them.
+      # The deprecated check covers every target with all features under
+      # stricter flags, a superset of `cargo check --workspace --all-features
+      # --lib --tests`, so that plain check does not run separately.
+      RUSTFLAGS: -D deprecated
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: clippy
 
       - name: Rust cache
         uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ws-check
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Reject deprecated API use in every target
+        run: cargo check --workspace --all-targets --all-features
+
+      - name: Enforce pinned Rust lint policy
+        run: cargo lint
+
+      - name: Reject rustdoc warnings
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --all-features --no-deps
+
+  feature-boundaries:
+    name: feature boundaries
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: feature-boundaries
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Check minimal font and PPT capability boundaries
+        run: |
+          for package in litchi-docx litchi-ppt litchi-pptx; do
+            cargo check -p "$package" --no-default-features
+            cargo check -p "$package" --no-default-features --features fonts
+            cargo check -p "$package" --no-default-features --features font-subset
+            cargo check -p "$package" --no-default-features --features font-discovery
+            cargo check -p "$package" --no-default-features --features automatic-fonts
+          done
+          cargo check -p litchi --no-default-features --features ppt
+          cargo check -p litchi --no-default-features --features ppt,fonts
+          cargo check -p litchi --no-default-features --features ppt,sign
+          cargo check -p litchi-docx --no-default-features --features vba-inspection
+          cargo check -p litchi-ppt --no-default-features --features vba-inspection
+          cargo check -p litchi-pptx --no-default-features --features vba-inspection
+          cargo check -p litchi-xlsb --no-default-features --features vba-inspection
+          cargo check -p litchi-xlsx --no-default-features --features vba-inspection
+          cargo check -p litchi --no-default-features --features docx,vba-inspection
+          cargo check -p litchi --no-default-features --features ppt,vba-inspection
+          cargo check -p litchi --no-default-features --features pptx,vba-inspection
+          cargo check -p litchi --no-default-features --features xlsb,vba-inspection
+          cargo check -p litchi --no-default-features --features xlsx,vba-inspection
+
+      - name: Check optional OOXML encryption boundaries
+        run: |
+          set -euo pipefail
+          dependencies() {
+            cargo tree --color never --edges normal --prefix none --format '{p}' "$@"
+          }
+          for package in litchi-xlsx litchi-pptx; do
+            tree=$(dependencies -p "$package" --no-default-features)
+            if grep -q '^litchi-crypto v' <<< "$tree"; then
+              echo "$package unexpectedly enables litchi-crypto without encryption" >&2
+              exit 1
+            fi
+            tree=$(dependencies -p "$package" --no-default-features --features encryption)
+            grep -q '^litchi-crypto v' <<< "$tree"
+          done
+          for feature in xlsx pptx; do
+            tree=$(dependencies -p litchi --no-default-features --features "$feature")
+            if grep -q '^litchi-crypto v' <<< "$tree"; then
+              echo "litchi unexpectedly enables litchi-crypto with bare $feature" >&2
+              exit 1
+            fi
+          done
+          cargo check -p litchi --no-default-features --features xlsx
+          cargo check -p litchi --no-default-features --features pptx
+          cargo test -p litchi --no-default-features --features xlsx,encryption \
+            --test encryption_facade
+          cargo test -p litchi --no-default-features --features pptx,encryption \
+            --test encryption_facade
+
+  api-glossary:
+    name: API glossary
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: api-glossary
+          workspaces: '. -> target/api-glossary'
+          save-if: ${{ github.ref == 'refs/heads/main' }}
+
+      - name: Check registered API glossary waves
+        run: python3 tools/check_api_glossary.py --target-dir target/api-glossary
+
+  test:
+    name: cargo test (${{ matrix.part }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      # Every part keeps `--workspace --all-features`, so feature unification
+      # is the same as in a single run. `lib` runs the library harnesses; the
+      # three `tests` partitions share the remaining commands.
+      matrix:
+        include:
+          - part: lib
+            selection: --part lib
+          - part: tests-1
+            selection: --part tests --partition 1/3
+          - part: tests-2
+            selection: --part tests --partition 2/3
+          - part: tests-3
+            selection: --part tests --partition 3/3
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Free runner disk space
+        run: |
+          sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc /usr/local/.ghcup /opt/hostedtoolcache/CodeQL
+          df -h .
+
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y protobuf-compiler pkg-config libfreetype6-dev libfontconfig1-dev
+
+      - name: Set up Rust toolchain
+        uses: dtolnay/rust-toolchain@1.95.0
+
+      # All parts build the same configuration; only the lib part saves it.
+      - name: Rust cache
+        uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ws-test
+          save-if: ${{ github.ref == 'refs/heads/main' && matrix.part == 'lib' }}
 
       - name: Run unit and integration tests
-        run: cargo test --workspace --all-features --lib --tests
+        # --no-fail-fast so one failing target does not hide the rest. cargo
+        # aborts after the first failing target by default, which silently skips
+        # every later test binary; a batch gate run in September 2026 found a
+        # facade integration failure that had been invisible for that reason.
+        run: python3 tools/gate/chunked_cargo_tests.py --workspace --all-features --lib-tests ${{ matrix.selection }}
 
       - name: Run doc tests
+        if: matrix.part == 'tests-3'
         run: cargo test --workspace --all-features --doc

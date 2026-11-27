@@ -1,0 +1,68 @@
+[package]
+name = "litchi-keynote-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Ryker Zhu <ryker.zhu@outlook.com>"]
+license = "Apache-2.0"
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[[bin]]
+name = "keynote_slide_audio_position"
+path = "fuzz_targets/keynote_slide_audio_position.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_media_properties"
+path = "fuzz_targets/keynote_slide_media_properties.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_audio_creation"
+path = "fuzz_targets/keynote_slide_audio_creation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_movie_creation"
+path = "fuzz_targets/keynote_slide_movie_creation.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_movie_geometry"
+path = "fuzz_targets/keynote_slide_movie_geometry.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keynote_slide_drawable_comments"
+path = "fuzz_targets/keynote_slide_drawable_comments.rs"
+test = false
+doc = false
+bench = false
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+litchi-iwa-archive = { path = "../../litchi-iwa-archive" }
+litchi-iwa-common = { path = "../../litchi-iwa-common" }
+litchi-iwa-core = { path = "../../litchi-iwa-core" }
+litchi-iwa-protos = { path = "../../litchi-iwa-protos" }
+litchi-keynote = { path = ".." }
+prost = "0.14.6"
+
+[profile.release]
+debug = 1
+codegen-units = 1
+lto = "thin"

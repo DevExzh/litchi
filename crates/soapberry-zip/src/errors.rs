@@ -36,6 +36,47 @@ impl Error {
     pub fn kind(&self) -> &ErrorKind {
         &self.inner.kind
     }
+
+    /// Consume this error and return its owned kind.
+    ///
+    /// This lets higher-level streaming publishers retain an original I/O
+    /// error and its source chain while adding format-specific progress.
+    pub fn into_kind(self) -> ErrorKind {
+        self.inner.kind
+    }
+
+    /// Whether this error is a property of the archive's own bytes — a
+    /// malformed, inconsistent or unsupported record or payload — rather than
+    /// of resources, transport, cancellation or caller policy.
+    ///
+    /// Reading the same bytes again under the same limits reproduces a
+    /// content fault exactly, so a caller may treat it as a deterministic
+    /// verdict about the archive. Every other error — allocation, a declared
+    /// size above a caller's limit, I/O, cancellation, worker or spool
+    /// failures, a reader's re-entry, and any kind added later — is not a
+    /// content fault.
+    ///
+    /// A declared size that does not fit the platform's `usize` is an
+    /// `InvalidInput` content fault: it is a property of the bytes, although
+    /// only on platforms whose `usize` is narrower than the size.
+    #[must_use]
+    pub fn is_content_fault(&self) -> bool {
+        matches!(
+            self.inner.kind,
+            ErrorKind::MissingEndOfCentralDirectory
+                | ErrorKind::MissingZip64EndOfCentralDirectory
+                | ErrorKind::InvalidSignature { .. }
+                | ErrorKind::InvalidChecksum { .. }
+                | ErrorKind::InvalidSize { .. }
+                | ErrorKind::InvalidUtf8(_)
+                | ErrorKind::InvalidInput { .. }
+                | ErrorKind::InvalidEndOfCentralDirectory
+                | ErrorKind::Eof
+                | ErrorKind::FileNotFound(_)
+                | ErrorKind::UnsupportedCompressionMethod(_)
+                | ErrorKind::UnsupportedPreservation { .. }
+        )
+    }
 }
 
 #[derive(Debug)]
@@ -72,14 +113,50 @@ pub enum ErrorKind {
     /// An invalid input error with associated message
     InvalidInput { msg: String },
 
+    /// An explicit parallel-read policy was internally inconsistent.
+    InvalidParallelReadLimits { reason: &'static str },
+
+    /// A member cannot fit within the caller-selected in-flight byte budget.
+    ParallelReadInFlightBytesExceeded { actual: u64, maximum: u64 },
+
+    /// A local parallel-read worker pool could not be created.
+    ParallelReadWorkerPool { workers: usize, message: String },
+
+    /// An explicit parallel-write policy was internally inconsistent.
+    InvalidParallelWriteLimits { reason: &'static str },
+
+    /// A local parallel-write worker pool could not be created.
+    ParallelWriteWorkerPool { workers: usize, message: String },
+
+    /// A scheduled compression task panicked.
+    ParallelWriteWorkerPanic { ordinal: usize },
+
+    /// A bounded operation could not reserve its required memory.
+    Allocation {
+        /// Resource whose bounded plan could not be reserved.
+        resource: &'static str,
+        /// Original allocator failure.
+        source: std::collections::TryReserveError,
+    },
+
+    /// A parallel-read operation observed cooperative cancellation.
+    Cancelled,
+
+    /// A declared archive resource exceeds the caller-selected ceiling.
+    LimitExceeded {
+        /// The resource whose declared size or count exceeded its ceiling.
+        resource: LimitResource,
+        /// The declared or observed value that exceeded the ceiling.
+        actual: u64,
+        /// The caller-selected ceiling.
+        maximum: u64,
+    },
+
     /// Could not construct an archive with the given end of central directory
     InvalidEndOfCentralDirectory,
 
     /// An IO error
     IO(std::io::Error),
-
-    /// An IO error (alias for compatibility)
-    Io(std::io::Error),
 
     /// An unexpected end of file
     Eof,
@@ -89,9 +166,43 @@ pub enum ErrorKind {
 
     /// Unsupported compression method
     UnsupportedCompressionMethod(u16),
+
+    /// A ZIP layout cannot be safely preserved by the raw-copy writer.
+    UnsupportedPreservation { reason: &'static str },
+
+    /// A caller-provided central-directory spool failed while being used.
+    ///
+    /// The original I/O error is retained as the source so callers can
+    /// distinguish storage failure from a ZIP format or payload failure.
+    CentralDirectorySpool {
+        /// Operation being performed on the caller-provided store.
+        operation: &'static str,
+        /// Original storage error.
+        source: std::io::Error,
+    },
+
+    /// The caller-provided central-directory spool exceeded its byte budget.
+    CentralDirectorySpoolLimitExceeded { actual: u64, maximum: u64 },
+
+    /// A reader re-entered an operation on the thread that was already
+    /// running it, which reports this instead of deadlocking. It is a property
+    /// of the reader, never of the archive's bytes.
+    Reentered {
+        /// The operation that was re-entered.
+        operation: &'static str,
+    },
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match &self.inner.kind {
+            ErrorKind::Allocation { source, .. } => Some(source),
+            ErrorKind::IO(error) => Some(error),
+            ErrorKind::CentralDirectorySpool { source, .. } => Some(source),
+            _ => None,
+        }
+    }
+}
 
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
@@ -139,17 +250,116 @@ impl std::fmt::Display for ErrorKind {
             ErrorKind::InvalidInput { ref msg } => {
                 write!(f, "Invalid input: {}", msg)
             },
+            ErrorKind::InvalidParallelReadLimits { reason } => {
+                write!(f, "Invalid parallel read limits: {reason}")
+            },
+            ErrorKind::ParallelReadInFlightBytesExceeded { actual, maximum } => {
+                write!(
+                    f,
+                    "Parallel read in-flight byte limit exceeded: declared {actual}, maximum {maximum}"
+                )
+            },
+            ErrorKind::ParallelReadWorkerPool {
+                workers,
+                ref message,
+            } => {
+                write!(
+                    f,
+                    "Could not create local parallel read pool with {workers} worker(s): {message}"
+                )
+            },
+            ErrorKind::InvalidParallelWriteLimits { reason } => {
+                write!(f, "Invalid parallel write limits: {reason}")
+            },
+            ErrorKind::ParallelWriteWorkerPool {
+                workers,
+                ref message,
+            } => {
+                write!(
+                    f,
+                    "Could not create local parallel write pool with {workers} worker(s): {message}"
+                )
+            },
+            ErrorKind::ParallelWriteWorkerPanic { ordinal } => {
+                write!(f, "Parallel write task {ordinal} panicked")
+            },
+            ErrorKind::Allocation {
+                resource,
+                ref source,
+            } => write!(f, "could not reserve {resource}: {source}"),
+            ErrorKind::Cancelled => write!(f, "Operation cancelled"),
+            ErrorKind::LimitExceeded {
+                resource,
+                actual,
+                maximum,
+            } => {
+                write!(
+                    f,
+                    "ZIP {} limit exceeded: declared {}, maximum {}",
+                    resource, actual, maximum
+                )
+            },
             ErrorKind::InvalidEndOfCentralDirectory => {
                 write!(f, "Invalid end of central directory")
             },
-            ErrorKind::Io(ref err) => err.fmt(f),
             ErrorKind::FileNotFound(ref name) => {
                 write!(f, "File not found in archive: {}", name)
             },
             ErrorKind::UnsupportedCompressionMethod(method) => {
                 write!(f, "Unsupported compression method: {}", method)
             },
+            ErrorKind::UnsupportedPreservation { reason } => {
+                write!(f, "Unsupported ZIP preservation layout: {reason}")
+            },
+            ErrorKind::CentralDirectorySpool { operation, .. } => {
+                write!(f, "central-directory spool {operation} failed")
+            },
+            ErrorKind::CentralDirectorySpoolLimitExceeded { actual, maximum } => {
+                write!(
+                    f,
+                    "central-directory spool limit exceeded: {actual} bytes, maximum {maximum}"
+                )
+            },
+            ErrorKind::Reentered { operation } => {
+                write!(f, "{operation} re-entered on its owning thread")
+            },
         }
+    }
+}
+
+/// A resource governed by [`ErrorKind::LimitExceeded`].
+///
+/// Values are declared ZIP metadata, except [`Self::FileCount`], which is the
+/// number of non-directory members accepted into an Office archive index.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum LimitResource {
+    /// Number of non-directory members.
+    FileCount,
+    /// Bytes in one raw member name.
+    MemberNameBytes,
+    /// Aggregate central-directory variable metadata bytes.
+    ///
+    /// This includes member names, extra fields, and file comments, including
+    /// those on directory entries.
+    MetadataBytes,
+    /// Declared compressed bytes for one non-directory member.
+    CompressedSize,
+    /// Declared uncompressed bytes for one non-directory member.
+    EntrySize,
+    /// Aggregate declared uncompressed bytes for non-directory members.
+    TotalSize,
+}
+
+impl std::fmt::Display for LimitResource {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::FileCount => "file count",
+            Self::MemberNameBytes => "member name bytes",
+            Self::MetadataBytes => "central-directory metadata bytes",
+            Self::CompressedSize => "compressed member size",
+            Self::EntrySize => "uncompressed member size",
+            Self::TotalSize => "total uncompressed size",
+        })
     }
 }
 
@@ -167,5 +377,82 @@ impl From<ErrorKind> for Error {
 impl From<std::io::Error> for Error {
     fn from(err: std::io::Error) -> Error {
         Error::from(ErrorKind::IO(err))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{Error, ErrorKind};
+
+    #[test]
+    fn allocation_error_retains_original_try_reserve_source() {
+        let source = Vec::<u8>::new().try_reserve_exact(usize::MAX).unwrap_err();
+        let source_message = source.to_string();
+        let error = Error::from(ErrorKind::Allocation {
+            resource: "test allocation",
+            source,
+        });
+
+        assert!(matches!(
+            error.kind(),
+            ErrorKind::Allocation {
+                resource: "test allocation",
+                ..
+            }
+        ));
+        let source = std::error::Error::source(&error).expect("allocation source");
+        assert_eq!(source.to_string(), source_message);
+        assert!(
+            source
+                .downcast_ref::<std::collections::TryReserveError>()
+                .is_some()
+        );
+    }
+
+    #[test]
+    fn content_faults_are_properties_of_the_bytes_and_nothing_else_is() {
+        let faults = [
+            ErrorKind::MissingEndOfCentralDirectory,
+            ErrorKind::InvalidSignature {
+                expected: 1,
+                actual: 2,
+            },
+            ErrorKind::InvalidChecksum {
+                expected: 1,
+                actual: 2,
+            },
+            ErrorKind::InvalidSize {
+                expected: 193,
+                actual: 177,
+            },
+            ErrorKind::InvalidInput {
+                msg: "trailing input".to_owned(),
+            },
+            ErrorKind::Eof,
+            ErrorKind::UnsupportedCompressionMethod(99),
+        ];
+        for kind in faults {
+            assert!(Error::from(kind).is_content_fault());
+        }
+        let others = [
+            ErrorKind::Allocation {
+                resource: "test allocation",
+                source: Vec::<u8>::new().try_reserve_exact(usize::MAX).unwrap_err(),
+            },
+            ErrorKind::LimitExceeded {
+                resource: super::LimitResource::CompressedSize,
+                actual: 2,
+                maximum: 1,
+            },
+            ErrorKind::IO(std::io::Error::other("transport")),
+            ErrorKind::Cancelled,
+            ErrorKind::BufferTooSmall,
+            ErrorKind::Reentered {
+                operation: "strict layout proof build",
+            },
+        ];
+        for kind in others {
+            assert!(!Error::from(kind).is_content_fault());
+        }
     }
 }

@@ -1,0 +1,285 @@
+use crate::package::Result;
+use crate::parts::annotation_bookmarks::Tags;
+use crate::parts::associated_strings::DocumentAssociatedStrings;
+use crate::parts::auto_summary::DocumentAutoSummary;
+use crate::parts::bookmarks::BookmarksTable;
+use crate::parts::captions::CaptionTables;
+use crate::parts::chp_bin_table::ChpBinTable;
+use crate::parts::comments::CommentsTable;
+use crate::parts::document_properties::DocumentProperties;
+use crate::parts::dofr::DofrArray;
+use crate::parts::embedded_fonts::DocumentEmbeddedFonts;
+use crate::parts::envelope::Envelope;
+use crate::parts::fib::FileInformationBlock;
+use crate::parts::fields::FieldsTable;
+use crate::parts::footnotes::{EndnotesTable, FootnotesTable};
+use crate::parts::format_consistency::DocumentFormatConsistencyMarks;
+use crate::parts::glossary::{AttachedGlossary, GlossaryMetadata};
+use crate::parts::grammar_cookies::GrammarCookieTables;
+use crate::parts::headers::HeadersTable;
+use crate::parts::hyperlinks::HyperlinksTable;
+use crate::parts::list_names::ListNamesTable;
+use crate::parts::list_templates::ListTemplateTable;
+use crate::parts::mail_merge::DocumentMailMerge;
+use crate::parts::numbering::ListTables;
+use crate::parts::ole_controls::RgxOcxInfo;
+use crate::parts::pap_bin_table::PapBinTable;
+use crate::parts::paragraph_groups::PgpArray;
+use crate::parts::print_environment::DocumentPrintEnvironment;
+use crate::parts::proofing::ProofingTables;
+use crate::parts::protection::Ranges;
+use crate::parts::repair_bookmarks::DocumentRepairBookmarks;
+use crate::parts::revisions::RevisionAuthorTable;
+use crate::parts::rmd_threading::DocumentRmdThreading;
+use crate::parts::route_slip::Metadata;
+use crate::parts::rsids::DocumentRsids;
+use crate::parts::saved_by::SavedByTable;
+use crate::parts::sections::SectionsTable;
+use crate::parts::smart_tags::DocumentSmartTags;
+use crate::parts::structured_tags::DocumentStructuredTags;
+use crate::parts::styles::StyleSheet;
+use crate::parts::subdocuments::Collection;
+use crate::parts::table_char_cache::TableCharacterCache;
+use crate::parts::text::TextExtractor;
+use crate::parts::text_services::TextServicesTables;
+use crate::parts::textbox_breaks::TextBoxBreakTables;
+use std::collections::HashMap;
+use std::sync::{Arc, OnceLock};
+
+/// A Word document (.doc).
+///
+/// This is the main API for reading and manipulating legacy Word document
+/// content. Its storage is kept separate from the semantic query implementation
+/// so binary streams and parsed tables remain owned here while the facade can
+/// expose borrowed views without cloning document state.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use litchi_doc::Package;
+///
+/// let pkg = Package::open("document.doc")?;
+/// let doc = pkg.document();
+/// let text = doc.text()?;
+/// println!("Document text: {}", text);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+/// Cheaply cloneable storage for one parsed document projection.
+///
+/// The public [`Document`] handle keeps this state behind an `Arc`, so package
+/// projections and caller handles never deep-copy the parsed tables.
+pub(in crate::document) struct DocumentState {
+    /// Physical source policy retained from package ingress for deferred raw
+    /// fragment codecs.
+    pub(in crate::document) source_limits: crate::package::SourceLimits,
+    /// File Information Block from `WordDocument` stream
+    pub(in crate::document) fib: FileInformationBlock,
+    /// The `WordDocument` stream - main document binary data
+    /// Used during initialization for `TextExtractor` and `ChpBinTable` parsing
+    pub(in crate::document) word_document: Arc<Vec<u8>>,
+    /// The Data stream - contains embedded objects, pictures, etc.
+    /// According to Apache POI, pictures are stored here, not in `WordDocument` stream.
+    pub(in crate::document) data_stream: Option<Vec<u8>>,
+    /// Bounded OfficeArtContent used to resolve floating picture anchors.
+    pub(in crate::document) drawing_images: crate::image::DrawingSource,
+    /// Text extractor - holds the extracted document text
+    pub(in crate::document) text_extractor: TextExtractor,
+    /// Character property bin table - parsed once and shared across all paragraph extractors
+    pub(in crate::document) chp_bin_table: Option<ChpBinTable>,
+    /// Paragraph property bin table - parsed once and shared across all paragraph extractors
+    pub(in crate::document) pap_bin_table: Option<PapBinTable>,
+    /// Fields table - contains field information (embedded equations, hyperlinks, etc.)
+    /// Used during initialization for hyperlink extraction; exposed via `fields_table()` accessor.
+    pub(in crate::document) fields_table: Option<FieldsTable>,
+    /// Headers and footers table
+    pub(in crate::document) headers_table: Option<HeadersTable>,
+    /// Footnotes table
+    pub(in crate::document) footnotes_table: Option<FootnotesTable>,
+    /// Endnotes table
+    pub(in crate::document) endnotes_table: Option<EndnotesTable>,
+    /// Comments table
+    ///
+    /// Empty when the table is absent or its parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::Comments`]).
+    pub(in crate::document) comments_table: CommentsTable,
+    /// Bounded raw source for deferred annotation-bookmark tag parsing, or its
+    /// deferred range/allocation diagnostic.
+    pub(in crate::document) annotation_bookmarks_source:
+        std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict annotation-bookmark (`SttbfAtnBkmk`) metadata parse.
+    pub(in crate::document) annotation_bookmarks:
+        OnceLock<std::result::Result<Option<Tags>, String>>,
+    /// Deferred strict parsing of the versioned document-property record.
+    pub(in crate::document) document_properties: Result<Option<DocumentProperties>>,
+    /// Standard bookmark tables
+    ///
+    /// Empty when the tables are absent or their parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::Bookmarks`]).
+    pub(in crate::document) bookmarks_table: BookmarksTable,
+    /// Legacy Word smart-tag bookmarks, property bags, and recognizer ranges.
+    pub(in crate::document) smart_tags: Option<DocumentSmartTags>,
+    /// Revision-save identifiers assigned in the document.
+    pub(in crate::document) rsids: Option<DocumentRsids>,
+    /// E-mail review threading data parallel to the revision-author table.
+    pub(in crate::document) rmd_threading: Option<DocumentRmdThreading>,
+    /// Embedded TrueType font descriptions.
+    pub(in crate::document) embedded_fonts: Option<DocumentEmbeddedFonts>,
+    /// Typed, inert `MsoEnvelopeCLSID` metadata from the table stream.
+    pub(in crate::document) envelope: Option<Envelope>,
+    /// `AutoSummary` priority ranges for the main document.
+    pub(in crate::document) auto_summary: Option<DocumentAutoSummary>,
+    /// Deferred legacy Word routing-slip lifecycle metadata (`RouteSlip`).
+    ///
+    /// Optional route-slip corruption is reported at the semantic boundary so
+    /// opening a document does not discard otherwise readable content.
+    pub(in crate::document) route_slip: Result<Option<Metadata>>,
+    /// Word 2003 range-level protection ("editable ranges") metadata.
+    pub(in crate::document) protected_ranges: Option<Ranges>,
+    /// Format consistency-checker marks.
+    pub(in crate::document) format_consistency_marks: Option<DocumentFormatConsistencyMarks>,
+    /// Word 2003 structured document tag bookmarks.
+    pub(in crate::document) structured_tags: Option<DocumentStructuredTags>,
+    /// Word 2003 XML schema definition references (`Hplxsdr`).
+    pub(in crate::document) xml_schemas: Option<crate::parts::xml_schemas::Collection>,
+    /// Custom XML save transform path (`fcCustomXForm`).
+    pub(in crate::document) custom_xml_transform_path: Option<String>,
+    /// OLE controls recorded in the document.
+    pub(in crate::document) ole_controls: Option<RgxOcxInfo>,
+    /// Mail-merge data-source state (`Pms` and the ODSO property set).
+    pub(in crate::document) mail_merge: Option<DocumentMailMerge>,
+    /// Master-document subdocument directory and referenced-file name table.
+    pub(in crate::document) subdocuments: Option<Collection>,
+    /// Revision-mark authors
+    ///
+    /// Empty when the table is absent or its parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::RevisionAuthors`]);
+    /// revision marks that name an author then stay unresolved.
+    pub(in crate::document) revision_authors: RevisionAuthorTable,
+    /// Fixed associated-document strings
+    pub(in crate::document) associated_strings: Option<DocumentAssociatedStrings>,
+    /// Names parallel to list definitions for LISTNUM fields
+    pub(in crate::document) list_names: Option<ListNamesTable>,
+    /// List-level template codes parallel to list definitions
+    pub(in crate::document) list_templates: Option<ListTemplateTable>,
+    /// Deferred strict spelling/grammar proofing metadata parse
+    pub(in crate::document) proofing_tables: Result<ProofingTables>,
+    /// Deferred strict grammar-checker cookie metadata parse
+    pub(in crate::document) grammar_cookies: Result<GrammarCookieTables>,
+    /// Deferred strict deprecated table-character cache parse
+    pub(in crate::document) table_char_cache: Result<Option<TableCharacterCache>>,
+    /// Deferred strict textbox break-table metadata parse
+    pub(in crate::document) textbox_breaks: Result<TextBoxBreakTables>,
+    /// Deferred strict Text Services Framework metadata parse
+    pub(in crate::document) text_services: Result<TextServicesTables>,
+    /// Deferred strict Word 97/2000 save-history metadata parse
+    pub(in crate::document) saved_by_table: Result<SavedByTable>,
+    /// Bounded raw source for deferred saved-selection parsing, or its
+    /// deferred range/allocation diagnostic.
+    pub(in crate::document) saved_selection_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict saved-selection (`Selsf`) metadata parse.
+    pub(in crate::document) saved_selection: OnceLock<
+        std::result::Result<Option<crate::parts::saved_selection::SavedSelection>, String>,
+    >,
+    /// Bounded raw source for deferred paragraph-group parsing, or its
+    /// deferred range/allocation diagnostic.
+    pub(in crate::document) paragraph_groups_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict paragraph-group properties (`PGPArray`), including the
+    /// first parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) paragraph_groups:
+        OnceLock<std::result::Result<Option<PgpArray>, String>>,
+    /// Bounded raw source for deferred frame-set/list parsing, or its deferred
+    /// range/allocation diagnostic.
+    pub(in crate::document) dofr_records_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict frame-set/list records (`RgDofr`), including the first
+    /// parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) dofr_records: OnceLock<std::result::Result<Option<DofrArray>, String>>,
+    /// Bounded raw sources for deferred printer metadata parsing. Each
+    /// selected FIB range is retained independently.
+    pub(in crate::document) print_driver_source: std::result::Result<Option<Vec<u8>>, String>,
+    pub(in crate::document) print_environment_portrait_source:
+        std::result::Result<Option<Vec<u8>>, String>,
+    pub(in crate::document) print_environment_landscape_source:
+        std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred inert printer driver and environment metadata, including the
+    /// first parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) print_environment:
+        OnceLock<std::result::Result<Option<DocumentPrintEnvironment>, String>>,
+    /// Bounded raw source for deferred VBA signature parsing, or its deferred
+    /// range/allocation diagnostic.
+    pub(in crate::document) vba_signatures_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict Word VBA signature-variable metadata parse, including
+    /// the first parse error so malformed optional metadata is not reparsed.
+    pub(in crate::document) vba_signatures: OnceLock<
+        std::result::Result<Option<crate::parts::vba_signature::DocumentVbaSignatures>, String>,
+    >,
+    /// Deferred strict caption label and `AutoCaption` metadata parse
+    pub(in crate::document) caption_tables: Result<CaptionTables>,
+    /// Deferred strict repair-bookmark metadata parse
+    pub(in crate::document) repair_bookmarks: Result<Option<DocumentRepairBookmarks>>,
+    /// Deferred strict glossary-only `AutoText` metadata parse
+    pub(in crate::document) glossary_metadata: Result<Option<GlossaryMetadata>>,
+    /// Deferred strict secondary-FIB glossary parse for templates
+    pub(in crate::document) attached_glossary: Result<Option<AttachedGlossary>>,
+    /// Section ranges, layout, and property revision marks
+    ///
+    /// Empty when the table is absent or its parse failure was degraded
+    /// (recorded as [`crate::AuxiliaryTableDefect::Sections`]). Section
+    /// ranges feed only layout queries, never structural offsets.
+    pub(in crate::document) sections: SectionsTable,
+    /// Floating-shape anchors from the Main Document `PlcfSpa` (empty when the
+    /// document has no floating shapes in the main story).
+    pub(in crate::document) shape_anchors: Vec<crate::parts::spa::ShapeAnchor>,
+    /// Floating-shape anchors from the Header Document `PlcfSpa` (empty when
+    /// the document has no floating shapes in the header story).
+    pub(in crate::document) header_shape_anchors: Vec<crate::parts::spa::ShapeAnchor>,
+    /// Text box entries from the `PlcftxbxTxt` (empty when the document has no
+    /// textbox story).
+    pub(in crate::document) textbox_entries: Vec<crate::parts::textbox::TextBoxEntry>,
+    /// Text box entries from the `PlcfHdrtxbxTxt` (empty when the document has no
+    /// header textbox story).
+    pub(in crate::document) header_textbox_entries: Vec<crate::parts::textbox::TextBoxEntry>,
+    /// Hyperlinks table
+    pub(in crate::document) hyperlinks_table: Option<HyperlinksTable>,
+    /// List/numbering tables
+    pub(in crate::document) list_tables: Option<ListTables>,
+    /// Word 97+ stylesheet, including raw style UPX property sets.
+    pub(in crate::document) stylesheet: Option<StyleSheet>,
+    /// Every non-structural defect repaired while the document was opened:
+    /// the degraded optional auxiliary tables first, then the stylesheet's
+    /// report, then the PAPX bin-table's report, in discovery order.
+    pub(in crate::document) tolerance: crate::leniency::ToleranceReport,
+    /// The LaTeX of each decoded embedded MTEF equation, keyed by its
+    /// `ObjectPool` storage name (`_<picture location>`).
+    pub(in crate::document) parsed_mtef: HashMap<String, Arc<str>>,
+    /// The `Equation Native` stream of each embedded equation object, keyed
+    /// by its `ObjectPool` storage number.
+    pub(in crate::document) equation_natives: HashMap<u32, Arc<[u8]>>,
+    /// Bounded raw source for the deferred font-table (`SttbfFfn`) parse, or
+    /// its deferred range/allocation diagnostic.
+    pub(in crate::document) font_table_source: std::result::Result<Option<Vec<u8>>, String>,
+    /// Deferred strict font-table parse, including the first parse error so
+    /// a malformed table is not reparsed.
+    pub(in crate::document) font_table:
+        OnceLock<std::result::Result<Option<crate::parts::fonts::FontTable>, String>>,
+    /// Memoized per-story element indexes, a weighted clean-value cache; see
+    /// [`Document::story_blocks`].
+    pub(in crate::document) story_indexes: super::semantic::stories::StoryIndexCache,
+}
+
+/// An owned, read-only semantic projection of a legacy Word document.
+///
+/// Cloning this handle only clones an `Arc`; the parsed document tables and
+/// retained semantic state stay shared across package and caller handles.
+pub struct Document(pub(in crate::document) Arc<DocumentState>);
+
+impl Clone for Document {
+    fn clone(&self) -> Self {
+        Self(Arc::clone(&self.0))
+    }
+}
+
+impl Document {
+    pub(in crate::document) fn from_state(state: DocumentState) -> Self {
+        Self(Arc::new(state))
+    }
+}

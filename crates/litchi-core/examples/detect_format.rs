@@ -6,12 +6,9 @@
 //!
 //! Run with:
 //! ```bash
-//! cargo run -p litchi-core --example detect_format --all-features -- <path>
-//! cargo run -p litchi-core --example detect_format --all-features -- test-data/ooxml/docx
+//! cargo run -p litchi-core --example detect_format -- <path>
+//! cargo run -p litchi-core --example detect_format -- test-data/ooxml/docx
 //! ```
-//!
-//! Without `--all-features`, ODF detection is stubbed and returns `None` when
-//! the `odf` feature is not enabled.
 
 use litchi_core::FileFormat;
 use litchi_core::detection::simd_utils::check_office_signatures;
@@ -23,12 +20,9 @@ const HEAD_BYTES: usize = 512;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut args = std::env::args().skip(1);
-    let target = match args.next() {
-        Some(p) => p,
-        None => {
-            eprintln!("usage: detect_format <file-or-directory>");
-            std::process::exit(2);
-        },
+    let Some(target) = args.next() else {
+        eprintln!("usage: detect_format <file-or-directory>");
+        std::process::exit(2);
     };
 
     let path = Path::new(&target);
@@ -36,9 +30,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         walk_dir(path)?;
     } else if path.is_file() {
         let label = describe(path)?;
-        println!("{}: {}", path.display(), label);
+        println!("{}: {label}", path.display());
     } else {
-        eprintln!("path does not exist or is not accessible: {}", target);
+        eprintln!("path does not exist or is not accessible: {target}");
         std::process::exit(1);
     }
 
@@ -48,7 +42,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Walk the immediate children of `dir` (non-recursive) and detect each file.
 fn walk_dir(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
     let mut entries: Vec<_> = fs::read_dir(dir)?.filter_map(Result::ok).collect();
-    entries.sort_by_key(|e| e.file_name());
+    entries.sort_by_key(fs::DirEntry::file_name);
 
     println!("Scanning {} ...", dir.display());
     for entry in entries {
@@ -56,10 +50,10 @@ fn walk_dir(dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
         if !p.is_file() {
             continue;
         }
-        let name = p.file_name().unwrap().to_string_lossy().into_owned();
+        let name = entry.file_name().to_string_lossy().into_owned();
         match describe(&p) {
-            Ok(label) => println!("  {:<40}  {}", name, label),
-            Err(e) => println!("  {:<40}  <error: {}>", name, e),
+            Ok(label) => println!("  {name:<40}  {label}"),
+            Err(error) => println!("  {name:<40}  <error: {error}>"),
         }
     }
     Ok(())
@@ -101,12 +95,6 @@ fn format_label(bytes: &[u8], path: &Path) -> String {
         return describe_format(fmt);
     }
 
-    // ODF: requires reading the ZIP `mimetype` member. The `odf` feature
-    // gates the real implementation; the stub returns `None`.
-    if let Some(fmt) = litchi_core::detection::odf::detect_odf_format(bytes) {
-        return describe_format(fmt);
-    }
-
     // Lower-level signature mask for the remaining categories.
     let mask = check_office_signatures(bytes);
     if mask.is_ole2() {
@@ -126,13 +114,15 @@ fn format_label(bytes: &[u8], path: &Path) -> String {
     "unknown / unrecognised signature".to_string()
 }
 
-fn describe_format(fmt: FileFormat) -> String {
-    format!("{:?}", fmt)
+fn describe_format(format: FileFormat) -> String {
+    format!("{format:?}")
 }
 
 fn suffix(path: &Path) -> String {
     path.extension()
-        .and_then(|s| s.to_str())
-        .map(|e| format!("extension: .{}", e))
-        .unwrap_or_else(|| "no extension".to_string())
+        .and_then(|extension| extension.to_str())
+        .map_or_else(
+            || "no extension".to_string(),
+            |extension| format!("extension: .{extension}"),
+        )
 }
